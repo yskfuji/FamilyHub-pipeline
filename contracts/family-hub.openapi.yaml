@@ -11,6 +11,17 @@ servers:
     description: Must be injected by the deploying environment
 security:
   - sessionCookie: []
+x-mutation-policy:
+  description: >-
+    Every non-GET request is verified server-side with the session cookie, CSRF
+    token, Origin and Fetch Metadata. Idempotency-Key is required, and
+    If-Permission-Revision is required after a household has been selected.
+    Authorization is evaluated for every request; client-side visibility is not
+    an authorization boundary. Membership, invitation, permission and financial
+    operations additionally require recent reauthentication and an audit event.
+  idempotencyHeader: Idempotency-Key
+  permissionRevisionHeader: If-Permission-Revision
+  csrfHeader: X-CSRF-Token
 paths:
   /v1/auth/passkey/challenge:
     post:
@@ -138,6 +149,12 @@ paths:
         '410': { $ref: '#/components/responses/Error' }
         default: { $ref: '#/components/responses/Error' }
   /v1/household-invites:
+    get:
+      operationId: listHouseholdInvites
+      responses:
+        '200': { description: Owner-only invitation list; tokens are never returned again }
+        '403': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
     post:
       operationId: createHouseholdInvite
       parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
@@ -151,6 +168,16 @@ paths:
               properties: { role: { enum: [adult, child, guest] } }
       responses:
         '201': { description: 24-hour, single-use token returned once }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/household-invites/{inviteId}:
+    delete:
+      operationId: revokeHouseholdInvite
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { name: inviteId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Invite revoked and audit event appended }
+        '403': { $ref: '#/components/responses/Error' }
         default: { $ref: '#/components/responses/Error' }
   /v1/household-memberships/{membershipId}:
     patch:
@@ -172,6 +199,45 @@ paths:
         '200': { description: Role updated; sole owner demotion is rejected }
         '409': { $ref: '#/components/responses/Error' }
         default: { $ref: '#/components/responses/Error' }
+  /v1/household-memberships/{membershipId}/permission-overrides:
+    get:
+      operationId: getPermissionOverrides
+      parameters:
+        - { name: membershipId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Owner-only individual allow and deny overrides
+          content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/PermissionOverride' } } } }
+        '403': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+    put:
+      operationId: updatePermissionOverrides
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { name: membershipId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [overrides, expectedPermissionRevision]
+              properties:
+                overrides: { type: array, items: { $ref: '#/components/schemas/PermissionOverride' } }
+                expectedPermissionRevision: { type: integer, minimum: 1 }
+      responses:
+        '200': { description: Updated snapshot; deny wins and role ceiling is enforced }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: resetPermissionOverrides
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { name: membershipId, in: path, required: true, schema: { type: string } }
+        - { name: expectedPermissionRevision, in: query, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200': { description: Role defaults restored }
+        default: { $ref: '#/components/responses/Error' }
   /v1/households/current/privacy:
     put:
       operationId: savePrivacySettings
@@ -192,7 +258,10 @@ paths:
   /v1/events:
     post:
       operationId: createEvent
-      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+        - { $ref: '#/components/parameters/PermissionRevision' }
       requestBody:
         required: true
         content:
@@ -241,13 +310,25 @@ paths:
         - { name: scope, in: query, required: true, schema: { enum: [this, future, series] } }
         - { name: expectedVersion, in: query, required: true, schema: { type: integer, minimum: 1 } }
       responses:
-        '204': { description: Event scope deleted after authorization and version check }
+        '204': { description: Event scope soft-deleted for seven days after authorization and version checks }
         '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/events/{eventId}/restore:
+    post:
+      operationId: restoreEvent
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { name: eventId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Soft-deleted event restored within seven days }
         default: { $ref: '#/components/responses/Error' }
   /v1/todos:
     post:
       operationId: createTodo
-      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+        - { $ref: '#/components/parameters/PermissionRevision' }
       requestBody:
         required: true
         content:
@@ -308,10 +389,31 @@ paths:
         '200': { description: Todo updated }
         '409': { $ref: '#/components/responses/Error' }
         default: { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: deleteTodo
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { name: todoId, in: path, required: true, schema: { type: string } }
+        - { name: expectedVersion, in: query, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        '204': { description: Soft deleted for seven days }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/todos/{todoId}/restore:
+    post:
+      operationId: restoreTodo
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { name: todoId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Todo restored }
+        default: { $ref: '#/components/responses/Error' }
   /v1/memos:
     post:
       operationId: createMemo
-      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+        - { $ref: '#/components/parameters/PermissionRevision' }
       requestBody:
         required: true
         content:
@@ -325,6 +427,32 @@ paths:
                 tags: { type: array, maxItems: 10, items: { type: string, maxLength: 30 } }
       responses:
         '201': { description: Memo created }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/memos/{memoId}:
+    patch:
+      operationId: updateMemo
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { name: memoId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Memo updated after version and authorization checks }
+        default: { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: deleteMemo
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { name: memoId, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: Soft deleted for seven days }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/memos/{memoId}/restore:
+    post:
+      operationId: restoreMemo
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { name: memoId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Memo restored }
         default: { $ref: '#/components/responses/Error' }
   /v1/memos/{memoId}/attachments:
     post:
@@ -389,6 +517,16 @@ paths:
       responses:
         '201': { description: Append-only settlement record created }
         '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/expenses/{expenseId}/settlements/{settlementId}/reverse:
+    post:
+      operationId: reverseSettlement
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { name: expenseId, in: path, required: true, schema: { type: string } }
+        - { name: settlementId, in: path, required: true, schema: { type: string } }
+      responses:
+        '201': { description: Append-only reversal record created; original remains auditable }
         default: { $ref: '#/components/responses/Error' }
   /v1/search:
     get:
@@ -475,6 +613,15 @@ paths:
       responses:
         '200': { description: Notification stopped }
         default: { $ref: '#/components/responses/Error' }
+  /v1/notifications/{notificationId}/resume:
+    post:
+      operationId: resumeNotification
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { name: notificationId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Notification resumed }
+        default: { $ref: '#/components/responses/Error' }
   /v1/notification-preferences:
     get:
       operationId: getNotificationPreferences
@@ -509,6 +656,16 @@ components:
       in: header
       required: true
       schema: { type: string, minLength: 32 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 16, maxLength: 128 }
+    PermissionRevision:
+      name: If-Permission-Revision
+      in: header
+      required: true
+      schema: { type: integer, minimum: 1 }
   responses:
     Error:
       description: Stable discriminated error
@@ -521,9 +678,11 @@ components:
       required: [code, message, retryable]
       properties:
         code:
-          enum: [UNAUTHENTICATED, FORBIDDEN, INVALID_INPUT, CONFLICT, OFFLINE, RATE_LIMITED, UPSTREAM_FAILURE, ATTACHMENT_REJECTED]
+          enum: [UNAUTHENTICATED, FORBIDDEN, NOT_FOUND, REAUTH_REQUIRED, INVALID_INPUT, CONFLICT, OFFLINE, RATE_LIMITED, UPSTREAM_FAILURE, ATTACHMENT_REJECTED]
         message: { type: string }
         retryable: { type: boolean }
+        reason:
+          enum: [CAPABILITY_MISSING, SCOPE_DENIED, MEMBERSHIP_INACTIVE, OWNER_REQUIRED, VERSION, PERMISSION_REVISION, IDEMPOTENCY]
         fieldErrors:
           type: object
           additionalProperties: { type: string }
@@ -608,7 +767,35 @@ components:
         - type: object
           required: [id]
           properties: { id: { type: string, format: uuid } }
+    PermissionOverride:
+      type: object
+      required: [membershipId, capability, effect]
+      properties:
+        membershipId: { type: string }
+        capability: { type: string }
+        effect: { enum: [allow, deny] }
+    VisibilityPolicy:
+      type: object
+      required: [audience, creatorMembershipId, selectedMembershipIds]
+      properties:
+        audience: { enum: [household, adults, participants, creator, selected] }
+        creatorMembershipId: { type: string }
+        selectedMembershipIds: { type: array, items: { type: string } }
+    ViewerContext:
+      type: object
+      required: [userId, membershipId, role, status, capabilities, permissionRevision]
+      properties:
+        userId: { type: string }
+        membershipId: { type: string }
+        role: { enum: [owner, adult, child, guest] }
+        status: { enum: [active, invited, suspended] }
+        capabilities: { type: array, items: { type: string } }
+        permissionRevision: { type: integer, minimum: 1 }
     HouseholdSnapshot:
       type: object
-      description: Projection shape is versioned independently; see TypeScript domain model.
+      description: Server-authorized projection. The server derives viewer and capabilities from the session and never trusts client-supplied roles.
+      required: [viewer, permissionOverrides]
+      properties:
+        viewer: { $ref: '#/components/schemas/ViewerContext' }
+        permissionOverrides: { type: array, items: { $ref: '#/components/schemas/PermissionOverride' } }
       additionalProperties: true

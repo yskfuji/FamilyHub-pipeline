@@ -1,14 +1,15 @@
 import type { PropsWithChildren, ReactNode } from 'react';
-import { useEffect, useEffectEvent, useId, useRef } from 'react';
+import { useEffectEvent, useId, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { CloseIcon, FileIcon } from './icons';
+import { ja } from '../content/ja';
 
 export function BrandMark() {
   return <svg className="brand-mark" viewBox="0 0 48 48" role="img" aria-label="よりどころの印"><path d="M24 4c7 8 16 10 16 21 0 9-7 17-16 17S8 34 8 25C8 14 17 12 24 4Z" fill="var(--persimmon-soft)" stroke="var(--persimmon)" strokeWidth="2"/><path d="M16 27c4-7 12-7 16 0M24 18v17" fill="none" stroke="var(--indigo-strong)" strokeWidth="2" strokeLinecap="round"/></svg>;
 }
 
 export function Brand({ compact = false }: { compact?: boolean }) {
-  return <a href="/today" className="brand" data-link><BrandMark />{!compact && <span className="brand-copy"><span className="brand-name">よりどころ</span><span className="brand-kicker">FAMILY HUB</span></span>}</a>;
+  return <a href="/today" className="brand" data-link><BrandMark />{!compact && <span className="brand-copy"><span className="brand-name">よりどころ</span><span className="brand-kicker">{ja.brandTagline}</span></span>}</a>;
 }
 
 export function PageHeader({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action?: ReactNode }) {
@@ -23,7 +24,7 @@ const focusable = 'a[href], button:not([disabled]), input:not([disabled]), selec
 let lastModalTrigger: HTMLElement | null = null;
 
 export function useModalTriggerTracking() {
-  useEffect(() => {
+  useLayoutEffect(() => {
     const remember = (event: PointerEvent) => {
       const target = event.target instanceof Element ? event.target.closest<HTMLElement>(focusable) : null;
       if (target && !target.closest('[data-modal-root]')) lastModalTrigger = target;
@@ -39,7 +40,7 @@ export function useModalBehavior(onClose: () => void) {
   const active = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null;
   const trigger = useRef<HTMLElement | null>(active ?? lastModalTrigger);
   const close = useEffectEvent(onClose);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const returnTarget = trigger.current;
     const appRoot = document.getElementById('root');
     const previousOverflow = document.body.style.overflow;

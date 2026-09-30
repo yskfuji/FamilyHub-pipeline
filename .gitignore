@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-audit/
 test-results/
 playwright-report/
 release/*.zip

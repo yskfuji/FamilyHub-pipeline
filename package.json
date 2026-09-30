@@ -8,19 +8,24 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:audit": "VITE_INCLUDE_AUDIT_SURFACE=true vite",
     "build": "tsc -b && vite build",
+    "build:audit": "VITE_INCLUDE_AUDIT_SURFACE=true tsc -b && VITE_INCLUDE_AUDIT_SURFACE=true vite build --outDir dist-audit --sourcemap",
     "preview": "vite preview --host 127.0.0.1",
+    "preview:audit": "vite preview --host 127.0.0.1 --outDir dist-audit",
     "typecheck": "tsc -b --pretty false",
     "lint": "eslint . --max-warnings 0",
     "test:unit": "vitest run",
-    "test:e2e": "playwright test e2e/core.spec.ts e2e/interactions.spec.ts",
-    "audit:a11y": "playwright test e2e/accessibility.spec.ts",
-    "audit:visual": "playwright test e2e/capture.spec.ts --project=chromium && node scripts/build-gallery.mjs",
+    "test:e2e": "npm run build:audit && PLAYWRIGHT_AUDIT=true playwright test e2e/core.spec.ts e2e/interactions.spec.ts e2e/authorization.spec.ts",
+    "audit:a11y": "npm run build:audit && PLAYWRIGHT_AUDIT=true playwright test e2e/accessibility.spec.ts --workers=1",
+    "audit:visual": "npm run build:audit && PLAYWRIGHT_AUDIT=true playwright test e2e/capture.spec.ts --project=chromium && node scripts/build-gallery.mjs",
     "audit:lighthouse": "bash scripts/lighthouse.sh",
     "audit:security": "node scripts/security-check.mjs",
+    "audit:ui": "node scripts/audit-ui.mjs",
+    "audit:contract": "node scripts/audit-contract.mjs",
     "render:er": "node scripts/render-er.mjs",
     "build:gallery": "node scripts/build-gallery.mjs",
-    "verify": "npm run lint && npm run typecheck && npm run test:unit && npm run build && npm run audit:security && npm run audit:lighthouse && npm run test:e2e && npm run audit:a11y",
+    "verify": "npm run lint && npm run typecheck && npm run test:unit && npm run build && npm run audit:security && npm run audit:ui && npm run audit:contract && npm run audit:lighthouse && npm run test:e2e && npm run audit:a11y",
     "package": "npm run verify && npm run render:er && npm run audit:visual && bash scripts/package.sh"
   },
   "dependencies": {
@@ -44,7 +49,7 @@
     "jsdom": "27.2.0",
     "typescript": "6.0.2",
     "typescript-eslint": "8.71.0",
-    "vite": "8.0.4",
+    "vite": "8.3.1",
     "vitest": "4.1.11"
   }
 }

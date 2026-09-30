@@ -159,6 +159,7 @@
   .donut { width: 9rem; aspect-ratio: 1; display: grid; place-items: center; border-radius: 50%; background: conic-gradient(var(--persimmon) 0 24%, var(--indigo) 24% 52%, var(--moss) 52% 82%, var(--plum) 82%); }
   .donut::after { content: '9月'; width: 63%; aspect-ratio: 1; display: grid; place-items: center; border-radius: 50%; background: var(--sheet); color: var(--ink-soft); font-weight: 800; }
   .setting-row { min-height: 4.5rem; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; align-items: center; padding: 1rem 0; border-bottom: 1px solid var(--line); }
+  .setting-row > span:first-child { min-width: 0; display: flex; flex-direction: column; gap: .2rem; }
   .toggle { width: 3.25rem; min-height: 2.75rem; position: relative; border: 0; border-radius: 999px; background: var(--line-strong); cursor: pointer; }
   .toggle::after { content: ''; position: absolute; top: .7rem; left: .25rem; width: 1.35rem; height: 1.35rem; border-radius: 50%; background: #fff; transition: transform var(--duration-base) var(--ease); }
   .toggle[aria-pressed='true'] { background: var(--success); }

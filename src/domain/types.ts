@@ -11,6 +11,8 @@ export type Result<T> =
 export type GatewayErrorCode =
   | 'UNAUTHENTICATED'
   | 'FORBIDDEN'
+  | 'NOT_FOUND'
+  | 'REAUTH_REQUIRED'
   | 'INVALID_INPUT'
   | 'CONFLICT'
   | 'OFFLINE'
@@ -23,6 +25,7 @@ export interface GatewayError {
   message: string;
   retryable: boolean;
   fieldErrors?: Record<string, string>;
+  reason?: 'CAPABILITY_MISSING' | 'SCOPE_DENIED' | 'MEMBERSHIP_INACTIVE' | 'OWNER_REQUIRED' | 'VERSION' | 'PERMISSION_REVISION' | 'IDEMPOTENCY';
 }
 
 export interface User {
@@ -39,6 +42,29 @@ export interface Household {
 }
 
 export type MembershipRole = 'owner' | 'adult' | 'child' | 'guest';
+export type Capability =
+  | 'household.members.read' | 'household.members.manage' | 'household.invites.manage'
+  | 'event.read' | 'event.create' | 'event.update' | 'event.delete'
+  | 'task.read' | 'task.create' | 'task.update' | 'task.delete' | 'task.transition'
+  | 'memo.read' | 'memo.create' | 'memo.update' | 'memo.delete' | 'memo.attach'
+  | 'expense.read' | 'expense.create' | 'expense.settle'
+  | 'insight.read' | 'resource.read' | 'settings.own' | 'notification.manage';
+export interface PermissionOverride { membershipId: Id; capability: Capability; effect: 'allow' | 'deny'; }
+export interface ViewerContext {
+  userId: Id;
+  membershipId: Id;
+  role: MembershipRole;
+  status: HouseholdMembership['status'];
+  capabilities: Capability[];
+  permissionRevision: number;
+}
+export type VisibilityAudience = 'household' | 'adults' | 'participants' | 'creator' | 'selected';
+export interface VisibilityPolicy {
+  audience: VisibilityAudience;
+  creatorMembershipId: Id;
+  selectedMembershipIds: Id[];
+}
+export type AuthorizationDecision = { allowed: true } | { allowed: false; reason: NonNullable<GatewayError['reason']> };
 export interface HouseholdMembership {
   id: Id;
   householdId: Id;
@@ -74,6 +100,8 @@ export interface CalendarEvent {
   note?: string;
   weatherSensitive?: boolean;
   version: number;
+  visibility: VisibilityPolicy;
+  deletedAt?: Rfc3339;
 }
 
 export type TodoStatus = 'open' | 'doing' | 'review' | 'done';
@@ -89,6 +117,8 @@ export interface Todo {
   recurrence?: RecurrenceRule;
   version: number;
   note?: string;
+  visibility: VisibilityPolicy;
+  deletedAt?: Rfc3339;
 }
 
 export type AttachmentStatus = 'selected' | 'validating' | 'quarantined' | 'clean' | 'rejected';
@@ -112,6 +142,9 @@ export interface Memo {
   tags: string[];
   attachments: Attachment[];
   ocrText?: string;
+  visibility: VisibilityPolicy;
+  deletedAt?: Rfc3339;
+  version: number;
 }
 
 export interface ExpenseShare {
@@ -126,6 +159,8 @@ export interface SettlementRecord {
   fromMembershipId: Id;
   toMembershipId: Id;
   recordedAt: Rfc3339;
+  reversedAt?: Rfc3339;
+  reversalOfSettlementId?: Id;
 }
 
 export interface Expense {
@@ -148,6 +183,7 @@ export interface ResourceLink {
   url: string;
   kind: 'school' | 'municipality' | 'document' | 'other';
   relatedEntityId?: Id;
+  visibility: VisibilityPolicy;
 }
 
 export interface ContextSnapshot {
@@ -164,6 +200,8 @@ export interface ContextSnapshot {
 }
 
 export interface HouseholdSnapshot {
+  viewer: ViewerContext;
+  permissionOverrides: PermissionOverride[];
   user: User;
   household: Household;
   memberships: HouseholdMembership[];
@@ -192,6 +230,7 @@ export interface HouseholdInvite {
   token: string;
   expiresAt: Rfc3339;
   remainingUses: number;
+  revokedAt?: Rfc3339;
 }
 
 export interface Authenticator {
@@ -233,4 +272,9 @@ export interface HouseholdNotification {
   remindAt: Rfc3339;
   read: boolean;
   status: 'active' | 'snoozed' | 'stopped';
+}
+
+export interface MutationContext {
+  idempotencyKey: string;
+  expectedPermissionRevision: number;
 }

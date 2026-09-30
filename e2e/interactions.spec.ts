@@ -6,6 +6,8 @@ test('notification bell opens an operable notification center', async ({ page })
   await expect(bell).toHaveAccessibleName(/未読1件/);
   await bell.click();
   await expect(page.getByRole('heading', { name: '通知センター' })).toBeVisible();
+  await expect(page.getByText('未読')).toBeVisible();
+  await page.getByRole('button', { name: '既読にする' }).click();
   await page.getByRole('button', { name: '30分延期' }).click();
   await expect(page.locator('.toast-visible')).toContainText('30分延期');
   await expect(page.getByText('延期済み')).toBeVisible();
@@ -18,7 +20,7 @@ test('calendar week/list, edit, cancel delete, and confirmed delete work', async
   await page.getByRole('button', { name: '週', exact: true }).click();
   await expect(page.getByLabel('9月28日から10月4日の予定')).toBeVisible();
   await page.getByRole('button', { name: '一覧', exact: true }).click();
-  await expect(page.getByRole('button', { name: '詳細' }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: /を開く/ }).first()).toBeVisible();
   await page.goto('/calendar/event-school');
   await page.getByRole('button', { name: '編集する' }).click();
   await page.getByLabel('予定名').fill('花｜学校公開（更新）');
@@ -55,21 +57,21 @@ test('Todo edit and memo creation update state and URLs', async ({ page }) => {
 test('all household permission controls, sole-owner guard, and invite creation work', async ({ page }) => {
   await page.goto('/settings/household');
   const permissionButtons = page.getByRole('button', { name: '権限' });
-  await expect(permissionButtons).toHaveCount(4);
-  for (let index = 0; index < 4; index += 1) {
+  await expect(permissionButtons).toHaveCount(5);
+  for (let index = 0; index < 5; index += 1) {
     await permissionButtons.nth(index).click();
     await expect(page.getByRole('dialog')).toBeVisible();
     await page.getByRole('button', { name: 'キャンセル' }).click();
   }
   await permissionButtons.first().click();
   await page.getByRole('dialog').getByLabel('役割').selectOption('adult');
-  await page.getByRole('button', { name: '権限を保存' }).click();
+  await page.getByRole('button', { name: '役割を保存' }).click();
   await expect(page.getByRole('alert')).toContainText('少なくとも1人');
   await page.getByRole('button', { name: 'キャンセル' }).click();
   await permissionButtons.nth(1).click();
   await page.getByRole('dialog').getByLabel('役割').selectOption('guest');
-  await page.getByRole('button', { name: '権限を保存' }).click();
-  await expect(page.locator('.toast-visible')).toContainText('guest');
+  await page.getByRole('button', { name: '役割を保存' }).click();
+  await expect(page.locator('.toast-visible')).toContainText('ゲスト');
   await page.locator('#invite-role').selectOption('guest');
   await page.getByRole('button', { name: /1回限りの招待/ }).click();
   await expect(page.getByText('今回だけ表示する招待コード')).toBeVisible();
@@ -97,7 +99,7 @@ test('passkey, password, and individual session controls work with confirmation'
 
 test('three notification preferences and preview actions persist', async ({ page }) => {
   await page.goto('/settings/notifications');
-  for (const label of ['Todo期限の通知', '出発時刻の通知', '夜間停止']) {
+  for (const label of ['タスク期限の通知', '出発時刻の通知', '夜間停止']) {
     const toggle = page.getByRole('button', { name: label });
     await expect(toggle).toHaveAttribute('aria-pressed', 'true');
     await toggle.click();
@@ -125,7 +127,7 @@ test('onboarding privacy draft toggles and saves creator-only default', async ({
 test('all resource links use HTTPS, noreferrer and an opener-free new tab', async ({ page, context }) => {
   await context.route('https://example.com/**', async (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<title>example</title>' }));
   await page.goto('/settings/resources');
-  const links = page.getByRole('link', { name: /安全な新しいタブで開く/ });
+  const links = page.getByRole('link', { name: /を開く（新しいタブ）/ });
   await expect(links).toHaveCount(3);
   for (let index = 0; index < 3; index += 1) {
     const link = links.nth(index);

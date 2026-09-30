@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const auditBuild = process.env.PLAYWRIGHT_AUDIT === 'true';
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,
@@ -17,7 +19,7 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   webServer: {
-    command: 'npm run preview',
+    command: auditBuild ? 'npm run preview:audit' : 'npm run preview',
     url: 'http://127.0.0.1:4173/today',
     reuseExistingServer: true,
     timeout: 120_000,

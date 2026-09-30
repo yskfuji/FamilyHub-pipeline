@@ -7,7 +7,7 @@ test('registration and onboarding reach Today', async ({ page }) => {
   await expect(page).toHaveURL(/onboarding/);
   await page.getByRole('button', { name: /次へ/ }).click();
   await page.getByRole('button', { name: /次へ/ }).click();
-  await page.getByRole('button', { name: /Todayを開く/ }).click();
+  await page.getByRole('button', { name: /今日の画面を開く/ }).click();
   await expect(page.getByRole('heading', { name: /おはよう/ })).toBeVisible();
 });
 
@@ -26,14 +26,14 @@ test('household invite join and expiry are distinguishable', async ({ page }) =>
 test('calendar exposes recurring edit scope', async ({ page }) => {
   await page.goto('/calendar/event-piano');
   await expect(page.getByRole('heading', { name: '空｜ピアノ' })).toBeVisible();
-  await expect(page.getByLabel('編集対象')).toContainText('今回のみ');
-  await expect(page.getByLabel('編集対象')).toContainText('今回以降');
-  await expect(page.getByLabel('編集対象')).toContainText('系列全体');
+  await expect(page.getByLabel('編集対象')).toContainText('この予定だけ');
+  await expect(page.getByLabel('編集対象')).toContainText('これ以降の予定');
+  await expect(page.getByLabel('編集対象')).toContainText('すべての予定');
 });
 
-test('Todo reviewer and state update are visible', async ({ page }) => {
+test('task reviewer and state update are visible', async ({ page }) => {
   await page.goto('/tasks/todo-form');
-  await expect(page.getByText('レビュアー')).toBeVisible();
+  await expect(page.getByText('確認する人', { exact: true })).toBeVisible();
   await expect(page.getByText('蓮', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '完了にする' }).click();
   await expect(page.locator('.toast-visible')).toContainText('更新しました');
@@ -41,8 +41,8 @@ test('Todo reviewer and state update are visible', async ({ page }) => {
 
 test('memo attachment has quarantine and OCR caveat', async ({ page }) => {
   await page.goto('/notes/memo-receipt');
-  await expect(page.getByText('隔離中')).toBeVisible();
-  await expect(page.getByText('要原本確認')).toBeVisible();
+  await expect(page.getByText('確認中', { exact: true })).toBeVisible();
+  await expect(page.getByText('原本の確認が必要')).toBeVisible();
   const chooser = page.waitForEvent('filechooser');
   await page.getByRole('button', { name: '追加' }).click();
   const fileChooser = await chooser;
@@ -62,7 +62,7 @@ test('resource links and global search are reachable', async ({ page }) => {
   await expect(page.getByRole('heading', { name: '青葉小学校 保護者ページ' })).toBeVisible();
   await page.getByRole('button', { name: /検索/ }).click();
   await page.getByRole('searchbox').fill('学校');
-  await expect(page.getByRole('link', { name: '予定 花｜学校公開' })).toBeVisible();
+  await expect(page.getByRole('link', { name: '予定「花｜学校公開」を開く' })).toBeVisible();
 });
 
 test('offline state retains cached data and has recovery', async ({ page }) => {

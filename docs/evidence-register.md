@@ -1,6 +1,6 @@
 # 証拠台帳
 
-最終更新: 2026-09-30。資料を「仕様・ガイダンス」「実験」「質的研究」「レビュー」に分け、主張の強さを越えて一般化しない。効果量が原著で統一報告されない場合は `not consistently reported` とし、推測しない。
+最終更新: 2026-10-01。資料を「仕様・ガイダンス」「実験」「質的研究」「レビュー」に分け、主張の強さを越えて一般化しない。効果量が原著で統一報告されない場合は `not consistently reported` とし、推測しない。
 
 | ID | 主張 | 資料種別・標本 | 効果・観察 | 限界・反証 | 採用した設計判断 | 確信度 |
 |---|---|---|---|---|---|---|
@@ -14,6 +14,10 @@
 | E08 | パスワードの長さ・漏えい値照合とパスキー優先が現行認証の要点 | NIST SP 800-63B-4 | 単一要素パスワード15文字以上、最大長を十分許容、構成規則・定期変更を避け、blocklist照合 | フロントUIだけでは検証・レート制御・耐フィッシング性を成立させられない | パスキー第一、15〜64文字、文字種強制なし、漏えい拒否理由。サーバー契約を明示 | 高 |
 | E09 | セッション・CSRF・CSPはサーバー境界で強制すべき | OWASP Session / CSRF / CSP Cheat Sheets、ASVS | Secure/HttpOnly/SameSite、CSRF token、Origin/Fetch Metadata、strict CSP等 | Cheat Sheetは脅威モデル固有の完全な保証ではない | `__Host-` Cookie、検証、ヘッダーテンプレートを契約化。認証情報をWeb Storageに置かない | 高 |
 | E10 | ファイルアップロードは多層検証と隔離が必要 | OWASP File Upload Cheat Sheet | allowlist、MIME/signature、ランダム名、webroot外、AV、認可等 | AVでも未知脅威を完全には排除できない | UIで selected/validating/quarantined/clean/rejected を区別し、サーバー必須要件を明記 | 高 |
+| E11 | 警告を重ねれば必ず誤操作が減るわけではない | 警告慣れの実験、N=22 | 反復警告に対する注意低下を観察 | 小規模で均質な実験標本。家庭アプリや全確認画面へ直接一般化できない | 可逆操作は取り消し、高リスク操作だけ対象と影響を示す確認にする | 低〜中 |
+| E12 | 認可は最小権限・既定拒否・全リクエスト検査が必要 | OWASP Authorization Cheat Sheet | サーバー側で毎回、属性と対象を含めて認可する指針 | ガイダンスであり、本システムへの侵入試験結果ではない | 能力と公開範囲を分離し、UI非表示を認可境界としない。不可視対象は `NOT_FOUND` | 高 |
+| E13 | Web Cryptoは保存暗号化を提供するが、同一オリジンの悪意あるコードを無効化しない | W3C Web Cryptography API | AES-GCM、非抽出鍵等のブラウザ暗号APIを規定 | XSS・端末侵害・実行中データの保護を保証しない | 再送待ちを暗号化するが多層防御と明記し、対象と保存期間を最小化 | 高 |
+| E14 | 日本語の製品UIでは「予定・タスク・メモ・招待」等へ用語が収束している | Apple／Google／TimeTree／Microsoftの公開日本語UI・ヘルプの定性的比較 | 複数製品で近い語が使われる | 標本抽出や利用者理解を測る統計研究ではなく、「普遍的」とは断定できない | 共通語彙へ集約し、内部enumと実装語を非表示。母語話者2名レビューまでは `evidence-pending` | 中 |
 
 ## 一次・公的資料
 
@@ -31,6 +35,13 @@
 - [OWASP CSRF Prevention](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html)
 - [OWASP Content Security Policy](https://cheatsheetseries.owasp.org/cheatsheets/Content_Security_Policy_Cheat_Sheet.html)
 - [OWASP File Upload](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html)
+- [デジタル庁 ボタンのアクセシビリティ](https://design.digital.go.jp/dads/components/button/accessibility/)
+- [WCAG 2.2 Error Identification](https://www.w3.org/WAI/WCAG22/Understanding/error-identification)
+- [WCAG Status Messages](https://www.w3.org/WAI/WCAG21/Understanding/status-messages)
+- [WCAG 2.2 Error Prevention](https://www.w3.org/WAI/WCAG22/Understanding/error-prevention-legal-financial-data.html)
+- [警告慣れの実験（PMC7751389）](https://pmc.ncbi.nlm.nih.gov/articles/PMC7751389/)
+- [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html)
+- [W3C Web Cryptography API](https://www.w3.org/TR/WebCryptoAPI/)
 
 ## 証拠状態
 
