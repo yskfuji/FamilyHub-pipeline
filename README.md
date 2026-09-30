@@ -22,3 +22,9 @@ npm run dev
 通常の `build` はconsumer向けで、`/showcase`、actor/scenario切替、監査用fixture、source mapを含みません。`build:audit`だけが内部監査面を生成します。HTTP adapterはHTTPSの接続先、実行時CSRF token provider、権限リビジョンproviderの注入を必須とします。
 
 詳細は [証拠台帳](docs/evidence-register.md)、[脅威モデル](docs/threat-model.md)、[IA](docs/information-architecture.md) を参照してください。
+
+## ライセンス
+
+Copyright (c) 2026 Yusuke Fujinami. All rights reserved.
+
+本リポジトリはソース公開（source-available）ですが、オープンソースではありません。閲覧・参照のみ許可しており、書面による事前許諾なく複製・改変・再配布・商用利用することはできません。商用利用の権利は Yusuke Fujinami のみが保有します。詳細は [LICENSE](LICENSE) を参照してください。
