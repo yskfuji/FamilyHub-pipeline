@@ -111,11 +111,3 @@ export function canMutateOwnedResource(
   if (viewer.role === 'owner' || viewer.role === 'adult' || ownerMembershipId === viewer.membershipId) return { allowed: true };
   return { allowed: false, reason: 'SCOPE_DENIED' };
 }
-
-export const roleLabels: Record<HouseholdMembership['role'], string> = {
-  owner: '管理者', adult: '大人のメンバー', child: '子どもメンバー', guest: 'ゲスト',
-};
-
-export const membershipStatusLabels: Record<HouseholdMembership['status'], string> = {
-  active: '利用中', invited: '招待中', suspended: '利用停止',
-};

@@ -3,19 +3,20 @@ import { baseNotificationPreferences, baseNotifications, basePrivacySettings, ba
 import { memoInputSchema, passwordSchema } from '../domain/schemas';
 import { authorize, canMutateOwnedResource, capabilitiesFor, capabilityCeilingFor, projectSnapshotForViewer } from '../authz/policy';
 import type { Authenticator, AuthorizationDecision, CalendarEvent, Capability, Expense, GatewayError, HouseholdInvite, HouseholdNotification, HouseholdSnapshot, Id, Memo, MutationContext, NotificationPreferences, PermissionOverride, PrivacySettings, Result, Scenario, SecurityOverview, Todo } from '../domain/types';
+import { ja } from '../content/ja';
 
 const delay = (ms = 90) => new Promise((resolve) => window.setTimeout(resolve, ms));
 const ok = <T,>(value: T): Result<T> => ({ ok: true, value });
 const fail = <T,>(error: GatewayError): Result<T> => ({ ok: false, error });
 const copy = (): HouseholdSnapshot => structuredClone(baseSnapshot);
-const denied = <T,>(decision: AuthorizationDecision, message = 'この操作を行う権限がありません。'): Result<T> => fail({ code: 'FORBIDDEN', message, retryable: false, reason: decision.allowed ? 'CAPABILITY_MISSING' : decision.reason });
+const denied = <T,>(decision: AuthorizationDecision, message = ja.errors.FORBIDDEN): Result<T> => fail({ code: 'FORBIDDEN', message, retryable: false, reason: decision.allowed ? 'CAPABILITY_MISSING' : decision.reason });
 const missing = <T,>(label: string): Result<T> => fail({ code: 'NOT_FOUND', message: `${label}が見つからないか、表示する権限がありません。`, retryable: false });
 
 const scenarioError = (scenario?: Scenario): GatewayError | null => {
-  if (scenario === 'offline') return { code: 'OFFLINE', message: 'ネットワークに接続できません。端末内の直近データを表示します。', retryable: true };
-  if (scenario === 'conflict') return { code: 'CONFLICT', message: '別の端末で内容が更新されました。差分を確認してください。', retryable: true };
+  if (scenario === 'offline') return { code: 'OFFLINE', message: 'インターネットに接続できません。最後に取得した内容を表示しています。', retryable: true };
+  if (scenario === 'conflict') return { code: 'CONFLICT', message: 'ほかの端末で内容が変更されました。最新の内容を確認してください。', retryable: true };
   if (scenario === 'expired-invite') return { code: 'UNAUTHENTICATED', message: '招待の有効期限が切れています。新しい招待を依頼してください。', retryable: false };
-  if (scenario === 'expired-session') return { code: 'UNAUTHENTICATED', message: '安全のためセッションを終了しました。もう一度サインインしてください。', retryable: false };
+  if (scenario === 'expired-session') return { code: 'UNAUTHENTICATED', message: 'サインインの有効期限が切れました。もう一度サインインしてください。', retryable: false };
   return null;
 };
 
@@ -44,7 +45,7 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
     const decision = authorize(viewer(), capability);
     return decision.allowed ? null : denied<T>(decision);
   };
-  const offlineFailure = <T,>(): Result<T> | null => offline ? fail({ code: 'OFFLINE', message: 'ネットワークに接続できません。接続後に再送できます。', retryable: true }) : null;
+  const offlineFailure = <T,>(): Result<T> | null => offline ? fail({ code: 'OFFLINE', message: 'インターネットに接続できません。接続後にもう一度お試しください。', retryable: true }) : null;
   const permissionConflict = <T,>(context?: MutationContext): Result<T> | null => context && context.expectedPermissionRevision !== permissionRevision
     ? fail({ code: 'CONFLICT', message: '権限が変更されています。現在の権限で内容を確認してください。', retryable: false, reason: 'PERMISSION_REVISION' })
     : null;
@@ -84,7 +85,7 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
       async revokeSession(sessionId) {
         await delay();
         const target = security.sessions.find((session) => session.id === sessionId);
-        if (!target || target.current) return fail({ code: 'FORBIDDEN', message: 'このセッションはここから終了できません。', retryable: false });
+        if (!target || target.current) return fail({ code: 'FORBIDDEN', message: 'この端末はここからサインアウトできません。', retryable: false });
         security.sessions.splice(security.sessions.indexOf(target), 1);
         return ok(undefined);
       },
@@ -101,7 +102,7 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
         }
         if (scenario === 'quarantined') {
           snapshot.memos[0].attachments[0].status = 'quarantined';
-          snapshot.memos[0].attachments[0].statusMessage = '安全確認中です。結果が出るまで開けません';
+          snapshot.memos[0].attachments[0].statusMessage = 'ファイルを確認しています。完了するまで開けません';
         }
         if (scenario === 'weather') snapshot.context.weather = { condition: 'storm', temperatureC: 20, precipitationPercent: 95, alert: '雷を伴う激しい雨のおそれ。屋外予定を確認してください' };
         return ok(snapshot);
@@ -119,7 +120,7 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
         if (!target) return missing('メンバー');
         if (target.version !== expectedVersion) return fail({ code: 'CONFLICT', message: '別の端末で権限が更新されています。', retryable: true, reason: 'VERSION' });
         const activeOwners = state.memberships.filter((member) => member.status === 'active' && member.role === 'owner');
-        if (target.role === 'owner' && role !== 'owner' && activeOwners.length === 1) return fail({ code: 'FORBIDDEN', message: '世帯には少なくとも1人の管理者が必要です。先に別の管理者を追加してください。', retryable: false, reason: 'OWNER_REQUIRED' });
+        if (target.role === 'owner' && role !== 'owner' && activeOwners.length === 1) return fail({ code: 'FORBIDDEN', message: '管理者は1人以上必要です。先に別のメンバーを管理者に変更してください。', retryable: false, reason: 'OWNER_REQUIRED' });
         target.role = role; target.version += 1; permissionRevision += 1;
         return ok(structuredClone(target));
       },
@@ -148,7 +149,7 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
         if (expectedPermissionRevision !== permissionRevision) return fail({ code: 'CONFLICT', message: '別の端末で権限が変更されました。最新の内容を確認してください。', retryable: true, reason: 'PERMISSION_REVISION' });
         const member = state.memberships.find((item) => item.id === membershipId); if (!member) return missing('メンバー');
         const ceiling = new Set(capabilityCeilingFor(member.role));
-        if (overrides.some((item) => item.membershipId !== membershipId || (item.effect === 'allow' && !ceiling.has(item.capability)))) return fail({ code: 'INVALID_INPUT', message: '役割の上限を超える権限は追加できません。', retryable: false });
+        if (overrides.some((item) => item.membershipId !== membershipId || (item.effect === 'allow' && !ceiling.has(item.capability)))) return fail({ code: 'INVALID_INPUT', message: 'この役割で利用できない機能は、個別に許可できません。必要な場合は役割を変更してください。', retryable: false });
         permissionOverrides = [...permissionOverrides.filter((item) => item.membershipId !== membershipId), ...structuredClone(overrides)];
         permissionRevision += 1; return ok(project());
       },
@@ -277,7 +278,7 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
           return fail({ code: 'ATTACHMENT_REJECTED', message: '形式またはサイズが許可範囲外です。PDF・JPEG・PNG、10MB以内にしてください。', retryable: false });
         }
         const memo: Memo = structuredClone(target);
-        memo.attachments.push({ id: `attachment-${Date.now()}`, memoId, originalName: file.name, mimeType: file.type, byteSize: file.size, status: 'quarantined', statusMessage: '隔離領域で安全確認中です' });
+        memo.attachments.push({ id: `attachment-${Date.now()}`, memoId, originalName: file.name, mimeType: file.type, byteSize: file.size, status: 'quarantined', statusMessage: 'ファイルを確認しています。完了するまで開けません' });
         Object.assign(target, memo);
         return ok(memo);
       },
@@ -341,7 +342,7 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
           ...snapshot.events.map((item) => ({ kind: '予定', id: item.id, label: item.title, destination: `/calendar/${item.id}` })),
           ...snapshot.todos.map((item) => ({ kind: 'タスク', id: item.id, label: item.title, destination: `/tasks/${item.id}` })),
           ...snapshot.memos.map((item) => ({ kind: 'メモ', id: item.id, label: item.title, destination: `/notes/${item.id}` })),
-          ...snapshot.resources.map((item) => ({ kind: 'リンク', id: item.id, label: item.label, destination: '/settings/resources' })),
+          ...snapshot.resources.map((item) => ({ kind: '関連リンク', id: item.id, label: item.label, destination: '/settings/resources' })),
         ].filter((item) => item.label.toLowerCase().includes(normalized));
         return ok(results.slice(0, 8));
       },

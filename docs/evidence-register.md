@@ -17,7 +17,8 @@
 | E11 | 警告を重ねれば必ず誤操作が減るわけではない | 警告慣れの実験、N=22 | 反復警告に対する注意低下を観察 | 小規模で均質な実験標本。家庭アプリや全確認画面へ直接一般化できない | 可逆操作は取り消し、高リスク操作だけ対象と影響を示す確認にする | 低〜中 |
 | E12 | 認可は最小権限・既定拒否・全リクエスト検査が必要 | OWASP Authorization Cheat Sheet | サーバー側で毎回、属性と対象を含めて認可する指針 | ガイダンスであり、本システムへの侵入試験結果ではない | 能力と公開範囲を分離し、UI非表示を認可境界としない。不可視対象は `NOT_FOUND` | 高 |
 | E13 | Web Cryptoは保存暗号化を提供するが、同一オリジンの悪意あるコードを無効化しない | W3C Web Cryptography API | AES-GCM、非抽出鍵等のブラウザ暗号APIを規定 | XSS・端末侵害・実行中データの保護を保証しない | 再送待ちを暗号化するが多層防御と明記し、対象と保存期間を最小化 | 高 |
-| E14 | 日本語の製品UIでは「予定・タスク・メモ・招待」等へ用語が収束している | Apple／Google／TimeTree／Microsoftの公開日本語UI・ヘルプの定性的比較 | 複数製品で近い語が使われる | 標本抽出や利用者理解を測る統計研究ではなく、「普遍的」とは断定できない | 共通語彙へ集約し、内部enumと実装語を非表示。母語話者2名レビューまでは `evidence-pending` | 中 |
+| E14 | 日本語の製品UIでは「予定・タスク・メモ・招待・メンバー」等へ用語が収束している | Apple／Google／TimeTree／Microsoftの公開日本語UI・ヘルプ5資料の定性的比較 | 予定、タスク、繰り返し、参加者・メンバー、招待の近い語を複数資料で確認 | 無作為抽出でも利用者理解の比較実験でもない。Google資料はAI翻訳を含む可能性を明記。製品ごとの対象差もあるため「普遍的」とは断定できない | 共通語彙へ集約し、内部enum・英語見出し・実装語を非表示。予定とタスクの繰り返し文言を分離。母語話者2名レビューまでは `evidence-pending` | 中 |
+| E15 | 入力やエラーは項目との関係、現在状態、修正方法が明確である必要がある | デジタル庁デザインシステムの入力欄・ボタン指針、WCAG 2.2 | ラベルの常時表示、補足・エラーの対応付け、操作名と状態通知の明確化を要求 | ガイダンスであり、本アプリの日本語理解率やタスク成功率を測った結果ではない | placeholderだけに頼らずラベルを表示し、失敗時は原因・入力保持・次の操作を示す。曖昧な「詳細」「確定」を避ける | 中〜高 |
 
 ## 一次・公的資料
 
@@ -42,6 +43,12 @@
 - [警告慣れの実験（PMC7751389）](https://pmc.ncbi.nlm.nih.gov/articles/PMC7751389/)
 - [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html)
 - [W3C Web Cryptography API](https://www.w3.org/TR/WebCryptoAPI/)
+- [Microsoft To Doの期限・リマインダー・繰り返し](https://support.microsoft.com/ja-jp/todo/add-due-dates-and-reminders-in-microsoft-to-do)
+- [Google カレンダーの繰り返すタスク](https://support.google.com/calendar/answer/12132599?co=GENIE.Platform%3DDesktop&hl=ja)
+- [Apple iCloudカレンダーの共有](https://support.apple.com/ja-jp/guide/icloud/mm6b1a9479/1.0/icloud/1.0)
+- [Apple ファミリー共有のメンバーの種類](https://support.apple.com/ja-jp/guide/personal-safety/ips75b3b794f/web)
+- [TimeTree 共有カレンダーへの参加](https://support.timetreeapp.com/hc/ja/articles/900006199983-%E5%85%B1%E6%9C%89%E3%82%AB%E3%83%AC%E3%83%B3%E3%83%80%E3%83%BC%E3%81%B8%E5%8F%82%E5%8A%A0%E3%81%97%E3%81%9F%E3%81%84)
+- [デジタル庁 インプットテキストの使い方](https://design.digital.go.jp/dads/components/input-text/usage/)
 
 ## 証拠状態
 

@@ -68,9 +68,9 @@ export function AppProvider({ children }: PropsWithChildren) {
     try {
       const items = await queue.list();
       const mismatched = items.some((item) => item.actorUserId !== snapshot.viewer.userId || item.householdId !== snapshot.household.id);
-      if (mismatched) { await queue.clear(); setPendingCommands([]); setToast('別のアカウントの再送待ちを安全のため削除しました'); return; }
+      if (mismatched) { await queue.clear(); setPendingCommands([]); setToast('別のアカウントで保存された未送信の変更を削除しました。'); return; }
       setPendingCommands(items);
-    } catch { setPendingCommands([]); setToast('再送待ちを読み込めませんでした。端末の保存設定を確認してください'); }
+    } catch { setPendingCommands([]); setToast('未送信の変更を読み込めませんでした。ブラウザの保存設定を確認してください。'); }
   }, [queue, snapshot.viewer.userId, snapshot.household.id]);
 
   const refresh = useCallback(async () => {
@@ -96,7 +96,7 @@ export function AppProvider({ children }: PropsWithChildren) {
     if (result.error.code !== 'OFFLINE') return { status: 'failed', error: result.error };
     try {
       await queue.enqueue(command, { actorUserId: snapshot.viewer.userId, householdId: snapshot.household.id, permissionRevision: snapshot.viewer.permissionRevision });
-      await loadQueue(); announce('接続後に送信できるよう、端末内の再送待ちへ保存しました'); return { status: 'queued' };
+      await loadQueue(); announce('未送信の変更として、この端末に保存しました。'); return { status: 'queued' };
     } catch (cause) {
       return { status: 'failed', error: { code: 'OFFLINE', message: cause instanceof Error ? cause.message : result.error.message, retryable: true } };
     }
@@ -116,7 +116,7 @@ export function AppProvider({ children }: PropsWithChildren) {
 
   const retryQueued = useCallback(async (id?: string) => {
     const probe = await gateway.household.getSnapshot('normal');
-    if (!probe.ok) { announce(`${probe.error.message} 接続を確認してから再試行してください。`); return; }
+    if (!probe.ok) { announce(`${probe.error.message} 接続を確認してから、もう一度お試しください。`); return; }
     setQueryScenario('normal'); setScenarioState('normal'); setSnapshot(probe.value); setError(null);
     const targets = (await queue.list()).filter((item) => !id || item.id === id);
     let sent = 0;
@@ -128,11 +128,11 @@ export function AppProvider({ children }: PropsWithChildren) {
       else { announce(`${item.summary}を送信できませんでした。${result.error.message}`); break; }
     }
     await loadQueue(); const updated = await gateway.household.getSnapshot('normal'); if (updated.ok) setSnapshot(updated.value);
-    announce(sent ? `${sent}件を送信しました` : '送信できる変更はありませんでした。競合または権限を確認してください');
+    announce(sent ? `${sent}件を送信しました。` : '送信できる変更はありません。最新の内容と権限を確認してください。');
   }, [announce, executeStored, gateway, loadQueue, queue]);
 
-  const discardQueued = useCallback(async (id: string) => { await queue.remove(id); await loadQueue(); announce('再送待ちから削除しました'); }, [announce, loadQueue, queue]);
-  const clearQueued = useCallback(async () => { await queue.clear(); setPendingCommands([]); announce('再送待ちをすべて削除しました'); }, [announce, queue]);
+  const discardQueued = useCallback(async (id: string) => { await queue.remove(id); await loadQueue(); announce('未送信の変更を削除しました。'); }, [announce, loadQueue, queue]);
+  const clearQueued = useCallback(async () => { await queue.clear(); setPendingCommands([]); announce('未送信の変更をすべて削除しました。'); }, [announce, queue]);
 
   const value = useMemo(() => ({ gateway, snapshot, loading, error, scenario, setScenario, refresh, theme, setTheme: setThemeState, toast, announce, can, requestQuickCreate, executeQueueable, pendingCommands, retryQueued, discardQueued, clearQueued }), [gateway, snapshot, loading, error, scenario, refresh, theme, toast, announce, can, requestQuickCreate, executeQueueable, pendingCommands, retryQueued, discardQueued, clearQueued]);
   return <AppContext.Provider value={value}>{children}<div className="sr-only" role="status" aria-live="polite">{toast}</div>{toast && <div className="toast-visible" role="status">{toast}</div>}</AppContext.Provider>;

@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test';
 
-test('registration and onboarding reach Today', async ({ page }) => {
+test('registration and onboarding reach the Today page', async ({ page }) => {
   await page.goto('/welcome');
   await page.getByRole('link', { name: /はじめる/ }).click();
-  await page.getByRole('button', { name: /パスキーで続ける/ }).click();
+  await page.getByRole('button', { name: /パスキーでサインイン/ }).click();
   await expect(page).toHaveURL(/onboarding/);
   await page.getByRole('button', { name: /次へ/ }).click();
   await page.getByRole('button', { name: /次へ/ }).click();
@@ -13,22 +13,22 @@ test('registration and onboarding reach Today', async ({ page }) => {
 
 test('household invite join and expiry are distinguishable', async ({ page }) => {
   await page.goto('/onboarding');
-  await page.getByRole('button', { name: '招待で参加' }).click();
+  await page.getByRole('button', { name: '招待コードで参加' }).click();
   const code = page.getByLabel('招待コード');
   await code.fill('EXPIRED');
   await page.getByRole('button', { name: /次へ/ }).click();
   await expect(page.getByRole('alert')).toContainText('有効期限');
   await code.fill('FAMILY-2026-VALID-CODE');
   await page.getByRole('button', { name: /次へ/ }).click();
-  await expect(page.getByRole('heading', { name: 'プライバシー' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '共有範囲', exact: true })).toBeVisible();
 });
 
 test('calendar exposes recurring edit scope', async ({ page }) => {
   await page.goto('/calendar/event-piano');
-  await expect(page.getByRole('heading', { name: '空｜ピアノ' })).toBeVisible();
-  await expect(page.getByLabel('編集対象')).toContainText('この予定だけ');
-  await expect(page.getByLabel('編集対象')).toContainText('これ以降の予定');
-  await expect(page.getByLabel('編集対象')).toContainText('すべての予定');
+  await expect(page.getByRole('heading', { name: 'ピアノ' })).toBeVisible();
+  await expect(page.getByLabel('対象とする予定')).toContainText('この予定だけ');
+  await expect(page.getByLabel('対象とする予定')).toContainText('これ以降の予定');
+  await expect(page.getByLabel('対象とする予定')).toContainText('すべての予定');
 });
 
 test('task reviewer and state update are visible', async ({ page }) => {
@@ -36,18 +36,18 @@ test('task reviewer and state update are visible', async ({ page }) => {
   await expect(page.getByText('確認する人', { exact: true })).toBeVisible();
   await expect(page.getByText('蓮', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '完了にする' }).click();
-  await expect(page.locator('.toast-visible')).toContainText('更新しました');
+  await expect(page.locator('.toast-visible')).toContainText('完了にしました');
 });
 
 test('memo attachment has quarantine and OCR caveat', async ({ page }) => {
   await page.goto('/notes/memo-receipt');
   await expect(page.getByText('確認中', { exact: true })).toBeVisible();
-  await expect(page.getByText('原本の確認が必要')).toBeVisible();
+  await expect(page.getByText('元のファイルを確認')).toBeVisible();
   const chooser = page.waitForEvent('filechooser');
-  await page.getByRole('button', { name: '追加' }).click();
+  await page.getByRole('button', { name: 'ファイルを追加' }).click();
   const fileChooser = await chooser;
   await fileChooser.setFiles({ name: 'notice.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF mock') });
-  await expect(page.locator('.toast-visible')).toContainText('隔離領域');
+  await expect(page.locator('.toast-visible')).toContainText('ファイルを受け付けました');
 });
 
 test('expense settlement changes the row', async ({ page }) => {
@@ -59,32 +59,32 @@ test('expense settlement changes the row', async ({ page }) => {
 
 test('resource links and global search are reachable', async ({ page }) => {
   await page.goto('/settings/resources');
-  await expect(page.getByRole('heading', { name: '青葉小学校 保護者ページ' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '青葉小学校の保護者向けページ' })).toBeVisible();
   await page.getByRole('button', { name: /検索/ }).click();
   await page.getByRole('searchbox').fill('学校');
-  await expect(page.getByRole('link', { name: '予定「花｜学校公開」を開く' })).toBeVisible();
+  await expect(page.getByRole('link', { name: '予定「学校公開」を開く' })).toBeVisible();
 });
 
 test('offline state retains cached data and has recovery', async ({ page }) => {
   await page.goto('/today?scenario=offline');
-  await expect(page.getByRole('alert')).toContainText('ネットワーク');
-  await expect(page.getByRole('button', { name: '再試行' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '今日の流れ' })).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText('インターネット');
+  await expect(page.getByRole('button', { name: 'もう一度試す' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /おはよう/ })).toBeVisible();
 });
 
 test('conflict preserves the last view and offers recovery', async ({ page }) => {
   await page.goto('/today?scenario=conflict');
-  await expect(page.getByRole('alert')).toContainText('別の端末');
-  await expect(page.getByRole('button', { name: '再試行' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '今日の流れ' })).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText('ほかの端末');
+  await expect(page.getByRole('button', { name: 'もう一度試す' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /おはよう/ })).toBeVisible();
 });
 
 test('expired session hides household content until sign-in', async ({ page }) => {
   await page.goto('/today?scenario=expired-session');
-  await expect(page.getByRole('alert')).toContainText('セッション');
+  await expect(page.getByRole('alert')).toContainText('サインインの有効期限');
   await expect(page.getByRole('heading', { name: '本人確認が必要です' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '今日の流れ' })).toBeHidden();
-  await expect(page.getByRole('link', { name: 'サインインへ' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /おはよう/ })).toBeHidden();
+  await expect(page.getByRole('link', { name: 'サインインする' })).toBeVisible();
 });
 
 for (const width of [320, 390, 768, 1024, 1440, 1920]) {

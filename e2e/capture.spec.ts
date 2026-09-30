@@ -32,7 +32,7 @@ for (const [viewport,width,height] of [['mobile',390,844],['desktop',1440,1000]]
     test.skip(browserName !== 'chromium', 'delivery capture uses fixed Chromium DPR 2');
     await page.setViewportSize({ width, height }); await page.goto('/today');
     await page.getByRole('button', { name: /通知を確認/ }).click();
-    await expect(page.getByRole('heading', { name: '通知センター' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '通知', exact: true })).toBeVisible();
     await page.screenshot({ path: `artifacts/screens/${viewport}-notification-center-light.png`, fullPage: false, animations: 'disabled' });
   });
   test(`${viewport} event editor`, async ({ page, browserName }) => {

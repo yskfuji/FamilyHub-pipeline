@@ -10,7 +10,7 @@ test('owner sees administration with localized role and status labels', async ({
 
 test('adult can view members but cannot administer them', async ({ page }) => {
   await page.goto('/settings/household?actor=member-ren');
-  await expect(page.getByText('権限の変更と招待は管理者だけが行えます。')).toBeVisible();
+  await expect(page.getByText('メンバーの権限変更と招待は、管理者だけが行えます。')).toBeVisible();
   await expect(page.getByRole('button', { name: /の権限を設定/ })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: '家族を招待' })).toBeHidden();
   await page.goto('/budget?actor=member-ren');
@@ -19,34 +19,34 @@ test('adult can view members but cannot administer them', async ({ page }) => {
 
 test('child sees related content and direct forbidden routes explain recovery', async ({ page }) => {
   await page.goto('/calendar?actor=member-hana');
-  await expect(page.getByText('花｜学校公開').first()).toBeVisible();
-  await expect(page.getByText('空｜ピアノ')).toHaveCount(0);
+  await expect(page.getByText('学校公開').first()).toBeVisible();
+  await expect(page.getByText('ピアノ')).toHaveCount(0);
   await expect(page.getByRole('link', { name: '家計' })).toBeHidden();
   await page.goto('/budget?actor=member-hana');
-  await expect(page.getByRole('heading', { name: 'このページは利用できません' })).toBeVisible();
-  await expect(page.getByRole('link', { name: '今日の画面へ戻る' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'このページは表示できません' })).toBeVisible();
+  await expect(page.getByRole('link', { name: '今日の画面に戻る' })).toBeVisible();
 });
 
 test('guest is read-only and sees only explicitly selected resources', async ({ page }) => {
   await page.goto('/today?actor=member-yui');
-  await expect(page.getByRole('button', { name: 'クイック作成' })).toBeHidden();
+  await expect(page.getByRole('button', { name: 'すぐに追加' })).toBeHidden();
   await expect(page.getByRole('link', { name: '家計' })).toBeHidden();
   await page.goto('/settings/resources?actor=member-yui');
-  await expect(page.getByRole('heading', { name: '青葉小学校 保護者ページ' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '世田谷区 子育て手続き' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: '青葉小学校の保護者向けページ' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '世田谷区の子育て手続き' })).toHaveCount(0);
   await page.goto('/settings/household?actor=member-yui');
-  await expect(page.getByRole('heading', { name: 'このページは利用できません' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'このページは表示できません' })).toBeVisible();
 });
 
 test('offline collaborative creation is queued, reviewed, and explicitly replayed', async ({ page }) => {
   await page.goto('/today?scenario=offline');
-  await page.getByRole('button', { name: 'クイック作成' }).click();
+  await page.getByRole('button', { name: 'すぐに追加' }).click();
   await page.getByRole('button', { name: '予定', exact: true }).click();
   await page.getByLabel('予定名').fill('再送する予定');
   await page.getByRole('button', { name: '追加する' }).click();
-  await expect(page.getByRole('button', { name: /再送待ち/ })).toContainText('1');
-  await page.getByRole('button', { name: /再送待ち/ }).click();
-  await expect(page.getByRole('heading', { name: '再送待ち' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /未送信の変更/ })).toContainText('1');
+  await page.getByRole('button', { name: /未送信の変更/ }).click();
+  await expect(page.getByRole('heading', { name: '未送信の変更' })).toBeVisible();
   await expect(page.getByText('予定「再送する予定」を作成')).toBeVisible();
   await page.getByRole('button', { name: 'この変更を送信' }).click();
   await expect(page.getByText('予定「再送する予定」を作成')).toBeHidden();

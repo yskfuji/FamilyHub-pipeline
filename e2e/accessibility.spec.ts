@@ -31,9 +31,9 @@ test('keyboard shortcut, modal trap, Escape, inert background, and focus restora
   await expect(page.locator('#root')).toHaveAttribute('inert', '');
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: /検索/ })).toBeFocused();
-  const quick = page.getByRole('button', { name: 'クイック作成' });
+  const quick = page.getByRole('button', { name: 'すぐに追加' });
   await quick.click();
-  const dialog = page.getByRole('dialog', { name: 'クイック作成' });
+  const dialog = page.getByRole('dialog', { name: 'すぐに追加' });
   const close = dialog.getByRole('button', { name: '閉じる' });
   await close.focus();
   await page.keyboard.press('Shift+Tab');
