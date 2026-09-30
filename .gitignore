@@ -1,0 +1,10 @@
+node_modules/
+dist/
+test-results/
+playwright-report/
+release/*.zip
+release/*.tgz
+release/SHA256SUMS
+.DS_Store
+*.log
+*.tsbuildinfo

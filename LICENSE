@@ -1,0 +1,45 @@
+Proprietary Source-Available License
+
+Copyright (c) 2026 Yusuke Fujinami. All rights reserved.
+
+This repository, including its source code, documentation, designs, images,
+and all other contents (the "Software"), is the exclusive property of
+Yusuke Fujinami (the "Owner").
+
+1. Permitted use
+   You may view and read the Software for personal, non-commercial reference
+   only. Viewing and forking through the features of GitHub, to the extent
+   required by the GitHub Terms of Service, are also permitted.
+
+2. Restrictions
+   Except as expressly permitted in Section 1, you may not, without the
+   Owner's prior written permission:
+   - copy, reproduce, or modify the Software or create derivative works;
+   - distribute, publish, sublicense, rent, lease, or sell the Software;
+   - use the Software, in whole or in part, for any commercial purpose,
+     including in any product or service; or
+   - use the Software to train, fine-tune, or evaluate machine learning
+     models.
+
+3. Commercial rights
+   All rights to use the Software for commercial purposes are reserved
+   exclusively to the Owner. No license, express or implied, is granted by
+   making the Software publicly visible.
+
+4. No warranty
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   OWNER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM, OUT
+   OF OR IN CONNECTION WITH THE SOFTWARE OR ITS USE.
+
+For licensing inquiries, contact the Owner via https://github.com/yskfuji.
+
+---
+
+【日本語要約】（解釈に疑義がある場合は上記英文が優先します）
+本リポジトリの一切の権利は Yusuke Fujinami に帰属します。個人的・非商用の閲覧・参照、
+および GitHub 利用規約上必要な範囲の閲覧・fork のみ許可します。書面による事前許諾なく、
+複製・改変・派生物の作成・再配布・販売・サブライセンス・商用利用・機械学習への利用を
+行うことはできません。商用利用の権利は Yusuke Fujinami のみが保有します。
+本ソフトウェアは無保証で提供されます。

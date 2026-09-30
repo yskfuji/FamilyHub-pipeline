@@ -1,0 +1,75 @@
+@layer reset, tokens, base, components, utilities, responsive;
+
+@layer tokens {
+  :root {
+    color-scheme: light;
+    --paper: #f6f0e5;
+    --paper-deep: #eee3d1;
+    --sheet: #fffdf8;
+    --sheet-raised: #ffffff;
+    --ink: #202b33;
+    --ink-soft: #52616a;
+    --ink-faint: #6f7c82;
+    --line: #d7cdbc;
+    --line-strong: #a99c88;
+    --indigo: #254e70;
+    --indigo-strong: #173951;
+    --persimmon: #a8462f;
+    --persimmon-soft: #f1d5c5;
+    --moss: #5a6744;
+    --moss-soft: #dce2cf;
+    --plum: #76546c;
+    --gold: #9a691c;
+    --danger: #982f2f;
+    --danger-soft: #f4d9d5;
+    --success: #356245;
+    --success-soft: #d7e8dc;
+    --focus: #ad4c22;
+    --shadow: 0 18px 48px rgb(47 39 28 / 10%);
+    --shadow-soft: 0 8px 24px rgb(47 39 28 / 7%);
+    --radius-sm: 10px;
+    --radius-md: 18px;
+    --radius-lg: 28px;
+    --space-1: .25rem;
+    --space-2: .5rem;
+    --space-3: .75rem;
+    --space-4: 1rem;
+    --space-5: 1.5rem;
+    --space-6: 2rem;
+    --space-7: 3rem;
+    --duration-fast: 120ms;
+    --duration-base: 180ms;
+    --duration-slow: 260ms;
+    --ease: cubic-bezier(.2,.75,.25,1);
+    --font-sans: 'Noto Sans JP Variable', 'Hiragino Sans', sans-serif;
+    --font-serif: 'Noto Serif JP Variable', 'Yu Mincho', serif;
+  }
+
+  [data-theme='dusk'] {
+    color-scheme: dark;
+    --paper: #101e2b;
+    --paper-deep: #0b1721;
+    --sheet: #172a39;
+    --sheet-raised: #1c3244;
+    --ink: #f7f1e8;
+    --ink-soft: #cbd6dc;
+    --ink-faint: #aab9c1;
+    --line: #405869;
+    --line-strong: #718594;
+    --indigo: #9fc8e1;
+    --indigo-strong: #d3e9f6;
+    --persimmon: #ed9e7b;
+    --persimmon-soft: #543329;
+    --moss: #bdcb9a;
+    --moss-soft: #344235;
+    --plum: #deb4d1;
+    --gold: #edc67e;
+    --danger: #ffb0a7;
+    --danger-soft: #532d2e;
+    --success: #a5d7b1;
+    --success-soft: #284236;
+    --focus: #ffb982;
+    --shadow: 0 18px 48px rgb(0 0 0 / 24%);
+    --shadow-soft: 0 8px 24px rgb(0 0 0 / 18%);
+  }
+}

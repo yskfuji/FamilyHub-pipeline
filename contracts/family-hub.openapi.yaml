@@ -1,0 +1,389 @@
+openapi: 3.1.0
+info:
+  title: Family Hub Gateway
+  version: 1.0.0
+  description: >-
+    Reference boundary. All authenticated operations use server-managed __Host-
+    Secure HttpOnly SameSite cookies. Mutations require CSRF token and Origin /
+    Fetch Metadata verification. Authentication secrets are never returned.
+servers:
+  - url: https://api.example.invalid
+    description: Must be injected by the deploying environment
+security:
+  - sessionCookie: []
+paths:
+  /v1/auth/passkey/challenge:
+    post:
+      security: []
+      operationId: beginPasskey
+      responses:
+        '200':
+          description: WebAuthn challenge
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PasskeyChallenge' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/auth/password:
+    post:
+      security: []
+      operationId: signInWithPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 15, maxLength: 64 }
+      responses:
+        '204': { description: Session cookie set by server }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/auth/session:
+    delete:
+      operationId: signOut
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: Session revoked }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/households/current/snapshot:
+    get:
+      operationId: getHouseholdSnapshot
+      responses:
+        '200':
+          description: Current household projection
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HouseholdSnapshot' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/household-invites/accept:
+    post:
+      operationId: acceptInvite
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties: { code: { type: string, minLength: 20, maxLength: 256 } }
+      responses:
+        '200':
+          description: Membership created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { householdId: { type: string, format: uuid } }
+        '410': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/events:
+    post:
+      operationId: createEvent
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EventInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Event' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/events/{eventId}:
+    patch:
+      operationId: updateRecurringEvent
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - name: eventId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scope, input]
+              properties:
+                scope: { enum: [this, future, series] }
+                input: { $ref: '#/components/schemas/EventInput' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Event' }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/todos:
+    post:
+      operationId: createTodo
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TodoInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Todo' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/todos/{todoId}/status:
+    patch:
+      operationId: updateTodoStatus
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - name: todoId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status, expectedVersion]
+              properties:
+                status: { enum: [open, doing, review, done] }
+                expectedVersion: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Todo' }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/memos/{memoId}/attachments:
+    post:
+      operationId: uploadAttachment
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - name: memoId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '202':
+          description: Accepted into quarantine; not safe to serve yet
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Attachment' }
+        '413': { $ref: '#/components/responses/Error' }
+        '415': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/expenses:
+    post:
+      operationId: createExpense
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExpenseInput' }
+      responses:
+        '201':
+          description: Created; server recomputes integer shares
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Expense' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/expenses/{expenseId}/settlements:
+    post:
+      operationId: recordSettlement
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - name: expenseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amountJpy]
+              properties: { amountJpy: { type: integer, minimum: 1 } }
+      responses:
+        '201': { description: Append-only settlement record created }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/search:
+    get:
+      operationId: searchHousehold
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 120 }
+      responses:
+        '200':
+          description: Authorized household results only
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 20
+                items:
+                  type: object
+                  required: [kind, id, label, destination]
+                  properties:
+                    kind: { type: string }
+                    id: { type: string, format: uuid }
+                    label: { type: string }
+                    destination: { type: string }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/context:
+    get:
+      operationId: getContext
+      description: Returns holiday, weather, and sync context with source timestamps.
+      responses:
+        '200':
+          description: Authorized context projection
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [asOf, timezone, weather, holidays, sync]
+                properties:
+                  asOf: { type: string, format: date-time }
+                  timezone: { type: string, example: Asia/Tokyo }
+                  weather: { type: object, additionalProperties: true }
+                  holidays: { type: array, items: { type: object, additionalProperties: true } }
+                  sync: { type: object, additionalProperties: true }
+        default: { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: __Host-family_session
+  parameters:
+    CsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      schema: { type: string, minLength: 32 }
+  responses:
+    Error:
+      description: Stable discriminated error
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/GatewayError' }
+  schemas:
+    GatewayError:
+      type: object
+      required: [code, message, retryable]
+      properties:
+        code:
+          enum: [UNAUTHENTICATED, FORBIDDEN, INVALID_INPUT, CONFLICT, OFFLINE, RATE_LIMITED, UPSTREAM_FAILURE, ATTACHMENT_REJECTED]
+        message: { type: string }
+        retryable: { type: boolean }
+        fieldErrors:
+          type: object
+          additionalProperties: { type: string }
+    PasskeyChallenge:
+      type: object
+      required: [challengeId, publicKey]
+      properties:
+        challengeId: { type: string, format: uuid }
+        publicKey: { type: object, additionalProperties: true }
+    Recurrence:
+      type: object
+      required: [rrule, timezone, exceptions]
+      properties:
+        rrule: { type: string, pattern: '^FREQ=' }
+        timezone: { type: string, example: Asia/Tokyo }
+        exceptions:
+          type: array
+          items: { type: string, format: date }
+    EventInput:
+      type: object
+      required: [title, startsAt, endsAt, timezone, participantMembershipIds]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 120 }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        timezone: { type: string, example: Asia/Tokyo }
+        participantMembershipIds:
+          type: array
+          minItems: 1
+          items: { type: string, format: uuid }
+        recurrence: { $ref: '#/components/schemas/Recurrence' }
+    Event:
+      allOf:
+        - { $ref: '#/components/schemas/EventInput' }
+        - type: object
+          required: [id, householdId]
+          properties:
+            id: { type: string, format: uuid }
+            householdId: { type: string, format: uuid }
+    TodoInput:
+      type: object
+      required: [title, assigneeMembershipId]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 120 }
+        dueAt: { type: string, format: date-time }
+        assigneeMembershipId: { type: string, format: uuid }
+        reviewerMembershipId: { type: string, format: uuid }
+    Todo:
+      allOf:
+        - { $ref: '#/components/schemas/TodoInput' }
+        - type: object
+          required: [id, status, version]
+          properties:
+            id: { type: string, format: uuid }
+            status: { enum: [open, doing, review, done] }
+            version: { type: integer, minimum: 1 }
+    Attachment:
+      type: object
+      required: [id, status, originalName, mimeType, byteSize]
+      properties:
+        id: { type: string, format: uuid }
+        status: { enum: [selected, validating, quarantined, clean, rejected] }
+        originalName: { type: string }
+        mimeType: { enum: [application/pdf, image/jpeg, image/png] }
+        byteSize: { type: integer, maximum: 10000000 }
+    ExpenseInput:
+      type: object
+      required: [title, amountJpy, incurredOn, payerMembershipId, shareMembershipIds]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 120 }
+        amountJpy: { type: integer, minimum: 1 }
+        incurredOn: { type: string, format: date }
+        payerMembershipId: { type: string, format: uuid }
+        shareMembershipIds:
+          type: array
+          minItems: 1
+          items: { type: string, format: uuid }
+    Expense:
+      allOf:
+        - { $ref: '#/components/schemas/ExpenseInput' }
+        - type: object
+          required: [id]
+          properties: { id: { type: string, format: uuid } }
+    HouseholdSnapshot:
+      type: object
+      description: Projection shape is versioned independently; see TypeScript domain model.
+      additionalProperties: true

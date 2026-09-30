@@ -1,0 +1,129 @@
+erDiagram
+  User ||--o{ HouseholdMembership : belongs_through
+  Household ||--o{ HouseholdMembership : has
+  User ||--o{ Authenticator : registers
+  User ||--o{ Session : owns
+  Household ||--o{ HouseholdInvite : issues
+  HouseholdInvite }o--|| HouseholdMembership : accepted_as
+  Household ||--o{ Event : contains
+  Household ||--o{ Todo : contains
+  Household ||--o{ Memo : contains
+  Household ||--o{ Expense : contains
+  Household ||--o{ ResourceLink : contains
+  Household ||--o{ AuditEvent : records
+  Event ||--o| RecurrenceRule : repeats_by
+  Event ||--o{ RecurrenceOverride : excepts
+  Todo ||--o| RecurrenceRule : repeats_by
+  Todo ||--o{ RecurrenceOverride : excepts
+  HouseholdMembership ||--o{ Todo : assigned_to
+  HouseholdMembership ||--o{ Todo : reviewed_by
+  HouseholdMembership ||--o{ Todo : created_by
+  Memo ||--o{ Attachment : has
+  Expense ||--|{ ExpenseShare : splits_into
+  Expense ||--o{ SettlementRecord : settled_by
+  HouseholdMembership ||--o{ ExpenseShare : owes
+
+  User {
+    uuid id PK
+    string email
+    string display_name
+  }
+  Household {
+    uuid id PK
+    string name
+    string iana_timezone
+  }
+  HouseholdMembership {
+    uuid id PK
+    uuid user_id FK
+    uuid household_id FK
+    enum role
+    enum status
+  }
+  Authenticator {
+    uuid id PK
+    uuid user_id FK
+    enum kind
+    bytes credential_public_key
+  }
+  Session {
+    uuid id PK
+    uuid user_id FK
+    timestamp expires_at
+    timestamp revoked_at
+  }
+  HouseholdInvite {
+    uuid id PK
+    uuid household_id FK
+    enum role
+    timestamp expires_at
+    int max_uses
+    int use_count
+  }
+  Event {
+    uuid id PK
+    uuid household_id FK
+    timestamp starts_at_utc
+    timestamp ends_at_utc
+    string timezone
+  }
+  Todo {
+    uuid id PK
+    uuid household_id FK
+    uuid assignee_membership_id FK
+    uuid reviewer_membership_id FK
+    uuid creator_membership_id FK
+    enum status
+    int version
+  }
+  Memo {
+    uuid id PK
+    uuid household_id FK
+    text body
+  }
+  Attachment {
+    uuid id PK
+    uuid memo_id FK
+    enum scan_status
+    int byte_size
+  }
+  Expense {
+    uuid id PK
+    uuid household_id FK
+    int amount_jpy
+    date incurred_on
+  }
+  ExpenseShare {
+    uuid id PK
+    uuid expense_id FK
+    uuid membership_id FK
+    int amount_jpy
+  }
+  SettlementRecord {
+    uuid id PK
+    uuid expense_id FK
+    int amount_jpy
+    timestamp recorded_at
+  }
+  RecurrenceRule {
+    uuid id PK
+    string rfc5545_rrule
+    string timezone
+  }
+  RecurrenceOverride {
+    uuid id PK
+    date occurrence_date
+    enum action
+  }
+  ResourceLink {
+    uuid id PK
+    uuid household_id FK
+    string url
+  }
+  AuditEvent {
+    uuid id PK
+    uuid household_id FK
+    uuid actor_membership_id FK
+    string action
+    timestamp occurred_at
+  }
