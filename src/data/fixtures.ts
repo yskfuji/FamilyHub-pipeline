@@ -1,4 +1,4 @@
-import type { HouseholdSnapshot, Insight } from '../domain/types';
+import type { HouseholdNotification, HouseholdSnapshot, Insight, NotificationPreferences, PrivacySettings, SecurityOverview } from '../domain/types';
 
 export const fixedNow = '2026-09-30T07:30:00+09:00';
 
@@ -6,16 +6,16 @@ export const baseSnapshot: HouseholdSnapshot = {
   user: { id: 'user-aoi', displayName: '碧', email: 'aoi@example.test', avatarTone: 'indigo' },
   household: { id: 'house-mori', name: '森さんち', timezone: 'Asia/Tokyo' },
   memberships: [
-    { id: 'member-aoi', householdId: 'house-mori', userId: 'user-aoi', displayName: '碧', role: 'owner', status: 'active', color: '#315c80' },
-    { id: 'member-ren', householdId: 'house-mori', userId: 'user-ren', displayName: '蓮', role: 'adult', status: 'active', color: '#a94f38' },
-    { id: 'member-hana', householdId: 'house-mori', userId: 'user-hana', displayName: '花', role: 'child', status: 'active', color: '#6f7552' },
-    { id: 'member-sora', householdId: 'house-mori', userId: 'user-sora', displayName: '空', role: 'child', status: 'active', color: '#8a6680' },
+    { id: 'member-aoi', householdId: 'house-mori', userId: 'user-aoi', displayName: '碧', role: 'owner', status: 'active', color: '#315c80', version: 1 },
+    { id: 'member-ren', householdId: 'house-mori', userId: 'user-ren', displayName: '蓮', role: 'adult', status: 'active', color: '#a94f38', version: 1 },
+    { id: 'member-hana', householdId: 'house-mori', userId: 'user-hana', displayName: '花', role: 'child', status: 'active', color: '#6f7552', version: 1 },
+    { id: 'member-sora', householdId: 'house-mori', userId: 'user-sora', displayName: '空', role: 'child', status: 'active', color: '#8a6680', version: 1 },
   ],
   events: [
-    { id: 'event-school', householdId: 'house-mori', title: '花｜学校公開', startsAt: '2026-09-30T09:30:00+09:00', endsAt: '2026-09-30T11:30:00+09:00', timezone: 'Asia/Tokyo', ownerMembershipId: 'member-aoi', participantMembershipIds: ['member-aoi', 'member-hana'], location: '青葉小学校', resourceIds: ['resource-school'], note: '上履きと来校証を忘れずに' },
-    { id: 'event-piano', householdId: 'house-mori', title: '空｜ピアノ', startsAt: '2026-09-30T16:30:00+09:00', endsAt: '2026-09-30T17:30:00+09:00', timezone: 'Asia/Tokyo', ownerMembershipId: 'member-ren', participantMembershipIds: ['member-sora'], location: '三宿音楽教室', recurrence: { rrule: 'FREQ=WEEKLY;BYDAY=WE', timezone: 'Asia/Tokyo', exceptions: [] } },
-    { id: 'event-clean', householdId: 'house-mori', title: '資源回収', startsAt: '2026-10-01T08:00:00+09:00', endsAt: '2026-10-01T08:30:00+09:00', timezone: 'Asia/Tokyo', ownerMembershipId: 'member-aoi', participantMembershipIds: ['member-aoi', 'member-ren'], recurrence: { rrule: 'FREQ=WEEKLY;BYDAY=TH', timezone: 'Asia/Tokyo', exceptions: [] } },
-    { id: 'event-park', householdId: 'house-mori', title: '週末の公園', startsAt: '2026-10-03T10:00:00+09:00', endsAt: '2026-10-03T12:00:00+09:00', timezone: 'Asia/Tokyo', ownerMembershipId: 'member-ren', participantMembershipIds: ['member-aoi','member-ren','member-hana','member-sora'], weatherSensitive: true },
+    { id: 'event-school', householdId: 'house-mori', title: '花｜学校公開', startsAt: '2026-09-30T09:30:00+09:00', endsAt: '2026-09-30T11:30:00+09:00', timezone: 'Asia/Tokyo', ownerMembershipId: 'member-aoi', participantMembershipIds: ['member-aoi', 'member-hana'], location: '青葉小学校', resourceIds: ['resource-school'], note: '上履きと来校証を忘れずに', version: 1 },
+    { id: 'event-piano', householdId: 'house-mori', title: '空｜ピアノ', startsAt: '2026-09-30T16:30:00+09:00', endsAt: '2026-09-30T17:30:00+09:00', timezone: 'Asia/Tokyo', ownerMembershipId: 'member-ren', participantMembershipIds: ['member-sora'], location: '三宿音楽教室', recurrence: { rrule: 'FREQ=WEEKLY;BYDAY=WE', timezone: 'Asia/Tokyo', exceptions: [] }, version: 1 },
+    { id: 'event-clean', householdId: 'house-mori', title: '資源回収', startsAt: '2026-10-01T08:00:00+09:00', endsAt: '2026-10-01T08:30:00+09:00', timezone: 'Asia/Tokyo', ownerMembershipId: 'member-aoi', participantMembershipIds: ['member-aoi', 'member-ren'], recurrence: { rrule: 'FREQ=WEEKLY;BYDAY=TH', timezone: 'Asia/Tokyo', exceptions: [] }, version: 1 },
+    { id: 'event-park', householdId: 'house-mori', title: '週末の公園', startsAt: '2026-10-03T10:00:00+09:00', endsAt: '2026-10-03T12:00:00+09:00', timezone: 'Asia/Tokyo', ownerMembershipId: 'member-ren', participantMembershipIds: ['member-aoi','member-ren','member-hana','member-sora'], weatherSensitive: true, version: 1 },
   ],
   todos: [
     { id: 'todo-form', householdId: 'house-mori', title: '就学援助の確認票', dueAt: '2026-09-30T20:00:00+09:00', status: 'review', assigneeMembershipId: 'member-aoi', reviewerMembershipId: 'member-ren', creatorMembershipId: 'member-aoi', version: 2, note: '記入済み。提出前の確認をお願いします。' },
@@ -35,9 +35,9 @@ export const baseSnapshot: HouseholdSnapshot = {
     { id: 'expense-groceries', householdId: 'house-mori', title: '週末の食材', amountJpy: 5840, incurredOn: '2026-09-26', payerMembershipId: 'member-aoi', category: 'food', shares: [{ membershipId: 'member-aoi', amountJpy: 2920, settledJpy: 2920 }, { membershipId: 'member-ren', amountJpy: 2920, settledJpy: 2920 }], settlements: [{ id: 'settlement-1', amountJpy: 2920, fromMembershipId: 'member-ren', toMembershipId: 'member-aoi', recordedAt: '2026-09-28T20:00:00+09:00' }] },
   ],
   resources: [
-    { id: 'resource-school', householdId: 'house-mori', label: '青葉小学校 保護者ページ', url: 'https://example.test/school', kind: 'school', relatedEntityId: 'event-school' },
-    { id: 'resource-city', householdId: 'house-mori', label: '世田谷区 子育て手続き', url: 'https://example.test/city', kind: 'municipality' },
-    { id: 'resource-guide', householdId: 'house-mori', label: '家族の連絡ルール', url: 'https://example.test/guide', kind: 'document' },
+    { id: 'resource-school', householdId: 'house-mori', label: '青葉小学校 保護者ページ', url: 'https://example.com/family-hub/school', kind: 'school', relatedEntityId: 'event-school' },
+    { id: 'resource-city', householdId: 'house-mori', label: '世田谷区 子育て手続き', url: 'https://example.com/family-hub/city', kind: 'municipality' },
+    { id: 'resource-guide', householdId: 'house-mori', label: '家族の連絡ルール', url: 'https://example.com/family-hub/guide', kind: 'document' },
   ],
   context: {
     asOf: fixedNow,
@@ -53,3 +53,18 @@ export const insights: Insight[] = [
   { id: 'insight-review', title: '提出前レビューが1件', summary: '「就学援助の確認票」は蓮さんの確認待ちです。自動提出はしません。', evidence: 'Todoの状態｜担当: 碧・確認: 蓮', actionLabel: 'Todoを開く', destination: '/tasks/todo-form', confidence: 'high' },
   { id: 'insight-settle', title: '未精算は合計3,110円', summary: '学校教材と交通費の記録から算出しています。精算の記録は取り消せます。', evidence: '支出2件の未精算分｜端数なし', actionLabel: '内訳を見る', destination: '/budget', confidence: 'high' },
 ];
+
+export const baseSecurityOverview: SecurityOverview = {
+  authenticators: [{ id: 'authenticator-macbook', label: 'MacBook', createdAt: '2026-09-28T18:00:00+09:00', kind: 'passkey', demo: true }],
+  sessions: [
+    { id: 'session-current', label: 'このブラウザ', location: '東京', lastSeenAt: fixedNow, current: true },
+    { id: 'session-iphone', label: 'iPhone Safari', location: '東京', lastSeenAt: '2026-09-30T05:30:00+09:00', current: false },
+  ],
+};
+
+export const baseNotifications: HouseholdNotification[] = [
+  { id: 'notification-library', title: '図書館の本を返す', body: '18:00まで · 担当は碧さんです', remindAt: '2026-09-30T17:30:00+09:00', read: false, status: 'active' },
+];
+
+export const baseNotificationPreferences: NotificationPreferences = { todoDue: true, eventDeparture: true, quietHours: true };
+export const basePrivacySettings: PrivacySettings = { defaultAudience: 'household', hideNotificationContent: true };

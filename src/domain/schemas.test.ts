@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { eventInputSchema, expenseInputSchema, passwordSchema } from './schemas';
+import { eventInputSchema, expenseInputSchema, passwordSchema, safeHttpsUrlSchema } from './schemas';
 
 describe('domain validation', () => {
   it('requires at least 15 password characters and accepts passphrases', () => {
@@ -23,5 +23,12 @@ describe('domain validation', () => {
       payerMembershipId: 'membership-1', shareMembershipIds: ['membership-1'],
     });
     expect(value.success).toBe(false);
+  });
+
+  it('rejects breached-looking values and non-HTTPS resource URLs', () => {
+    expect(passwordSchema.safeParse('123456789012345').success).toBe(false);
+    expect(safeHttpsUrlSchema.safeParse('javascript:alert(1)').success).toBe(false);
+    expect(safeHttpsUrlSchema.safeParse('http://example.com').success).toBe(false);
+    expect(safeHttpsUrlSchema.safeParse('https://example.com/resource').success).toBe(true);
   });
 });

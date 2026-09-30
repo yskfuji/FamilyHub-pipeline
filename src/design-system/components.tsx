@@ -1,5 +1,6 @@
 import type { PropsWithChildren, ReactNode } from 'react';
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useEffectEvent, useId, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { CloseIcon, FileIcon } from './icons';
 
 export function BrandMark() {
@@ -18,26 +19,67 @@ export function EmptyState({ title, children, action }: PropsWithChildren<{ titl
   return <div className="empty"><div className="empty-mark"><FileIcon /></div><h2>{title}</h2><p className="muted">{children}</p>{action}</div>;
 }
 
+const focusable = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+let lastModalTrigger: HTMLElement | null = null;
+
+export function useModalTriggerTracking() {
+  useEffect(() => {
+    const remember = (event: PointerEvent) => {
+      const target = event.target instanceof Element ? event.target.closest<HTMLElement>(focusable) : null;
+      if (target && !target.closest('[data-modal-root]')) lastModalTrigger = target;
+      else if (target) lastModalTrigger = target;
+    };
+    document.addEventListener('pointerdown', remember, true);
+    return () => document.removeEventListener('pointerdown', remember, true);
+  }, []);
+}
+
+export function useModalBehavior(onClose: () => void) {
+  const root = useRef<HTMLElement>(null);
+  const active = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null;
+  const trigger = useRef<HTMLElement | null>(active ?? lastModalTrigger);
+  const close = useEffectEvent(onClose);
+  useEffect(() => {
+    const returnTarget = trigger.current;
+    const appRoot = document.getElementById('root');
+    const previousOverflow = document.body.style.overflow;
+    appRoot?.setAttribute('inert', '');
+    document.body.style.overflow = 'hidden';
+    const frame = requestAnimationFrame(() => {
+      const preferred = root.current?.querySelector<HTMLElement>('[autofocus], [data-autofocus], button, input, select, textarea, a[href]');
+      preferred?.focus();
+    });
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); close(); return; }
+      if (event.key !== 'Tab' || !root.current) return;
+      const items = [...root.current.querySelectorAll<HTMLElement>(focusable)].filter((element) => !element.hasAttribute('disabled') && element.getAttribute('aria-hidden') !== 'true');
+      if (!items.length) { event.preventDefault(); return; }
+      const first = items[0]; const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', handler);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener('keydown', handler);
+      appRoot?.removeAttribute('inert');
+      document.body.style.overflow = previousOverflow;
+      requestAnimationFrame(() => returnTarget?.focus());
+    };
+  }, []);
+  return root;
+}
+
 export function Dialog({ title, description, onClose, children, actions }: PropsWithChildren<{ title: string; description?: string; onClose: () => void; actions?: ReactNode }>) {
   const titleId = useId();
-  const first = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    first.current?.focus();
-    const handler = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [onClose]);
-  return <div className="dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="dialog" role="dialog" aria-modal="true" aria-labelledby={titleId}><div className="dialog-head"><div><h2 id={titleId}>{title}</h2>{description && <p className="muted mb-0">{description}</p>}</div><button ref={first} className="icon-button" type="button" onClick={onClose} aria-label="閉じる"><CloseIcon /></button></div>{children}{actions && <div className="dialog-actions">{actions}</div>}</section></div>;
+  const root = useModalBehavior(onClose);
+  return createPortal(<div ref={root as React.RefObject<HTMLDivElement>} data-modal-root className="dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="dialog" role="dialog" aria-modal="true" aria-labelledby={titleId}><div className="dialog-head"><div><h2 id={titleId}>{title}</h2>{description && <p className="muted mb-0">{description}</p>}</div><button data-autofocus className="icon-button" type="button" onClick={onClose} aria-label="閉じる"><CloseIcon /></button></div>{children}{actions && <div className="dialog-actions">{actions}</div>}</section></div>, document.body);
 }
 
 export function Drawer({ title, eyebrow, onClose, children }: PropsWithChildren<{ title: string; eyebrow: string; onClose: () => void }>) {
   const titleId = useId();
-  useEffect(() => {
-    const handler = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [onClose]);
-  return <><div className="backdrop" onClick={onClose} /><aside className="drawer" role="dialog" aria-modal="true" aria-labelledby={titleId}><div className="drawer-head"><div><p className="eyebrow">{eyebrow}</p><h2 id={titleId}>{title}</h2></div><button className="icon-button" type="button" onClick={onClose} aria-label="詳細を閉じる"><CloseIcon /></button></div>{children}</aside></>;
+  const root = useModalBehavior(onClose);
+  return createPortal(<div ref={root as React.RefObject<HTMLDivElement>} data-modal-root><div className="backdrop" onClick={onClose} /><aside className="drawer" role="dialog" aria-modal="true" aria-labelledby={titleId}><div className="drawer-head"><div><p className="eyebrow">{eyebrow}</p><h2 id={titleId}>{title}</h2></div><button data-autofocus className="icon-button" type="button" onClick={onClose} aria-label="詳細を閉じる"><CloseIcon /></button></div>{children}</aside></div>, document.body);
 }
 
 export function StatusBadge({ tone = 'neutral', children }: PropsWithChildren<{ tone?: 'neutral' | 'attention' | 'success' | 'danger' }>) {

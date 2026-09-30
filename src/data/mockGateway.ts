@@ -1,6 +1,7 @@
 import type { FamilyHubGateway } from './gateway';
-import { baseSnapshot } from './fixtures';
-import type { CalendarEvent, Expense, GatewayError, HouseholdSnapshot, Memo, Result, Scenario, Todo } from '../domain/types';
+import { baseNotificationPreferences, baseNotifications, basePrivacySettings, baseSecurityOverview, baseSnapshot } from './fixtures';
+import { memoInputSchema, passwordSchema } from '../domain/schemas';
+import type { Authenticator, CalendarEvent, Expense, GatewayError, HouseholdNotification, HouseholdSnapshot, Memo, NotificationPreferences, PrivacySettings, Result, Scenario, SecurityOverview, Todo } from '../domain/types';
 
 const delay = (ms = 90) => new Promise((resolve) => window.setTimeout(resolve, ms));
 const ok = <T,>(value: T): Result<T> => ({ ok: true, value });
@@ -17,6 +18,12 @@ const scenarioError = (scenario?: Scenario): GatewayError | null => {
 
 export function createMockGateway(): FamilyHubGateway {
   const state = copy();
+  const security: SecurityOverview = structuredClone(baseSecurityOverview);
+  const notifications: HouseholdNotification[] = structuredClone(baseNotifications);
+  let notificationPreferences: NotificationPreferences = structuredClone(baseNotificationPreferences);
+  let privacy: PrivacySettings = structuredClone(basePrivacySettings);
+  let sequence = 0;
+  const nextId = (prefix: string) => `${prefix}-mock-${++sequence}`;
 
   return {
     auth: {
@@ -27,6 +34,29 @@ export function createMockGateway(): FamilyHubGateway {
         return ok({ userId: state.user.id });
       },
       async signOut() { await delay(); return ok(undefined); },
+      async getSecurityOverview() { await delay(); return ok(structuredClone(security)); },
+      async beginPasskeyRegistration() { await delay(); return ok({ challengeId: nextId('challenge'), publicKey: null }); },
+      async finishPasskeyRegistration(challengeId, credential) {
+        await delay();
+        if (!challengeId || !credential) return fail({ code: 'INVALID_INPUT', message: 'パスキー登録を完了できませんでした。', retryable: true });
+        const authenticator: Authenticator = { id: nextId('authenticator'), label: 'この端末（デモ）', createdAt: '2026-09-30T07:45:00+09:00', kind: 'passkey', demo: true };
+        security.authenticators.push(authenticator);
+        return ok(structuredClone(authenticator));
+      },
+      async changePassword(currentPassword, newPassword) {
+        await delay();
+        if (!passwordSchema.safeParse(currentPassword).success) return fail({ code: 'UNAUTHENTICATED', message: '現在のパスワードを確認してください。', retryable: false });
+        const parsed = passwordSchema.safeParse(newPassword);
+        if (!parsed.success) return fail({ code: 'INVALID_INPUT', message: parsed.error.issues[0]?.message ?? '新しいパスワードを確認してください。', retryable: false });
+        return ok(undefined);
+      },
+      async revokeSession(sessionId) {
+        await delay();
+        const target = security.sessions.find((session) => session.id === sessionId);
+        if (!target || target.current) return fail({ code: 'FORBIDDEN', message: 'このセッションはここから終了できません。', retryable: false });
+        security.sessions.splice(security.sessions.indexOf(target), 1);
+        return ok(undefined);
+      },
     },
     household: {
       async getSnapshot(scenario) {
@@ -49,6 +79,22 @@ export function createMockGateway(): FamilyHubGateway {
         if (code === 'EXPIRED') return fail({ code: 'UNAUTHENTICATED', message: '招待の有効期限が切れています。', retryable: false });
         return ok({ householdId: state.household.id });
       },
+      async updateMembershipRole(id, role, expectedVersion) {
+        await delay();
+        const target = state.memberships.find((member) => member.id === id);
+        if (!target) return fail({ code: 'INVALID_INPUT', message: 'メンバーが見つかりません。', retryable: false });
+        if (target.version !== expectedVersion) return fail({ code: 'CONFLICT', message: '別の端末で権限が更新されています。', retryable: true });
+        const activeOwners = state.memberships.filter((member) => member.status === 'active' && member.role === 'owner');
+        if (target.role === 'owner' && role !== 'owner' && activeOwners.length === 1) return fail({ code: 'FORBIDDEN', message: '世帯には少なくとも1人のownerが必要です。先に別のownerを追加してください。', retryable: false });
+        target.role = role; target.version += 1;
+        return ok(structuredClone(target));
+      },
+      async createInvite(role) {
+        await delay();
+        const invite = { id: nextId('invite'), householdId: state.household.id, role, token: `FAMILY-2026-${String(sequence).padStart(4, '0')}-ONE-TIME`, expiresAt: '2026-10-01T07:45:00+09:00', remainingUses: 1 } as const;
+        return ok(structuredClone(invite));
+      },
+      async savePrivacySettings(settings) { await delay(); privacy = structuredClone(settings); return ok(structuredClone(privacy)); },
     },
     events: {
       async createEvent(input) {
@@ -56,17 +102,26 @@ export function createMockGateway(): FamilyHubGateway {
         const event: CalendarEvent = {
           id: `event-${Date.now()}`, householdId: state.household.id, ownerMembershipId: 'member-aoi',
           title: input.title, startsAt: input.startsAt, endsAt: input.endsAt, timezone: input.timezone,
-          participantMembershipIds: input.participantMembershipIds, recurrence: input.recurrence as CalendarEvent['recurrence'],
+          participantMembershipIds: input.participantMembershipIds, recurrence: input.recurrence as CalendarEvent['recurrence'], location: input.location, weatherSensitive: input.weatherSensitive, version: 1,
         };
         state.events = [...state.events, event];
         return ok(structuredClone(event));
       },
-      async updateRecurrence(id, _scope, input) {
+      async updateEvent(id, _scope, input, expectedVersion) {
         await delay();
         const target = state.events.find((event) => event.id === id);
         if (!target) return fail({ code: 'INVALID_INPUT', message: '予定が見つかりません。', retryable: false });
-        Object.assign(target, input);
+        if (target.version !== expectedVersion) return fail({ code: 'CONFLICT', message: '別の端末で予定が更新されています。', retryable: true });
+        Object.assign(target, input); target.version += 1;
         return ok(structuredClone(target));
+      },
+      async deleteEvent(id, _scope, expectedVersion) {
+        await delay();
+        const target = state.events.find((event) => event.id === id);
+        if (!target) return fail({ code: 'INVALID_INPUT', message: '予定が見つかりません。', retryable: false });
+        if (target.version !== expectedVersion) return fail({ code: 'CONFLICT', message: '別の端末で予定が更新されています。', retryable: true });
+        state.events = state.events.filter((event) => event.id !== id);
+        return ok(undefined);
       },
     },
     todos: {
@@ -84,8 +139,24 @@ export function createMockGateway(): FamilyHubGateway {
         target.status = status; target.version += 1;
         return ok(structuredClone(target));
       },
+      async updateTodo(id, _scope, input, expectedVersion) {
+        await delay();
+        const target = state.todos.find((todo) => todo.id === id);
+        if (!target) return fail({ code: 'INVALID_INPUT', message: 'Todoが見つかりません。', retryable: false });
+        if (target.version !== expectedVersion) return fail({ code: 'CONFLICT', message: '別の端末で更新されています。現在の内容を確認してください。', retryable: true });
+        Object.assign(target, input); target.version += 1;
+        return ok(structuredClone(target));
+      },
     },
     memos: {
+      async createMemo(input) {
+        await delay();
+        const parsed = memoInputSchema.safeParse(input);
+        if (!parsed.success) return fail({ code: 'INVALID_INPUT', message: parsed.error.issues[0]?.message ?? '入力を確認してください。', retryable: false });
+        const memo: Memo = { id: nextId('memo'), householdId: state.household.id, ...parsed.data, updatedAt: '2026-09-30T07:45:00+09:00', authorMembershipId: 'member-aoi', attachments: [] };
+        state.memos = [memo, ...state.memos];
+        return ok(structuredClone(memo));
+      },
       async uploadAttachment(memoId, file) {
         await delay(260);
         const target = state.memos.find((memo) => memo.id === memoId);
@@ -140,6 +211,29 @@ export function createMockGateway(): FamilyHubGateway {
     },
     context: {
       async getContext() { await delay(60); return ok(structuredClone(state.context)); },
+    },
+    notifications: {
+      async list() { await delay(50); return ok(structuredClone(notifications)); },
+      async markRead(id) {
+        await delay(50); const target = notifications.find((item) => item.id === id);
+        if (!target) return fail({ code: 'INVALID_INPUT', message: '通知が見つかりません。', retryable: false });
+        target.read = true; return ok(structuredClone(target));
+      },
+      async snooze(id, minutes) {
+        await delay(); const target = notifications.find((item) => item.id === id);
+        if (!target || minutes !== 30) return fail({ code: 'INVALID_INPUT', message: '通知を延期できません。', retryable: false });
+        target.status = 'snoozed'; target.remindAt = '2026-09-30T18:00:00+09:00'; return ok(structuredClone(target));
+      },
+      async stop(id) {
+        await delay(); const target = notifications.find((item) => item.id === id);
+        if (!target) return fail({ code: 'INVALID_INPUT', message: '通知が見つかりません。', retryable: false });
+        target.status = 'stopped'; return ok(structuredClone(target));
+      },
+      async getPreferences() { await delay(50); return ok(structuredClone(notificationPreferences)); },
+      async updatePreferences(input) { await delay(); notificationPreferences = { ...notificationPreferences, ...input }; return ok(structuredClone(notificationPreferences)); },
+    },
+    credentials: {
+      async create() { await delay(); return ok({ id: nextId('mock-credential'), demo: true }); },
     },
   };
 }

@@ -3,6 +3,7 @@ import { createMockGateway } from '../data/mockGateway';
 import { baseSnapshot } from '../data/fixtures';
 import type { FamilyHubGateway } from '../data/gateway';
 import type { GatewayError, HouseholdSnapshot, Scenario, Theme } from '../domain/types';
+import { useModalTriggerTracking } from '../design-system/components';
 
 interface AppState {
   gateway: FamilyHubGateway;
@@ -28,6 +29,7 @@ function queryScenario(): Scenario {
 }
 
 export function AppProvider({ children }: PropsWithChildren) {
+  useModalTriggerTracking();
   const [snapshot, setSnapshot] = useState<HouseholdSnapshot>(structuredClone(baseSnapshot));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<GatewayError | null>(null);

@@ -47,7 +47,10 @@ export interface HouseholdMembership {
   role: MembershipRole;
   status: 'active' | 'invited' | 'suspended';
   color: string;
+  version: number;
 }
+
+export type RecurrenceScope = 'this' | 'future' | 'series';
 
 export interface RecurrenceRule {
   rrule: string;
@@ -70,6 +73,7 @@ export interface CalendarEvent {
   resourceIds?: Id[];
   note?: string;
   weatherSensitive?: boolean;
+  version: number;
 }
 
 export type TodoStatus = 'open' | 'doing' | 'review' | 'done';
@@ -179,4 +183,54 @@ export interface Insight {
   actionLabel: string;
   destination: string;
   confidence: 'high' | 'medium' | 'low';
+}
+
+export interface HouseholdInvite {
+  id: Id;
+  householdId: Id;
+  role: Exclude<MembershipRole, 'owner'>;
+  token: string;
+  expiresAt: Rfc3339;
+  remainingUses: number;
+}
+
+export interface Authenticator {
+  id: Id;
+  label: string;
+  createdAt: Rfc3339;
+  kind: 'passkey';
+  demo: boolean;
+}
+
+export interface Session {
+  id: Id;
+  label: string;
+  location: string;
+  lastSeenAt: Rfc3339;
+  current: boolean;
+}
+
+export interface SecurityOverview {
+  authenticators: Authenticator[];
+  sessions: Session[];
+}
+
+export interface PrivacySettings {
+  defaultAudience: 'household' | 'creator';
+  hideNotificationContent: boolean;
+}
+
+export interface NotificationPreferences {
+  todoDue: boolean;
+  eventDeparture: boolean;
+  quietHours: boolean;
+}
+
+export interface HouseholdNotification {
+  id: Id;
+  title: string;
+  body: string;
+  remindAt: Rfc3339;
+  read: boolean;
+  status: 'active' | 'snoozed' | 'stopped';
 }

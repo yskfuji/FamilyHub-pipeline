@@ -16,6 +16,7 @@ paths:
     post:
       security: []
       operationId: beginPasskey
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
       responses:
         '200':
           description: WebAuthn challenge
@@ -27,6 +28,7 @@ paths:
     post:
       security: []
       operationId: signInWithPassword
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
       requestBody:
         required: true
         content:
@@ -46,6 +48,62 @@ paths:
       parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
       responses:
         '204': { description: Session revoked }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/auth/security:
+    get:
+      operationId: getSecurityOverview
+      responses:
+        '200': { description: Authenticators and sessions without secrets }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/auth/passkeys/registration:
+    post:
+      operationId: beginPasskeyRegistration
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '200': { description: Short-lived WebAuthn registration challenge }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/auth/passkeys/registration/complete:
+    post:
+      operationId: finishPasskeyRegistration
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challengeId, credential]
+              properties:
+                challengeId: { type: string }
+                credential: { type: object, additionalProperties: true }
+      responses:
+        '201': { description: Authenticator registered after origin and challenge verification }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/auth/password/change:
+    post:
+      operationId: changePassword
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string, minLength: 15, maxLength: 64 }
+                newPassword: { type: string, minLength: 15, maxLength: 64 }
+      responses:
+        '204': { description: Password changed; breached values rejected server-side }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/auth/sessions/{sessionId}:
+    delete:
+      operationId: revokeSession
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { name: sessionId, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: Exactly the requested non-current session was revoked }
         default: { $ref: '#/components/responses/Error' }
   /v1/households/current/snapshot:
     get:
@@ -79,6 +137,58 @@ paths:
                 properties: { householdId: { type: string, format: uuid } }
         '410': { $ref: '#/components/responses/Error' }
         default: { $ref: '#/components/responses/Error' }
+  /v1/household-invites:
+    post:
+      operationId: createHouseholdInvite
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties: { role: { enum: [adult, child, guest] } }
+      responses:
+        '201': { description: 24-hour, single-use token returned once }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/household-memberships/{membershipId}:
+    patch:
+      operationId: updateMembershipRole
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { name: membershipId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role, expectedVersion]
+              properties:
+                role: { enum: [owner, adult, child, guest] }
+                expectedVersion: { type: integer, minimum: 1 }
+      responses:
+        '200': { description: Role updated; sole owner demotion is rejected }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/households/current/privacy:
+    put:
+      operationId: savePrivacySettings
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [defaultAudience, hideNotificationContent]
+              properties:
+                defaultAudience: { enum: [household, creator] }
+                hideNotificationContent: { type: boolean }
+      responses:
+        '200': { description: Privacy defaults saved; never implies public access }
+        default: { $ref: '#/components/responses/Error' }
   /v1/events:
     post:
       operationId: createEvent
@@ -110,16 +220,28 @@ paths:
           application/json:
             schema:
               type: object
-              required: [scope, input]
+              required: [scope, input, expectedVersion]
               properties:
                 scope: { enum: [this, future, series] }
                 input: { $ref: '#/components/schemas/EventInput' }
+                expectedVersion: { type: integer, minimum: 1 }
       responses:
         '200':
           description: Updated
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Event' }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: deleteEvent
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { name: eventId, in: path, required: true, schema: { type: string } }
+        - { name: scope, in: query, required: true, schema: { enum: [this, future, series] } }
+        - { name: expectedVersion, in: query, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        '204': { description: Event scope deleted after authorization and version check }
         '409': { $ref: '#/components/responses/Error' }
         default: { $ref: '#/components/responses/Error' }
   /v1/todos:
@@ -164,6 +286,45 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Todo' }
         '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/todos/{todoId}:
+    patch:
+      operationId: updateTodo
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { name: todoId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scope, input, expectedVersion]
+              properties:
+                scope: { enum: [this, future, series] }
+                input: { $ref: '#/components/schemas/TodoInput' }
+                expectedVersion: { type: integer, minimum: 1 }
+      responses:
+        '200': { description: Todo updated }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/memos:
+    post:
+      operationId: createMemo
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, body, tags]
+              properties:
+                title: { type: string, minLength: 1, maxLength: 120 }
+                body: { type: string, minLength: 1, maxLength: 5000 }
+                tags: { type: array, maxItems: 10, items: { type: string, maxLength: 30 } }
+      responses:
+        '201': { description: Memo created }
         default: { $ref: '#/components/responses/Error' }
   /v1/memos/{memoId}/attachments:
     post:
@@ -273,6 +434,69 @@ paths:
                   holidays: { type: array, items: { type: object, additionalProperties: true } }
                   sync: { type: object, additionalProperties: true }
         default: { $ref: '#/components/responses/Error' }
+  /v1/notifications:
+    get:
+      operationId: listNotifications
+      responses:
+        '200': { description: Authorized household notifications }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/notifications/{notificationId}/read:
+    post:
+      operationId: markNotificationRead
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { name: notificationId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Notification marked read }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/notifications/{notificationId}/snooze:
+    post:
+      operationId: snoozeNotification
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { name: notificationId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [minutes]
+              properties: { minutes: { type: integer, enum: [30] } }
+      responses:
+        '200': { description: Notification reminder moved by 30 minutes }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/notifications/{notificationId}/stop:
+    post:
+      operationId: stopNotification
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { name: notificationId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Notification stopped }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/notification-preferences:
+    get:
+      operationId: getNotificationPreferences
+      responses:
+        '200': { description: Notification preference snapshot }
+        default: { $ref: '#/components/responses/Error' }
+    patch:
+      operationId: updateNotificationPreferences
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                todoDue: { type: boolean }
+                eventDeparture: { type: boolean }
+                quietHours: { type: boolean }
+      responses:
+        '200': { description: Notification preferences updated }
+        default: { $ref: '#/components/responses/Error' }
 components:
   securitySchemes:
     sessionCookie:
@@ -335,10 +559,11 @@ components:
       allOf:
         - { $ref: '#/components/schemas/EventInput' }
         - type: object
-          required: [id, householdId]
+          required: [id, householdId, version]
           properties:
             id: { type: string, format: uuid }
             householdId: { type: string, format: uuid }
+            version: { type: integer, minimum: 1 }
     TodoInput:
       type: object
       required: [title, assigneeMembershipId]

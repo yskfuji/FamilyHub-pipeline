@@ -10,6 +10,7 @@ export const todoInputSchema = z.object({
   dueAt: rfc3339Schema.optional(),
   assigneeMembershipId: idSchema,
   reviewerMembershipId: idSchema.optional(),
+  note: z.string().max(2000).optional(),
 });
 
 export const eventInputSchema = z.object({
@@ -23,6 +24,8 @@ export const eventInputSchema = z.object({
     timezone: z.string(),
     exceptions: z.array(isoDateSchema),
   }).optional(),
+  location: z.string().max(200).optional(),
+  weatherSensitive: z.boolean().optional(),
 }).refine((value) => Date.parse(value.endsAt) > Date.parse(value.startsAt), {
   message: '終了は開始より後にしてください',
   path: ['endsAt'],
@@ -41,6 +44,15 @@ export const passwordSchema = z.string()
   .max(64, '64文字以内で入力してください')
   .refine((value) => !['passwordpassword', '123456789012345', 'qwertyuiopasdfg'].includes(value.toLowerCase()), '既知の漏えいパスワードに近いため使用できません');
 
+export const memoInputSchema = z.object({
+  title: z.string().trim().min(1, 'タイトルを入力してください').max(120),
+  body: z.string().trim().min(1, '本文を入力してください').max(5000),
+  tags: z.array(z.string().trim().min(1).max(30)).max(10),
+});
+
+export const safeHttpsUrlSchema = z.string().url().refine((value) => new URL(value).protocol === 'https:', 'HTTPSのURLだけを開けます');
+
 export type TodoInput = z.infer<typeof todoInputSchema>;
 export type EventInput = z.infer<typeof eventInputSchema>;
 export type ExpenseInput = z.infer<typeof expenseInputSchema>;
+export type MemoInput = z.infer<typeof memoInputSchema>;

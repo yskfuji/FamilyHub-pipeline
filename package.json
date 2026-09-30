@@ -13,7 +13,7 @@
     "typecheck": "tsc -b --pretty false",
     "lint": "eslint . --max-warnings 0",
     "test:unit": "vitest run",
-    "test:e2e": "playwright test e2e/core.spec.ts",
+    "test:e2e": "playwright test e2e/core.spec.ts e2e/interactions.spec.ts",
     "audit:a11y": "playwright test e2e/accessibility.spec.ts",
     "audit:visual": "playwright test e2e/capture.spec.ts --project=chromium && node scripts/build-gallery.mjs",
     "audit:lighthouse": "bash scripts/lighthouse.sh",
