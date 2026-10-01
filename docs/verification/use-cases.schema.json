@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["version", "evidencePolicy", "cases"],
+  "properties": {
+    "version": {"type": "integer", "minimum": 1},
+    "cases": {
+      "type": "array",
+      "minItems": 52,
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "products", "roles", "capability", "success", "failures", "recovery"],
+        "properties": {
+          "id": {"pattern": "^UC-[A-Z][0-9]{2}$"},
+          "products": {"type": "array", "items": {"enum": ["B", "F"]}, "minItems": 1, "uniqueItems": true},
+          "roles": {"type": "array", "minItems": 1},
+          "failures": {"type": "array", "minItems": 1}
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}

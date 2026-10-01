@@ -6,6 +6,9 @@ test('owner sees administration with localized role and status labels', async ({
   await expect(page.getByRole('button', { name: /の権限を設定/ })).toHaveCount(5);
   await expect(page.getByRole('heading', { name: '家族を招待' })).toBeVisible();
   await expect(page.getByText(/owner · active/)).toBeHidden();
+  await page.goto('/calendar');
+  await expect(page.getByText('ピアノ')).toHaveCount(0);
+  await expect(page.getByText('学校公開').first()).toBeVisible();
 });
 
 test('adult can view members but cannot administer them', async ({ page }) => {

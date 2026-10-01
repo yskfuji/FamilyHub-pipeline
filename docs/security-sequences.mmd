@@ -1,0 +1,76 @@
+sequenceDiagram
+    autonumber
+    actor U as 利用者
+    participant UI as 画面
+    participant API as API
+    participant AZ as 認可サービス
+    participant DB as DB
+
+    rect rgb(239,246,255)
+      Note over U,DB: 認可と本人確認
+      U->>UI: 重要操作を選ぶ
+      UI->>API: 対象ID・版・権限revision
+      API->>AZ: 能力・所属・公開範囲を判定
+      alt 認可されない
+        AZ-->>API: 403 または存在を隠す404
+        API-->>UI: 日本語messageKey
+      else 認可されるが本人確認が必要
+        API-->>UI: 401 REAUTH_REQUIRED
+        U->>UI: パスワード等で本人確認
+        UI->>API: 短時間の確認トークン付き再要求
+        API->>DB: 版と権限revisionを再確認して更新
+        DB-->>UI: 成功状態
+      end
+    end
+
+    rect rgb(248,250,252)
+      Note over U,DB: 招待の一回利用
+      U->>UI: 招待コードを送信
+      UI->>API: コード
+      API->>DB: ハッシュ・期限・失効・残回数を条件付き更新
+      alt 同時要求の一つ目
+        DB-->>API: 1行更新
+        API->>DB: Membership作成を同一transactionで確定
+        API-->>UI: 参加完了
+      else 二つ目以降
+        DB-->>API: 0行更新
+        API-->>UI: 無効・期限切れ・使用済みを区別しない400
+      end
+    end
+
+    rect rgb(255,247,237)
+      Note over U,DB: オフライン下書きの復旧
+      UI--xAPI: 作成・更新が通信失敗
+      UI->>UI: 許可対象だけ暗号化下書きへ保存
+      U->>UI: 復帰後に内容を確認
+      UI->>API: セッション・権限・最新版を再取得
+      alt 競合または権限喪失
+        API-->>UI: 409または403
+        UI-->>U: 現在内容を残す／下書きを修正・破棄
+      else 再送可能
+        U->>UI: 送信を確定
+        UI->>API: 冪等キー付きmutation
+        API-->>UI: 成功
+      end
+    end
+
+    rect rgb(240,253,244)
+      Note over U,DB: 添付の隔離
+      U->>UI: ファイルを選ぶ
+      UI->>API: multipart送信
+      API->>API: 拡張子・MIME・signature・容量を検証
+      API->>DB: webroot外の隔離領域へランダム名で保存
+      alt 検査不能または不正
+        API-->>UI: 503またはATTACHMENT_REJECTED
+      else 検査済み
+        API-->>UI: 利用可能
+      end
+    end
+
+    rect rgb(254,242,242)
+      Note over U,DB: 天気サービス障害
+      UI->>API: 天気を要求
+      API--xAPI: 外部サービス失敗
+      API-->>UI: 取得時刻付きの古い情報または503
+      UI-->>U: 予定は変更せず手動判断を案内
+    end

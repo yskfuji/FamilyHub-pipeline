@@ -37,7 +37,7 @@ for (const [viewport,width,height] of [['mobile',390,844],['desktop',1440,1000]]
   });
   test(`${viewport} event editor`, async ({ page, browserName }) => {
     test.skip(browserName !== 'chromium', 'delivery capture uses fixed Chromium DPR 2');
-    await page.setViewportSize({ width, height }); await page.goto('/calendar/event-piano');
+    await page.setViewportSize({ width, height }); await page.goto('/calendar/event-clean');
     await page.getByRole('button', { name: '編集する' }).click();
     await expect(page.getByRole('heading', { name: '予定を編集' })).toBeVisible();
     await page.screenshot({ path: `artifacts/screens/${viewport}-calendar-edit-light.png`, fullPage: false, animations: 'disabled' });
