@@ -74,12 +74,13 @@ export function authorizeVisibleResource(
 ): AuthorizationDecision {
   const capabilityDecision = authorize(viewer, capability);
   if (!capabilityDecision.allowed) return capabilityDecision;
-  if (viewer.role === 'owner') return { allowed: true };
-  const visible = (visibility.audience === 'household' && viewer.role !== 'guest')
-    || (visibility.audience === 'adults' && viewer.role === 'adult')
+  const isCreator = visibility.creatorMembershipId === viewer.membershipId;
+  const isRelated = relatedMembershipIds.includes(viewer.membershipId);
+  const visible = (visibility.audience === 'household' && (viewer.role === 'owner' || viewer.role === 'adult' || isCreator || isRelated))
+    || (visibility.audience === 'adults' && (viewer.role === 'owner' || viewer.role === 'adult'))
     || (visibility.audience === 'creator' && visibility.creatorMembershipId === viewer.membershipId)
-    || (visibility.audience === 'participants' && relatedMembershipIds.includes(viewer.membershipId))
-    || (visibility.audience === 'selected' && visibility.selectedMembershipIds.includes(viewer.membershipId));
+    || (visibility.audience === 'participants' && (isCreator || isRelated))
+    || (visibility.audience === 'selected' && (isCreator || visibility.selectedMembershipIds.includes(viewer.membershipId)));
   return visible ? { allowed: true } : { allowed: false, reason: 'SCOPE_DENIED' };
 }
 

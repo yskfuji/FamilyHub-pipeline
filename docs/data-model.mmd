@@ -1,6 +1,7 @@
 erDiagram
   User ||--o{ HouseholdMembership : belongs_through
   Household ||--o{ HouseholdMembership : has
+  HouseholdMembership ||--o{ PermissionOverride : receives
   User ||--o{ Authenticator : registers
   User ||--o{ Session : owns
   Household ||--o{ HouseholdInvite : issues
@@ -11,6 +12,7 @@ erDiagram
   Household ||--o{ Expense : contains
   Household ||--o{ ResourceLink : contains
   Household ||--o{ AuditEvent : records
+  Household ||--o{ IdempotencyRecord : deduplicates
   Event ||--o| RecurrenceRule : repeats_by
   Event ||--o{ RecurrenceOverride : excepts
   Todo ||--o| RecurrenceRule : repeats_by
@@ -21,17 +23,19 @@ erDiagram
   Memo ||--o{ Attachment : has
   Expense ||--|{ ExpenseShare : splits_into
   Expense ||--o{ SettlementRecord : settled_by
+  SettlementRecord o|--o| SettlementRecord : reverses
   HouseholdMembership ||--o{ ExpenseShare : owes
 
   User {
     uuid id PK
-    string email
+    string email UK
     string display_name
   }
   Household {
     uuid id PK
     string name
     string iana_timezone
+    int authorization_revision
   }
   HouseholdMembership {
     uuid id PK
@@ -39,6 +43,13 @@ erDiagram
     uuid household_id FK
     enum role
     enum status
+    int version
+  }
+  PermissionOverride {
+    uuid id PK
+    uuid membership_id FK
+    string capability
+    enum effect
   }
   Authenticator {
     uuid id PK
@@ -66,6 +77,10 @@ erDiagram
     timestamp starts_at_utc
     timestamp ends_at_utc
     string timezone
+    enum visibility_audience
+    json selected_membership_ids
+    int version
+    timestamp deleted_at
   }
   Todo {
     uuid id PK
@@ -74,12 +89,19 @@ erDiagram
     uuid reviewer_membership_id FK
     uuid creator_membership_id FK
     enum status
+    enum visibility_audience
+    json selected_membership_ids
     int version
+    timestamp deleted_at
   }
   Memo {
     uuid id PK
     uuid household_id FK
     text body
+    enum visibility_audience
+    json selected_membership_ids
+    int version
+    timestamp deleted_at
   }
   Attachment {
     uuid id PK
@@ -102,6 +124,9 @@ erDiagram
   SettlementRecord {
     uuid id PK
     uuid expense_id FK
+    uuid from_membership_id FK
+    uuid to_membership_id FK
+    uuid reversal_of_id FK
     int amount_jpy
     timestamp recorded_at
   }
@@ -118,7 +143,9 @@ erDiagram
   ResourceLink {
     uuid id PK
     uuid household_id FK
-    string url
+    string validated_https_url
+    enum visibility_audience
+    json selected_membership_ids
   }
   AuditEvent {
     uuid id PK
@@ -126,4 +153,12 @@ erDiagram
     uuid actor_membership_id FK
     string action
     timestamp occurred_at
+  }
+  IdempotencyRecord {
+    uuid id PK
+    uuid household_id FK
+    string key_hash UK
+    string request_hash
+    int response_status
+    timestamp expires_at
   }

@@ -27,10 +27,12 @@ describe('authorization policy', () => {
     expect(authorizeVisibleResource(viewer('guest', 'member-guest'), 'event.read', visibility)).toEqual({ allowed: false, reason: 'SCOPE_DENIED' });
   });
 
-  it('gives owners full household visibility and requires explicit sharing for guests', () => {
+  it('does not let the owner role bypass private visibility and requires explicit sharing for guests', () => {
     const household: VisibilityPolicy = { audience: 'household', creatorMembershipId: 'member-owner', selectedMembershipIds: [] };
-    expect(authorizeVisibleResource(viewer('owner'), 'event.read', { ...household, audience: 'creator' }).allowed).toBe(true);
+    expect(authorizeVisibleResource(viewer('owner'), 'event.read', { ...household, creatorMembershipId: 'member-child', audience: 'creator' })).toEqual({ allowed: false, reason: 'SCOPE_DENIED' });
+    expect(authorizeVisibleResource(viewer('owner'), 'event.read', { ...household, creatorMembershipId: 'member-child', audience: 'selected' })).toEqual({ allowed: false, reason: 'SCOPE_DENIED' });
     expect(authorizeVisibleResource(viewer('guest'), 'resource.read', household)).toEqual({ allowed: false, reason: 'SCOPE_DENIED' });
+    expect(authorizeVisibleResource(viewer('child'), 'event.read', { ...household, creatorMembershipId: 'member-adult' })).toEqual({ allowed: false, reason: 'SCOPE_DENIED' });
   });
 
   it('projects protected collections before rendering a role-specific snapshot', () => {

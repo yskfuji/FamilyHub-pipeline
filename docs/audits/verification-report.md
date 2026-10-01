@@ -1,6 +1,6 @@
 # 検証結果
 
-実測日: 2026-10-01。固定ロケール `ja-JP`、`Asia/Tokyo`、固定fixtureで実行。未実行の項目を合格とは記載しない。
+実測日: 2026-10-02。固定ロケール `ja-JP`、`Asia/Tokyo`、固定fixtureで実行。未実行の項目を合格とは記載しない。
 
 | 区分 | 状態 | 証拠 |
 |---|---|---|
@@ -12,7 +12,7 @@
 | axe serious/critical / keyboard | pass | 15件×3ブラウザ=45/45。フォーカストラップ・復帰、inert、Reduced Motion、44px監査を含みserious/critical 0 |
 | 320〜1920px水平オーバーフロー | pass | 主要ルート×6幅×3ブラウザ、document/body/main差分0 |
 | 全主要画面スクリーン | pass + human reviewed | DPR 2 PNG 97枚、390/834/1440px、明暗・異常状態・4ロール・通知/編集/権限/パスワード、`artifacts/screens/gallery.html` |
-| Lighthouse Today desktop | target met | Performance 100、Accessibility 100、Best Practices 100、LCP 649ms、CLS 0.00045、TBT 0ms |
+| Lighthouse Today desktop | target met | Performance 100、Accessibility 100、Best Practices 100、LCP 646ms、CLS 0.00045、TBT 0ms |
 | npm runtime/full audit | pass | `npm audit --omit=dev`、全依存 `npm audit` ともに0 vulnerabilities。Vite 8.3.1 |
 | VoiceOver + Safari実機 | evidence-pending | 人手記録なし |
 | 家庭ユーザー試験 | evidence-pending | 6世帯12名未実施 |

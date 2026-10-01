@@ -24,8 +24,8 @@ test('household invite join and expiry are distinguishable', async ({ page }) =>
 });
 
 test('calendar exposes recurring edit scope', async ({ page }) => {
-  await page.goto('/calendar/event-piano');
-  await expect(page.getByRole('heading', { name: 'ピアノ' })).toBeVisible();
+  await page.goto('/calendar/event-clean');
+  await expect(page.getByRole('heading', { name: '資源回収' })).toBeVisible();
   await expect(page.getByLabel('対象とする予定')).toContainText('この予定だけ');
   await expect(page.getByLabel('対象とする予定')).toContainText('これ以降の予定');
   await expect(page.getByLabel('対象とする予定')).toContainText('すべての予定');
