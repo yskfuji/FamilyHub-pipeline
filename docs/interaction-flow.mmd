@@ -1,0 +1,15 @@
+flowchart LR
+  A["操作入口\n明示 data-control-id"] --> B{"表示条件と能力"}
+  B -->|許可| C["共通 command 状態\nidle / submitting / queued / failed"]
+  B -->|非許可| X["安全な戻り先を示す"]
+  C --> D["FamilyHubGateway"]
+  D --> E["Mock adapter\n状態遷移の参照実装"]
+  D --> F["HTTP adapter\nOpenAPI 境界"]
+  F --> G{"サーバー認可\n対象・公開範囲・権限revision"}
+  G -->|許可| H["対象エンティティを更新"]
+  G -->|拒否| Y["403または存在を隠す404"]
+  H --> I["追記型 AuditEvent"]
+  H --> J["再取得・状態通知・取消経路"]
+
+  classDef warning fill:#fff1dc,stroke:#a55b1f,color:#492d13;
+  class X,Y warning;

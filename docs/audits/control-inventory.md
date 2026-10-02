@@ -1,6 +1,6 @@
 # 操作台帳
 
-全可視操作には実行時に重複しない `data-control-id` と危険度を付与する。明示IDのない繰り返し項目は、ルート、要素種別、アクセス可能名から決定的に生成する。E2Eはconsumerの14ルート、Dialog／Drawer、4ロールで名称、ID、重複、操作結果、失敗時の回復経路を検査する。
+全可視操作には、ソース上で明示した `data-control-id` を付与する。繰り返し項目は `calendar.event.open.{eventId}` のようにドメインIDを含める。表示文言、DOM順序、連番から実行時にIDを生成しない。`src/app/controlRegistry.ts` は検証時に未付与と重複を報告するだけで、DOMを書き換えない。機械可読な契約正本は `docs/audits/control-inventory.json` とし、E2Eはconsumerの14ルート、Dialog／Drawer、4ロールで名称、ID、重複、操作結果、失敗時の回復経路を検査する。
 
 | 区分 | 失敗時 | オフライン | 取消・確認 |
 |---|---|---|---|

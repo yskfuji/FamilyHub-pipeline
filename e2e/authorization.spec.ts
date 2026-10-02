@@ -67,3 +67,18 @@ test('every visible interactive control has a stable registry id and accessible 
     expect(new Set(ids).size, `${route}: duplicate control registry id`).toBe(ids.length);
   }
 });
+
+test('control identifiers are explicit before and after overlays render', async ({ page }) => {
+  await page.goto('/calendar');
+  const inspect = async () => page.locator('button:visible, a[href]:visible, input:visible, select:visible, textarea:visible').evaluateAll((elements) => ({
+    missing: elements.filter((element) => !(element as HTMLElement).dataset.controlId).map((element) => element.outerHTML),
+    ids: elements.map((element) => (element as HTMLElement).dataset.controlId ?? ''),
+  }));
+  let result = await inspect();
+  expect(result.missing).toEqual([]);
+  expect(new Set(result.ids).size).toBe(result.ids.length);
+  await page.getByRole('button', { name: /2026年9月/ }).click();
+  result = await inspect();
+  expect(result.missing).toEqual([]);
+  expect(new Set(result.ids).size).toBe(result.ids.length);
+});

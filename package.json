@@ -23,11 +23,12 @@
     "audit:lighthouse": "bash scripts/lighthouse.sh",
     "audit:security": "node scripts/security-check.mjs",
     "audit:ui": "node scripts/audit-ui.mjs",
+    "audit:controls": "node scripts/check-control-contracts.mjs",
     "audit:contract": "node scripts/audit-contract.mjs",
     "audit:use-cases": "node scripts/check-use-cases.mjs",
     "render:er": "node scripts/render-er.mjs",
     "build:gallery": "node scripts/build-gallery.mjs",
-    "verify": "npm run lint && npm run typecheck && npm run test:unit && npm run build && npm run audit:security && npm run audit:ui && npm run audit:contract && npm run audit:use-cases && npm run audit:lighthouse && npm run test:e2e && npm run audit:a11y",
+    "verify": "npm run lint && npm run typecheck && npm run test:unit && npm run build && npm run audit:security && npm run audit:ui && npm run audit:controls && npm run audit:contract && npm run audit:use-cases && npm run audit:lighthouse && npm run test:e2e && npm run audit:a11y",
     "package": "npm run verify && npm run render:er && npm run audit:visual && bash scripts/package.sh"
   },
   "dependencies": {
@@ -39,6 +40,8 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "4.11.3",
+    "@mermaid-js/mermaid-cli": "11.16.0",
+    "puppeteer": "24.34.0",
     "@eslint/js": "9.39.4",
     "@playwright/test": "1.59.1",
     "@types/node": "24.10.1",
