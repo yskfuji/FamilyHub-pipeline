@@ -9,7 +9,7 @@ export function BrandMark() {
 }
 
 export function Brand({ compact = false }: { compact?: boolean }) {
-  return <a href="/today" className="brand" data-link><BrandMark />{!compact && <span className="brand-copy"><span className="brand-name">{ja.brand.name}</span><span className="brand-kicker">{ja.brand.tagline}</span></span>}</a>;
+  return <a data-control-id="brand.home" href="/today" className="brand" data-link><BrandMark />{!compact && <span className="brand-copy"><span className="brand-name">{ja.brand.name}</span><span className="brand-kicker">{ja.brand.tagline}</span></span>}</a>;
 }
 
 export function PageHeader({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action?: ReactNode }) {
@@ -71,13 +71,13 @@ export function useModalBehavior(onClose: () => void) {
 export function Dialog({ title, description, onClose, children, actions }: PropsWithChildren<{ title: string; description?: string; onClose: () => void; actions?: ReactNode }>) {
   const titleId = useId();
   const root = useModalBehavior(onClose);
-  return createPortal(<div ref={root as React.RefObject<HTMLDivElement>} data-modal-root className="dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="dialog" role="dialog" aria-modal="true" aria-labelledby={titleId}><div className="dialog-head"><div><h2 id={titleId}>{title}</h2>{description && <p className="muted mb-0">{description}</p>}</div><button data-autofocus className="icon-button" type="button" onClick={onClose} aria-label={ja.actions.close}><CloseIcon /></button></div>{children}{actions && <div className="dialog-actions">{actions}</div>}</section></div>, document.body);
+  return createPortal(<div ref={root as React.RefObject<HTMLDivElement>} data-modal-root className="dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="dialog" role="dialog" aria-modal="true" aria-labelledby={titleId}><div className="dialog-head"><div><h2 id={titleId}>{title}</h2>{description && <p className="muted mb-0">{description}</p>}</div><button data-control-id="dialog.close" data-autofocus className="icon-button" type="button" onClick={onClose} aria-label={ja.actions.close}><CloseIcon /></button></div>{children}{actions && <div className="dialog-actions">{actions}</div>}</section></div>, document.body);
 }
 
 export function Drawer({ title, eyebrow, onClose, children }: PropsWithChildren<{ title: string; eyebrow: string; onClose: () => void }>) {
   const titleId = useId();
   const root = useModalBehavior(onClose);
-  return createPortal(<div ref={root as React.RefObject<HTMLDivElement>} data-modal-root><div className="backdrop" onClick={onClose} /><aside className="drawer" role="dialog" aria-modal="true" aria-labelledby={titleId}><div className="drawer-head"><div><p className="eyebrow">{eyebrow}</p><h2 id={titleId}>{title}</h2></div><button data-autofocus className="icon-button" type="button" onClick={onClose} aria-label={ja.actions.close}><CloseIcon /></button></div>{children}</aside></div>, document.body);
+  return createPortal(<div ref={root as React.RefObject<HTMLDivElement>} data-modal-root><div className="backdrop" onClick={onClose} /><aside className="drawer" role="dialog" aria-modal="true" aria-labelledby={titleId}><div className="drawer-head"><div><p className="eyebrow">{eyebrow}</p><h2 id={titleId}>{title}</h2></div><button data-control-id="drawer.close" data-autofocus className="icon-button" type="button" onClick={onClose} aria-label={ja.actions.close}><CloseIcon /></button></div>{children}</aside></div>, document.body);
 }
 
 export function StatusBadge({ tone = 'neutral', children }: PropsWithChildren<{ tone?: 'neutral' | 'attention' | 'success' | 'danger' }>) {

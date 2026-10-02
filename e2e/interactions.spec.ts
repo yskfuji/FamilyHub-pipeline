@@ -18,8 +18,24 @@ test('notification bell opens an operable notification center', async ({ page })
 
 test('calendar week/list, edit, cancel delete, and confirmed delete work', async ({ page }) => {
   await page.goto('/calendar');
+  await expect(page.getByRole('button', { name: /2026年9月/ })).toBeVisible();
+  await page.getByRole('button', { name: '次月' }).click();
+  await expect(page).toHaveURL(/month=2026-10/);
+  await expect(page.getByRole('button', { name: /2026年10月/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '日付を選んでください' })).toBeVisible();
+  await page.goBack();
+  await expect(page.getByRole('button', { name: /2026年9月/ })).toBeVisible();
+  await page.getByRole('button', { name: /2026年9月/ }).click();
+  const monthDialog = page.getByRole('dialog', { name: '表示する年月を選ぶ' });
+  await monthDialog.getByRole('spinbutton', { name: '年' }).fill('2028');
+  await monthDialog.getByRole('combobox', { name: '月' }).selectOption('2');
+  await page.getByRole('button', { name: 'この年月を表示' }).click();
+  await expect(page).toHaveURL(/month=2028-02/);
+  await expect(page.getByRole('button', { name: '2028年2月' })).toBeVisible();
+  await page.getByRole('button', { name: '今月' }).click();
+  await expect(page).not.toHaveURL(/month=/);
   await page.getByRole('button', { name: '週', exact: true }).click();
-  await expect(page.getByLabel('9月28日から10月4日の予定')).toBeVisible();
+  await expect(page.getByLabel('9月27日(日)から10月3日(土)の予定')).toBeVisible();
   await page.getByRole('button', { name: '一覧', exact: true }).click();
   await expect(page.getByRole('button', { name: /を開く/ }).first()).toBeVisible();
   await page.goto('/calendar/event-school');

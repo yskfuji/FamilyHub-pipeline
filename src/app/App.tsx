@@ -19,7 +19,7 @@ import { AuditPage, auditPath } from '@audit-surface';
 function PermissionBoundary({ capability, children }: { capability: Capability; children: ReactNode }) {
   const { can } = useApp();
   if (can(capability)) return children;
-  return <div className="page"><EmptyState title="このページは表示できません" action={<a className="button primary" href="/today" data-link>今日の画面に戻る</a>}>現在の役割では利用できません。必要な場合は、管理者に権限を確認してください。</EmptyState></div>;
+  return <div className="page"><EmptyState title="このページは表示できません" action={<a data-control-id="route.today.permission-denied" className="button primary" href="/today" data-link>今日の画面に戻る</a>}>現在の役割では利用できません。必要な場合は、管理者に権限を確認してください。</EmptyState></div>;
 }
 
 export default function App() {
@@ -37,6 +37,6 @@ export default function App() {
   else if (path.startsWith('/settings/household')) page = <PermissionBoundary capability="household.members.read"><SettingsPage path={path}/></PermissionBoundary>;
   else if (path.startsWith('/settings')) page = <PermissionBoundary capability="settings.own"><SettingsPage path={path}/></PermissionBoundary>;
   else if (auditPath && path.startsWith(auditPath)) page = <AuditPage/>;
-  else page = <div className="page"><EmptyState title="ページが見つかりません" action={<a className="button primary" href="/today" data-link>今日の画面に戻る</a>}>URLが正しいか確認してください。</EmptyState></div>;
+  else page = <div className="page"><EmptyState title="ページが見つかりません" action={<a data-control-id="route.today.not-found" className="button primary" href="/today" data-link>今日の画面に戻る</a>}>URLが正しいか確認してください。</EmptyState></div>;
   return <Shell path={path}>{page}</Shell>;
 }

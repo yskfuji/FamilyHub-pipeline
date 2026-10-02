@@ -6,7 +6,6 @@ import type { Capability, GatewayError, HouseholdSnapshot, Result, Scenario, The
 import { useModalTriggerTracking } from '../design-system/components';
 import { capabilitiesFor, projectSnapshotForViewer } from '../authz/policy';
 import { EncryptedOfflineQueue, IndexedDbQueuePersistence, type QueueableCommand, type QueuedCommand } from '../offline/queue';
-import { useControlRegistry } from './controlRegistry';
 
 export type CommandOutcome<T> = { status: 'completed'; value: T } | { status: 'queued' } | { status: 'failed'; error: GatewayError };
 
@@ -52,7 +51,6 @@ function setQueryScenario(next: Scenario) {
 
 export function AppProvider({ children }: PropsWithChildren) {
   useModalTriggerTracking();
-  useControlRegistry();
   const [actorId] = useState(queryActor);
   const [gateway] = useState(() => createMockGateway(actorId));
   const [queue] = useState(() => new EncryptedOfflineQueue(new IndexedDbQueuePersistence()));

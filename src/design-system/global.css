@@ -137,6 +137,11 @@
   .mobile-brand { display: none; }
   .toast-visible { position: fixed; z-index: 200; left: 50%; bottom: 1.5rem; transform: translateX(-50%); width: max-content; max-width: calc(100% - 2rem); padding: .75rem 1rem; border-radius: 999px; background: var(--ink); color: var(--sheet); box-shadow: var(--shadow); font-weight: 700; font-size: .82rem; }
   .calendar-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(17rem, .8fr); gap: 1.2rem; align-items: start; }
+  .calendar-toolbar { display: grid; gap: .75rem; margin-bottom: 1rem; }
+  .calendar-month-navigation { display: grid; grid-template-columns: minmax(4.5rem, auto) minmax(9rem, 1fr) minmax(4.5rem, auto) minmax(4.5rem, auto); gap: .6rem; align-items: center; }
+  .calendar-month-heading { min-width: 0; min-height: 2.75rem; display: inline-flex; align-items: center; justify-content: center; gap: .45rem; border: 1px solid transparent; border-radius: var(--radius-sm); color: var(--ink); background: transparent; font: inherit; font-family: var(--font-serif); font-size: clamp(1.25rem, 2vw, 1.65rem); font-weight: 800; cursor: pointer; }
+  .calendar-month-heading:hover { border-color: var(--line); background: var(--paper); }
+  .calendar-toolbar > .segmented { justify-self: end; }
   .month { min-width: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: var(--radius-md); overflow: clip; background: var(--sheet); }
   .weekday { padding: .65rem .3rem; text-align: center; color: var(--ink-soft); font-size: .72rem; font-weight: 800; background: var(--paper-deep); }
   .day { min-width: 0; min-height: 7.5rem; padding: .55rem; border: 0; border-top: 1px solid var(--line); border-right: 1px solid var(--line); background: var(--sheet); color: var(--ink); text-align: left; cursor: pointer; }
@@ -217,7 +222,7 @@
   @media (max-width: 760px) {
     .app-shell { display: block; }
     .rail { display: none; }
-    .topbar { min-height: 4.4rem; padding: .65rem 1rem; }
+    .topbar { min-height: 4.4rem; padding: .65rem 1rem; will-change: transform; }
     .topbar .brand-name { font-size: 1rem; }
     .mobile-brand { display: inline-flex; }
     .topbar-date { display: none; }
@@ -226,8 +231,8 @@
     .grid.two, .grid.three, .calendar-layout, .task-board, .welcome, .auth-layout { grid-template-columns: minmax(0, 1fr); }
     .grid.three { gap: .8rem; }
     .topbar-actions .button .label { display: none; }
-    .quick-create { right: 1rem; bottom: 5.5rem; }
-    .mobile-nav { position: fixed; z-index: 50; inset: auto 0 0; min-height: 4.6rem; padding: .35rem max(.45rem, env(safe-area-inset-right)) max(.35rem, env(safe-area-inset-bottom)) max(.45rem, env(safe-area-inset-left)); display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid var(--line); background: color-mix(in srgb, var(--sheet) 92%, transparent); backdrop-filter: blur(18px); }
+    .quick-create { right: 1rem; bottom: 5.5rem; will-change: transform; }
+    .mobile-nav { position: fixed; z-index: 50; inset: auto 0 0; min-height: 4.6rem; padding: .35rem max(.45rem, env(safe-area-inset-right)) max(.35rem, env(safe-area-inset-bottom)) max(.45rem, env(safe-area-inset-left)); display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid var(--line); background: color-mix(in srgb, var(--sheet) 92%, transparent); backdrop-filter: blur(18px); will-change: transform; }
     .mobile-nav a, .mobile-nav button { min-width: 0; min-height: 3.7rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .1rem; border: 0; border-radius: .6rem; background: transparent; color: var(--ink-soft); text-decoration: none; font-size: .62rem; font-weight: 750; }
     .mobile-nav [aria-current='page'] { color: var(--indigo-strong); background: var(--paper-deep); }
     .mobile-nav svg { width: 1.25rem; height: 1.25rem; }
@@ -238,6 +243,10 @@
     .dialog-backdrop { align-items: end; padding: 0; }
     .dialog { width: 100%; max-height: 92vh; border-radius: 1.5rem 1.5rem 0 0; padding: 1.2rem 1rem calc(1rem + env(safe-area-inset-bottom)); }
     .month { border-radius: var(--radius-sm); }
+    .calendar-month-navigation { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .35rem; }
+    .calendar-month-heading { grid-column: 1 / -1; grid-row: 1; }
+    .calendar-month-navigation > .button { grid-row: 2; min-width: 0; padding-inline: .4rem; }
+    .calendar-toolbar > .segmented { justify-self: stretch; }
     .day { min-height: 4.4rem; padding: .3rem; }
     .calendar-event { height: .35rem; padding: 0; color: transparent; border-radius: 999px; }
     .calendar-event:nth-of-type(n+3) { display: none; }

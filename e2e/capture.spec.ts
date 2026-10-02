@@ -27,6 +27,23 @@ for (const [viewport,width,height] of viewports) {
   }
 }
 
+test('mobile calendar viewport positions', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'delivery capture uses fixed Chromium DPR 2');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/calendar');
+  await page.waitForLoadState('networkidle');
+  const positions = [
+    ['initial', 0],
+    ['middle', 0.5],
+    ['end', 1],
+  ] as const;
+  for (const [name, ratio] of positions) {
+    await page.evaluate((value) => window.scrollTo({ top: (document.documentElement.scrollHeight - window.innerHeight) * value, behavior: 'instant' }), ratio);
+    await page.waitForTimeout(800);
+    await page.screenshot({ path: `artifacts/screens/mobile-calendar-viewport-${name}-light.png`, fullPage: false, animations: 'allow' });
+  }
+});
+
 for (const [viewport,width,height] of [['mobile',390,844],['desktop',1440,1000]] as const) {
   test(`${viewport} notification center`, async ({ page, browserName }) => {
     test.skip(browserName !== 'chromium', 'delivery capture uses fixed Chromium DPR 2');
