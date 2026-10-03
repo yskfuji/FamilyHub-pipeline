@@ -166,9 +166,10 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
         if (!state.memberships.some((item) => item.id === membershipId)) return missing('メンバー');
         permissionOverrides = permissionOverrides.filter((item) => item.membershipId !== membershipId); permissionRevision += 1; return ok(project());
       },
-      async getPrivacySettings() { await delay(); return ok(structuredClone(privacy)); },
+      async getPrivacySettings() { await delay(); const guard = requireCapability<PrivacySettings>('settings.own'); return guard ?? ok(structuredClone(privacy)); },
       async savePrivacySettings(settings) {
         await delay();
+        const guard = requireCapability<PrivacySettings>('settings.own'); if (guard) return guard;
         const parsed = privacySettingsSchema.safeParse(settings);
         if (!parsed.success) return invalid(parsed.error.issues);
         const next = parsed.data;

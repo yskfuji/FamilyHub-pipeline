@@ -74,6 +74,7 @@ test('owner attaches a nearby place from the current location; only a rounded ce
   await d.getByRole('button', { name: '同意して続ける' }).click();
   const candidates = d.locator('.place-candidates button');
   await expect(candidates).toHaveCount(3);
+  await expect(candidates.nth(0)).toBeFocused();
   await expect(candidates.nth(0)).toContainText('みどり文具店');
   await expect(candidates.nth(0)).toContainText('すぐ近く');
   await expect(candidates.nth(1)).toContainText('こもれびベーカリー');
@@ -113,6 +114,8 @@ for (const [label, behavior, message] of [
     await d.getByRole('button', { name: '同意して続ける' }).click();
     await expect(d.getByRole('alert')).toContainText(message);
     await expect(d.getByRole('button', { name: '手入力にする' })).toBeVisible();
+    await expect(page.locator('body')).not.toBeFocused();
+    expect(await page.evaluate(() => document.activeElement?.closest('.place-picker') !== null)).toBe(true);
     if (label.startsWith('coarse')) await expect(d.getByLabel('お店や場所の名前')).toBeVisible();
     else await expect(d.getByRole('button', { name: '名前で探す' }).last()).toBeVisible();
     expect(requests).toHaveLength(0);
@@ -149,6 +152,7 @@ test('name search shows nationwide fallback, and manual entry still works when t
   await d.getByRole('button', { name: '場所を追加（任意）' }).click();
   await d.getByRole('button', { name: '名前で探す', exact: true }).click();
   await d.getByLabel('お店や場所の名前').fill('朝市');
+  await expect(d.getByRole('button', { name: '検索' })).toBeEnabled();
   await d.getByLabel('お店や場所の名前').press('Enter');
   await d.getByRole('button', { name: '同意して続ける' }).click();
   await expect(d.locator('.place-candidates button')).toContainText('とおくの朝市');

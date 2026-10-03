@@ -296,12 +296,13 @@ export function recurrenceLabel(kind: 'event' | 'task', scope: RecurrenceScope):
 
 export function placeDistanceLabel(meters: number): string {
   if (meters < 30) return 'すぐ近く';
-  if (meters < 1000) return `約${Math.round(meters / 10) * 10}m`;
+  const tens = Math.round(meters / 10) * 10;
+  if (tens < 1000) return `約${tens}m`;
   return `約${(meters / 1000).toFixed(1)}km`;
 }
 
 export function placeCategoryLabel(category?: string): string | undefined {
-  return category ? ja.place.categories[category] : undefined;
+  return category && Object.hasOwn(ja.place.categories, category) ? ja.place.categories[category] : undefined;
 }
 
 export function externalLinkLabel(label: string): string {

@@ -21,10 +21,23 @@ describe('OpenPOI adapter', () => {
     expect(parsed.pathname).toBe('/v1/search');
     expect(parsed.searchParams.get('center')).toBe('139.670,35.644');
     expect(parsed.searchParams.get('limit')).toBe('200');
-    expect(Number(parsed.searchParams.get('radius'))).toBeGreaterThanOrEqual(300);
+    expect(parsed.searchParams.get('radius')).toBe('380');
     expect(url).not.toContain('35.643712');
     expect(url).not.toContain('139.670234');
     expect(init).toMatchObject({ method: 'GET', credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-store', mode: 'cors' });
+  });
+
+  it('sends an identical request for any exact position inside the same rounded cell', async () => {
+    const fetchImpl = respond({ count: 0, results: [] });
+    const lookup = createOpenPoiPlaceLookup(fetchImpl as unknown as typeof fetch);
+    await findNearbyPlaces(lookup, { lat: 35.643_51, lng: 139.668_51 });
+    await findNearbyPlaces(lookup, { lat: 35.644_49, lng: 139.669_49 });
+    expect(fetchImpl.mock.calls[0][0]).toBe(fetchImpl.mock.calls[1][0]);
+  });
+
+  it('rejects oversized response bodies before parsing', async () => {
+    const fetchImpl = vi.fn(async () => new Response(`{"results":[${'0,'.repeat(1_000_001)}0]}`, { status: 200 }));
+    expect(await createOpenPoiPlaceLookup(fetchImpl as unknown as typeof fetch).nearby(coarsen(exact), 380)).toMatchObject({ ok: false, error: { code: 'UPSTREAM_FAILURE', retryable: false } });
   });
 
   it('drops rows without usable coordinates or names and re-ranks by exact distance', async () => {

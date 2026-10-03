@@ -92,4 +92,3 @@ export type TodoInput = z.infer<typeof todoInputSchema>;
 export type EventInput = z.infer<typeof eventInputSchema>;
 export type ExpenseInput = z.infer<typeof expenseInputSchema>;
 export type MemoInput = z.infer<typeof memoInputSchema>;
-export type PlaceRefInput = z.infer<typeof placeRefSchema>;

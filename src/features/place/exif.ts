@@ -249,7 +249,9 @@ function timestamp(date: string | null, time: number[] | null): string | undefin
   if (hours > 23 || minutes > 59 || seconds > 60) return undefined;
   const pad = (value: number) => String(value).padStart(2, '0');
   const iso = `${match[1]}-${match[2]}-${match[3]}T${pad(hours)}:${pad(minutes)}:${pad(Math.min(seconds, 59))}Z`;
-  return Number.isNaN(Date.parse(iso)) ? undefined : iso;
+  const parsed = new Date(iso);
+  // 2月31日のような存在しない日付は Date が繰り上げるため、往復して一致しなければ捨てる。
+  return Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== iso.slice(0, 10) ? undefined : iso;
 }
 
 export function readGpsFromTiff(buffer: ArrayBuffer, tiffOffset: number, tiffEnd = buffer.byteLength): PhotoGpsOutcome {

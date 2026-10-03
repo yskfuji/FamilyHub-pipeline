@@ -37,5 +37,7 @@ describe('日本語コンテンツカタログ', () => {
     expect(placeDistanceLabel(12)).toBe('すぐ近く');
     expect(placeDistanceLabel(44)).toBe('約40m');
     expect(placeDistanceLabel(1234)).toBe('約1.2km');
+    expect(placeDistanceLabel(997)).toBe('約1.0km');
+    expect(placeDistanceLabel(994)).toBe('約990m');
   });
 });

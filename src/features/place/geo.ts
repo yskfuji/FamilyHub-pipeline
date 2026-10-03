@@ -1,5 +1,5 @@
 import type { PlaceCaptureSource, PlaceRef } from '../../domain/types';
-import { ja } from '../../content/ja';
+import { placeCategoryLabel } from '../../content/ja';
 
 /** 端末や写真から得た正確な位置。端末の外へ出さない。 */
 export interface ExactPosition { readonly lat: number; readonly lng: number }
@@ -25,7 +25,11 @@ export interface PlaceCandidate {
 export const COARSE_ACCURACY_METERS = 1000;
 /** 誤差がこれを超えるときは、候補がずれうることを知らせる。 */
 export const APPROXIMATE_ACCURACY_METERS = 100;
-export const NEARBY_BASE_RADIUS_METERS = 300;
+/**
+ * 近くの候補を探す半径。正確な位置の周囲300mに、丸めによる最大のずれ（0.001度の升目の半対角、赤道でも約79m）を足した固定値。
+ * 正確な位置から計算すると、半径の値から升目の中の位置が分かってしまうため、丸めた中心だけで決まる値にする。
+ */
+export const NEARBY_RADIUS_METERS = 380;
 export const MAX_VISIBLE_CANDIDATES = 8;
 
 const COARSE_FACTOR = 1e3;
@@ -47,11 +51,6 @@ export function haversineMeters(a: { lat: number; lng: number }, b: { lat: numbe
   return 2 * EARTH_RADIUS_METERS * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
-/** 丸めでずれた分だけ半径を広げ、正確な位置の周囲300mを取りこぼさないようにする。 */
-export function nearbyRadius(exact: ExactPosition, center: CoarseCenter): number {
-  return NEARBY_BASE_RADIUS_METERS + Math.ceil(haversineMeters(exact, center));
-}
-
 const normalize = (value: string) => value.normalize('NFKC').replace(/\s+/g, '').toLowerCase();
 
 /** 名前と住所から作る安定したキー（FNV-1a 32bit）。外部データに ID がないため、表示と操作 ID に使う。 */
@@ -64,17 +63,14 @@ export function candidateKey(name: string, address: string): string {
   return hash.toString(16).padStart(8, '0');
 }
 
-const union = (a: string[], b: string[]) => [...new Set([...a, ...b])];
-
-/** 同じ名前・住所の重複をまとめ、正確な位置から近い順に並べる（外部の並び順は距離順ではない）。 */
+/** 同じ名前・住所の重複は近いほうだけを残し、正確な位置から近い順に並べる（外部の並び順は距離順ではない）。 */
 export function rankCandidates(candidates: PlaceCandidate[], from: ExactPosition, limit = MAX_VISIBLE_CANDIDATES): PlaceCandidate[] {
   const byKey = new Map<string, PlaceCandidate>();
   for (const candidate of candidates) {
     const withDistance = { ...candidate, distanceMeters: haversineMeters(from, candidate) };
     const existing = byKey.get(candidate.key);
-    if (!existing) { byKey.set(candidate.key, withDistance); continue; }
-    const nearer = (withDistance.distanceMeters ?? Infinity) < (existing.distanceMeters ?? Infinity) ? withDistance : existing;
-    byKey.set(candidate.key, { ...nearer, licenses: union(existing.licenses, candidate.licenses), attributions: union(existing.attributions, candidate.attributions) });
+    // 表示・保存するのは残した1件の内容だけなので、出典もその1件のものだけを持つ。
+    if (!existing || (withDistance.distanceMeters ?? Infinity) < (existing.distanceMeters ?? Infinity)) byKey.set(candidate.key, withDistance);
   }
   return [...byKey.values()]
     .sort((a, b) => (a.distanceMeters ?? 0) - (b.distanceMeters ?? 0) || a.name.localeCompare(b.name, 'ja'))
@@ -87,7 +83,7 @@ export function toPlaceRef(candidate: PlaceCandidate, via: Exclude<PlaceCaptureS
     name: candidate.name,
     ...(candidate.address ? { address: candidate.address } : {}),
     coordinates: { lat: roundTo(candidate.lat, STORED_FACTOR), lng: roundTo(candidate.lng, STORED_FACTOR) },
-    ...(candidate.category && ja.place.categories[candidate.category] ? { category: candidate.category } : {}),
+    ...(placeCategoryLabel(candidate.category) ? { category: candidate.category } : {}),
     provenance: { provider: 'openpoi', source: candidate.source, licenses: candidate.licenses.slice(0, 10), attributions: candidate.attributions.slice(0, 20) },
     capturedVia: via,
     selectedAt: toRfc3339(now),

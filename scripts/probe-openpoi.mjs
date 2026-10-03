@@ -68,7 +68,8 @@ for (const [point, [lng, lat]] of Object.entries(POINTS)) {
   for (const digits of [3, 2]) {
     const rl = round(lng, digits); const rt = round(lat, digits);
     const shift = haversine(lng, lat, rl, rt);
-    const coarse = await search(rl, rt, 300 + Math.ceil(shift), 200);
+    // 半径は丸めた中心だけで決まる固定値（実装の NEARBY_RADIUS_METERS と同じ）。正確な位置との距離を漏らさない。
+    const coarse = await search(rl, rt, digits === 3 ? 380 : 300 + 760, 200);
     const got = ranked(lng, lat, coarse.results).slice(0, 10);
     row[`round${digits}ShiftMeters`] = Math.round(shift);
     row[`round${digits}Top10Recall`] = top10.length ? top10.filter((k) => got.includes(k)).length / top10.length : null;
@@ -81,7 +82,7 @@ process.stderr.write('\n');
 const sum = (field) => rows.reduce((total, row) => total + row[field], 0);
 console.log(JSON.stringify({
   measuredAt: new Date().toISOString(),
-  method: { points: rows.length, endpoint: API, throttleMs: 250, note: 'top-10 truth = 10 nearest of limit=200 around the exact point; rounded queries use radius 300+shift and limit=200, re-ranked by exact distance' },
+  method: { points: rows.length, endpoint: API, throttleMs: 250, note: 'top-10 truth = 10 nearest of limit=200 around the exact point; rounded queries use a fixed radius derived from the rounded cell only (380 m for 3 decimals, 1060 m for 2 decimals) and limit=200, re-ranked by exact distance' },
   cors,
   latencyMs: summary(latencies),
   countsAtLimit50: { r100: summary(rows.map((row) => row.n100)), r300: summary(rows.map((row) => row.n300)), r1000: summary(rows.map((row) => row.n1000)) },

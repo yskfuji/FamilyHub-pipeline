@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { GatewayError, Result } from '../../domain/types';
 import { ja } from '../../content/ja';
-import { candidateKey, coarsen, haversineMeters, nearbyRadius, rankCandidates, type CoarseCenter, type ExactPosition, type PlaceCandidate } from './geo';
+import { NEARBY_RADIUS_METERS, candidateKey, coarsen, haversineMeters, rankCandidates, type CoarseCenter, type ExactPosition, type PlaceCandidate } from './geo';
 
 /**
  * 外部の場所検索（OpenPOI API）への唯一の出口。
@@ -18,6 +18,8 @@ const SEARCH_LIMIT = 20;
 const SEARCH_RADIUS_METERS = 5000;
 const REQUEST_TIMEOUT_MS = 8000;
 const MAX_QUERY_LENGTH = 60;
+/** 応答本文の上限。上限200件の正常な応答は数百KBに収まる。 */
+const MAX_RESPONSE_CHARS = 2_000_000;
 
 export interface PlaceLookupPort {
   nearby(center: CoarseCenter, radiusMeters: number, signal?: AbortSignal): Promise<Result<PlaceCandidate[]>>;
@@ -84,7 +86,9 @@ export function createOpenPoiPlaceLookup(fetchImpl: typeof fetch = (...args) => 
       });
       if (response.status === 429) return failure('RATE_LIMITED', true);
       if (!response.ok) return failure('UPSTREAM_FAILURE', response.status >= 500);
-      return { ok: true, value: await response.json() as unknown };
+      const text = await response.text();
+      if (text.length > MAX_RESPONSE_CHARS) return failure('UPSTREAM_FAILURE', false);
+      return { ok: true, value: JSON.parse(text) as unknown };
     } catch {
       if (typeof navigator !== 'undefined' && navigator.onLine === false) return failure('OFFLINE', true);
       return failure('UPSTREAM_FAILURE', true);
@@ -119,10 +123,9 @@ export function createOpenPoiPlaceLookup(fetchImpl: typeof fetch = (...args) => 
 
 export const openPoiPlaceLookup: PlaceLookupPort = createOpenPoiPlaceLookup();
 
-/** 正確な位置を丸めて問い合わせ、返ってきた候補を正確な位置から近い順に並べ直す。 */
+/** 丸めた中心と固定の半径だけで問い合わせ、返ってきた候補を正確な位置から近い順に並べ直す。 */
 export async function findNearbyPlaces(port: PlaceLookupPort, exact: ExactPosition, signal?: AbortSignal): Promise<Result<PlaceCandidate[]>> {
-  const center = coarsen(exact);
-  const result = await port.nearby(center, nearbyRadius(exact, center), signal);
+  const result = await port.nearby(coarsen(exact), NEARBY_RADIUS_METERS, signal);
   return result.ok ? { ok: true, value: rankCandidates(result.value, exact) } : result;
 }
 

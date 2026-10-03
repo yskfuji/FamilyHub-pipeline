@@ -265,7 +265,8 @@ paths:
           description: >-
             Privacy defaults saved; never implies public access. The server stamps
             placeLookupConsent.grantedAt itself, accepts only the current noticeVersion,
-            and appends an AuditEvent when consent is granted or revoked.
+            and appends an AuditEvent when consent is granted or revoked. The server
+            rejects a noticeVersion that does not match its currently published notice.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/PrivacySettings' }
@@ -441,7 +442,11 @@ paths:
                 title: { type: string, minLength: 1, maxLength: 120 }
                 body: { type: string, minLength: 1, maxLength: 5000 }
                 tags: { type: array, maxItems: 10, items: { type: string, maxLength: 30 } }
-                place: { $ref: '#/components/schemas/PlaceRef' }
+                place:
+                  description: PlaceRef to attach; null is treated as absent. Requires place.read.
+                  oneOf:
+                    - { $ref: '#/components/schemas/PlaceRef' }
+                    - { type: 'null' }
       responses:
         '201': { description: Memo created; place requires place.read }
         default: { $ref: '#/components/responses/Error' }
@@ -814,9 +819,9 @@ components:
       required: [provider, source, licenses, attributions]
       properties:
         provider: { const: openpoi }
-        source: { type: string, maxLength: 40 }
-        licenses: { type: array, maxItems: 10, items: { type: string, maxLength: 200 } }
-        attributions: { type: array, maxItems: 20, items: { type: string, maxLength: 300 } }
+        source: { type: string, minLength: 1, maxLength: 40 }
+        licenses: { type: array, maxItems: 10, items: { type: string, minLength: 1, maxLength: 200 } }
+        attributions: { type: array, maxItems: 20, items: { type: string, minLength: 1, maxLength: 300 } }
     PlaceRef:
       type: object
       description: >-
@@ -834,12 +839,19 @@ components:
           additionalProperties: false
           required: [lat, lng]
           properties:
-            lat: { type: number, minimum: -90, maximum: 90, multipleOf: 0.00001 }
-            lng: { type: number, minimum: -180, maximum: 180, multipleOf: 0.00001 }
-        category: { type: string, maxLength: 40 }
+            lat: { type: number, minimum: -90, maximum: 90, description: 'WGS84. At most five decimal places (about 1 m); rounded by the client and re-validated by the server.' }
+            lng: { type: number, minimum: -180, maximum: 180, description: 'WGS84. At most five decimal places (about 1 m); rounded by the client and re-validated by the server.' }
+        category: { type: string, minLength: 1, maxLength: 40 }
         provenance: { $ref: '#/components/schemas/PlaceProvenance' }
         capturedVia: { enum: [device, photo, search, manual] }
         selectedAt: { type: string, format: date-time }
+      oneOf:
+        - description: Manual entry carries neither coordinates nor provenance.
+          properties: { capturedVia: { const: manual } }
+          not: { anyOf: [{ required: [coordinates] }, { required: [provenance] }] }
+        - description: Looked-up places carry both coordinates and provenance.
+          properties: { capturedVia: { enum: [device, photo, search] } }
+          required: [coordinates, provenance]
     PlaceLookupConsent:
       type: object
       additionalProperties: false

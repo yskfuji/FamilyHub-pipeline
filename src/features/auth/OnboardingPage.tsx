@@ -21,7 +21,9 @@ export function OnboardingPage() {
       if (!result.ok) { setError(result.error.message); return; }
     }
     if (step === 2) {
-      const result = await gateway.household.savePrivacySettings({ defaultAudience: householdOnly ? 'household' : 'creator', hideNotificationContent, placeLookupConsent: null });
+      // 共有範囲だけを変え、外部検索への同意は利用者が設定画面で決めたまま残す。
+      const current = await gateway.household.getPrivacySettings();
+      const result = await gateway.household.savePrivacySettings({ defaultAudience: householdOnly ? 'household' : 'creator', hideNotificationContent, placeLookupConsent: current.ok ? current.value.placeLookupConsent : null });
       if (!result.ok) { setError(result.error.message); return; }
       announce(`共有範囲を「${result.value.defaultAudience === 'household' ? '家族全員' : '作成した本人だけ'}」に設定しました。`);
     }

@@ -17,6 +17,12 @@ describe('readPhotoGps', () => {
     expect(result.gps.takenAt).toBe('2026-09-29T09:15:30Z');
   });
 
+  it('ignores capture dates that do not exist instead of shifting them', async () => {
+    const result = await readPhotoGps(fileOf(buildJpegWithGps({ takenAt: { date: '2026:02:31', time: [9, 0, 0] } })));
+    expect(result).toMatchObject({ status: 'found' });
+    if (result.status === 'found') expect(result.gps.takenAt).toBeUndefined();
+  });
+
   it('reads big-endian JPEG and southern/western hemispheres', async () => {
     const result = await readPhotoGps(fileOf(buildJpegWithGps({ littleEndian: false, lat: -33.8568, lng: -151.2153 })));
     expect(result).toMatchObject({ status: 'found', gps: { lat: expect.closeTo(-33.8568, 4), lng: expect.closeTo(-151.2153, 4) } });

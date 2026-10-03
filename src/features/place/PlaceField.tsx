@@ -51,10 +51,10 @@ export function usePlaceLookupConsent(enabled: boolean) {
       ? await gateway.household.savePrivacySettings({ ...current, placeLookupConsent: granted ? { noticeVersion: PLACE_LOOKUP_NOTICE_VERSION, grantedAt: toRfc3339(new Date()) } : null })
       : { ok: false, error: { code: 'UPSTREAM_FAILURE', message: ja.place.failures['consent-failed'], retryable: true } };
     if (result.ok) setSettings(result.value);
-    else setStatus(previous);
+    else setStatus(previous === 'loading' ? 'required' : previous);
     return result;
   }, [gateway, settings, status]);
-  return { status, consent: settings?.placeLookupConsent ?? null, grant: () => save(true), revoke: () => save(false) };
+  return { status, grant: () => save(true), revoke: () => save(false) };
 }
 
 /* ---------- 表示部品 ---------- */
@@ -103,21 +103,35 @@ export function PlaceField({ value, onChange, disabled = false, port = openPoiPl
   const consentAccept = useRef<HTMLButtonElement>(null);
   const sourceAction = useRef<HTMLButtonElement | HTMLInputElement | null>(null);
   const setSourceAction = (element: HTMLButtonElement | HTMLInputElement | null) => { sourceAction.current = element; };
+  const fieldsetRef = useRef<HTMLFieldSetElement>(null);
+  const pendingGrant = useRef<Promise<Result<PrivacySettings>> | null>(null);
+  const consentStatus = useRef(consent.status);
   const headingId = useId();
-  const statusId = useId();
   const geolocation = isGeolocationAvailable();
   const sources = (Object.keys(ja.place.sources) as PlaceCaptureSource[]).filter((item) => item !== 'device' || geolocation);
 
   const cancelPending = () => { abortRef.current?.abort(); abortRef.current = null; };
   const nextSignal = () => { cancelPending(); abortRef.current = new AbortController(); return abortRef.current.signal; };
   useEffect(() => () => { abortRef.current?.abort(); exactRef.current = null; }, []);
-  // 同意の確認は押したボタンと入れ替わって表示されるため、次の操作へフォーカスを移して画面内に出す。
+  useEffect(() => { consentStatus.current = consent.status; }, [consent.status]);
+  // パネルが入れ替わると押したボタンが消えたり無効になったりするため、フォーカスが失われたら次の操作へ移す。
   useEffect(() => {
-    if (panel.kind !== 'consent') return;
-    consentAccept.current?.focus();
-    consentAccept.current?.scrollIntoView({ block: 'nearest' });
-  }, [panel.kind]);
-  const focusSourceAction = () => requestAnimationFrame(() => sourceAction.current?.focus());
+    if (!expanded) return;
+    if (panel.kind === 'consent') {
+      consentAccept.current?.focus();
+      consentAccept.current?.scrollIntoView({ block: 'nearest' });
+      return;
+    }
+    const root = fieldsetRef.current;
+    const active = document.activeElement;
+    // body に落ちた場合と、待機中に fieldset へ預けた場合だけ移す。利用者が自分で選んだ位置は奪わない。
+    if (active && active !== document.body && active !== root) return;
+    const target = panel.kind === 'results' ? root?.querySelector<HTMLElement>('.place-candidate')
+      : panel.kind === 'failed' || panel.kind === 'empty' ? root?.querySelector<HTMLElement>('.place-failure button')
+        : panel.kind === 'busy' ? root
+          : sourceAction.current;
+    target?.focus();
+  }, [expanded, panel, source]);
 
   const collapse = (focusTarget: 'change' | 'add') => {
     cancelPending();
@@ -138,7 +152,13 @@ export function PlaceField({ value, onChange, disabled = false, port = openPoiPl
     collapse('change');
   };
 
-  const showNearby = async (position: ExactPosition, accuracy: number | undefined, origin: LookupOrigin, takenAt?: string) => {
+  /** 外部へ送る直前に、同意が記録済みであることを確かめる（記録中なら結果を待つ）。 */
+  const consentConfirmed = async () => {
+    if (pendingGrant.current && !(await pendingGrant.current).ok) return false;
+    return consentStatus.current === 'granted';
+  };
+
+  const showNearby = async (signal: AbortSignal, position: ExactPosition, accuracy: number | undefined, origin: LookupOrigin, takenAt?: string) => {
     if (accuracy !== undefined && accuracy > COARSE_ACCURACY_METERS) {
       // おおよその位置では近くの候補がずれるため、名前検索に切り替える（検索の優先地域としてだけ使う）。
       exactRef.current = position;
@@ -148,33 +168,42 @@ export function PlaceField({ value, onChange, disabled = false, port = openPoiPl
     }
     exactRef.current = position;
     setPanel({ kind: 'busy', message: ja.place.search.busy });
-    const result = await findNearbyPlaces(port, position, nextSignal());
+    if (!(await consentConfirmed()) || signal.aborted) { if (!signal.aborted) setPanel({ kind: 'failed', reason: 'consent-failed' }); return; }
+    const result = await findNearbyPlaces(port, position, signal);
+    if (signal.aborted) return;
     if (!result.ok) { setPanel({ kind: 'failed', reason: errorFailure(result.error.code), retry: origin }); return; }
     if (result.value.length === 0) { setPanel({ kind: 'empty', origin }); return; }
     setPanel({ kind: 'results', origin, candidates: result.value, ...(accuracy !== undefined && accuracy > APPROXIMATE_ACCURACY_METERS ? { notice: 'approximate' as const } : {}), ...(takenAt ? { takenAt } : {}) });
   };
 
   const locate = async () => {
+    const signal = nextSignal();
     setPanel({ kind: 'busy', message: ja.place.device.busy });
-    const outcome = await getDevicePosition(nextSignal());
+    const outcome = await getDevicePosition(signal);
+    if (signal.aborted) return;
     if (!outcome.ok) { setPanel({ kind: 'failed', reason: deviceFailure[outcome.reason], retry: 'device' }); return; }
-    await showNearby(outcome.position, outcome.accuracyMeters, 'device');
+    await showNearby(signal, outcome.position, outcome.accuracyMeters, 'device');
   };
 
   const readPhoto = async (file?: File) => {
     if (photoInput.current) photoInput.current.value = '';
     if (!file) return;
+    const signal = nextSignal();
     setPanel({ kind: 'busy', message: ja.place.photo.busy });
     const outcome = await readPhotoGps(file);
+    if (signal.aborted) return;
     if (outcome.status !== 'found') { setPanel({ kind: 'failed', reason: photoFailure[outcome.status], retry: 'photo' }); return; }
-    await showNearby({ lat: outcome.gps.lat, lng: outcome.gps.lng }, outcome.gps.accuracyMeters, 'photo', outcome.gps.takenAt);
+    await showNearby(signal, { lat: outcome.gps.lat, lng: outcome.gps.lng }, outcome.gps.accuracyMeters, 'photo', outcome.gps.takenAt);
   };
 
   const search = async () => {
     const q = query.trim();
     if (!q) return;
+    const signal = nextSignal();
     setPanel({ kind: 'busy', message: ja.place.search.busy });
-    const result = await searchPlacesByName(port, q, exactRef.current, nextSignal());
+    if (!(await consentConfirmed()) || signal.aborted) { if (!signal.aborted) setPanel({ kind: 'failed', reason: 'consent-failed' }); return; }
+    const result = await searchPlacesByName(port, q, exactRef.current, signal);
+    if (signal.aborted) return;
     if (!result.ok) { setPanel({ kind: 'failed', reason: errorFailure(result.error.code), retry: 'search' }); return; }
     if (result.value.candidates.length === 0) { setPanel({ kind: 'empty', origin: 'search' }); return; }
     setPanel({ kind: 'results', origin: 'search', candidates: result.value.candidates, ...(result.value.nationwide ? { notice: 'nationwide' as const } : {}) });
@@ -188,9 +217,12 @@ export function PlaceField({ value, onChange, disabled = false, port = openPoiPl
     else void search();
   };
   const acceptConsent = async (resume: LookupOrigin) => {
-    focusSourceAction();
+    const pending = consent.grant();
+    pendingGrant.current = pending;
+    // 写真の選択画面は利用者の操作の中でしか開けないため先に開く。外部への問い合わせは同意の記録を待ってから行う。
     if (resume === 'photo') { setPanel({ kind: 'idle' }); photoInput.current?.click(); }
-    const result = await consent.grant();
+    const result = await pending;
+    if (pendingGrant.current === pending) pendingGrant.current = null;
     if (!result.ok) { setPanel({ kind: 'failed', reason: 'consent-failed' }); return; }
     if (resume === 'device') void locate();
     else if (resume === 'search') void search();
@@ -226,7 +258,7 @@ export function PlaceField({ value, onChange, disabled = false, port = openPoiPl
   const busy = panel.kind === 'busy';
   // 候補が出たら探し直しの操作は控えめにし、視線を候補へ向ける。
   const actionClass = panel.kind === 'results' ? 'button' : 'button primary';
-  return <fieldset className="fieldset place-picker" aria-labelledby={headingId} aria-busy={busy} onKeyDown={onKeyDown}>
+  return <fieldset ref={fieldsetRef} tabIndex={-1} className="fieldset place-picker" aria-labelledby={headingId} aria-busy={busy} onKeyDown={onKeyDown}>
     <legend id={headingId}>{ja.place.legend}</legend>
     <div className="segmented place-sources" role="group" aria-label={ja.place.sourceSwitcher}>
       {sources.map((item) => <button key={item} data-control-id={`place.source.${item}`} type="button" aria-pressed={source === item} disabled={busy} onClick={() => switchSource(item)}>{ja.place.sources[item]}</button>)}
@@ -241,14 +273,14 @@ export function PlaceField({ value, onChange, disabled = false, port = openPoiPl
         <p className="small muted mb-0">{ja.place.consent.revokeHint}</p>
         <div className="place-actions mt-1">
           <button ref={consentAccept} data-control-id="place.consent.accept" className="button primary" type="button" onClick={() => void acceptConsent(panel.resume)}>{ja.place.consent.accept}</button>
-          <button data-control-id="place.consent.decline" className="button" type="button" onClick={() => { switchSource('manual'); focusSourceAction(); }}>{ja.place.consent.decline}</button>
+          <button data-control-id="place.consent.decline" className="button" type="button" onClick={() => switchSource('manual')}>{ja.place.consent.decline}</button>
         </div>
       </div>
     </div> : <>
       {source === 'device' && <div className="place-panel"><p className="small muted mb-0">{ja.place.device.help}</p><button ref={setSourceAction} data-control-id="place.device.locate" className={actionClass} type="button" disabled={busy || consent.status === 'loading'} onClick={() => start('device')}><LocateIcon width="18"/>{ja.place.device.action}</button></div>}
       {source === 'photo' && <div className="place-panel"><p className="small muted mb-0">{ja.place.photo.help}</p><button ref={setSourceAction} data-control-id="place.photo.choose" className={actionClass} type="button" disabled={busy || consent.status === 'loading'} onClick={() => start('photo')}><ImageIcon width="18"/>{ja.place.photo.action}</button></div>}
       {source === 'search' && <div className="place-search" role="search">
-        <div className="field"><label htmlFor={`${headingId}-q`}>{ja.place.search.label}</label><input ref={setSourceAction} data-control-id="place.search.query" id={`${headingId}-q`} className="input" type="search" enterKeyHint="search" maxLength={60} autoComplete="off" value={query} aria-describedby={`${headingId}-q-help`} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); if (query.trim() && !busy) start('search'); } }}/><span className="field-help" id={`${headingId}-q-help`}>{ja.place.search.help}</span></div>
+        <div className="field"><label htmlFor={`${headingId}-q`}>{ja.place.search.label}</label><input ref={setSourceAction} data-control-id="place.search.query" id={`${headingId}-q`} className="input" type="search" enterKeyHint="search" maxLength={60} autoComplete="off" value={query} aria-describedby={`${headingId}-q-help`} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); if (query.trim() && !busy && consent.status !== 'loading') start('search'); } }}/><span className="field-help" id={`${headingId}-q-help`}>{ja.place.search.help}</span></div>
         <button data-control-id="place.search.submit" className={actionClass} type="button" disabled={busy || !query.trim() || consent.status === 'loading'} onClick={() => start('search')}><SearchIcon width="18"/>{ja.place.search.submit}</button>
       </div>}
       {source === 'manual' && <div className="place-manual">
@@ -261,7 +293,7 @@ export function PlaceField({ value, onChange, disabled = false, port = openPoiPl
 
     <input data-control-id="place.photo.file" ref={photoInput} className="sr-only" type="file" accept="image/*" tabIndex={-1} aria-label={ja.place.photo.input} onChange={(event) => void readPhoto(event.target.files?.[0])}/>
 
-    <div id={statusId} role="status" aria-live="polite" className="place-status">
+    <div role="status" aria-live="polite" className="place-status">
       {panel.kind === 'busy' && <><span className="sr-only">{panel.message}</span><div className="place-skeleton" aria-hidden="true"><span className="skeleton"/><span className="skeleton"/><span className="skeleton"/></div></>}
       {panel.kind === 'results' && <p className="small muted mb-0">{panel.origin === 'search' ? ja.place.searchResultCount(panel.candidates.length) : ja.place.resultCount(panel.candidates.length)}{panel.takenAt ? ` ${ja.place.photo.takenAt}: ${formatTakenAt(panel.takenAt)}` : ''}</p>}
       {panel.kind === 'empty' && <p className="small mb-0">{ja.place.empty[panel.origin]}</p>}

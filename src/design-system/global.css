@@ -205,6 +205,7 @@
   .place-summary .row-main { display: flex; flex-direction: column; gap: .15rem; }
   .place-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
   .place-picker { display: grid; gap: .85rem; }
+  .place-picker:focus { outline: none; }
   .place-sources { width: 100%; }
   .place-sources button { flex: 1 1 0; }
   .place-transmission { margin: 0; }

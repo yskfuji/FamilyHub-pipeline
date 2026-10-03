@@ -1,7 +1,7 @@
-import { COARSE_ACCURACY_METERS, type ExactPosition } from './geo';
+import type { ExactPosition } from './geo';
 
 export type DeviceLocationOutcome =
-  | { ok: true; position: ExactPosition; accuracyMeters: number; coarse: boolean }
+  | { ok: true; position: ExactPosition; accuracyMeters: number }
   | { ok: false; reason: 'unsupported' | 'denied' | 'unavailable' | 'timeout' };
 
 /** 端末の種類は判定せず、機能があるかだけを見る（iPadOS は Mac と名乗るなど、端末判定は壊れやすい）。 */
@@ -23,8 +23,7 @@ export function getDevicePosition(signal?: AbortSignal): Promise<DeviceLocationO
       ({ coords }) => finish({
         ok: true,
         position: { lat: coords.latitude, lng: coords.longitude },
-        accuracyMeters: coords.accuracy,
-        coarse: !Number.isFinite(coords.accuracy) || coords.accuracy > COARSE_ACCURACY_METERS,
+        accuracyMeters: Number.isFinite(coords.accuracy) ? coords.accuracy : Number.POSITIVE_INFINITY,
       }),
       (error) => finish({ ok: false, reason: error.code === 1 ? 'denied' : error.code === 3 ? 'timeout' : 'unavailable' }),
       { enableHighAccuracy: true, timeout: 15_000, maximumAge: 60_000 },

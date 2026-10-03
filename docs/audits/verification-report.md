@@ -4,7 +4,7 @@
 
 | 区分 | 状態 | 証拠 |
 |---|---|---|
-| lint / TypeScript / unit | pass | ESLint 0 warnings、TypeScript 0 errors、Vitest 76/76。年月の年越し、閏年、無効URL、東京日付、週範囲、選択日の正規化に加え、場所の丸め・並べ直し・外部応答の検証・位置情報の失敗・EXIF（JPEG/HEIF、不正構造、変異ファズ500回）・項目単位の秘匿を含む |
+| lint / TypeScript / unit | pass | ESLint 0 warnings、TypeScript 0 errors、Vitest 79/79。年月の年越し、閏年、無効URL、東京日付、週範囲、選択日の正規化に加え、場所の丸め・並べ直し・外部応答の検証・位置情報の失敗・EXIF（JPEG/HEIF、不正構造、変異ファズ500回）・項目単位の秘匿を含む |
 | 静的ビルド | pass | Vite 8.3.1、119 modules、consumer `dist/`生成。showcase、監査切替、source mapなし。JS gzip 123.4KB（main比 +12.1KB）、CSS gzip 38.9KB（+0.5KB） |
 | OpenAPI / HTTP adapter | pass | 45 operationId一意（`getPrivacySettings` 追加、`PlaceRef`／`PrivacySettings` スキーマ）、CSRF・冪等キー・権限revision・204応答・復元操作の静的契約監査 |
 | Chromium / WebKit / Firefox E2E | pass | 41件×3ブラウザ=123/123。主要フロー、旧無反応25操作、前月・次月・今月・年月選択・ブラウザ戻る、4ロール、権限拒否、取消、失敗、オフライン再送、操作IDに加え、場所の外部送信内容（丸めた中心・Cookie/リファラーなし）、位置情報の拒否・時間切れ・精度不足、写真の位置あり・なし、全国検索、外部停止時の手入力、子ども非表示、同意撤回を含む。外部APIは架空データで差し替え、Service Workerを無効にして実APIへ接続しない |
