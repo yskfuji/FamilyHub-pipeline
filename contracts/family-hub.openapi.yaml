@@ -6,6 +6,9 @@ info:
     Reference boundary. All authenticated operations use server-managed __Host-
     Secure HttpOnly SameSite cookies. Mutations require CSRF token and Origin /
     Fetch Metadata verification. Authentication secrets are never returned.
+    Place lookup goes directly from the client to OpenPOI API with a rounded
+    position and never passes through this API; only the chosen PlaceRef is
+    stored here and it is returned only to members holding place.read.
 servers:
   - url: https://api.example.invalid
     description: Must be injected by the deploying environment
@@ -239,6 +242,16 @@ paths:
         '200': { description: Role defaults restored }
         default: { $ref: '#/components/responses/Error' }
   /v1/households/current/privacy:
+    get:
+      operationId: getPrivacySettings
+      description: Returns the signed-in member's own privacy settings, including place-lookup consent.
+      responses:
+        '200':
+          description: Current privacy settings of the requesting member
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrivacySettings' }
+        default: { $ref: '#/components/responses/Error' }
     put:
       operationId: savePrivacySettings
       parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
@@ -246,14 +259,16 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              required: [defaultAudience, hideNotificationContent]
-              properties:
-                defaultAudience: { enum: [household, creator] }
-                hideNotificationContent: { type: boolean }
+            schema: { $ref: '#/components/schemas/PrivacySettings' }
       responses:
-        '200': { description: Privacy defaults saved; never implies public access }
+        '200':
+          description: >-
+            Privacy defaults saved; never implies public access. The server stamps
+            placeLookupConsent.grantedAt itself, accepts only the current noticeVersion,
+            and appends an AuditEvent when consent is granted or revoked.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrivacySettings' }
         default: { $ref: '#/components/responses/Error' }
   /v1/events:
     post:
@@ -421,19 +436,44 @@ paths:
             schema:
               type: object
               required: [title, body, tags]
+              additionalProperties: false
               properties:
                 title: { type: string, minLength: 1, maxLength: 120 }
                 body: { type: string, minLength: 1, maxLength: 5000 }
                 tags: { type: array, maxItems: 10, items: { type: string, maxLength: 30 } }
+                place: { $ref: '#/components/schemas/PlaceRef' }
       responses:
-        '201': { description: Memo created }
+        '201': { description: Memo created; place requires place.read }
         default: { $ref: '#/components/responses/Error' }
   /v1/memos/{memoId}:
     patch:
       operationId: updateMemo
       parameters:
         - { $ref: '#/components/parameters/CsrfToken' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+        - { $ref: '#/components/parameters/PermissionRevision' }
         - { name: memoId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [input, expectedVersion]
+              properties:
+                expectedVersion: { type: integer, minimum: 1 }
+                input:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    title: { type: string, minLength: 1, maxLength: 120 }
+                    body: { type: string, minLength: 1, maxLength: 5000 }
+                    tags: { type: array, maxItems: 10, items: { type: string, maxLength: 30 } }
+                    place:
+                      description: PlaceRef to set, or null to remove. Omitted means unchanged. Requires place.read.
+                      oneOf:
+                        - { $ref: '#/components/schemas/PlaceRef' }
+                        - { type: 'null' }
       responses:
         '200': { description: Memo updated after version and authorization checks }
         default: { $ref: '#/components/responses/Error' }
@@ -761,12 +801,63 @@ components:
           type: array
           minItems: 1
           items: { type: string, format: uuid }
+        place: { $ref: '#/components/schemas/PlaceRef' }
     Expense:
       allOf:
         - { $ref: '#/components/schemas/ExpenseInput' }
         - type: object
           required: [id]
           properties: { id: { type: string, format: uuid } }
+    PlaceProvenance:
+      type: object
+      additionalProperties: false
+      required: [provider, source, licenses, attributions]
+      properties:
+        provider: { const: openpoi }
+        source: { type: string, maxLength: 40 }
+        licenses: { type: array, maxItems: 10, items: { type: string, maxLength: 200 } }
+        attributions: { type: array, maxItems: 20, items: { type: string, maxLength: 300 } }
+    PlaceRef:
+      type: object
+      description: >-
+        The place a member chose for a memo or expense. Never contains the member's
+        own device or photo position or its accuracy. Returned only to viewers that
+        hold place.read (owners and adults; never children or guests). Manual entries
+        carry neither coordinates nor provenance; looked-up places carry both.
+      additionalProperties: false
+      required: [name, capturedVia, selectedAt]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        address: { type: string, minLength: 1, maxLength: 200 }
+        coordinates:
+          type: object
+          additionalProperties: false
+          required: [lat, lng]
+          properties:
+            lat: { type: number, minimum: -90, maximum: 90, multipleOf: 0.00001 }
+            lng: { type: number, minimum: -180, maximum: 180, multipleOf: 0.00001 }
+        category: { type: string, maxLength: 40 }
+        provenance: { $ref: '#/components/schemas/PlaceProvenance' }
+        capturedVia: { enum: [device, photo, search, manual] }
+        selectedAt: { type: string, format: date-time }
+    PlaceLookupConsent:
+      type: object
+      additionalProperties: false
+      required: [noticeVersion, grantedAt]
+      properties:
+        noticeVersion: { type: string, maxLength: 40 }
+        grantedAt: { type: string, format: date-time, description: Stamped by the server }
+    PrivacySettings:
+      type: object
+      additionalProperties: false
+      required: [defaultAudience, hideNotificationContent, placeLookupConsent]
+      properties:
+        defaultAudience: { enum: [household, creator] }
+        hideNotificationContent: { type: boolean }
+        placeLookupConsent:
+          oneOf:
+            - { $ref: '#/components/schemas/PlaceLookupConsent' }
+            - { type: 'null' }
     PermissionOverride:
       type: object
       required: [membershipId, capability, effect]

@@ -5,7 +5,7 @@ const ranges = (prefix, count) => Array.from({ length: count }, (_, index) => `U
 const expected = new Set([
   ...ranges('A', 8), ...ranges('H', 8), ...ranges('D', 2), ...ranges('C', 5),
   ...ranges('T', 4), ...ranges('M', 4), ...ranges('B', 5), ...ranges('R', 2),
-  ...ranges('S', 2), 'UC-N01', ...ranges('P', 3), ...ranges('F', 6), ...ranges('X', 2),
+  ...ranges('S', 2), 'UC-N01', ...ranges('P', 3), ...ranges('F', 6), ...ranges('X', 2), ...ranges('L', 5),
 ]);
 const ids = catalog.cases.map((item) => item.id);
 const actual = new Set(ids);

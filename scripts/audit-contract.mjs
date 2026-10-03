@@ -16,7 +16,7 @@ const requiredOperations = [
   'updateMembershipRole', 'listHouseholdInvites', 'revokeHouseholdInvite',
   'getPermissionOverrides', 'updatePermissionOverrides', 'resetPermissionOverrides',
   'restoreEvent', 'restoreTodo', 'restoreMemo', 'reverseSettlement',
-  'resumeNotification', 'updateNotificationPreferences',
+  'resumeNotification', 'updateNotificationPreferences', 'getPrivacySettings',
 ];
 for (const operation of requiredOperations) {
   if (!operationIds.includes(operation)) failures.push(`missing OpenAPI operationId: ${operation}`);
@@ -25,6 +25,7 @@ for (const operation of requiredOperations) {
 const requiredContractMarkers = [
   'x-mutation-policy:', 'Idempotency-Key', 'If-Permission-Revision', 'X-CSRF-Token',
   'NOT_FOUND', 'REAUTH_REQUIRED', 'OWNER_REQUIRED', 'PERMISSION_REVISION', 'IDEMPOTENCY',
+  'PlaceRef:', 'PlaceLookupConsent:', 'place.read',
 ];
 for (const marker of requiredContractMarkers) {
   if (!contract.includes(marker)) failures.push(`missing OpenAPI contract marker: ${marker}`);
@@ -40,12 +41,13 @@ for (const marker of adapterMarkers) {
 
 const gatewayMethods = [
   'updatePermissionOverrides', 'resetPermissionOverrides', 'revokeInvite',
-  'restoreEvent', 'restoreTodo', 'restoreMemo', 'reverseSettlement', 'resume',
+  'restoreEvent', 'restoreTodo', 'restoreMemo', 'reverseSettlement', 'resume', 'getPrivacySettings',
 ];
 for (const method of gatewayMethods) {
   if (!gateway.includes(`${method}(`)) failures.push(`missing gateway method: ${method}`);
 }
 
+if (!domain.includes("'place.read'")) failures.push('missing capability: place.read');
 for (const reason of ['CAPABILITY_MISSING', 'SCOPE_DENIED', 'OWNER_REQUIRED', 'VERSION', 'PERMISSION_REVISION', 'IDEMPOTENCY']) {
   if (!domain.includes(reason)) failures.push(`missing discriminated failure reason: ${reason}`);
 }

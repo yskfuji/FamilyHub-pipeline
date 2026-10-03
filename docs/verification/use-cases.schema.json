@@ -6,7 +6,7 @@
     "version": {"type": "integer", "minimum": 1},
     "cases": {
       "type": "array",
-      "minItems": 52,
+      "minItems": 57,
       "items": {
         "type": "object",
         "required": ["id", "title", "products", "roles", "capability", "success", "failures", "recovery"],

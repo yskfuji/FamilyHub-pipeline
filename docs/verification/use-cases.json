@@ -58,6 +58,11 @@
     {"id":"UC-F05","title":"DB、Redis、天気、ファイル検査の障害と安全側への停止","products":["B"],"roles":["owner","adult","child","guest"],"capability":null,"success":"依存障害時に機密を漏らさず停止する","failures":["依存サービス停止"],"recovery":"復旧後に明示的に再試行"},
     {"id":"UC-F06","title":"バックグラウンド復帰、別アカウント切替、未送信データ消去","products":["B","F"],"roles":["owner","adult","child","guest"],"capability":null,"success":"利用者とグループを取り違えず復帰する","failures":["セッション変更","権限変更"],"recovery":"再認証し下書きを確認または削除"},
     {"id":"UC-X01","title":"キーボード、VoiceOver、フォーカス、ズーム、長い日本語","products":["B","F"],"roles":["owner","adult","child","guest"],"capability":null,"success":"支援技術と拡大表示で操作する","failures":["遮蔽","名称不足","順序不正"],"recovery":"欠陥として記録し修正する"},
-    {"id":"UC-X02","title":"320から1920px、明暗、空、エラー、全ロールの光学確認","products":["B","F"],"roles":["owner","adult","child","guest"],"capability":null,"success":"対象表示条件で崩れなく利用する","failures":["切れ","重なり","意図しない横スクロール"],"recovery":"原因箇所を修正して再撮影する"}
+    {"id":"UC-X02","title":"320から1920px、明暗、空、エラー、全ロールの光学確認","products":["B","F"],"roles":["owner","adult","child","guest"],"capability":null,"success":"対象表示条件で崩れなく利用する","failures":["切れ","重なり","意図しない横スクロール"],"recovery":"原因箇所を修正して再撮影する"},
+    {"id":"UC-L01","title":"現在地から近くの場所を選んで支出・メモに付ける","products":["F"],"roles":["owner","adult"],"capability":"place.read","success":"丸めた位置だけを送り、端末内で近い順に並べた候補から選んだ場所だけを記録する","failures":["位置情報の拒否","精度不足（正確な位置情報がオフ）","取得の時間切れ","候補なし"],"recovery":"理由を示し、名前で探す・手入力へ切り替える"},
+    {"id":"UC-L02","title":"写真に記録された位置から場所を選ぶ","products":["F"],"roles":["owner","adult"],"capability":"place.read","success":"写真を送らずに端末内で位置だけを読み取り、近くの候補から選ぶ","failures":["写真に位置情報がない（端末やカメラ撮影で除去）","非対応の形式","30MB超過","壊れたファイル"],"recovery":"理由と位置情報を残す方法を示し、名前で探す・手入力へ切り替える"},
+    {"id":"UC-L03","title":"名前で探す、または手入力で場所を付ける","products":["F"],"roles":["owner","adult"],"capability":"place.read","success":"確定した検索語だけを送り、該当なしでも手入力で記録できる","failures":["該当なし（全国へ広げた結果を明示）","外部サービスの停止・混雑","オフライン"],"recovery":"手入力はオフラインでも使え、外部の状態に依存しない"},
+    {"id":"UC-L04","title":"外部送信の説明を読み、同意・撤回する","products":["F"],"roles":["owner","adult"],"capability":"place.read","success":"初回の外部検索前に送信先・送る内容・送らないものを示し、同意は受付側の日時で記録し、設定から撤回できる","failures":["同意の保存失敗","説明の版が変わった"],"recovery":"同意せずに手入力だけを使える。説明が変わったら同意を取り直す"},
+    {"id":"UC-L05","title":"記録した場所の表示範囲を守る","products":["F"],"roles":["owner","adult","child","guest"],"capability":"place.read","success":"管理者と大人だけに場所を返し、子ども・ゲストには項目ごと除いたメモを返す","failures":["個別に場所の閲覧を止められた大人","未送信の変更を送る前に権限が変わった"],"recovery":"場所を除いて表示し、権限を失った未送信の変更は送らずに確認を求める"}
   ]
 }
