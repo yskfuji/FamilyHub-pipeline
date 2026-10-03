@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../../app/AppContext';
 import { capabilityCeilingFor, defaultCapabilitiesFor } from '../../authz/policy';
 import { externalLinkLabel, ja, membershipStatusLabels, roleLabels } from '../../content/ja';
@@ -33,10 +33,18 @@ export function SettingsPage({ path }: { path: string }) {
     localStorage.setItem('family-hub-reduced-motion', String(value));
   };
   useEffect(() => { document.documentElement.dataset.reduceMotion = String(reduced); }, [reduced]);
+  // 狭い画面ではタブが横にスクロールするため、表示中のタブが隠れないよう横方向だけ寄せる（縦には動かさない）。
+  const tabsRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const nav = tabsRef.current;
+    const active = nav?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!nav || !active || nav.scrollWidth <= nav.clientWidth) return;
+    nav.scrollLeft = active.offsetLeft - (nav.clientWidth - active.offsetWidth) / 2;
+  }, [path]);
 
   return <div className="page">
     <PageHeader eyebrow="設定" title={current} description="家族との共有範囲や、表示・通知・サインイン方法を変更できます。"/>
-    <nav className="segmented settings-tabs" aria-label="設定項目">
+    <nav ref={tabsRef} className="segmented settings-tabs" aria-label="設定項目">
       {settingsTabs.filter((tab) => can(tab.capability)).map(({ href, label }) => <a data-control-id={`settings.section.${href.split("/").at(-1)}`} key={href} className="button" href={href} data-link aria-current={path.startsWith(href) ? 'page' : undefined}>{label}</a>)}
     </nav>
     {path.startsWith('/settings/security') ? <Security/>
