@@ -1,6 +1,6 @@
 # 操作台帳
 
-全可視操作には、ソース上で明示した `data-control-id` を付与する。繰り返し項目は `calendar.event.open.{eventId}` のようにドメインIDを含める。表示文言、DOM順序、連番から実行時にIDを生成しない。`src/app/controlRegistry.ts` は検証時に未付与と重複を報告するだけで、DOMを書き換えない。機械可読な契約正本は `docs/audits/control-inventory.json` とし、E2Eはconsumerの15ルート、Dialog／Drawer、4ロールで名称、ID、重複、操作結果、失敗時の回復経路を検査する。
+全可視操作には、ソース上で明示した `data-control-id` を付与する。繰り返し項目は `calendar.event.open.{eventId}` のようにドメインIDを含める。表示文言、DOM順序、連番から実行時にIDを生成しない。`scripts/check-control-contracts.mjs` は、全操作の接頭辞が台帳の系統に当たること、台帳の能力名が実在すること、どの操作にも当たらない系統がないことを静的に検査する。機械可読な契約正本は `docs/audits/control-inventory.json` とし、E2Eは22ルート（詳細・404を含む）と検索・すぐに追加・通知・その他の重ね表示を4ロールで、Dialog／Drawer、4ロールで名称、ID、重複、操作結果、失敗時の回復経路を検査する。
 
 | 区分 | 失敗時 | オフライン | 取消・確認 |
 |---|---|---|---|
@@ -30,6 +30,9 @@
 | `/settings/household` 役割、個別権限、招待 | `household.manage/invite` | 必要 | revision更新、監査対象 | 最終管理者保護、競合時は再読込 | 再認証、高リスク確認、招待失効 |
 | `/settings/security` パスキー、パスワード、端末終了 | 自分の認証設定 | 必要 | 対象認証器／端末だけ更新 | 秘密入力を閉じると破棄 | 再認証、対象を示す確認 |
 | `/settings/notifications` 設定、停止、再開 | 自分の通知設定 | 必要 | 対象または設定だけ更新 | 現在値を保持し再試行 | 停止は再開可能 |
+| `/budget/{支出}` 支出詳細、精算、精算の取り消し、編集、削除・復元 | `expense.read/create/settle` | 必要 | 場所・負担・精算の履歴を表示。取り消しは反対の記録 | 精算がある間は金額・負担の変更と削除を止める | 削除は7日間復元できる |
+| `/places` 記録した場所の一覧と詳細 | `place.read` | 不要（記録から集計） | 最近使った順（既定）・支出順・回数順 | 該当なしは空の状態 | ブラウザの戻る操作 |
+| `/settings/privacy` 共有範囲の初期値、通知の表示 | 自分の設定 | 必要 | 本人の設定だけ更新 | 現在値を保持し再試行 | もう一度切り替える |
 | `/settings/location` 外部送信の説明、同意／撤回 | `place.read` | 必要 | 同意状態だけ更新、受付側で日時を記録 | 現在の状態を保持し再試行 | もう一度切り替える。撤回しても記録済みの場所は残る |
 | `/settings/accessibility` 明暗、動き | 自分の表示設定 | 不要 | 即時反映 | OS設定を優先可能 | 即時に戻せる |
 | `/settings/resources` 外部リンク | `resource.view`＋公開範囲 | 遷移先による | 検証済みHTTPSを新しいタブで開く | 不正schemeはリンク化しない | `noopener noreferrer`、referrer送信なし |

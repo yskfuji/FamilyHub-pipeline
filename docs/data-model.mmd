@@ -28,6 +28,7 @@ erDiagram
   Memo ||--o| PlaceSnapshot : located_at
   Expense ||--o| PlaceSnapshot : located_at
   HouseholdMembership ||--o{ PlaceLookupConsent : grants
+  HouseholdMembership ||--o{ Notification : receives
 
   User {
     uuid id PK
@@ -115,8 +116,22 @@ erDiagram
   Expense {
     uuid id PK
     uuid household_id FK
+    uuid payer_membership_id FK
     int amount_jpy
     date incurred_on
+    enum category
+    text note
+    int version
+    timestamp deleted_at
+  }
+  Notification {
+    uuid id PK
+    uuid membership_id FK
+    enum kind
+    string destination
+    timestamp remind_at
+    enum status
+    bool read
   }
   ExpenseShare {
     uuid id PK

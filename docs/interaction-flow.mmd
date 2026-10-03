@@ -3,13 +3,15 @@ flowchart LR
   B -->|許可| C["共通 command 状態\nidle / submitting / queued / failed"]
   B -->|非許可| X["安全な戻り先を示す"]
   C --> D["FamilyHubGateway"]
+  D --> L["ドメイン計算（純粋関数）\n台帳・ヒント・繰り返し・場所の集計"]
+  L --> J
   D --> E["Mock adapter\n状態遷移の参照実装"]
   D --> F["HTTP adapter\nOpenAPI 境界"]
   F --> G{"サーバー認可\n対象・公開範囲・権限revision"}
   G -->|許可| H["対象エンティティを更新"]
   G -->|拒否| Y["403または存在を隠す404"]
   H --> I["追記型 AuditEvent"]
-  H --> J["再取得・状態通知・取消経路"]
+  H --> J["再取得（画面と取消の案内を保持）・状態通知・取消経路"]
   C --> P["PlaceLookupPort\n丸めた位置・確定した検索語だけ"]
   P --> Q["OpenPOI API（外部）\n同意後・Cookieなし・リファラーなし"]
   Q --> R["端末内で近い順に並べ直し\n選んだ場所だけを入力へ"]

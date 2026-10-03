@@ -25,6 +25,13 @@
 | E19 | 位置情報の許可は利用者の操作直後に求めるほうが許可されやすい | web.dev（Chromeの許可プロンプト計測）、Apple HIG | 意図の兆候なしの表示は許可12%、操作後は30% | デスクトップChromeの計測で、家庭アプリや位置情報に限った実験ではない | ボタンを押したときだけ位置情報を求め、初回の外部検索の直前に同意を求める | 中 |
 | E20 | 座標だけで店を当てるのは屋内で難しい | CheckInside（4施設・20名・6週間） | 既存の位置情報サービスで上位5件に正解が入るのは17% | 小規模・屋内・2016年の研究 | 候補の一覧に加え、名前検索と手入力を同じ画面に置く。自動で場所を決めない | 低〜中 |
 | E21 | アカウントに結び付く位置情報は個人情報として扱い、外部送信は公表と同意が要る | 個人情報保護委員会ガイドライン（通則編）、総務省 外部送信規律、de Montjoye ら（Sci Rep 2013） | 位置情報は蓄積で特定個人を識別しうる。4つの時空間点で95%を一意に特定 | 法令の適用可否は事業形態で異なり、本台帳は法的助言ではない | 現在地を保存しない、送信内容を最小化、送信先・内容・目的を公表し同意を記録、子ども・ゲストに返さない | 中〜高 |
+| E22 | 取り消しと現在の状態は、見える場所で常に確認できる必要がある | NN/g 10ヒューリスティック（#1 状態の可視性、#3 ユーザーの制御と自由、#6 再生より再認） | 「Support Undo and Redo」「visible option to undo」。状態が予測できることが信頼につながる | 専門家の原則で、家計アプリでの取り消しの効果量を示す実験ではない（該当する査読研究は見つからなかった） | 取り消し・復元の案内が再取得で消える不具合を直し、精算の取り消しを支出詳細と「精算の履歴」に常設。記録は書き換えず反対の記録で残す | 中〜高 |
+| E23 | 角度で比べる図は位置・長さより読み取りが不正確 | Cleveland & McGill 1984、Heer & Bostock 2010（MTurk再現）、Skau & Kosara 2016（2実験・各80〜100名） | 位置＞長さ＞角度・面積の順に正確。ドーナツは円と同程度だが角度は手掛かりとして弱い | 部分と全体の比較では円も棒も大差ないとする報告もある（Spence & Lewandowsky 1991、二次資料のため未検証） | 費目別は円グラフをやめ、金額と割合を文字で示す横棒の一覧にする。割合は最大剰余法で合計100% | 中〜高 |
+| E24 | 主要なナビゲーションを隠すと見つけにくくなる | NN/g 隠しナビの実験（179名・6サイト） | 見つけやすさはほぼ半減、モバイルでは15%遅く、難しさの評価が21%上がる | Webサイトの調査で、家族向けアプリの画面数・利用頻度と同じではない | ボトムナビを残し、「その他」に入る家計・場所へは画面内の文脈からも入れるようにする | 中〜高 |
+| E25 | 画面下部に固定するナビはWebでは非推奨（反証） | デジタル庁デザインシステム「ボトムナビゲーション」 | ブラウザのUIやジェスチャー領域との競合、DOMの後方に置かれることによるキーボード・読み上げの到達の問題 | 行政サービス向けの指針で、E24と緊張関係にある | 安全領域（env(safe-area-inset-bottom)）に対応し、「その他」をモーダルにしてEscape・フォーカス復帰・表示中の項目を示す。本文へ移動のリンクを維持 | 中 |
+| E26 | 詳細はURLで開けて、戻る操作で閉じられる必要がある | NN/g「URL as UI」「Bottom sheet」 | URLは長く有効に保つ。長く読む情報を一時的なシートに置かない、戻るで閉じられるようにする | 指針であり、本アプリでの比較試験ではない | 支出・場所に詳細URL（/budget/{id}、/places/{key}）。不明・権限外のIDは一覧に黙って戻さず理由を表示 | 中 |
+| E27 | 繰り返しの例外と分割は標準の規則で表す | RFC 5545（RRULE / EXDATE / UNTIL / COUNT） | COUNTは例外を除く前に数える。シリーズの分割はUNTILで前半を終える | 対応する規則は一部（DAILY・WEEKLY+BYDAY・MONTHLY・INTERVAL・UNTIL・COUNT）。それ以外は推測で展開しない | 「この予定だけ」は例外日、「これ以降」はUNTILでの分割と後半の新シリーズ、削除・分割の前の状態を保存して7日間戻せる | 高 |
+| E28 | 金額は3桁区切りの半角数字で示す | 公用文作成の考え方（文化審議会、2022） | 「大きな数は、三桁ごとにコンマで区切る」「半角数字を用いる」 | 公用文の指針で、アプリの表示規範ではない | 金額は Intl.NumberFormat（ja-JP, JPY）と等幅数字で右寄せ。ブラウザにより円記号の全角・半角が異なる点はテストで許容 | 中〜高 |
 
 ## 一次・公的資料
 
@@ -68,6 +75,14 @@
 - [個人情報保護委員会 ガイドライン（通則編）](https://www.ppc.go.jp/personalinfo/legal/guidelines_tsusoku/)
 - [総務省 外部送信規律](https://www.soumu.go.jp/main_sosiki/joho_tsusin/d_syohi/gaibusoushin_kiritsu.html)
 - [de Montjoye et al. Unique in the Crowd（Sci Rep 2013）](https://www.nature.com/articles/srep01376)
+- [NN/g 10 Usability Heuristics](https://www.nngroup.com/articles/ten-usability-heuristics/)、[User Control and Freedom](https://www.nngroup.com/articles/user-control-and-freedom/)
+- [NN/g Hamburger Menus and Hidden Navigation](https://www.nngroup.com/articles/hamburger-menus/)
+- [デジタル庁 ボトムナビゲーション（非推奨）](https://design.digital.go.jp/dads/components/bottom-navigation/)
+- [Skau & Kosara, EuroVis 2016](https://eagereyes.org/publications/Skau-EuroVis-2016)、[Heer & Bostock, CHI 2010](https://homes.cs.washington.edu/~jheer/files/2010-MTurk-CHI.pdf)
+- [WCAG 2.2 Use of Color](https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html)、[Non-text Contrast](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html)
+- [NN/g Bottom Sheets](https://www.nngroup.com/articles/bottom-sheet/)、[URL as UI](https://www.nngroup.com/articles/url-as-ui/)、[Progressive Disclosure](https://www.nngroup.com/articles/progressive-disclosure/)
+- [RFC 5545](https://datatracker.ietf.org/doc/html/rfc5545)
+- [公用文作成の考え方（文化審議会）](https://www.bunka.go.jp/seisaku/bunkashingikai/kokugo/hokoku/pdf/93731901_01.pdf)
 
 ## 証拠状態
 

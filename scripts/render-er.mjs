@@ -29,7 +29,7 @@ for (const diagram of diagrams) {
   if (diagram.kind === 'er') {
     const entities = [...source.matchAll(/^\s{2}([A-Z][A-Za-z]+)\s*\{/gm)].length;
     const relations = [...source.matchAll(/^\s{2}[A-Z][A-Za-z]+\s+[^:]+:\s+[a-z_]+/gm)].length;
-    if (entities !== 21 || relations !== 29) throw new Error(`ER contract drift: expected 21 entities and 29 relations, found ${entities} and ${relations}`);
+    if (entities !== 22 || relations !== 30) throw new Error(`ER contract drift: expected 22 entities and 30 relations, found ${entities} and ${relations}`);
   }
   execFileSync(mmdc, ['-i', sourcePath, '-o', outputPath, '-t', 'neutral', '-b', 'transparent'], {
     stdio: 'inherit',

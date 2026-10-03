@@ -5,7 +5,7 @@ sequenceDiagram
     participant API as API
     participant AZ as 認可サービス
     participant DB as DB
-    participant DEV as 端末の位置情報
+    participant DEV as 端末（位置情報・本人確認）
     participant EXT as OpenPOI API
 
     rect rgb(239,246,255)
@@ -102,4 +102,24 @@ sequenceDiagram
         API->>DB: 場所のスナップショットを保存（現在地は保存しない）
         API-->>UI: place.read を持つ閲覧者にだけ場所を返す
       end
+    end
+
+    rect rgb(245,243,255)
+      Note over U,DB: パスキーの完了と設定の振り分け
+      U->>UI: パスキーでサインイン
+      UI->>API: チャレンジを要求
+      API-->>UI: 1回だけ有効なチャレンジ
+      UI->>DEV: 端末で本人確認（署名）
+      DEV-->>UI: 署名済みの応答
+      UI->>API: 応答を送って完了を要求
+      API->>API: 署名・origin・RP ID・チャレンジを検証
+      alt 検証に失敗
+        API-->>UI: 401（先へ進まない）
+      else 検証に成功
+        API-->>UI: サインイン完了（Cookieを設定）
+      end
+      U->>UI: /settings を開く
+      UI->>AZ: タブごとの能力を確認
+      AZ-->>UI: 許可されたタブの一覧
+      UI-->>U: 最初の許可タブへ置き換え（家族タブへ黙って落とさない）
     end
