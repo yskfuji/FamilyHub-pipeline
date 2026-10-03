@@ -10,7 +10,7 @@ export function isGeolocationAvailable(): boolean {
 }
 
 /**
- * 利用者がボタンを押したときに一度だけ現在地を取得する。継続的な追跡（watchPosition）はしない。
+ * 利用者がボタンを押したときに一度だけ現在地を取得する。継続的な追跡はしない。
  * accuracy は「95%の確率でこの半径内」を表すメートル値（W3C Geolocation）。
  */
 export function getDevicePosition(signal?: AbortSignal): Promise<DeviceLocationOutcome> {
