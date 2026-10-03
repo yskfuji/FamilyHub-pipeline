@@ -38,6 +38,29 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/PasskeyChallenge' }
         default: { $ref: '#/components/responses/Error' }
+  /v1/auth/passkey/complete:
+    post:
+      security: []
+      operationId: finishPasskey
+      description: The server verifies the assertion signature, origin, RP ID, and the single-use challenge before issuing the session cookie.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challengeId, assertion]
+              properties:
+                challengeId: { type: string }
+                assertion: { type: object, additionalProperties: true, description: PublicKeyCredential assertion (base64url fields) }
+      responses:
+        '200':
+          description: Signed in; session cookie set by server
+          content:
+            application/json:
+              schema: { type: object, required: [userId], properties: { userId: { type: string } } }
+        default: { $ref: '#/components/responses/Error' }
   /v1/auth/password:
     post:
       security: []
@@ -67,14 +90,22 @@ paths:
     get:
       operationId: getSecurityOverview
       responses:
-        '200': { description: Authenticators and sessions without secrets }
+        '200':
+          description: Authenticators and sessions without secrets
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SecurityOverview' }
         default: { $ref: '#/components/responses/Error' }
   /v1/auth/passkeys/registration:
     post:
       operationId: beginPasskeyRegistration
       parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
       responses:
-        '200': { description: Short-lived WebAuthn registration challenge }
+        '200':
+          description: Short-lived WebAuthn registration challenge
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PasskeyRegistrationChallenge' }
         default: { $ref: '#/components/responses/Error' }
   /v1/auth/passkeys/registration/complete:
     post:
@@ -91,7 +122,11 @@ paths:
                 challengeId: { type: string }
                 credential: { type: object, additionalProperties: true }
       responses:
-        '201': { description: Authenticator registered after origin and challenge verification }
+        '201':
+          description: Authenticator registered after origin and challenge verification
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Authenticator' }
         default: { $ref: '#/components/responses/Error' }
   /v1/auth/password/change:
     post:
@@ -148,14 +183,18 @@ paths:
             application/json:
               schema:
                 type: object
-                properties: { householdId: { type: string, format: uuid } }
+                properties: { householdId: { type: string } }
         '410': { $ref: '#/components/responses/Error' }
         default: { $ref: '#/components/responses/Error' }
   /v1/household-invites:
     get:
       operationId: listHouseholdInvites
       responses:
-        '200': { description: Owner-only invitation list; tokens are never returned again }
+        '200':
+          description: Owner-only invitation list; tokens are never returned again
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/HouseholdInvite' } }
         '403': { $ref: '#/components/responses/Error' }
         default: { $ref: '#/components/responses/Error' }
     post:
@@ -170,7 +209,11 @@ paths:
               required: [role]
               properties: { role: { enum: [adult, child, guest] } }
       responses:
-        '201': { description: 24-hour, single-use token returned once }
+        '201':
+          description: 24-hour, single-use token returned once
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HouseholdInvite' }
         default: { $ref: '#/components/responses/Error' }
   /v1/household-invites/{inviteId}:
     delete:
@@ -179,7 +222,11 @@ paths:
         - { $ref: '#/components/parameters/CsrfToken' }
         - { name: inviteId, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: Invite revoked and audit event appended }
+        '200':
+          description: Invite revoked and audit event appended
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HouseholdInvite' }
         '403': { $ref: '#/components/responses/Error' }
         default: { $ref: '#/components/responses/Error' }
   /v1/household-memberships/{membershipId}:
@@ -199,7 +246,11 @@ paths:
                 role: { enum: [owner, adult, child, guest] }
                 expectedVersion: { type: integer, minimum: 1 }
       responses:
-        '200': { description: Role updated; sole owner demotion is rejected }
+        '200':
+          description: Role updated; sole owner demotion is rejected
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HouseholdMembership' }
         '409': { $ref: '#/components/responses/Error' }
         default: { $ref: '#/components/responses/Error' }
   /v1/household-memberships/{membershipId}/permission-overrides:
@@ -229,7 +280,11 @@ paths:
                 overrides: { type: array, items: { $ref: '#/components/schemas/PermissionOverride' } }
                 expectedPermissionRevision: { type: integer, minimum: 1 }
       responses:
-        '200': { description: Updated snapshot; deny wins and role ceiling is enforced }
+        '200':
+          description: Updated snapshot; deny wins and role ceiling is enforced
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HouseholdSnapshot' }
         '409': { $ref: '#/components/responses/Error' }
         default: { $ref: '#/components/responses/Error' }
     delete:
@@ -239,7 +294,32 @@ paths:
         - { name: membershipId, in: path, required: true, schema: { type: string } }
         - { name: expectedPermissionRevision, in: query, required: true, schema: { type: integer, minimum: 1 } }
       responses:
-        '200': { description: Role defaults restored }
+        '200':
+          description: Role defaults restored
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HouseholdSnapshot' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/households/current:
+    patch:
+      operationId: updateHouseholdProfile
+      description: Owner only. Renames the household.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name]
+              properties: { name: { type: string, minLength: 1, maxLength: 40 } }
+      responses:
+        '200':
+          description: Updated household
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Household' }
         default: { $ref: '#/components/responses/Error' }
   /v1/households/current/privacy:
     get:
@@ -298,7 +378,7 @@ paths:
         - name: eventId
           in: path
           required: true
-          schema: { type: string, format: uuid }
+          schema: { type: string }
       requestBody:
         required: true
         content:
@@ -308,8 +388,9 @@ paths:
               required: [scope, input, expectedVersion]
               properties:
                 scope: { enum: [this, future, series] }
-                input: { $ref: '#/components/schemas/EventInput' }
+                input: { $ref: '#/components/schemas/EventPatch' }
                 expectedVersion: { type: integer, minimum: 1 }
+                occurrenceDate: { type: string, format: date, description: Required when scope is this or future on a recurring event }
       responses:
         '200':
           description: Updated
@@ -325,6 +406,7 @@ paths:
         - { name: eventId, in: path, required: true, schema: { type: string } }
         - { name: scope, in: query, required: true, schema: { enum: [this, future, series] } }
         - { name: expectedVersion, in: query, required: true, schema: { type: integer, minimum: 1 } }
+        - { name: occurrenceDate, in: query, required: false, schema: { type: string, format: date }, description: Required when scope is this or future on a recurring event }
       responses:
         '204': { description: Event scope soft-deleted for seven days after authorization and version checks }
         '409': { $ref: '#/components/responses/Error' }
@@ -336,7 +418,11 @@ paths:
         - { $ref: '#/components/parameters/CsrfToken' }
         - { name: eventId, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: Soft-deleted event restored within seven days }
+        '200':
+          description: Soft-deleted event restored within seven days
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Event' }
         default: { $ref: '#/components/responses/Error' }
   /v1/todos:
     post:
@@ -365,7 +451,7 @@ paths:
         - name: todoId
           in: path
           required: true
-          schema: { type: string, format: uuid }
+          schema: { type: string }
       requestBody:
         required: true
         content:
@@ -399,10 +485,14 @@ paths:
               required: [scope, input, expectedVersion]
               properties:
                 scope: { enum: [this, future, series] }
-                input: { $ref: '#/components/schemas/TodoInput' }
+                input: { $ref: '#/components/schemas/TodoPatch' }
                 expectedVersion: { type: integer, minimum: 1 }
       responses:
-        '200': { description: Todo updated }
+        '200':
+          description: Todo updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Todo' }
         '409': { $ref: '#/components/responses/Error' }
         default: { $ref: '#/components/responses/Error' }
     delete:
@@ -411,8 +501,9 @@ paths:
         - { $ref: '#/components/parameters/CsrfToken' }
         - { name: todoId, in: path, required: true, schema: { type: string } }
         - { name: expectedVersion, in: query, required: true, schema: { type: integer, minimum: 1 } }
+        - { name: scope, in: query, required: false, schema: { enum: [this, future, series], default: series }, description: this skips only the current occurrence of a recurring task and advances the series }
       responses:
-        '204': { description: Soft deleted for seven days }
+        '204': { description: Deleted (or the current occurrence skipped); restorable for seven days }
         default: { $ref: '#/components/responses/Error' }
   /v1/todos/{todoId}/restore:
     post:
@@ -421,7 +512,11 @@ paths:
         - { $ref: '#/components/parameters/CsrfToken' }
         - { name: todoId, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: Todo restored }
+        '200':
+          description: Todo restored
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Todo' }
         default: { $ref: '#/components/responses/Error' }
   /v1/memos:
     post:
@@ -448,7 +543,11 @@ paths:
                     - { $ref: '#/components/schemas/PlaceRef' }
                     - { type: 'null' }
       responses:
-        '201': { description: Memo created; place requires place.read }
+        '201':
+          description: Memo created; place requires place.read
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Memo' }
         default: { $ref: '#/components/responses/Error' }
   /v1/memos/{memoId}:
     patch:
@@ -480,7 +579,11 @@ paths:
                         - { $ref: '#/components/schemas/PlaceRef' }
                         - { type: 'null' }
       responses:
-        '200': { description: Memo updated after version and authorization checks }
+        '200':
+          description: Memo updated after version and authorization checks
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Memo' }
         default: { $ref: '#/components/responses/Error' }
     delete:
       operationId: deleteMemo
@@ -497,7 +600,11 @@ paths:
         - { $ref: '#/components/parameters/CsrfToken' }
         - { name: memoId, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: Memo restored }
+        '200':
+          description: Memo restored
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Memo' }
         default: { $ref: '#/components/responses/Error' }
   /v1/memos/{memoId}/attachments:
     post:
@@ -507,7 +614,7 @@ paths:
         - name: memoId
           in: path
           required: true
-          schema: { type: string, format: uuid }
+          schema: { type: string }
       requestBody:
         required: true
         content:
@@ -522,9 +629,23 @@ paths:
           description: Accepted into quarantine; not safe to serve yet
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Attachment' }
+              schema: { $ref: '#/components/schemas/Memo' }
         '413': { $ref: '#/components/responses/Error' }
         '415': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/memos/{memoId}/attachments/{attachmentId}/link:
+    get:
+      operationId: getAttachmentLink
+      description: Issues a short-lived signed URL only for attachments whose scan status is clean and only to viewers allowed to read the memo.
+      parameters:
+        - { name: memoId, in: path, required: true, schema: { type: string } }
+        - { name: attachmentId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Short-lived signed URL
+          content:
+            application/json:
+              schema: { type: object, required: [url, expiresAt], properties: { url: { type: string, format: uri }, expiresAt: { type: string, format: date-time } } }
         default: { $ref: '#/components/responses/Error' }
   /v1/expenses:
     post:
@@ -542,6 +663,56 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Expense' }
         default: { $ref: '#/components/responses/Error' }
+  /v1/expenses/{expenseId}:
+    patch:
+      operationId: updateExpense
+      description: Amount, payer and shares can change only while no live (unreversed) settlement exists; otherwise 409.
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+        - { name: expenseId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [input, expectedVersion]
+              properties:
+                expectedVersion: { type: integer, minimum: 1 }
+                input: { $ref: '#/components/schemas/ExpensePatch' }
+      responses:
+        '200':
+          description: Updated expense
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Expense' }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: deleteExpense
+      description: Rejected with 409 while a live settlement exists. Soft delete; restorable for seven days.
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { name: expenseId, in: path, required: true, schema: { type: string } }
+        - { name: expectedVersion, in: query, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        '204': { description: Soft deleted for seven days }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/expenses/{expenseId}/restore:
+    post:
+      operationId: restoreExpense
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { name: expenseId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Restored expense
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Expense' }
+        default: { $ref: '#/components/responses/Error' }
   /v1/expenses/{expenseId}/settlements:
     post:
       operationId: recordSettlement
@@ -550,17 +721,23 @@ paths:
         - name: expenseId
           in: path
           required: true
-          schema: { type: string, format: uuid }
+          schema: { type: string }
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [amountJpy]
-              properties: { amountJpy: { type: integer, minimum: 1 } }
+              required: [fromMembershipId, amountJpy]
+              properties:
+                fromMembershipId: { type: string, description: The member whose share is being settled }
+                amountJpy: { type: integer, minimum: 1, description: Capped at the member's remaining share }
       responses:
-        '201': { description: Append-only settlement record created }
+        '201':
+          description: Append-only settlement record created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Expense' }
         '409': { $ref: '#/components/responses/Error' }
         default: { $ref: '#/components/responses/Error' }
   /v1/expenses/{expenseId}/settlements/{settlementId}/reverse:
@@ -571,7 +748,11 @@ paths:
         - { name: expenseId, in: path, required: true, schema: { type: string } }
         - { name: settlementId, in: path, required: true, schema: { type: string } }
       responses:
-        '201': { description: Append-only reversal record created; original remains auditable }
+        '201':
+          description: Append-only reversal record created; original remains auditable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Expense' }
         default: { $ref: '#/components/responses/Error' }
   /v1/search:
     get:
@@ -588,40 +769,37 @@ paths:
             application/json:
               schema:
                 type: array
-                maxItems: 20
+                maxItems: 12
                 items:
                   type: object
                   required: [kind, id, label, destination]
                   properties:
-                    kind: { type: string }
-                    id: { type: string, format: uuid }
+                    kind: { enum: [event, task, memo, expense, place, resource] }
+                    detail: { type: string }
+                    id: { type: string }
                     label: { type: string }
                     destination: { type: string }
         default: { $ref: '#/components/responses/Error' }
-  /v1/context:
+  /v1/insights:
     get:
-      operationId: getContext
-      description: Returns holiday, weather, and sync context with source timestamps.
+      operationId: listInsights
+      description: Derived on the server from the requester's authorized projection only; requires insight.read. Never changes events or assignments.
       responses:
         '200':
-          description: Authorized context projection
+          description: Insights for the requesting member
           content:
             application/json:
-              schema:
-                type: object
-                required: [asOf, timezone, weather, holidays, sync]
-                properties:
-                  asOf: { type: string, format: date-time }
-                  timezone: { type: string, example: Asia/Tokyo }
-                  weather: { type: object, additionalProperties: true }
-                  holidays: { type: array, items: { type: object, additionalProperties: true } }
-                  sync: { type: object, additionalProperties: true }
+              schema: { type: array, items: { $ref: '#/components/schemas/Insight' } }
         default: { $ref: '#/components/responses/Error' }
   /v1/notifications:
     get:
       operationId: listNotifications
       responses:
-        '200': { description: Authorized household notifications }
+        '200':
+          description: Authorized household notifications
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/HouseholdNotification' } }
         default: { $ref: '#/components/responses/Error' }
   /v1/notifications/{notificationId}/read:
     post:
@@ -630,7 +808,11 @@ paths:
         - { $ref: '#/components/parameters/CsrfToken' }
         - { name: notificationId, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: Notification marked read }
+        '200':
+          description: Notification marked read
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HouseholdNotification' }
         default: { $ref: '#/components/responses/Error' }
   /v1/notifications/{notificationId}/snooze:
     post:
@@ -647,7 +829,11 @@ paths:
               required: [minutes]
               properties: { minutes: { type: integer, enum: [30] } }
       responses:
-        '200': { description: Notification reminder moved by 30 minutes }
+        '200':
+          description: Notification reminder moved by 30 minutes
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HouseholdNotification' }
         default: { $ref: '#/components/responses/Error' }
   /v1/notifications/{notificationId}/stop:
     post:
@@ -656,7 +842,11 @@ paths:
         - { $ref: '#/components/parameters/CsrfToken' }
         - { name: notificationId, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: Notification stopped }
+        '200':
+          description: Notification stopped
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HouseholdNotification' }
         default: { $ref: '#/components/responses/Error' }
   /v1/notifications/{notificationId}/resume:
     post:
@@ -665,13 +855,21 @@ paths:
         - { $ref: '#/components/parameters/CsrfToken' }
         - { name: notificationId, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: Notification resumed }
+        '200':
+          description: Notification resumed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HouseholdNotification' }
         default: { $ref: '#/components/responses/Error' }
   /v1/notification-preferences:
     get:
       operationId: getNotificationPreferences
       responses:
-        '200': { description: Notification preference snapshot }
+        '200':
+          description: Notification preference snapshot
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationPreferences' }
         default: { $ref: '#/components/responses/Error' }
     patch:
       operationId: updateNotificationPreferences
@@ -687,7 +885,11 @@ paths:
                 eventDeparture: { type: boolean }
                 quietHours: { type: boolean }
       responses:
-        '200': { description: Notification preferences updated }
+        '200':
+          description: Notification preferences updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationPreferences' }
         default: { $ref: '#/components/responses/Error' }
 components:
   securitySchemes:
@@ -735,7 +937,7 @@ components:
       type: object
       required: [challengeId, publicKey]
       properties:
-        challengeId: { type: string, format: uuid }
+        challengeId: { type: string }
         publicKey: { type: object, additionalProperties: true }
     Recurrence:
       type: object
@@ -757,43 +959,96 @@ components:
         participantMembershipIds:
           type: array
           minItems: 1
-          items: { type: string, format: uuid }
+          items: { type: string }
         recurrence: { $ref: '#/components/schemas/Recurrence' }
+        location: { type: string, maxLength: 200 }
+        note: { type: string, maxLength: 2000 }
+        weatherSensitive: { type: boolean }
+    EventPatch:
+      description: Partial EventInput. endsAt must stay after startsAt after merging.
+      type: object
+      properties:
+        title: { type: string, minLength: 1, maxLength: 120 }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        timezone: { type: string }
+        participantMembershipIds: { type: array, minItems: 1, items: { type: string } }
+        recurrence: { $ref: '#/components/schemas/Recurrence' }
+        location: { type: string, maxLength: 200 }
+        note: { type: string, maxLength: 2000 }
+        weatherSensitive: { type: boolean }
     Event:
       allOf:
         - { $ref: '#/components/schemas/EventInput' }
         - type: object
-          required: [id, householdId, version]
+          required: [id, householdId, ownerMembershipId, version, visibility]
           properties:
-            id: { type: string, format: uuid }
-            householdId: { type: string, format: uuid }
+            id: { type: string }
+            householdId: { type: string }
+            ownerMembershipId: { type: string }
             version: { type: integer, minimum: 1 }
+            visibility: { $ref: '#/components/schemas/VisibilityPolicy' }
+            resourceIds: { type: array, items: { type: string } }
+            deletedAt: { type: string, format: date-time }
     TodoInput:
       type: object
       required: [title, assigneeMembershipId]
       properties:
         title: { type: string, minLength: 1, maxLength: 120 }
         dueAt: { type: string, format: date-time }
-        assigneeMembershipId: { type: string, format: uuid }
-        reviewerMembershipId: { type: string, format: uuid }
+        assigneeMembershipId: { type: string }
+        reviewerMembershipId: { type: string }
+        note: { type: string, maxLength: 2000 }
+    TodoPatch:
+      type: object
+      properties:
+        title: { type: string, minLength: 1, maxLength: 120 }
+        dueAt: { type: string, format: date-time }
+        assigneeMembershipId: { type: string }
+        reviewerMembershipId: { type: string }
+        note: { type: string, maxLength: 2000 }
     Todo:
       allOf:
         - { $ref: '#/components/schemas/TodoInput' }
         - type: object
-          required: [id, status, version]
+          required: [id, householdId, status, creatorMembershipId, version, visibility]
           properties:
-            id: { type: string, format: uuid }
+            id: { type: string }
+            householdId: { type: string }
             status: { enum: [open, doing, review, done] }
+            creatorMembershipId: { type: string }
+            recurrence: { $ref: '#/components/schemas/Recurrence' }
             version: { type: integer, minimum: 1 }
+            visibility: { $ref: '#/components/schemas/VisibilityPolicy' }
+            deletedAt: { type: string, format: date-time }
     Attachment:
       type: object
       required: [id, status, originalName, mimeType, byteSize]
       properties:
-        id: { type: string, format: uuid }
+        id: { type: string }
         status: { enum: [selected, validating, quarantined, clean, rejected] }
         originalName: { type: string }
         mimeType: { enum: [application/pdf, image/jpeg, image/png] }
         byteSize: { type: integer, maximum: 10000000 }
+        memoId: { type: string }
+        statusMessage: { type: string }
+    Memo:
+      type: object
+      required: [id, householdId, title, body, tags, updatedAt, authorMembershipId, attachments, visibility, version]
+      properties:
+        id: { type: string }
+        householdId: { type: string }
+        title: { type: string, maxLength: 120 }
+        body: { type: string, maxLength: 5000 }
+        tags: { type: array, maxItems: 10, items: { type: string, maxLength: 30 } }
+        updatedAt: { type: string, format: date-time }
+        authorMembershipId: { type: string }
+        attachments: { type: array, items: { $ref: '#/components/schemas/Attachment' } }
+        ocrText: { type: string }
+        place: { $ref: '#/components/schemas/PlaceRef' }
+        visibility: { $ref: '#/components/schemas/VisibilityPolicy' }
+        version: { type: integer, minimum: 1 }
+        deletedAt: { type: string, format: date-time }
     ExpenseInput:
       type: object
       required: [title, amountJpy, incurredOn, payerMembershipId, shareMembershipIds]
@@ -801,18 +1056,100 @@ components:
         title: { type: string, minLength: 1, maxLength: 120 }
         amountJpy: { type: integer, minimum: 1 }
         incurredOn: { type: string, format: date }
-        payerMembershipId: { type: string, format: uuid }
+        payerMembershipId: { type: string }
         shareMembershipIds:
           type: array
           minItems: 1
-          items: { type: string, format: uuid }
+          items: { type: string }
+        category: { enum: [food, transport, education, home, other], default: other }
+        note: { type: string, maxLength: 500 }
         place: { $ref: '#/components/schemas/PlaceRef' }
+    ExpensePatch:
+      type: object
+      additionalProperties: false
+      properties:
+        title: { type: string, minLength: 1, maxLength: 120 }
+        amountJpy: { type: integer, minimum: 1 }
+        incurredOn: { type: string, format: date }
+        payerMembershipId: { type: string }
+        shareMembershipIds: { type: array, minItems: 1, items: { type: string } }
+        category: { enum: [food, transport, education, home, other] }
+        note: { oneOf: [{ type: string, maxLength: 500 }, { type: 'null' }] }
+        place: { oneOf: [{ $ref: '#/components/schemas/PlaceRef' }, { type: 'null' }] }
+    ExpenseShare:
+      type: object
+      required: [membershipId, amountJpy, settledJpy]
+      properties:
+        membershipId: { type: string }
+        amountJpy: { type: integer, minimum: 0 }
+        settledJpy: { type: integer, minimum: 0 }
+    SettlementRecord:
+      type: object
+      description: Append-only. A reversal is a new record with a negative amount that points to the original.
+      required: [id, amountJpy, fromMembershipId, toMembershipId, recordedAt]
+      properties:
+        id: { type: string }
+        amountJpy: { type: integer }
+        fromMembershipId: { type: string }
+        toMembershipId: { type: string }
+        recordedAt: { type: string, format: date-time }
+        reversedAt: { type: string, format: date-time }
+        reversalOfSettlementId: { type: string }
     Expense:
-      allOf:
-        - { $ref: '#/components/schemas/ExpenseInput' }
-        - type: object
-          required: [id]
-          properties: { id: { type: string, format: uuid } }
+      type: object
+      required: [id, householdId, title, amountJpy, incurredOn, payerMembershipId, category, shares, settlements, version]
+      properties:
+        id: { type: string }
+        householdId: { type: string }
+        title: { type: string, maxLength: 120 }
+        amountJpy: { type: integer, minimum: 1 }
+        incurredOn: { type: string, format: date }
+        payerMembershipId: { type: string }
+        category: { enum: [food, transport, education, home, other] }
+        shares: { type: array, items: { $ref: '#/components/schemas/ExpenseShare' } }
+        settlements: { type: array, items: { $ref: '#/components/schemas/SettlementRecord' } }
+        note: { type: string, maxLength: 500 }
+        place: { $ref: '#/components/schemas/PlaceRef' }
+        version: { type: integer, minimum: 1 }
+        deletedAt: { type: string, format: date-time }
+    Household:
+      type: object
+      required: [id, name, timezone]
+      properties:
+        id: { type: string }
+        name: { type: string, maxLength: 40 }
+        timezone: { const: Asia/Tokyo }
+    Insight:
+      type: object
+      required: [id, title, summary, evidence, actionLabel, destination, confidence]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        summary: { type: string }
+        evidence: { type: string }
+        actionLabel: { type: string }
+        destination: { type: string }
+        confidence: { enum: [high, medium, low] }
+    HouseholdNotification:
+      type: object
+      required: [id, kind, destination, title, body, remindAt, read, status]
+      properties:
+        id: { type: string }
+        kind: { enum: [todoDue, eventDeparture] }
+        destination: { type: string }
+        title: { type: string }
+        body: { type: string }
+        remindAt: { type: string, format: date-time, description: Already moved to 07:00 when quiet hours apply }
+        read: { type: boolean }
+        status: { enum: [active, snoozed, stopped] }
+    NotificationPreferences:
+      type: object
+      additionalProperties: false
+      required: [todoDue, eventDeparture, quietHours]
+      properties:
+        todoDue: { type: boolean }
+        eventDeparture: { type: boolean }
+        quietHours: { type: boolean }
     PlaceProvenance:
       type: object
       additionalProperties: false
@@ -870,6 +1207,60 @@ components:
           oneOf:
             - { $ref: '#/components/schemas/PlaceLookupConsent' }
             - { type: 'null' }
+    Authenticator:
+      type: object
+      required: [id, label, createdAt, kind, demo]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        createdAt: { type: string, format: date-time }
+        kind: { const: passkey }
+        demo: { type: boolean }
+    Session:
+      type: object
+      required: [id, label, location, lastSeenAt, current]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        location: { type: string }
+        lastSeenAt: { type: string, format: date-time }
+        current: { type: boolean }
+    SecurityOverview:
+      type: object
+      description: Never contains credential secrets or public keys.
+      required: [authenticators, sessions]
+      properties:
+        authenticators: { type: array, items: { $ref: '#/components/schemas/Authenticator' } }
+        sessions: { type: array, items: { $ref: '#/components/schemas/Session' } }
+    PasskeyRegistrationChallenge:
+      type: object
+      required: [challengeId, publicKey]
+      properties:
+        challengeId: { type: string }
+        publicKey: { type: [object, 'null'], additionalProperties: true, description: PublicKeyCredentialCreationOptions with base64url fields }
+    HouseholdInvite:
+      type: object
+      required: [id, householdId, role, expiresAt, remainingUses]
+      properties:
+        id: { type: string }
+        householdId: { type: string }
+        role: { enum: [adult, child, guest] }
+        token: { type: string, description: Returned only once in the create response; list responses omit it }
+        expiresAt: { type: string, format: date-time }
+        remainingUses: { type: integer, minimum: 0 }
+        revokedAt: { type: string, format: date-time }
+    HouseholdMembership:
+      type: object
+      required: [id, householdId, userId, displayName, role, status, version]
+      properties:
+        id: { type: string }
+        householdId: { type: string }
+        userId: { type: string }
+        displayName: { type: string }
+        role: { enum: [owner, adult, child, guest] }
+        status: { enum: [active, invited, suspended] }
+        color: { type: string }
+        version: { type: integer, minimum: 1 }
     PermissionOverride:
       type: object
       required: [membershipId, capability, effect]
