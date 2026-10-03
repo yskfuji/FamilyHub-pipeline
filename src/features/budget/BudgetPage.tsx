@@ -2,6 +2,7 @@ import { useApp, memberName } from '../../app/AppContext';
 import { PageHeader, StatusBadge, formatDateOnly, formatYen } from '../../design-system/components';
 import { CheckIcon, YenIcon } from '../../design-system/icons';
 import { useState } from 'react';
+import { PlaceAttributionLink } from '../place/PlaceField';
 
 export function BudgetPage() {
   const { snapshot, gateway, refresh, announce, can, requestQuickCreate } = useApp();
@@ -30,7 +31,7 @@ export function BudgetPage() {
     </div>
     <section className="card mt-1"><div className="section-head"><div><p className="eyebrow">支出</p><h2>記録と精算</h2></div><span className="meta">新しい順</span></div><ul className="list">{snapshot.expenses.map((expense) => {
       const due = expense.shares.reduce((sum, share) => sum + Math.max(0, share.amountJpy - share.settledJpy), 0);
-      return <li className="list-row" key={expense.id}><span className="avatar" aria-hidden="true">{memberName(snapshot,expense.payerMembershipId).slice(0,1)}</span><div className="row-main"><strong>{expense.title}</strong><span className="meta">{formatDateOnly(expense.incurredOn)} · 支払った人：{memberName(snapshot,expense.payerMembershipId)}さん · 合計{formatYen(expense.amountJpy)}</span></div>{due > 0 && can('expense.settle') ? <button data-control-id={`budget.settlement.record.${expense.id}`} className="button" type="button" onClick={() => void settle(expense.id,due)}>残り{formatYen(due)}を精算</button> : <StatusBadge tone={due > 0 ? 'attention' : 'success'}>{due > 0 ? '未精算' : <><CheckIcon width="14"/>精算済み</>}</StatusBadge>}</li>;
-    })}</ul></section>
+      return <li className="list-row" key={expense.id}><span className="avatar" aria-hidden="true">{memberName(snapshot,expense.payerMembershipId).slice(0,1)}</span><div className="row-main"><strong>{expense.title}</strong><span className="meta">{formatDateOnly(expense.incurredOn)}{expense.place ? ` · ${expense.place.name}` : ''} · 支払った人：{memberName(snapshot,expense.payerMembershipId)}さん · 合計{formatYen(expense.amountJpy)}</span></div>{due > 0 && can('expense.settle') ? <button data-control-id={`budget.settlement.record.${expense.id}`} className="button" type="button" onClick={() => void settle(expense.id,due)}>残り{formatYen(due)}を精算</button> : <StatusBadge tone={due > 0 ? 'attention' : 'success'}>{due > 0 ? '未精算' : <><CheckIcon width="14"/>精算済み</>}</StatusBadge>}</li>;
+    })}</ul>{snapshot.expenses.some((expense) => expense.place?.provenance) && <PlaceAttributionLink where="budget"/>}</section>
   </div>;
 }

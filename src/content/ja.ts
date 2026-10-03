@@ -219,6 +219,10 @@ export const ja = {
       UPSTREAM_FAILURE: '場所の検索サービスから応答がありません。時間をおいて探すか、手入力してください。',
       'consent-failed': '同意を記録できませんでした。もう一度お試しください。',
     },
+    collapse: {
+      keep: '場所を変えずに戻る',
+      skip: '場所を付けずに戻る',
+    },
     retry: 'もう一度探す',
     switchToSearch: '名前で探す',
     switchToManual: '手入力にする',

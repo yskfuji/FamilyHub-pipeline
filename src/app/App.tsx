@@ -34,6 +34,7 @@ export default function App() {
   else if (path.startsWith('/notes')) page = <PermissionBoundary capability="memo.read"><NotesPage path={path}/></PermissionBoundary>;
   else if (path.startsWith('/budget')) page = <PermissionBoundary capability="expense.read"><BudgetPage/></PermissionBoundary>;
   else if (path.startsWith('/insights')) page = <PermissionBoundary capability="insight.read"><InsightsPage/></PermissionBoundary>;
+  else if (path.startsWith('/settings/location')) page = <PermissionBoundary capability="place.read"><SettingsPage path={path}/></PermissionBoundary>;
   else if (path.startsWith('/settings/household')) page = <PermissionBoundary capability="household.members.read"><SettingsPage path={path}/></PermissionBoundary>;
   else if (path.startsWith('/settings')) page = <PermissionBoundary capability="settings.own"><SettingsPage path={path}/></PermissionBoundary>;
   else if (auditPath && path.startsWith(auditPath)) page = <AuditPage/>;

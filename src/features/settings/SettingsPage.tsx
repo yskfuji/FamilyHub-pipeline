@@ -5,12 +5,15 @@ import { externalLinkLabel, ja, membershipStatusLabels, notificationStatusLabels
 import { Dialog, PageHeader, StatusBadge, formatTime } from '../../design-system/components';
 import { ArrowIcon, LinkIcon, LockIcon, PeopleIcon, ShieldIcon } from '../../design-system/icons';
 import { passwordSchema, safeHttpsUrlSchema } from '../../domain/schemas';
+import { usePlaceLookupConsent } from '../place/PlaceField';
+import { OPENPOI_ATTRIBUTION_URL, OPENPOI_TERMS_URL } from '../place/openPoi';
 import type { Capability, HouseholdInvite, HouseholdMembership, HouseholdNotification, MembershipRole, NotificationPreferences, PermissionOverride, SecurityOverview } from '../../domain/types';
 
 const tabs = [
   ['/settings/household', '家族'],
   ['/settings/security', 'サインインとセキュリティ'],
   ['/settings/notifications', '通知'],
+  ['/settings/location', ja.place.settings.tab],
   ['/settings/accessibility', '表示・操作'],
   ['/settings/resources', '関連リンク'],
 ] as const;
@@ -30,10 +33,11 @@ export function SettingsPage({ path }: { path: string }) {
   return <div className="page">
     <PageHeader eyebrow="設定" title={current} description="家族との共有範囲や、表示・通知・サインイン方法を変更できます。"/>
     <nav className="segmented settings-tabs" aria-label="設定項目">
-      {tabs.filter(([href]) => href !== '/settings/household' || can('household.members.read')).map(([href, label]) => <a data-control-id={`settings.section.${href.split("/").at(-1)}`} key={href} className="button" href={href} data-link aria-current={path.startsWith(href) ? 'page' : undefined}>{label}</a>)}
+      {tabs.filter(([href]) => (href !== '/settings/household' || can('household.members.read')) && (href !== '/settings/location' || can('place.read'))).map(([href, label]) => <a data-control-id={`settings.section.${href.split("/").at(-1)}`} key={href} className="button" href={href} data-link aria-current={path.startsWith(href) ? 'page' : undefined}>{label}</a>)}
     </nav>
     {path.startsWith('/settings/security') ? <Security/>
       : path.startsWith('/settings/notifications') ? <Notifications/>
+        : path.startsWith('/settings/location') ? <LocationPrivacy/>
         : path.startsWith('/settings/accessibility') ? <Accessibility theme={theme} setTheme={setTheme} reduced={reduced} setReduced={setReduced}/>
           : path.startsWith('/settings/resources') ? <Resources/>
             : <Household/>}
@@ -215,6 +219,32 @@ function Security() {
     {passwordOpen && <Dialog title="パスワードを変更" description="この画面を閉じると、入力中のパスワードは消去されます。" onClose={() => { setPasswordOpen(false); setPasswordError(''); }}><form className="stack" onSubmit={(event) => { event.preventDefault(); void changePassword(event.currentTarget); }}><label className="field"><span>現在のパスワード</span><input data-control-id="settings.password.current" className="input" name="current" type="password" autoComplete="current-password" minLength={15} maxLength={64} required/></label><label className="field"><span>新しいパスワード</span><input data-control-id="settings.password.new" className="input" name="next" type="password" autoComplete="new-password" minLength={15} maxLength={64} required/></label><label className="field"><span>新しいパスワード（確認）</span><input data-control-id="settings.password.confirm" className="input" name="confirm" type="password" autoComplete="new-password" minLength={15} maxLength={64} required/></label>{passwordError && <p className="field-error" role="alert">{passwordError}</p>}<div className="dialog-actions"><button data-control-id="settings.password.cancel" className="button" type="button" onClick={() => setPasswordOpen(false)}>{ja.actions.cancel}</button><button data-control-id="settings.password.submit" className="button primary" type="submit">変更する</button></div></form></Dialog>}
     {revoke && <Dialog title="この端末からサインアウトしますか" description="現在使用中の端末はサインアウトされません。" onClose={() => setRevoke(null)} actions={<><button data-control-id="settings.session.revoke-cancel" className="button" type="button" onClick={() => setRevoke(null)}>{ja.actions.cancel}</button><button data-control-id="settings.session.revoke-confirm" className="button danger" type="button" onClick={() => void revokeSession()}>サインアウト</button></>}/>}
   </>;
+}
+
+function LocationPrivacy() {
+  const { announce } = useApp();
+  const consent = usePlaceLookupConsent(true);
+  const [saving, setSaving] = useState(false);
+  const granted = consent.status === 'granted';
+  const toggle = async () => {
+    if (saving || consent.status === 'loading' || consent.status === 'unavailable') return;
+    setSaving(true);
+    const result = granted ? await consent.revoke() : await consent.grant();
+    setSaving(false);
+    announce(result.ok ? (granted ? ja.place.settings.consentRevoked : ja.place.settings.consentGranted) : ja.place.failures['consent-failed']);
+  };
+  return <div className="grid two">
+    <section className="card"><h2>{ja.place.settings.title}</h2><p className="muted">{ja.place.settings.description}</p>
+      <dl className="place-disclosure">{ja.place.settings.rows.map(([term, detail]) => <div key={term}><dt>{term}</dt><dd>{detail}</dd></div>)}</dl>
+    </section>
+    <section className="card"><h2>{ja.place.settings.consentLabel}</h2>
+      <div className="setting-row"><div><strong>{granted ? ja.place.settings.consentOn : ja.place.settings.consentOff}</strong><p className="small muted mb-0">{ja.place.settings.revokeNote}</p></div><button data-control-id="settings.location.lookup-consent" type="button" className="toggle" aria-label={ja.place.settings.consentLabel} aria-pressed={granted} disabled={saving || consent.status === 'loading' || consent.status === 'unavailable'} onClick={() => void toggle()}/></div>
+      <ul className="list">
+        <li className="list-row"><LinkIcon width="20"/><div className="row-main"><a data-control-id="settings.location.terms" href={OPENPOI_TERMS_URL} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" aria-label={externalLinkLabel(ja.place.settings.terms)}>{ja.place.settings.terms}</a></div></li>
+        <li className="list-row"><LinkIcon width="20"/><div className="row-main"><a data-control-id="settings.location.attribution" href={OPENPOI_ATTRIBUTION_URL} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" aria-label={externalLinkLabel(ja.place.settings.attribution)}>{ja.place.settings.attribution}</a></div></li>
+      </ul>
+    </section>
+  </div>;
 }
 
 function Notifications() {
