@@ -26,6 +26,7 @@ export interface HouseholdPort {
   getPermissionOverrides(membershipId: Id): Promise<Result<PermissionOverride[]>>;
   updatePermissionOverrides(membershipId: Id, overrides: PermissionOverride[], expectedPermissionRevision: number): Promise<Result<HouseholdSnapshot>>;
   resetPermissionOverrides(membershipId: Id, expectedPermissionRevision: number): Promise<Result<HouseholdSnapshot>>;
+  getPrivacySettings(): Promise<Result<PrivacySettings>>;
   savePrivacySettings(settings: PrivacySettings): Promise<Result<PrivacySettings>>;
 }
 

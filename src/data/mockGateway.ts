@@ -1,8 +1,8 @@
 import type { FamilyHubGateway } from './gateway';
 import { baseNotificationPreferences, baseNotifications, basePrivacySettings, baseSecurityOverview, baseSnapshot } from './fixtures';
-import { memoInputSchema, passwordSchema } from '../domain/schemas';
-import { authorize, canMutateOwnedResource, capabilitiesFor, capabilityCeilingFor, projectSnapshotForViewer } from '../authz/policy';
-import type { Authenticator, AuthorizationDecision, CalendarEvent, Capability, Expense, GatewayError, HouseholdInvite, HouseholdNotification, HouseholdSnapshot, Id, Memo, MutationContext, NotificationPreferences, PermissionOverride, PrivacySettings, Result, Scenario, SecurityOverview, Todo } from '../domain/types';
+import { expenseInputSchema, memoInputSchema, passwordSchema, privacySettingsSchema } from '../domain/schemas';
+import { authorize, canMutateOwnedResource, capabilitiesFor, capabilityCeilingFor, projectSnapshotForViewer, redactPlace } from '../authz/policy';
+import type { Authenticator, AuthorizationDecision, CalendarEvent, Capability, Expense, GatewayError, HouseholdInvite, HouseholdNotification, HouseholdSnapshot, Id, Memo, MutationContext, NotificationPreferences, PermissionOverride, PlaceRef, PrivacySettings, Result, Scenario, SecurityOverview, Todo } from '../domain/types';
 import { ja } from '../content/ja';
 
 const delay = (ms = 90) => new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -49,6 +49,13 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
   const permissionConflict = <T,>(context?: MutationContext): Result<T> | null => context && context.expectedPermissionRevision !== permissionRevision
     ? fail({ code: 'CONFLICT', message: '権限が変更されています。現在の権限で内容を確認してください。', retryable: false, reason: 'PERMISSION_REVISION' })
     : null;
+  const visible = <T extends { place?: PlaceRef }>(item: T): T => redactPlace(structuredClone(item), viewer());
+  const placeWriteGuard = <T,>(place: unknown): Result<T> | null => {
+    if (place === undefined) return null;
+    const decision = authorize(viewer(), 'place.read');
+    return decision.allowed ? null : denied<T>(decision);
+  };
+  const invalid = <T,>(issues: Array<{ message: string }>): Result<T> => fail({ code: 'INVALID_INPUT', message: issues[0]?.message ?? '入力を確認してください。', retryable: false });
   const project = (): HouseholdSnapshot => {
     const current = viewer();
     const snapshot = projectSnapshotForViewer(state, current);
@@ -159,7 +166,20 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
         if (!state.memberships.some((item) => item.id === membershipId)) return missing('メンバー');
         permissionOverrides = permissionOverrides.filter((item) => item.membershipId !== membershipId); permissionRevision += 1; return ok(project());
       },
-      async savePrivacySettings(settings) { await delay(); privacy = structuredClone(settings); return ok(structuredClone(privacy)); },
+      async getPrivacySettings() { await delay(); return ok(structuredClone(privacy)); },
+      async savePrivacySettings(settings) {
+        await delay();
+        const parsed = privacySettingsSchema.safeParse(settings);
+        if (!parsed.success) return invalid(parsed.error.issues);
+        const next = parsed.data;
+        const previous = privacy.placeLookupConsent;
+        // 同意の日時は利用者の端末ではなく受け付けた側の時計で記録する。
+        const placeLookupConsent = next.placeLookupConsent
+          ? (previous?.noticeVersion === next.placeLookupConsent.noticeVersion ? previous : { noticeVersion: next.placeLookupConsent.noticeVersion, grantedAt: '2026-09-30T07:45:00+09:00' })
+          : null;
+        privacy = { ...next, placeLookupConsent };
+        return ok(structuredClone(privacy));
+      },
     },
     events: {
       async createEvent(input, context) {
@@ -253,20 +273,29 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
         await delay();
         const revision = permissionConflict<Memo>(context); if (revision) return revision;
         const guard = requireCapability<Memo>('memo.create'); if (guard) return guard;
+        const placeGuard = placeWriteGuard<Memo>(input.place); if (placeGuard) return placeGuard;
         const network = offlineFailure<Memo>(); if (network) return network;
         const parsed = memoInputSchema.safeParse(input);
-        if (!parsed.success) return fail({ code: 'INVALID_INPUT', message: parsed.error.issues[0]?.message ?? '入力を確認してください。', retryable: false });
-        const memo: Memo = { id: nextId('memo'), householdId: state.household.id, ...parsed.data, updatedAt: '2026-09-30T07:45:00+09:00', authorMembershipId: viewer().membershipId, attachments: [], visibility: { audience: 'creator', creatorMembershipId: viewer().membershipId, selectedMembershipIds: [] }, version: 1 };
+        if (!parsed.success) return invalid(parsed.error.issues);
+        const { place, ...fields } = parsed.data;
+        const memo: Memo = { id: nextId('memo'), householdId: state.household.id, ...fields, ...(place ? { place } : {}), updatedAt: '2026-09-30T07:45:00+09:00', authorMembershipId: viewer().membershipId, attachments: [], visibility: { audience: 'creator', creatorMembershipId: viewer().membershipId, selectedMembershipIds: [] }, version: 1 };
         state.memos = [memo, ...state.memos];
-        return ok(structuredClone(memo));
+        return ok(visible(memo));
       },
       async updateMemo(id, input, expectedVersion, context) {
         await delay(); const target = state.memos.find((item) => item.id === id); if (!target) return missing('メモ');
         const revision = permissionConflict<Memo>(context); if (revision) return revision;
         const decision = canMutateOwnedResource(viewer(), 'memo.update', target.authorMembershipId); if (!decision.allowed) return denied(decision);
+        const placeGuard = placeWriteGuard<Memo>(input.place); if (placeGuard) return placeGuard;
         const network = offlineFailure<Memo>(); if (network) return network;
         if (target.version !== expectedVersion) return fail({ code: 'CONFLICT', message: '別の端末でメモが更新されています。', retryable: true, reason: 'VERSION' });
-        Object.assign(target, input); target.version += 1; target.updatedAt = '2026-09-30T07:50:00+09:00'; return ok(structuredClone(target));
+        const parsed = memoInputSchema.partial().safeParse(input);
+        if (!parsed.success) return invalid(parsed.error.issues);
+        const { place, ...fields } = parsed.data;
+        Object.assign(target, fields);
+        if (place === null) delete target.place;
+        else if (place) target.place = place;
+        target.version += 1; target.updatedAt = '2026-09-30T07:50:00+09:00'; return ok(visible(target));
       },
       async uploadAttachment(memoId, file) {
         await delay(260);
@@ -280,7 +309,7 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
         const memo: Memo = structuredClone(target);
         memo.attachments.push({ id: `attachment-${Date.now()}`, memoId, originalName: file.name, mimeType: file.type, byteSize: file.size, status: 'quarantined', statusMessage: 'ファイルを確認しています。完了するまで開けません' });
         Object.assign(target, memo);
-        return ok(memo);
+        return ok(visible(memo));
       },
       async deleteMemo(id) {
         await delay(); const target = state.memos.find((item) => item.id === id); if (!target) return missing('メモ');
@@ -291,23 +320,28 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
       async restoreMemo(id) {
         await delay(); const target = state.memos.find((item) => item.id === id) ?? archivedMemos.get(id); if (!target) return missing('メモ');
         const decision = canMutateOwnedResource(viewer(), 'memo.update', target.authorMembershipId); if (!decision.allowed) return denied(decision);
-        delete target.deletedAt; archivedMemos.delete(id); return ok(structuredClone(target));
+        delete target.deletedAt; archivedMemos.delete(id); return ok(visible(target));
       },
     },
     expenses: {
       async createExpense(input) {
         await delay();
         const guard = requireCapability<Expense>('expense.create'); if (guard) return guard;
+        const placeGuard = placeWriteGuard<Expense>(input.place); if (placeGuard) return placeGuard;
         const network = offlineFailure<Expense>(); if (network) return network;
-        const base = Math.floor(input.amountJpy / input.shareMembershipIds.length);
-        let remainder = input.amountJpy - base * input.shareMembershipIds.length;
+        const parsed = expenseInputSchema.safeParse(input);
+        if (!parsed.success) return invalid(parsed.error.issues);
+        const data = parsed.data;
+        const base = Math.floor(data.amountJpy / data.shareMembershipIds.length);
+        let remainder = data.amountJpy - base * data.shareMembershipIds.length;
         const expense: Expense = {
-          id: `expense-${Date.now()}`, householdId: state.household.id, title: input.title, amountJpy: input.amountJpy,
-          incurredOn: input.incurredOn as Expense['incurredOn'], payerMembershipId: input.payerMembershipId, category: 'other', settlements: [],
-          shares: input.shareMembershipIds.map((membershipId) => ({ membershipId, amountJpy: base + (remainder-- > 0 ? 1 : 0), settledJpy: membershipId === input.payerMembershipId ? base : 0 })),
+          id: `expense-${Date.now()}`, householdId: state.household.id, title: data.title, amountJpy: data.amountJpy,
+          incurredOn: data.incurredOn as Expense['incurredOn'], payerMembershipId: data.payerMembershipId, category: 'other', settlements: [],
+          shares: data.shareMembershipIds.map((membershipId) => ({ membershipId, amountJpy: base + (remainder-- > 0 ? 1 : 0), settledJpy: membershipId === data.payerMembershipId ? base : 0 })),
+          ...(data.place ? { place: data.place } : {}),
         };
         state.expenses = [expense, ...state.expenses];
-        return ok(structuredClone(expense));
+        return ok(visible(expense));
       },
       async recordSettlement(expenseId, amountJpy) {
         await delay();
@@ -320,7 +354,7 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
         const applied = Math.min(amountJpy, share.amountJpy - share.settledJpy);
         share.settledJpy += applied;
         target.settlements.push({ id: `settlement-${Date.now()}`, amountJpy: applied, fromMembershipId: share.membershipId, toMembershipId: target.payerMembershipId, recordedAt: '2026-09-30T07:45:00+09:00' });
-        return ok(structuredClone(target));
+        return ok(visible(target));
       },
       async reverseSettlement(expenseId, settlementId) {
         await delay(); const guard = requireCapability<Expense>('expense.settle'); if (guard) return guard;
@@ -329,7 +363,7 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
         const share = target.shares.find((item) => item.membershipId === settlement.fromMembershipId); if (!share) return missing('負担記録');
         settlement.reversedAt = '2026-09-30T07:50:00+09:00'; share.settledJpy = Math.max(0, share.settledJpy - settlement.amountJpy);
         target.settlements.push({ id: nextId('settlement-reversal'), amountJpy: -settlement.amountJpy, fromMembershipId: settlement.toMembershipId, toMembershipId: settlement.fromMembershipId, recordedAt: '2026-09-30T07:50:00+09:00', reversalOfSettlementId: settlement.id });
-        return ok(structuredClone(target));
+        return ok(visible(target));
       },
     },
     resources: {

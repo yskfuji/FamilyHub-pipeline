@@ -21,7 +21,7 @@ export function OnboardingPage() {
       if (!result.ok) { setError(result.error.message); return; }
     }
     if (step === 2) {
-      const result = await gateway.household.savePrivacySettings({ defaultAudience: householdOnly ? 'household' : 'creator', hideNotificationContent });
+      const result = await gateway.household.savePrivacySettings({ defaultAudience: householdOnly ? 'household' : 'creator', hideNotificationContent, placeLookupConsent: null });
       if (!result.ok) { setError(result.error.message); return; }
       announce(`共有範囲を「${result.value.defaultAudience === 'household' ? '家族全員' : '作成した本人だけ'}」に設定しました。`);
     }

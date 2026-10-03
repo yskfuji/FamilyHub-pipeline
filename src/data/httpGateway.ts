@@ -89,6 +89,7 @@ export function createHttpGateway(baseUrl: string, getCsrfToken: () => string, g
       getPermissionOverrides: (membershipId) => request(`/v1/household-memberships/${encodeURIComponent(membershipId)}/permission-overrides`),
       updatePermissionOverrides: (membershipId, overrides, expectedPermissionRevision) => request(`/v1/household-memberships/${encodeURIComponent(membershipId)}/permission-overrides`, { method: 'PUT', body: JSON.stringify({ overrides, expectedPermissionRevision }), csrf: true }),
       resetPermissionOverrides: (membershipId, expectedPermissionRevision) => request(`/v1/household-memberships/${encodeURIComponent(membershipId)}/permission-overrides?expectedPermissionRevision=${expectedPermissionRevision}`, { method: 'DELETE', csrf: true }),
+      getPrivacySettings: () => request('/v1/households/current/privacy'),
       savePrivacySettings: (settings) => request('/v1/households/current/privacy', { method: 'PUT', body: JSON.stringify(settings), csrf: true }),
     },
     events: {

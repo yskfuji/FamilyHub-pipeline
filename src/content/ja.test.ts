@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { externalLinkLabel, ja, recurrenceLabel } from './ja';
+import { externalLinkLabel, ja, placeDistanceLabel, recurrenceLabel } from './ja';
 
 describe('日本語コンテンツカタログ', () => {
   it('内部の役割値と利用状態を日本語の表示名に変換する', () => {
@@ -23,5 +23,19 @@ describe('日本語コンテンツカタログ', () => {
   it('共通エラーに内部実装用語を含めない', () => {
     const copy = Object.values(ja.errors).join('\n');
     expect(copy).not.toMatch(/セッション|CSRF|WebAuthn|バックエンド|サーバー/);
+  });
+
+  it('場所の文言は送信先・送る内容・送らないものを明示し、実装用語を含めない', () => {
+    const copy = JSON.stringify(ja.place);
+    expect(copy).not.toMatch(/セッション|CSRF|サーバー|EXIF|GPS|(?<!Open)POI|API キー|座標値/);
+    expect(ja.place.consent.points.join('')).toMatch(/OpenPOI/);
+    expect(ja.place.consent.points.join('')).toMatch(/IPアドレス/);
+    expect(ja.place.transmission).toMatch(/写真は送信しません/);
+  });
+
+  it('距離を近さの感覚で表す', () => {
+    expect(placeDistanceLabel(12)).toBe('すぐ近く');
+    expect(placeDistanceLabel(44)).toBe('約40m');
+    expect(placeDistanceLabel(1234)).toBe('約1.2km');
   });
 });
