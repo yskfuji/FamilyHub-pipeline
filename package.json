@@ -17,7 +17,7 @@
     "typecheck": "tsc -b --pretty false",
     "lint": "eslint . --max-warnings 0",
     "test:unit": "vitest run",
-    "test:e2e": "npm run build:audit && PLAYWRIGHT_AUDIT=true playwright test e2e/core.spec.ts e2e/interactions.spec.ts e2e/authorization.spec.ts",
+    "test:e2e": "npm run build:audit && PLAYWRIGHT_AUDIT=true playwright test e2e/core.spec.ts e2e/interactions.spec.ts e2e/authorization.spec.ts e2e/places.spec.ts",
     "audit:a11y": "npm run build:audit && PLAYWRIGHT_AUDIT=true playwright test e2e/accessibility.spec.ts --workers=1",
     "audit:visual": "npm run build:audit && PLAYWRIGHT_AUDIT=true playwright test e2e/capture.spec.ts --project=chromium && node scripts/build-gallery.mjs",
     "audit:lighthouse": "bash scripts/lighthouse.sh",

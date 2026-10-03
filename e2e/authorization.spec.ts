@@ -56,7 +56,7 @@ test('offline collaborative creation is queued, reviewed, and explicitly replaye
 });
 
 test('every visible interactive control has a stable registry id and accessible name', async ({ page }) => {
-  for (const route of ['/welcome','/auth','/onboarding','/today','/calendar','/tasks','/notes','/budget','/insights','/settings/household','/settings/security','/settings/notifications','/settings/accessibility','/settings/resources']) {
+  for (const route of ['/welcome','/auth','/onboarding','/today','/calendar','/tasks','/notes','/budget','/insights','/settings/household','/settings/security','/settings/notifications','/settings/accessibility','/settings/resources','/settings/location']) {
     await page.goto(route);
     await page.waitForLoadState('networkidle');
     const failures = await page.locator('button:visible, a[href]:visible, input:visible, select:visible, textarea:visible').evaluateAll((elements) => elements.map((element) => ({

@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
-for (const route of ['/welcome','/auth','/onboarding','/today','/calendar','/tasks','/notes','/budget','/insights','/settings/security','/showcase']) {
+for (const route of ['/welcome','/auth','/onboarding','/today','/calendar','/tasks','/notes','/budget','/insights','/settings/security','/settings/location','/showcase']) {
   test(`axe serious and critical: ${route}`, async ({ page }) => {
     await page.goto(route);
     await page.waitForLoadState('networkidle');
@@ -58,7 +58,7 @@ test('manual Reduced Motion switch removes effective transitions', async ({ page
 
 test('all visible buttons meet the 44 by 44 CSS pixel target at mobile width', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const route of ['/today','/calendar','/tasks','/notes','/budget','/insights','/settings/household','/settings/security','/settings/notifications','/settings/accessibility','/showcase']) {
+  for (const route of ['/today','/calendar','/tasks','/notes','/budget','/insights','/settings/household','/settings/security','/settings/notifications','/settings/accessibility','/settings/location','/showcase']) {
     await page.goto(route);
     const undersized = await page.locator('button:visible').evaluateAll((buttons) => buttons.map((button) => {
       const rect = button.getBoundingClientRect();
@@ -66,4 +66,34 @@ test('all visible buttons meet the 44 by 44 CSS pixel target at mobile width', a
     }).filter((item) => item.width < 44 || item.height < 44));
     expect(undersized, `${route}: ${JSON.stringify(undersized)}`).toEqual([]);
   }
+});
+
+test.describe('place picker', () => {
+  test.use({ serviceWorkers: 'block' });
+  test('with results passes axe and keeps 44px targets at mobile width', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.context().route('https://api.openpoiapi.com/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ count: 2, scope: 'view', suggestions: [
+    { name: 'みどり文具店', address: '架空県みどり市こもれび町1-1', category: 'retail_other', lat: 35.6438, lng: 139.6692, source: 'overture', licenses: ['CDLA-Permissive-2.0'], attributions: ['Overture Maps Foundation, overturemaps.org'] },
+    { name: 'とても長い名前のこもれびベーカリー　みどり市こもれび町本店（架空）', address: '架空県みどり市こもれび町二丁目三番地四号　こもれびビル一階', category: 'bakery', lat: 35.6441, lng: 139.6693, source: 'jff', licenses: ['CC BY 4.0'], attributions: ['架空県食品衛生営業許可施設'] },
+  ], licenses: [], attributions: [] }) }));
+  await page.goto('/budget');
+  await page.getByRole('button', { name: '支出を追加' }).click();
+  const dialog = page.getByRole('dialog', { name: 'すぐに追加' });
+  await dialog.getByRole('button', { name: '場所を追加（任意）' }).click();
+  await dialog.getByRole('button', { name: '名前で探す', exact: true }).click();
+  await dialog.getByLabel('お店や場所の名前').fill('文具');
+  await dialog.getByRole('button', { name: '検索' }).click();
+  await dialog.getByRole('button', { name: '同意して続ける' }).click();
+  await expect(dialog.locator('.place-candidates button')).toHaveCount(2);
+  const results = await new AxeBuilder({ page }).include('.dialog').withTags(['wcag2a','wcag2aa','wcag21aa','wcag22aa']).analyze();
+  const blocking = results.violations.filter((violation) => ['serious','critical'].includes(violation.impact ?? ''));
+  expect(blocking, JSON.stringify(blocking, null, 2)).toEqual([]);
+  const undersized = await dialog.locator('button:visible').evaluateAll((buttons) => buttons.map((button) => {
+    const rect = button.getBoundingClientRect();
+    return { label: button.getAttribute('aria-label') || button.textContent?.trim(), width: rect.width, height: rect.height };
+  }).filter((item) => item.width < 44 || item.height < 44));
+  expect(undersized).toEqual([]);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+});
 });
