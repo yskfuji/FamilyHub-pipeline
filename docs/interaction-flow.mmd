@@ -10,6 +10,12 @@ flowchart LR
   G -->|拒否| Y["403または存在を隠す404"]
   H --> I["追記型 AuditEvent"]
   H --> J["再取得・状態通知・取消経路"]
+  C --> P["PlaceLookupPort\n丸めた位置・確定した検索語だけ"]
+  P --> Q["OpenPOI API（外部）\n同意後・Cookieなし・リファラーなし"]
+  Q --> R["端末内で近い順に並べ直し\n選んだ場所だけを入力へ"]
+  R --> D
 
   classDef warning fill:#fff1dc,stroke:#a55b1f,color:#492d13;
+  classDef external fill:#eef3f8,stroke:#315c80,color:#13283a,stroke-dasharray: 4 3;
   class X,Y warning;
+  class Q external;

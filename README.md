@@ -23,6 +23,16 @@ npm run dev
 
 詳細は [証拠台帳](docs/evidence-register.md)、[脅威モデル](docs/threat-model.md)、[IA](docs/information-architecture.md) を参照してください。
 
+## 場所の記録と外部送信
+
+支出とメモに、任意で「場所」を付けられます（管理者と大人のメンバーだけ。子どもメンバーとゲストには表示しません）。
+
+- 探し方: 現在地、写真に記録された位置情報、名前で探す、手入力。端末の種類では分けず、使える機能をすべて表示します。
+- 外部送信: 近くのお店の候補は [OpenPOI API](https://docs.openpoiapi.com/) から取得します。送るのは小数第3位（約100m）に丸めた位置、または確定した検索語だけで、正確な現在地と写真は送りません。Cookieとリファラーは送らず、応答はキャッシュしません。外部への出口は `src/features/place/openPoi.ts` の1ファイルだけです。
+- 同意: 初めて外部に問い合わせる前に送信先と内容を示して同意を求め、`/settings/location` でいつでも撤回できます。説明を変えたら `PLACE_LOOKUP_NOTICE_VERSION` を更新して同意を取り直します。
+- 保存: 選んだ場所の名前・住所・場所の座標・出典だけを保存し、現在地は保存しません。
+- 検証: E2Eは架空データで OpenPOI を差し替え、実APIへは接続しません。実データでの性質は `npm run probe:openpoi` で再測定でき、結果は `docs/audits/place-lookup-probe.md` にまとめています。
+
 ## ライセンス
 
 Copyright (c) 2026 Yusuke Fujinami. All rights reserved.

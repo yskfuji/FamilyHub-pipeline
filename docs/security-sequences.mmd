@@ -5,6 +5,8 @@ sequenceDiagram
     participant API as API
     participant AZ as 認可サービス
     participant DB as DB
+    participant DEV as 端末の位置情報
+    participant EXT as OpenPOI API
 
     rect rgb(239,246,255)
       Note over U,DB: 認可と本人確認
@@ -73,4 +75,31 @@ sequenceDiagram
       API--xAPI: 外部サービス失敗
       API-->>UI: 取得時刻付きの古い情報または503
       UI-->>U: 予定は変更せず手動判断を案内
+    end
+
+    rect rgb(238,243,248)
+      Note over U,EXT: 場所の検索と保存
+      U->>UI: 「現在地から探す」を押す
+      alt 外部検索に未同意
+        UI-->>U: 送信先・送る内容・送らないものを表示
+        U->>UI: 同意して続ける
+        UI->>API: 同意を保存（版のみ）
+        API->>DB: 受付側の日時で記録しAuditEventを追記
+      end
+      UI->>DEV: 一度だけ現在地を要求
+      DEV-->>UI: 正確な位置と誤差（端末内だけで保持）
+      alt 誤差が1000m超
+        UI-->>U: 名前で探す・手入力へ案内
+      else 十分な精度
+        UI->>UI: 小数第3位へ丸める
+        UI->>EXT: GET 丸めた中心・半径・上限200（Cookieなし・リファラーなし）
+        EXT-->>UI: 候補（距離順ではない）
+        UI->>UI: 正確な位置から近い順に並べ直し、重複をまとめる
+        U->>UI: 候補を選ぶ
+        UI->>API: 選んだ場所だけを含む支出・メモを保存
+        API->>AZ: place.read と対象の能力を確認
+        AZ-->>API: 許可
+        API->>DB: 場所のスナップショットを保存（現在地は保存しない）
+        API-->>UI: place.read を持つ閲覧者にだけ場所を返す
+      end
     end
