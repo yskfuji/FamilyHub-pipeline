@@ -195,6 +195,8 @@ export interface Expense {
   settlements: SettlementRecord[];
   note?: string;
   place?: PlaceRef;
+  version: number;
+  deletedAt?: Rfc3339;
 }
 
 export interface ResourceLink {
@@ -211,6 +213,8 @@ export interface ContextSnapshot {
   asOf: Rfc3339;
   timezone: string;
   weather: {
+    /** 予報の対象地域（表示用）。 */
+    location: string;
     condition: 'sunny' | 'rain' | 'storm';
     temperatureC: number;
     precipitationPercent: number;
@@ -248,7 +252,8 @@ export interface HouseholdInvite {
   id: Id;
   householdId: Id;
   role: Exclude<MembershipRole, 'owner'>;
-  token: string;
+  /** 作成時の応答にだけ含まれる。一覧では返さない。 */
+  token?: string;
   expiresAt: Rfc3339;
   remainingUses: number;
   revokedAt?: Rfc3339;
@@ -294,6 +299,10 @@ export interface NotificationPreferences {
 
 export interface HouseholdNotification {
   id: Id;
+  /** 通知の種類。通知設定（タスクの期限・予定の出発）による出し分けに使う。 */
+  kind: 'todoDue' | 'eventDeparture';
+  /** 通知から開く画面。 */
+  destination: string;
   title: string;
   body: string;
   remindAt: Rfc3339;

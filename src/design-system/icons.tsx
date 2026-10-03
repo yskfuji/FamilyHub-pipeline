@@ -19,7 +19,6 @@ export const BellIcon = (p: IconProps) => <svg {...base} {...p}><path d="M18 8a6
 export const RainIcon = (p: IconProps) => <svg {...base} {...p}><path d="M7 16H6a4 4 0 1 1 1.4-7.7A5.5 5.5 0 0 1 18 10a3 3 0 0 1 0 6h-1"/><path d="m8 19-1 2M13 18l-1 3M18 19l-1 2"/></svg>;
 export const AlertIcon = (p: IconProps) => <svg {...base} {...p}><path d="M12 3 2.5 20h19z"/><path d="M12 9v4M12 17h.01"/></svg>;
 export const ArrowIcon = (p: IconProps) => <svg {...base} {...p}><path d="M5 12h14M14 7l5 5-5 5"/></svg>;
-export const BackIcon = (p: IconProps) => <svg {...base} {...p}><path d="M19 12H5M10 7l-5 5 5 5"/></svg>;
 export const LinkIcon = (p: IconProps) => <svg {...base} {...p}><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1"/></svg>;
 export const ShieldIcon = (p: IconProps) => <svg {...base} {...p}><path d="M12 3 4 6v5c0 5 3.4 8.3 8 10 4.6-1.7 8-5 8-10V6z"/><path d="m9 12 2 2 4-5"/></svg>;
 export const UploadIcon = (p: IconProps) => <svg {...base} {...p}><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>;

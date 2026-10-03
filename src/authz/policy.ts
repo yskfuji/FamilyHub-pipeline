@@ -101,7 +101,7 @@ export function projectSnapshotForViewer(source: HouseholdSnapshot, viewer: View
   snapshot.todos = snapshot.todos.filter((item) => !item.deletedAt && authorizeVisibleResource(viewer, 'task.read', item.visibility, [item.creatorMembershipId, item.assigneeMembershipId, ...(item.reviewerMembershipId ? [item.reviewerMembershipId] : [])]).allowed);
   snapshot.memos = snapshot.memos.filter((item) => !item.deletedAt && authorizeVisibleResource(viewer, 'memo.read', item.visibility, [item.authorMembershipId]).allowed).map((item) => redactPlace(item, viewer));
   snapshot.resources = snapshot.resources.filter((item) => authorizeVisibleResource(viewer, 'resource.read', item.visibility).allowed);
-  snapshot.expenses = authorize(viewer, 'expense.read').allowed ? snapshot.expenses.map((item) => redactPlace(item, viewer)) : [];
+  snapshot.expenses = authorize(viewer, 'expense.read').allowed ? snapshot.expenses.filter((item) => !item.deletedAt).map((item) => redactPlace(item, viewer)) : [];
   if (!authorize(viewer, 'household.members.read').allowed) {
     const referenced = new Set([viewer.membershipId]);
     snapshot.events.forEach((item) => { referenced.add(item.ownerMembershipId); item.participantMembershipIds.forEach((id) => referenced.add(id)); });

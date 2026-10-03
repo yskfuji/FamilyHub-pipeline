@@ -1,27 +1,31 @@
 import { useEffect, useState } from 'react';
 import { useApp } from '../../app/AppContext';
 import { capabilityCeilingFor, defaultCapabilitiesFor } from '../../authz/policy';
-import { externalLinkLabel, ja, membershipStatusLabels, notificationStatusLabels, roleLabels } from '../../content/ja';
-import { Dialog, PageHeader, StatusBadge, formatTime } from '../../design-system/components';
+import { externalLinkLabel, ja, membershipStatusLabels, roleLabels } from '../../content/ja';
+import { Dialog, PageHeader, StatusBadge, formatDate, formatRelative, formatTime } from '../../design-system/components';
+import { navigate } from '../../app/router';
 import { ArrowIcon, LinkIcon, LockIcon, PeopleIcon, ShieldIcon } from '../../design-system/icons';
 import { passwordSchema, safeHttpsUrlSchema } from '../../domain/schemas';
 import { usePlaceLookupConsent } from '../place/PlaceField';
 import { OPENPOI_ATTRIBUTION_URL, OPENPOI_TERMS_URL } from '../place/openPoi';
-import type { Capability, HouseholdInvite, HouseholdMembership, HouseholdNotification, MembershipRole, NotificationPreferences, PermissionOverride, SecurityOverview } from '../../domain/types';
+import type { Capability, HouseholdInvite, HouseholdMembership, MembershipRole, NotificationPreferences, PermissionOverride, SecurityOverview } from '../../domain/types';
 
-const tabs = [
-  ['/settings/household', '家族'],
-  ['/settings/security', 'サインインとセキュリティ'],
-  ['/settings/notifications', '通知'],
-  ['/settings/location', ja.place.settings.tab],
-  ['/settings/accessibility', '表示・操作'],
-  ['/settings/resources', '関連リンク'],
-] as const;
+/** 設定のタブと、その表示に必要な能力。経路の許可（App.tsx）とタブの表示はこの表だけを参照する。 */
+export const settingsTabs: ReadonlyArray<{ href: string; label: string; capability: Capability }> = [
+  { href: '/settings/household', label: '家族', capability: 'household.members.read' },
+  { href: '/settings/security', label: 'サインインとセキュリティ', capability: 'settings.own' },
+  { href: '/settings/privacy', label: '共有とプライバシー', capability: 'settings.own' },
+  { href: '/settings/notifications', label: '通知', capability: 'notification.manage' },
+  { href: '/settings/location', label: ja.place.settings.tab, capability: 'place.read' },
+  { href: '/settings/accessibility', label: '表示・操作', capability: 'settings.own' },
+  { href: '/settings/resources', label: '関連リンク', capability: 'resource.read' },
+];
+export const settingsTabFor = (path: string) => settingsTabs.find((tab) => path === tab.href || path.startsWith(`${tab.href}/`));
 const inviteRoles: Array<Exclude<MembershipRole, 'owner'>> = ['adult', 'child', 'guest'];
 
 export function SettingsPage({ path }: { path: string }) {
   const { theme, setTheme, can } = useApp();
-  const current = tabs.find(([href]) => path.startsWith(href))?.[1] ?? '家族';
+  const current = settingsTabFor(path)?.label ?? '';
   const [reduced, setReducedState] = useState(() => localStorage.getItem('family-hub-reduced-motion') === 'true');
   const setReduced = (value: boolean) => {
     setReducedState(value);
@@ -33,14 +37,16 @@ export function SettingsPage({ path }: { path: string }) {
   return <div className="page">
     <PageHeader eyebrow="設定" title={current} description="家族との共有範囲や、表示・通知・サインイン方法を変更できます。"/>
     <nav className="segmented settings-tabs" aria-label="設定項目">
-      {tabs.filter(([href]) => (href !== '/settings/household' || can('household.members.read')) && (href !== '/settings/location' || can('place.read'))).map(([href, label]) => <a data-control-id={`settings.section.${href.split("/").at(-1)}`} key={href} className="button" href={href} data-link aria-current={path.startsWith(href) ? 'page' : undefined}>{label}</a>)}
+      {settingsTabs.filter((tab) => can(tab.capability)).map(({ href, label }) => <a data-control-id={`settings.section.${href.split("/").at(-1)}`} key={href} className="button" href={href} data-link aria-current={path.startsWith(href) ? 'page' : undefined}>{label}</a>)}
     </nav>
     {path.startsWith('/settings/security') ? <Security/>
+      : path.startsWith('/settings/privacy') ? <Privacy/>
       : path.startsWith('/settings/notifications') ? <Notifications/>
         : path.startsWith('/settings/location') ? <LocationPrivacy/>
         : path.startsWith('/settings/accessibility') ? <Accessibility theme={theme} setTheme={setTheme} reduced={reduced} setReduced={setReduced}/>
           : path.startsWith('/settings/resources') ? <Resources/>
-            : <Household/>}
+            : path.startsWith('/settings/household') ? <Household/>
+              : null}
   </div>;
 }
 
@@ -112,7 +118,7 @@ function Household() {
     setInvite(result.value); await loadInvites(); announce('招待コードを作成しました。');
   };
   const copyInvite = async () => {
-    if (!invite) return;
+    if (!invite?.token) return;
     try { await navigator.clipboard.writeText(invite.token); announce('招待コードをコピーしました。'); }
     catch { announce('コピーできませんでした。表示中のコードを選択してコピーしてください。'); }
   };
@@ -124,7 +130,14 @@ function Household() {
     ...(effect === 'default' || !member ? [] : [{ membershipId: member.id, capability, effect }]),
   ]);
 
+  const renameHousehold = async (form: HTMLFormElement) => {
+    const name = String(new FormData(form).get('householdName') ?? '');
+    const result = await gateway.household.updateProfile({ name });
+    if (!result.ok) { announce(result.error.message); return; }
+    await refresh(); announce(`家族グループの名前を「${result.value.name}」にしました。`);
+  };
   return <>
+    {canManage && <section className="card household-profile"><h2>家族グループの名前</h2><form className="inline-form" onSubmit={(event) => { event.preventDefault(); void renameHousehold(event.currentTarget); }}><label className="field"><span>名前</span><input data-control-id="settings.household.name" className="input" name="householdName" required maxLength={40} defaultValue={snapshot.household.name} key={snapshot.household.name}/></label><button data-control-id="settings.household.name-save" className="button" type="submit">名前を保存</button></form><p className="small muted mb-0">日時は日本時間で表示します。</p></section>}
     <div className="grid two">
       <section className="card">
         <p className="eyebrow">家族</p><h2>{snapshot.household.name}</h2><p className="muted">日時の表示 · 日本時間</p>
@@ -141,9 +154,9 @@ function Household() {
         <div className="field"><label htmlFor="invite-role">役割</label><select data-control-id="settings.invite.role" className="select" id="invite-role" value={inviteRole} onChange={(event) => setInviteRole(event.target.value as Exclude<MembershipRole, 'owner'>)}>{inviteRoles.map((value) => <option key={value} value={value}>{roleLabels[value]}</option>)}</select></div>
         <button data-control-id="settings.invite.create" className="button primary full mt-1" type="button" onClick={() => void createInvite()}><PeopleIcon width="18"/>招待コードを作成</button>
         <p className="small muted mt-1">有効期間：24時間 · 使用回数：1回 · 管理者はいつでも無効にできます</p>
-        {invite && <div className="notice invite-result" role="status"><strong>この画面でのみ表示する招待コード</strong><code>{invite.token}</code><span className="small">有効期限：{formatTime(invite.expiresAt)} · 残り{invite.remainingUses}回</span><button data-control-id="settings.invite.copy" className="button" type="button" onClick={() => void copyInvite()}>招待コードをコピー</button></div>}
+        {invite && <div className="notice invite-result" role="status"><strong>この画面でのみ表示する招待コード</strong><code>{invite.token}</code><span className="small">有効期限：{formatDate(invite.expiresAt)} {formatTime(invite.expiresAt)} · 残り{invite.remainingUses}回</span><button data-control-id="settings.invite.copy" className="button" type="button" onClick={() => void copyInvite()}>招待コードをコピー</button></div>}
         <h3 className="mt-1">作成した招待</h3>
-        {invites.length === 0 ? <p className="muted small">使用できる招待コードはありません。</p> : <ul className="list">{invites.map((item) => <li className="list-row" key={item.id}><div className="row-main"><strong>{roleLabels[item.role]}として招待</strong><span className="meta">{item.revokedAt ? '無効' : `残り${item.remainingUses}回 · ${formatTime(item.expiresAt)}まで`}</span></div>{!item.revokedAt && <button data-control-id={`settings.invite.revoke.${item.id}`} className="button danger" type="button" onClick={async () => {
+        {invites.length === 0 ? <p className="muted small">使用できる招待コードはありません。</p> : <ul className="list">{invites.map((item) => <li className="list-row" key={item.id}><div className="row-main"><strong>{roleLabels[item.role]}として招待</strong><span className="meta">{item.revokedAt ? '無効' : `残り${item.remainingUses}回 · ${`${formatDate(item.expiresAt)} ${formatTime(item.expiresAt)}`}まで`}</span></div>{!item.revokedAt && <button data-control-id={`settings.invite.revoke.${item.id}`} className="button danger" type="button" onClick={async () => {
           const result = await gateway.household.revokeInvite(item.id);
           if (!result.ok) { announce(result.error.message); return; }
           await loadInvites(); announce('招待コードを無効にしました。');
@@ -163,7 +176,13 @@ function Household() {
 }
 
 function Security() {
-  const { gateway, announce } = useApp();
+  const { gateway, announce, snapshot } = useApp();
+  const [signingOut, setSigningOut] = useState(false);
+  const signOut = async () => {
+    const result = await gateway.auth.signOut();
+    if (!result.ok) { announce(result.error.message); return; }
+    setSigningOut(false); navigate('/welcome'); announce('この端末からサインアウトしました。');
+  };
   const [overview, setOverview] = useState<SecurityOverview | null>(null);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [passwordError, setPasswordError] = useState('');
@@ -213,17 +232,18 @@ function Security() {
     <div className="grid two">
       <section className="card accent"><ShieldIcon width="30"/><p className="eyebrow">おすすめ</p><h2>パスキー</h2><p>端末の画面ロックを使って本人確認します。パスワードのみを使うより、偽のサインイン画面に情報を入力するリスクを減らせます。</p>{overview?.authenticators.map((item) => <div className="setting-row" key={item.id}><div><strong>{item.label}</strong><p className="small muted mb-0">{item.demo ? 'デモ登録' : '登録済み'}</p></div><StatusBadge tone="success">利用中</StatusBadge></div>)}<button data-control-id="settings.passkey.add" className="button full" type="button" onClick={() => void addPasskey()}>別のパスキーを追加</button><p className="small muted mt-1">このデモでは実際のパスキーは登録されません。実際の利用時は、ブラウザの本人確認画面が開きます。</p></section>
       <section className="card"><LockIcon width="30"/><p className="eyebrow">別の方法</p><h2>パスワード</h2><p>15文字以上64文字以内で設定します。数字や記号を必ず混ぜる必要はありません。安全性が低いと判断されたパスワードは使用できません。</p><button data-control-id="settings.password.open" className="button full" type="button" onClick={() => setPasswordOpen(true)}>パスワードを変更</button></section>
-      <section className="card"><h2>サインイン中の端末</h2><ul className="list">{overview?.sessions.map((session) => <li className="list-row" key={session.id}><span className="status-dot" style={{ color: session.current ? 'var(--success)' : undefined }}/><div className="row-main"><strong>{session.label}</strong><span className="meta">{session.location} · {session.current ? 'この端末' : '最終利用：2時間前'}</span></div>{session.current ? <StatusBadge tone="success">利用中</StatusBadge> : <button data-control-id={`settings.session.revoke-open.${session.id}`} className="button danger" type="button" onClick={() => setRevoke(session.id)}>サインアウト</button>}</li>)}</ul></section>
-      <section className="card"><h2>端末を紛失したとき</h2><p>使わない端末や紛失した端末から、個別にサインアウトできます。次回の利用時には、もう一度本人確認が必要です。</p></section>
+      <section className="card"><h2>サインイン中の端末</h2><ul className="list">{overview?.sessions.map((session) => <li className="list-row" key={session.id}><span className="status-dot" style={{ color: session.current ? 'var(--success)' : undefined }}/><div className="row-main"><strong>{session.label}</strong><span className="meta">{session.location} · {session.current ? 'この端末' : `最終利用：${formatRelative(session.lastSeenAt, snapshot.context.asOf)}`}</span></div>{session.current ? <StatusBadge tone="success">利用中</StatusBadge> : <button data-control-id={`settings.session.revoke-open.${session.id}`} className="button danger" type="button" onClick={() => setRevoke(session.id)}>サインアウト</button>}</li>)}</ul></section>
+      <section className="card"><h2>この端末からサインアウト</h2><p>共用の端末や、しばらく使わない端末では、使い終わったらサインアウトしてください。次回の利用時には、もう一度本人確認が必要です。</p><button data-control-id="settings.session.sign-out-current" className="button full" type="button" onClick={() => setSigningOut(true)}>この端末からサインアウト</button><p className="small muted mt-1 mb-0">紛失した端末は、左の一覧から個別にサインアウトできます。</p></section>
     </div>
     {passwordOpen && <Dialog title="パスワードを変更" description="この画面を閉じると、入力中のパスワードは消去されます。" onClose={() => { setPasswordOpen(false); setPasswordError(''); }}><form className="stack" onSubmit={(event) => { event.preventDefault(); void changePassword(event.currentTarget); }}><label className="field"><span>現在のパスワード</span><input data-control-id="settings.password.current" className="input" name="current" type="password" autoComplete="current-password" minLength={15} maxLength={64} required/></label><label className="field"><span>新しいパスワード</span><input data-control-id="settings.password.new" className="input" name="next" type="password" autoComplete="new-password" minLength={15} maxLength={64} required/></label><label className="field"><span>新しいパスワード（確認）</span><input data-control-id="settings.password.confirm" className="input" name="confirm" type="password" autoComplete="new-password" minLength={15} maxLength={64} required/></label>{passwordError && <p className="field-error" role="alert">{passwordError}</p>}<div className="dialog-actions"><button data-control-id="settings.password.cancel" className="button" type="button" onClick={() => setPasswordOpen(false)}>{ja.actions.cancel}</button><button data-control-id="settings.password.submit" className="button primary" type="submit">変更する</button></div></form></Dialog>}
+    {signingOut && <Dialog title="この端末からサインアウトしますか" description="未送信の変更があれば、この端末に残ります。もう一度サインインすると送信できます。" onClose={() => setSigningOut(false)} actions={<><button data-control-id="settings.session.sign-out-cancel" className="button" type="button" onClick={() => setSigningOut(false)}>{ja.actions.cancel}</button><button data-control-id="settings.session.sign-out-confirm" className="button danger" type="button" onClick={() => void signOut()}>サインアウト</button></>}/>}
     {revoke && <Dialog title="この端末からサインアウトしますか" description="現在使用中の端末はサインアウトされません。" onClose={() => setRevoke(null)} actions={<><button data-control-id="settings.session.revoke-cancel" className="button" type="button" onClick={() => setRevoke(null)}>{ja.actions.cancel}</button><button data-control-id="settings.session.revoke-confirm" className="button danger" type="button" onClick={() => void revokeSession()}>サインアウト</button></>}/>}
   </>;
 }
 
 function LocationPrivacy() {
   const { announce } = useApp();
-  const consent = usePlaceLookupConsent(true);
+  const consent = usePlaceLookupConsent();
   const [saving, setSaving] = useState(false);
   const granted = consent.status === 'granted';
   const toggle = async () => {
@@ -248,22 +268,11 @@ function LocationPrivacy() {
 }
 
 function Notifications() {
-  const { gateway, announce } = useApp();
+  const { gateway, announce, privacy } = useApp();
   const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
-  const [notifications, setNotifications] = useState<HouseholdNotification[]>([]);
-  const [preview, setPreview] = useState(true);
-  const load = async () => {
-    const [prefs, list] = await Promise.all([gateway.notifications.getPreferences(), gateway.notifications.list()]);
-    if (prefs.ok) setPreferences(prefs.value);
-    if (list.ok) setNotifications(list.value);
-  };
   useEffect(() => {
     let mounted = true;
-    void Promise.all([gateway.notifications.getPreferences(), gateway.notifications.list()]).then(([prefs, list]) => {
-      if (!mounted) return;
-      if (prefs.ok) setPreferences(prefs.value);
-      if (list.ok) setNotifications(list.value);
-    });
+    void gateway.notifications.getPreferences().then((result) => { if (mounted && result.ok) setPreferences(result.value); });
     return () => { mounted = false; };
   }, [gateway]);
   const toggle = async (key: keyof NotificationPreferences) => {
@@ -272,22 +281,41 @@ function Notifications() {
     if (!result.ok) { announce(result.error.message); return; }
     setPreferences(result.value); announce('通知設定を保存しました。');
   };
-  const notice = notifications[0];
+  const rows: Array<[keyof NotificationPreferences, string, string, string]> = [
+    ['todoDue', 'タスクの期限', '期限の30分前に通知', 'タスクの期限を通知'],
+    ['eventDeparture', '予定の出発時刻', '移動時間を含めた出発時刻を通知', '予定の出発時刻を通知'],
+    ['quietHours', '夜間は通知しない', '21:00から翌朝7:00までの通知は、7:00にまとめて届けます', '夜間は通知しない'],
+  ];
+  const hidden = privacy?.hideNotificationContent ?? true;
   return <div className="grid two">
-    <section className="card"><h2>通知する内容</h2>{preferences && <><div className="setting-row"><div><strong>タスクの期限</strong><p className="small muted mb-0">期限の30分前に通知</p></div><button data-control-id="settings.notifications.todo-due" type="button" className="toggle" aria-label="タスクの期限を通知" aria-pressed={preferences.todoDue} onClick={() => void toggle('todoDue')}/></div><div className="setting-row"><div><strong>予定の出発時刻</strong><p className="small muted mb-0">移動時間を含めた出発時刻を通知</p></div><button data-control-id="settings.notifications.event-departure" type="button" className="toggle" aria-label="予定の出発時刻を通知" aria-pressed={preferences.eventDeparture} onClick={() => void toggle('eventDeparture')}/></div><div className="setting-row"><div><strong>夜間は通知しない</strong><p className="small muted mb-0">21:00から翌朝7:00まで</p></div><button data-control-id="settings.notifications.quiet-hours" type="button" className="toggle" aria-label="夜間は通知しない" aria-pressed={preferences.quietHours} onClick={() => void toggle('quietHours')}/></div></>}</section>
-    <section className="card"><div className="section-head"><h2>通知の表示例</h2><button data-control-id="settings.notifications.preview" className="button" type="button" onClick={() => setPreview(!preview)}>{preview ? '閉じる' : '表示する'}</button></div>{preview && notice && <div className="card flat"><StatusBadge>{notice.status === 'active' ? formatTime(notice.remindAt) : notificationStatusLabels[notice.status]}</StatusBadge><h3 className="mt-1">{notice.title}</h3><p className="muted">{notice.body}</p><div className="grid two">{notice.status === 'stopped' ? <button data-control-id={`settings.notifications.resume.${notice.id}`} className="button" type="button" onClick={async () => {
-      const result = await gateway.notifications.resume(notice.id);
-      if (!result.ok) { announce(result.error.message); return; }
-      await load(); announce('通知を再開しました。');
-    }}>通知を再開</button> : <><button data-control-id={`settings.notifications.snooze.${notice.id}`} className="button" type="button" onClick={async () => {
-      const result = await gateway.notifications.snooze(notice.id, 30);
-      if (!result.ok) { announce(result.error.message); return; }
-      await load(); announce('通知を30分後に変更しました。');
-    }}>30分後に通知</button><button data-control-id={`settings.notifications.stop.${notice.id}`} className="button" type="button" onClick={async () => {
-      const result = await gateway.notifications.stop(notice.id);
-      if (!result.ok) { announce(result.error.message); return; }
-      await load(); announce('この通知を停止しました。');
-    }}>この通知を停止</button></>}</div></div>}<p className="small muted mt-1">通知には、期限や出発時刻と、対象の予定・タスクを表示します。後で通知するか、停止するかを選べます。</p></section>
+    <section className="card"><h2>通知する内容</h2>{preferences && rows.map(([key, title, description, label]) => <div className="setting-row" key={key}><div><strong>{title}</strong><p className="small muted mb-0">{description}</p></div><button data-control-id={`settings.notifications.${key === 'todoDue' ? 'todo-due' : key === 'eventDeparture' ? 'event-departure' : 'quiet-hours'}`} type="button" className="toggle" aria-label={label} aria-pressed={preferences[key]} onClick={() => void toggle(key)}/></div>)}<p className="small muted mt-1 mb-0">通知を受け取ったら、上部のベルから既読・延期・停止を選べます。</p></section>
+    <section className="card"><h2>通知の表示例</h2><p className="small muted">見本です。実際の通知は変わりません。</p><div className="card flat notification-sample" aria-label="通知の見本"><StatusBadge tone="success">18:00</StatusBadge>{hidden ? <><h3 className="mt-1">タスクのお知らせ</h3><p className="muted mb-0">内容は表示しない設定です。開くと題名と内容を確認できます。</p></> : <><h3 className="mt-1">図書館の本を返す</h3><p className="muted mb-0">18:00まで・担当：碧さん</p></>}</div><p className="small muted mt-1 mb-0">題名や内容を表示するかどうかは「共有とプライバシー」で変えられます。</p></section>
+  </div>;
+}
+
+/** 共有の初期値と、通知に内容を表示するかどうか。保存は AppContext 経由で、別の画面の変更を上書きしない。 */
+function Privacy() {
+  const { privacy: saved, updatePrivacy, announce } = useApp();
+  const [saving, setSaving] = useState(false);
+  // 操作をすぐ画面に反映し、保存に失敗したら保存済みの値へ戻す。
+  const [draft, setDraft] = useState<Partial<NonNullable<typeof saved>>>({});
+  const privacy = saved ? { ...saved, ...draft } : null;
+  const save = async (patch: Parameters<typeof updatePrivacy>[0], message: string) => {
+    setDraft((current) => ({ ...current, ...patch }));
+    setSaving(true);
+    const result = await updatePrivacy(patch);
+    setSaving(false);
+    setDraft({});
+    announce(result.ok ? message : result.error.message);
+  };
+  if (!privacy) return <div className="grid two" aria-busy="true"><div className="skeleton"/><div className="skeleton"/></div>;
+  return <div className="grid two">
+    <section className="card"><h2>新しく作る予定・タスク・メモの共有範囲</h2><p className="muted">あとから作るものに使う初期値です。作成済みのものは変わりません。</p>
+      <fieldset className="fieldset" disabled={saving}><legend>共有範囲の初期値</legend>
+        {(['household', 'creator'] as const).map((value) => <label className="check-row" key={value}><input data-control-id={`settings.privacy.audience.${value}`} type="radio" name="defaultAudience" value={value} checked={privacy.defaultAudience === value} onChange={() => void save({ defaultAudience: value }, `共有範囲の初期値を「${value === 'household' ? '家族全員' : '作成した本人だけ'}」にしました。`)}/>{value === 'household' ? '家族全員（子どもメンバーには、本人に関係するものだけ）' : '作成した本人だけ'}</label>)}
+      </fieldset>
+    </section>
+    <section className="card"><h2>通知の内容</h2><div className="setting-row"><div><strong>通知の題名と内容を表示しない</strong><p className="small muted mb-0">ほかの人に画面を見られても、予定やタスクの中身が分からないようにします。開いたときだけ表示します。</p></div><button data-control-id="settings.privacy.hide-notification-content" type="button" className="toggle" aria-label="通知の題名と内容を表示しない" aria-pressed={privacy.hideNotificationContent} disabled={saving} onClick={() => void save({ hideNotificationContent: !privacy.hideNotificationContent }, privacy.hideNotificationContent ? '通知の題名と内容を表示するようにしました。' : '通知の題名と内容を表示しないようにしました。')}/></div></section>
   </div>;
 }
 
@@ -300,9 +328,17 @@ function Accessibility({ theme, setTheme, reduced, setReduced }: { theme: 'light
 
 function Resources() {
   const { snapshot } = useApp();
+  const target = decodeURIComponent(window.location.hash.slice(1));
+  // 検索や予定から開いたときは、対象のリンクへ移動して示す。
+  useEffect(() => {
+    if (!target) return;
+    const element = document.getElementById(target);
+    element?.scrollIntoView({ block: 'center' });
+    element?.focus();
+  }, [target]);
   return <div className="grid two">{snapshot.resources.map((resource) => {
     const parsed = safeHttpsUrlSchema.safeParse(resource.url);
-    return <article className="card" key={resource.id}>
+    return <article className={`card${resource.id === target ? ' is-target' : ''}`} key={resource.id} id={resource.id} tabIndex={-1}>
       <div className="split"><LinkIcon width="24"/><StatusBadge>{ja.resourceKinds[resource.kind]}</StatusBadge></div>
       <h2>{resource.label}</h2><p className="muted wrap">{resource.url}</p>
       {parsed.success ? <a data-control-id={`settings.resource.open.${resource.id}`} className="button full" href={parsed.data} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">{externalLinkLabel(resource.label)} <ArrowIcon width="16"/></a> : <p className="notice error" role="alert">このリンクは開けません。管理者にリンク先の確認を依頼してください。</p>}

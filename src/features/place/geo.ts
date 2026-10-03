@@ -1,5 +1,6 @@
 import type { PlaceCaptureSource, PlaceRef } from '../../domain/types';
 import { placeCategoryLabel } from '../../content/ja';
+import { toJstRfc3339 } from '../../domain/calendarDate';
 
 /** 端末や写真から得た正確な位置。端末の外へ出さない。 */
 export interface ExactPosition { readonly lat: number; readonly lng: number }
@@ -51,17 +52,7 @@ export function haversineMeters(a: { lat: number; lng: number }, b: { lat: numbe
   return 2 * EARTH_RADIUS_METERS * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
-const normalize = (value: string) => value.normalize('NFKC').replace(/\s+/g, '').toLowerCase();
-
-/** 名前と住所から作る安定したキー（FNV-1a 32bit）。外部データに ID がないため、表示と操作 ID に使う。 */
-export function candidateKey(name: string, address: string): string {
-  let hash = 0x811c9dc5;
-  for (const char of `${normalize(name)}|${normalize(address)}`) {
-    hash ^= char.codePointAt(0) ?? 0;
-    hash = Math.imul(hash, 0x01000193) >>> 0;
-  }
-  return hash.toString(16).padStart(8, '0');
-}
+export { placeKey as candidateKey } from '../../domain/places';
 
 /** 同じ名前・住所の重複は近いほうだけを残し、正確な位置から近い順に並べる（外部の並び順は距離順ではない）。 */
 export function rankCandidates(candidates: PlaceCandidate[], from: ExactPosition, limit = MAX_VISIBLE_CANDIDATES): PlaceCandidate[] {
@@ -86,12 +77,8 @@ export function toPlaceRef(candidate: PlaceCandidate, via: Exclude<PlaceCaptureS
     ...(placeCategoryLabel(candidate.category) ? { category: candidate.category } : {}),
     provenance: { provider: 'openpoi', source: candidate.source, licenses: candidate.licenses.slice(0, 10), attributions: candidate.attributions.slice(0, 20) },
     capturedVia: via,
-    selectedAt: toRfc3339(now),
+    selectedAt: toJstRfc3339(now),
   };
 }
 
-/** 日本時間のオフセット付き RFC 3339。 */
-export function toRfc3339(date: Date): string {
-  const jst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
-  return `${jst.toISOString().slice(0, 19)}+09:00`;
-}
+export { toJstRfc3339 as toRfc3339 } from '../../domain/calendarDate';

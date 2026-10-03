@@ -24,42 +24,24 @@ type PanelState =
 
 export type ConsentStatus = 'loading' | 'granted' | 'required' | 'unavailable';
 
-/** 外部検索への同意。現在の説明（noticeVersion）に同意している場合だけ granted。 */
-export function usePlaceLookupConsent(enabled: boolean) {
-  const { gateway } = useApp();
-  const [settings, setSettings] = useState<PrivacySettings | null>(null);
-  const [status, setStatus] = useState<ConsentStatus>('loading');
-  useEffect(() => {
-    if (!enabled) return;
-    let mounted = true;
-    void gateway.household.getPrivacySettings().then((result) => {
-      if (!mounted) return;
-      // 読み込み中に同意の操作があった場合は、その結果を優先する。
-      if (!result.ok) { setStatus((previous) => (previous === 'loading' ? 'unavailable' : previous)); return; }
-      setSettings((previous) => previous ?? result.value);
-      setStatus((previous) => (previous === 'loading' ? (result.value.placeLookupConsent?.noticeVersion === PLACE_LOOKUP_NOTICE_VERSION ? 'granted' : 'required') : previous));
-    });
-    return () => { mounted = false; };
-  }, [enabled, gateway]);
+/** 外部検索への同意。現在の説明（noticeVersion）に同意している場合だけ granted。設定は AppContext の1か所で持つ。 */
+export function usePlaceLookupConsent() {
+  const { privacy, updatePrivacy } = useApp();
+  // 操作直後は結果を待たずに反映し（続けて操作しても再確認を出さない）、記録に失敗したら元に戻す。
+  const [pending, setPending] = useState<ConsentStatus | null>(null);
+  const recorded: ConsentStatus = privacy === null ? 'loading' : privacy.placeLookupConsent?.noticeVersion === PLACE_LOOKUP_NOTICE_VERSION ? 'granted' : 'required';
   const save = useCallback(async (granted: boolean): Promise<Result<PrivacySettings>> => {
-    // 読み込み前に操作された場合も、最新の設定を取得してから同意だけを変える。
-    // 同意の操作をすぐ画面に反映し、記録に失敗したら元の状態に戻す（続けて操作したときに再確認を出さないため）。
-    const previous = status;
-    setStatus(granted ? 'granted' : 'required');
-    const current = settings ?? await gateway.household.getPrivacySettings().then((result) => (result.ok ? result.value : null));
-    const result: Result<PrivacySettings> = current
-      ? await gateway.household.savePrivacySettings({ ...current, placeLookupConsent: granted ? { noticeVersion: PLACE_LOOKUP_NOTICE_VERSION, grantedAt: toRfc3339(new Date()) } : null })
-      : { ok: false, error: { code: 'UPSTREAM_FAILURE', message: ja.place.failures['consent-failed'], retryable: true } };
-    if (result.ok) setSettings(result.value);
-    else setStatus(previous === 'loading' ? 'required' : previous);
+    setPending(granted ? 'granted' : 'required');
+    const result = await updatePrivacy({ placeLookupConsent: granted ? { noticeVersion: PLACE_LOOKUP_NOTICE_VERSION, grantedAt: toRfc3339(new Date()) } : null });
+    setPending(null);
     return result;
-  }, [gateway, settings, status]);
-  return { status, grant: () => save(true), revoke: () => save(false) };
+  }, [updatePrivacy]);
+  return { status: pending ?? recorded, grant: () => save(true), revoke: () => save(false) };
 }
 
 /* ---------- 表示部品 ---------- */
 
-export function PlaceAttributionLink({ where }: { where: 'picker' | 'memo' | 'budget' }) {
+export function PlaceAttributionLink({ where }: { where: 'picker' | 'memo' | 'budget' | 'expense' | 'places' }) {
   return <p className="place-attribution small muted">{ja.place.attributionPrefix}: <a data-control-id={`place.attribution.${where}`} href={OPENPOI_ATTRIBUTION_URL} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" aria-label={externalLinkLabel(`${ja.place.attributionPrefix} ${ja.place.attributionLabel}`)}>{ja.place.attributionLabel}<LinkIcon width="13"/></a></p>;
 }
 
@@ -94,7 +76,7 @@ export function PlaceField({ value, onChange, disabled = false, port = openPoiPl
   const [query, setQuery] = useState('');
   const [manual, setManual] = useState({ name: '', address: '' });
   const [manualError, setManualError] = useState('');
-  const consent = usePlaceLookupConsent(expanded);
+  const consent = usePlaceLookupConsent();
   const exactRef = useRef<ExactPosition | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const photoInput = useRef<HTMLInputElement>(null);

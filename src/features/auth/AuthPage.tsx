@@ -9,7 +9,17 @@ export function AuthPage() {
   const { gateway } = useApp();
   const [passwordMode, setPasswordMode] = useState(false);
   const [error, setError] = useState('');
-  const passkey = async () => { const result = await gateway.auth.beginPasskey(); if (result.ok) navigate('/onboarding'); else setError(result.error.message); };
+  // 開始 → 端末で本人確認（署名）→ API 側で検証して完了、の3段階。完了したときだけ先へ進む。
+  const passkey = async () => {
+    setError('');
+    const begun = await gateway.auth.beginPasskey();
+    if (!begun.ok) { setError(begun.error.message); return; }
+    const assertion = await gateway.credentials.get(begun.value.publicKey);
+    if (!assertion.ok) { setError(assertion.error.message); return; }
+    const finished = await gateway.auth.finishPasskey(begun.value.challengeId, assertion.value);
+    if (!finished.ok) { setError(finished.error.message); return; }
+    navigate('/onboarding');
+  };
   const password = async (form: HTMLFormElement) => {
     setError(''); const data = new FormData(form); const value = String(data.get('password'));
     const parsed = passwordSchema.safeParse(value); if (!parsed.success) { setError(parsed.error.issues[0]?.message ?? '入力を確認してください'); return; }

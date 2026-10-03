@@ -1,7 +1,8 @@
 import type { PropsWithChildren, ReactNode } from 'react';
 import { useEffectEvent, useId, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { CloseIcon, FileIcon } from './icons';
+import { AlertIcon, CloseIcon, FileIcon } from './icons';
+import { addDateKeyDays, dateKeyFromRfc3339 } from '../domain/calendarDate';
 import { ja } from '../content/ja';
 
 export function BrandMark() {
@@ -9,7 +10,8 @@ export function BrandMark() {
 }
 
 export function Brand({ compact = false }: { compact?: boolean }) {
-  return <a data-control-id="brand.home" href="/today" className="brand" data-link><BrandMark />{!compact && <span className="brand-copy"><span className="brand-name">{ja.brand.name}</span><span className="brand-kicker">{ja.brand.tagline}</span></span>}</a>;
+  // ロゴだけを表示するときも、リンク先が名前から分かるようにする。
+  return <a data-control-id="brand.home" href="/today" className="brand" data-link aria-label={compact ? `${ja.brand.name}（今日の画面へ）` : undefined}><BrandMark />{!compact && <span className="brand-copy"><span className="brand-name">{ja.brand.name}</span><span className="brand-kicker">{ja.brand.tagline}</span></span>}</a>;
 }
 
 export function PageHeader({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action?: ReactNode }) {
@@ -88,3 +90,35 @@ export const formatYen = (value: number) => new Intl.NumberFormat('ja-JP', { sty
 export const formatTime = (value?: string) => value ? new Intl.DateTimeFormat('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' }).format(new Date(value)) : ja.states.noDueDate;
 export const formatDate = (value: string) => new Intl.DateTimeFormat('ja-JP', { month: 'long', day: 'numeric', weekday: 'short', timeZone: 'Asia/Tokyo' }).format(new Date(value));
 export const formatDateOnly = (value: string) => new Intl.DateTimeFormat('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Tokyo' }).format(new Date(`${value}T12:00:00+09:00`));
+
+/** 期限の表示。今日なら時刻だけ、明日なら「明日」、それ以外は日付も付ける（時刻だけだと別の日の期限と区別できない）。 */
+export function formatDue(value: string | undefined, asOf: string): string {
+  if (!value) return ja.states.noDueDate;
+  const today = dateKeyFromRfc3339(asOf);
+  const day = dateKeyFromRfc3339(value);
+  const time = formatTime(value);
+  if (day === today) return time;
+  if (day === addDateKeyDays(today, 1)) return `明日 ${time}`;
+  if (day === addDateKeyDays(today, -1)) return `昨日 ${time}`;
+  return `${formatDate(value)} ${time}`;
+}
+
+/** 基準時刻からの経過を「5分前」「2時間前」のように表す。7日以上前は日付で示す。 */
+export function formatRelative(value: string, asOf: string): string {
+  const minutes = Math.round((Date.parse(asOf) - Date.parse(value)) / 60_000);
+  if (minutes < 1) return 'たった今';
+  if (minutes < 60) return `${minutes}分前`;
+  if (minutes < 60 * 24) return `${Math.floor(minutes / 60)}時間前`;
+  if (minutes < 60 * 24 * 7) return `${Math.floor(minutes / (60 * 24))}日前`;
+  return formatDate(value);
+}
+
+/** 詳細URLの対象が、削除・共有範囲の変更・存在しないIDのいずれかで表示できないとき。存在の有無は区別しない。 */
+export function DetailNotFound({ what, feature, backHref }: { what: string; feature: string; backHref: string }) {
+  return <div className="callout detail-missing" role="status">
+    <AlertIcon/>
+    <div><strong>{what}が見つからないか、表示する権限がありません</strong><p className="small muted mb-0">削除されたか、共有の範囲が変わった可能性があります。</p></div>
+    <a data-control-id={`route.detail.back.${feature}`} className="button" href={backHref} data-link>一覧に戻る</a>
+  </div>;
+}
+
