@@ -4,8 +4,9 @@ import { expect, test } from '@playwright/test';
 test.use({ deviceScaleFactor: 2 });
 
 const screens = [
-  ['welcome','/welcome'],['auth','/auth'],['onboarding','/onboarding'],['today','/today'],['calendar','/calendar'],['tasks','/tasks'],['notes','/notes'],['budget','/budget'],['insights','/insights'],['settings-household','/settings/household'],['settings-security','/settings/security'],['settings-notifications','/settings/notifications'],['settings-accessibility','/settings/accessibility'],['settings-resources','/settings/resources'],['showcase','/showcase'],
+  ['welcome','/welcome'],['auth','/auth'],['onboarding','/onboarding'],['today','/today'],['calendar','/calendar'],['tasks','/tasks'],['notes','/notes'],['budget','/budget'],['insights','/insights'],['settings-household','/settings/household'],['settings-security','/settings/security'],['settings-notifications','/settings/notifications'],['settings-accessibility','/settings/accessibility'],['settings-resources','/settings/resources'],['settings-location','/settings/location'],['showcase','/showcase'],
   ['today-empty','/today?scenario=empty'],['today-offline','/today?scenario=offline'],['today-conflict','/today?scenario=conflict'],['today-expired-session','/today?scenario=expired-session'],['today-weather','/today?scenario=weather'],['notes-quarantined','/notes/memo-school?scenario=quarantined'],['showcase-expired-invite','/showcase?scenario=expired-invite'],
+  ['budget-detail','/budget/expense-books'],['places','/places'],['places-detail','/places/550c29b2'],['calendar-occurrence','/calendar/event-clean?month=2026-10&on=2026-10-08'],['tasks-recurring','/tasks/todo-garbage'],['settings-privacy','/settings/privacy'],['not-found','/todayx'],
   ['today-child','/today?actor=member-hana'],['calendar-child','/calendar?actor=member-hana'],['today-guest','/today?actor=member-yui'],['resources-guest','/settings/resources?actor=member-yui'],['household-adult','/settings/household?actor=member-ren'],['household-forbidden-guest','/settings/household?actor=member-yui'],
 ] as const;
 const viewports = [
@@ -85,3 +86,16 @@ for (const [name,route] of [['today','/today'],['calendar','/calendar'],['tasks'
     await page.screenshot({ path: `artifacts/screens/desktop-${name}-dusk.png`, fullPage: true, animations: 'disabled' });
   });
 }
+
+test('mobile more menu and quick create', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'delivery capture uses fixed Chromium DPR 2');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/budget');
+  await page.getByRole('button', { name: /^その他/ }).click();
+  await page.screenshot({ path: 'artifacts/screens/mobile-more-menu-light.png', fullPage: false, animations: 'disabled' });
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'すぐに追加' }).click();
+  await page.getByRole('button', { name: '支出', exact: true }).click();
+  await page.screenshot({ path: 'artifacts/screens/mobile-quick-create-expense-light.png', fullPage: false, animations: 'disabled' });
+});
+

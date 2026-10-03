@@ -22,6 +22,31 @@ function browserPasskeyOptions(options: PublicKeyCredentialCreationOptions): Pub
   };
 }
 
+function browserRequestOptions(options: PublicKeyCredentialRequestOptions): PublicKeyCredentialRequestOptions {
+  const source = options as PublicKeyCredentialRequestOptions & { challenge: ArrayBuffer | string; allowCredentials?: Array<PublicKeyCredentialDescriptor & { id: ArrayBuffer | string }> };
+  return {
+    ...source,
+    challenge: typeof source.challenge === 'string' ? fromBase64Url(source.challenge) : source.challenge,
+    allowCredentials: source.allowCredentials?.map((item) => ({ ...item, id: typeof item.id === 'string' ? fromBase64Url(item.id) : item.id })),
+  };
+}
+
+function serializeAssertion(credential: PublicKeyCredential) {
+  const response = credential.response as AuthenticatorAssertionResponse;
+  return {
+    id: credential.id,
+    type: credential.type,
+    rawId: toBase64Url(credential.rawId),
+    clientExtensionResults: credential.getClientExtensionResults(),
+    response: {
+      clientDataJSON: toBase64Url(response.clientDataJSON),
+      authenticatorData: toBase64Url(response.authenticatorData),
+      signature: toBase64Url(response.signature),
+      userHandle: response.userHandle ? toBase64Url(response.userHandle) : null,
+    },
+  };
+}
+
 function serializeRegistration(credential: PublicKeyCredential) {
   const response = credential.response as AuthenticatorAttestationResponse;
   return {
@@ -71,6 +96,7 @@ export function createHttpGateway(baseUrl: string, getCsrfToken: () => string, g
   return {
     auth: {
       beginPasskey: () => request('/v1/auth/passkey/challenge', { method: 'POST', csrf: true }),
+      finishPasskey: (challengeId, assertion) => request('/v1/auth/passkey/complete', { method: 'POST', body: JSON.stringify({ challengeId, assertion }), csrf: true }),
       signInWithPassword: (email, password) => request('/v1/auth/password', { method: 'POST', body: JSON.stringify({ email, password }), csrf: true }),
       signOut: () => request('/v1/auth/session', { method: 'DELETE', csrf: true }),
       getSecurityOverview: () => request('/v1/auth/security'),
@@ -82,6 +108,7 @@ export function createHttpGateway(baseUrl: string, getCsrfToken: () => string, g
     household: {
       getSnapshot: () => request('/v1/households/current/snapshot'),
       acceptInvite: (code) => request('/v1/household-invites/accept', { method: 'POST', body: JSON.stringify({ code }), csrf: true }),
+      updateProfile: (input) => request('/v1/households/current', { method: 'PATCH', body: JSON.stringify(input), csrf: true }),
       updateMembershipRole: (id, role, expectedVersion) => request(`/v1/household-memberships/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ role, expectedVersion }), csrf: true }),
       createInvite: (role) => request('/v1/household-invites', { method: 'POST', body: JSON.stringify({ role }), csrf: true }),
       listInvites: () => request('/v1/household-invites'),
@@ -89,19 +116,20 @@ export function createHttpGateway(baseUrl: string, getCsrfToken: () => string, g
       getPermissionOverrides: (membershipId) => request(`/v1/household-memberships/${encodeURIComponent(membershipId)}/permission-overrides`),
       updatePermissionOverrides: (membershipId, overrides, expectedPermissionRevision) => request(`/v1/household-memberships/${encodeURIComponent(membershipId)}/permission-overrides`, { method: 'PUT', body: JSON.stringify({ overrides, expectedPermissionRevision }), csrf: true }),
       resetPermissionOverrides: (membershipId, expectedPermissionRevision) => request(`/v1/household-memberships/${encodeURIComponent(membershipId)}/permission-overrides?expectedPermissionRevision=${expectedPermissionRevision}`, { method: 'DELETE', csrf: true }),
+      getPrivacySettings: () => request('/v1/households/current/privacy'),
       savePrivacySettings: (settings) => request('/v1/households/current/privacy', { method: 'PUT', body: JSON.stringify(settings), csrf: true }),
     },
     events: {
       createEvent: (input, context) => request('/v1/events', { method: 'POST', body: JSON.stringify(input), csrf: true, ...mutationHeaders(context) }),
-      updateEvent: (id, scope, input, expectedVersion, context) => request(`/v1/events/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ scope, input, expectedVersion }), csrf: true, ...mutationHeaders(context) }),
-      deleteEvent: (id, scope, expectedVersion) => request(`/v1/events/${encodeURIComponent(id)}?scope=${scope}&expectedVersion=${expectedVersion}`, { method: 'DELETE', csrf: true }),
+      updateEvent: (id, scope, input, expectedVersion, context, occurrenceDate) => request(`/v1/events/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ scope, input, expectedVersion, ...(occurrenceDate ? { occurrenceDate } : {}) }), csrf: true, ...mutationHeaders(context) }),
+      deleteEvent: (id, scope, expectedVersion, occurrenceDate) => request(`/v1/events/${encodeURIComponent(id)}?${new URLSearchParams({ scope, expectedVersion: String(expectedVersion), ...(occurrenceDate ? { occurrenceDate } : {}) })}`, { method: 'DELETE', csrf: true }),
       restoreEvent: (id) => request(`/v1/events/${encodeURIComponent(id)}/restore`, { method: 'POST', csrf: true }),
     },
     todos: {
       createTodo: (input, context) => request('/v1/todos', { method: 'POST', body: JSON.stringify(input), csrf: true, ...mutationHeaders(context) }),
       updateTodoStatus: (id, status, expectedVersion) => request(`/v1/todos/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: JSON.stringify({ status, expectedVersion }), csrf: true }),
       updateTodo: (id, scope, input, expectedVersion, context) => request(`/v1/todos/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ scope, input, expectedVersion }), csrf: true, ...mutationHeaders(context) }),
-      deleteTodo: (id, expectedVersion) => request(`/v1/todos/${encodeURIComponent(id)}?expectedVersion=${expectedVersion}`, { method: 'DELETE', csrf: true }),
+      deleteTodo: (id, expectedVersion, scope = 'series') => request(`/v1/todos/${encodeURIComponent(id)}?${new URLSearchParams({ scope, expectedVersion: String(expectedVersion) })}`, { method: 'DELETE', csrf: true }),
       restoreTodo: (id) => request(`/v1/todos/${encodeURIComponent(id)}/restore`, { method: 'POST', csrf: true }),
     },
     memos: {
@@ -111,16 +139,20 @@ export function createHttpGateway(baseUrl: string, getCsrfToken: () => string, g
         const form = new FormData(); form.set('file', file);
         return request(`/v1/memos/${encodeURIComponent(memoId)}/attachments`, { method: 'POST', body: form, csrf: true });
       },
+      getAttachmentLink: (memoId, attachmentId) => request(`/v1/memos/${encodeURIComponent(memoId)}/attachments/${encodeURIComponent(attachmentId)}/link`),
       deleteMemo: (id) => request(`/v1/memos/${encodeURIComponent(id)}`, { method: 'DELETE', csrf: true }),
       restoreMemo: (id) => request(`/v1/memos/${encodeURIComponent(id)}/restore`, { method: 'POST', csrf: true }),
     },
     expenses: {
       createExpense: (input) => request('/v1/expenses', { method: 'POST', body: JSON.stringify(input), csrf: true }),
-      recordSettlement: (expenseId, amountJpy) => request(`/v1/expenses/${encodeURIComponent(expenseId)}/settlements`, { method: 'POST', body: JSON.stringify({ amountJpy }), csrf: true }),
+      updateExpense: (id, input, expectedVersion) => request(`/v1/expenses/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ input, expectedVersion }), csrf: true }),
+      deleteExpense: (id, expectedVersion) => request(`/v1/expenses/${encodeURIComponent(id)}?expectedVersion=${expectedVersion}`, { method: 'DELETE', csrf: true }),
+      restoreExpense: (id) => request(`/v1/expenses/${encodeURIComponent(id)}/restore`, { method: 'POST', csrf: true }),
+      recordSettlement: (expenseId, fromMembershipId, amountJpy) => request(`/v1/expenses/${encodeURIComponent(expenseId)}/settlements`, { method: 'POST', body: JSON.stringify({ fromMembershipId, amountJpy }), csrf: true }),
       reverseSettlement: (expenseId, settlementId) => request(`/v1/expenses/${encodeURIComponent(expenseId)}/settlements/${encodeURIComponent(settlementId)}/reverse`, { method: 'POST', csrf: true }),
     },
     resources: { search: (query) => request(`/v1/search?q=${encodeURIComponent(query)}`) },
-    context: { getContext: () => request('/v1/context') },
+    insights: { list: () => request('/v1/insights') },
     notifications: {
       list: () => request('/v1/notifications'),
       markRead: (id) => request(`/v1/notifications/${encodeURIComponent(id)}/read`, { method: 'POST', csrf: true }),
@@ -139,6 +171,16 @@ export function createHttpGateway(baseUrl: string, getCsrfToken: () => string, g
           return { ok: true, value: serializeRegistration(credential) };
         } catch {
           return { ok: false, error: { code: 'UPSTREAM_FAILURE', message: 'パスキーの作成を完了できませんでした。', retryable: true } };
+        }
+      },
+      async get(options) {
+        if (!window.isSecureContext || !navigator.credentials || !options) return { ok: false, error: { code: 'UPSTREAM_FAILURE', message: 'パスキーには安全な接続と対応ブラウザが必要です。', retryable: false } };
+        try {
+          const credential = await navigator.credentials.get({ publicKey: browserRequestOptions(options) });
+          if (!(credential instanceof PublicKeyCredential)) return { ok: false, error: { code: 'UPSTREAM_FAILURE', message: 'パスキーでの本人確認がキャンセルされました。', retryable: true } };
+          return { ok: true, value: serializeAssertion(credential) };
+        } catch {
+          return { ok: false, error: { code: 'UPSTREAM_FAILURE', message: 'パスキーでの本人確認を完了できませんでした。', retryable: true } };
         }
       },
     },

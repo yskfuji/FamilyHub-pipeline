@@ -18,7 +18,7 @@ test('household invite join and expiry are distinguishable', async ({ page }) =>
   await code.fill('EXPIRED');
   await page.getByRole('button', { name: /次へ/ }).click();
   await expect(page.getByRole('alert')).toContainText('有効期限');
-  await code.fill('FAMILY-2026-VALID-CODE');
+  await code.fill('FAMILY-2026-DEMO-0001');
   await page.getByRole('button', { name: /次へ/ }).click();
   await expect(page.getByRole('heading', { name: '共有範囲', exact: true })).toBeVisible();
 });
@@ -42,7 +42,7 @@ test('task reviewer and state update are visible', async ({ page }) => {
 test('memo attachment has quarantine and OCR caveat', async ({ page }) => {
   await page.goto('/notes/memo-receipt');
   await expect(page.getByText('確認中', { exact: true })).toBeVisible();
-  await expect(page.getByText('元のファイルを確認')).toBeVisible();
+  await expect(page.getByText('元のファイルと照合')).toBeVisible();
   const chooser = page.waitForEvent('filechooser');
   await page.getByRole('button', { name: 'ファイルを追加' }).click();
   const fileChooser = await chooser;
@@ -50,11 +50,14 @@ test('memo attachment has quarantine and OCR caveat', async ({ page }) => {
   await expect(page.locator('.toast-visible')).toContainText('ファイルを受け付けました');
 });
 
-test('expense settlement changes the row', async ({ page }) => {
+test('expense settlement changes the row and the undo stays visible after refresh', async ({ page }) => {
   await page.goto('/budget');
-  const button = page.getByRole('button', { name: /残り.*を精算/ }).first();
-  await button.click();
+  await page.getByRole('link', { name: '学校教材' }).click();
+  const drawer = page.getByRole('dialog', { name: '学校教材' });
+  await drawer.getByRole('button', { name: /蓮さんの残り.*を精算/ }).click();
   await expect(page.locator('.toast-visible')).toContainText('精算を記録');
+  await expect(page.getByRole('button', { name: '精算を取り消す', exact: true })).toBeVisible();
+  await expect(drawer.getByText('蓮さんから碧さんへ')).toBeVisible();
 });
 
 test('resource links and global search are reachable', async ({ page }) => {

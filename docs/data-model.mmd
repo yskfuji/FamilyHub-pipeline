@@ -25,6 +25,10 @@ erDiagram
   Expense ||--o{ SettlementRecord : settled_by
   SettlementRecord o|--o| SettlementRecord : reverses
   HouseholdMembership ||--o{ ExpenseShare : owes
+  Memo ||--o| PlaceSnapshot : located_at
+  Expense ||--o| PlaceSnapshot : located_at
+  HouseholdMembership ||--o{ PlaceLookupConsent : grants
+  HouseholdMembership ||--o{ Notification : receives
 
   User {
     uuid id PK
@@ -112,8 +116,22 @@ erDiagram
   Expense {
     uuid id PK
     uuid household_id FK
+    uuid payer_membership_id FK
     int amount_jpy
     date incurred_on
+    enum category
+    text note
+    int version
+    timestamp deleted_at
+  }
+  Notification {
+    uuid id PK
+    uuid membership_id FK
+    enum kind
+    string destination
+    timestamp remind_at
+    enum status
+    bool read
   }
   ExpenseShare {
     uuid id PK
@@ -146,6 +164,27 @@ erDiagram
     string validated_https_url
     enum visibility_audience
     json selected_membership_ids
+  }
+  PlaceSnapshot {
+    uuid id PK
+    uuid household_id FK
+    string name
+    string address
+    decimal poi_lat
+    decimal poi_lng
+    string category
+    enum captured_via
+    string provider_source
+    json licenses
+    json attributions
+    timestamp selected_at
+  }
+  PlaceLookupConsent {
+    uuid id PK
+    uuid membership_id FK
+    string notice_version
+    timestamp granted_at
+    timestamp revoked_at
   }
   AuditEvent {
     uuid id PK

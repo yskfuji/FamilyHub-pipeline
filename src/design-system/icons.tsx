@@ -19,7 +19,6 @@ export const BellIcon = (p: IconProps) => <svg {...base} {...p}><path d="M18 8a6
 export const RainIcon = (p: IconProps) => <svg {...base} {...p}><path d="M7 16H6a4 4 0 1 1 1.4-7.7A5.5 5.5 0 0 1 18 10a3 3 0 0 1 0 6h-1"/><path d="m8 19-1 2M13 18l-1 3M18 19l-1 2"/></svg>;
 export const AlertIcon = (p: IconProps) => <svg {...base} {...p}><path d="M12 3 2.5 20h19z"/><path d="M12 9v4M12 17h.01"/></svg>;
 export const ArrowIcon = (p: IconProps) => <svg {...base} {...p}><path d="M5 12h14M14 7l5 5-5 5"/></svg>;
-export const BackIcon = (p: IconProps) => <svg {...base} {...p}><path d="M19 12H5M10 7l-5 5 5 5"/></svg>;
 export const LinkIcon = (p: IconProps) => <svg {...base} {...p}><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1"/></svg>;
 export const ShieldIcon = (p: IconProps) => <svg {...base} {...p}><path d="M12 3 4 6v5c0 5 3.4 8.3 8 10 4.6-1.7 8-5 8-10V6z"/><path d="m9 12 2 2 4-5"/></svg>;
 export const UploadIcon = (p: IconProps) => <svg {...base} {...p}><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>;
@@ -28,3 +27,6 @@ export const PeopleIcon = (p: IconProps) => <svg {...base} {...p}><circle cx="9"
 export const EyeIcon = (p: IconProps) => <svg {...base} {...p}><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.5"/></svg>;
 export const LockIcon = (p: IconProps) => <svg {...base} {...p}><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>;
 export const FileIcon = (p: IconProps) => <svg {...base} {...p}><path d="M6 2h8l4 4v16H6z"/><path d="M14 2v5h4"/></svg>;
+export const MapPinIcon = (p: IconProps) => <svg {...base} {...p}><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg>;
+export const LocateIcon = (p: IconProps) => <svg {...base} {...p}><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>;
+export const ImageIcon = (p: IconProps) => <svg {...base} {...p}><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-9 9"/></svg>;

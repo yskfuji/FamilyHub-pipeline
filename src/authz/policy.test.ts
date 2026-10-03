@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { authorizeVisibleResource, capabilitiesFor, capabilityCeilingFor, projectSnapshotForViewer } from './policy';
+import { authorizeVisibleResource, capabilitiesFor, capabilityCeilingFor, projectSnapshotForViewer, redactPlace } from './policy';
 import type { PermissionOverride, ViewerContext, VisibilityPolicy } from '../domain/types';
 import { baseSnapshot } from '../data/fixtures';
 
@@ -43,5 +43,31 @@ describe('authorization policy', () => {
     const guest = projectSnapshotForViewer(baseSnapshot, viewer('guest', 'member-yui'));
     expect(guest.resources.map((item) => item.id)).toEqual(['resource-school', 'resource-guide']);
     expect(guest.expenses).toEqual([]);
+  });
+
+  it('shows recorded places only to owners and adults, field by field', () => {
+    const placeOf = (snapshot: ReturnType<typeof projectSnapshotForViewer>) => snapshot.memos.find((memo) => memo.id === 'memo-school')?.place;
+    expect(placeOf(projectSnapshotForViewer(baseSnapshot, viewer('owner', 'member-aoi')))?.name).toBe('青葉小学校 体育館');
+    expect(placeOf(projectSnapshotForViewer(baseSnapshot, viewer('adult', 'member-ren')))?.name).toBe('青葉小学校 体育館');
+    const child = projectSnapshotForViewer(baseSnapshot, viewer('child', 'member-hana'));
+    expect(child.memos.find((memo) => memo.id === 'memo-school')).toBeDefined();
+    expect(placeOf(child)).toBeUndefined();
+    expect(JSON.stringify(child)).not.toContain('青葉小学校 体育館');
+  });
+
+  it('lets an owner withhold places from a specific adult but never grants them to children or guests', () => {
+    const restricted = viewer('adult', 'member-ren', [{ membershipId: 'member-ren', capability: 'place.read', effect: 'deny' }]);
+    const snapshot = projectSnapshotForViewer(baseSnapshot, restricted);
+    expect(snapshot.memos.some((memo) => memo.place)).toBe(false);
+    expect(snapshot.expenses.some((expense) => expense.place)).toBe(false);
+    expect(capabilityCeilingFor('child')).not.toContain('place.read');
+    expect(capabilitiesFor('child', [{ membershipId: 'member-child', capability: 'place.read', effect: 'allow' }])).not.toContain('place.read');
+    expect(capabilitiesFor('guest', [{ membershipId: 'member-guest', capability: 'place.read', effect: 'allow' }])).not.toContain('place.read');
+  });
+
+  it('returns the same object when nothing needs to be removed', () => {
+    const memo = baseSnapshot.memos[0];
+    expect(redactPlace(memo, viewer('owner', 'member-aoi'))).toBe(memo);
+    expect(redactPlace(memo, viewer('child', 'member-hana'))).not.toHaveProperty('place');
   });
 });

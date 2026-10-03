@@ -80,3 +80,9 @@ export function urlWithCalendarMonth(urlLike: string, monthKey: string, currentM
   else url.searchParams.set('month', monthKey);
   return `${url.pathname}${url.search}${url.hash}`;
 }
+
+/** 日本時間のオフセット付き RFC 3339（例: 2026-09-30T07:45:00+09:00）。 */
+export function toJstRfc3339(date: Date): string {
+  const jst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  return `${jst.toISOString().slice(0, 19)}+09:00`;
+}

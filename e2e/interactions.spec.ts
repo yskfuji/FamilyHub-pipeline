@@ -7,13 +7,18 @@ test('notification bell opens an operable notification center', async ({ page })
   await bell.click();
   await expect(page.getByRole('heading', { name: '通知' })).toBeVisible();
   await expect(page.getByText('未読')).toBeVisible();
+  const hidden = page.locator('article').filter({ has: page.locator('[data-control-id="notifications.reveal.notification-library"]') });
+  await expect(hidden.getByRole('heading', { name: 'タスクのお知らせ' })).toBeVisible();
+  await hidden.getByRole('button', { name: '内容を表示' }).click();
+  const library = page.locator('article').filter({ hasText: '図書館の本を返す' });
+  await expect(library.getByRole('heading', { name: '図書館の本を返す' })).toBeVisible();
   await page.getByRole('button', { name: '既読にする' }).click();
   await expect(page.locator('.toast-visible')).toContainText('既読にしました');
-  await page.getByRole('button', { name: '30分後に通知' }).click();
+  await library.getByRole('button', { name: '30分後に通知' }).click();
   await expect(page.locator('.toast-visible')).toContainText('30分後');
-  await expect(page.getByText('延期済み')).toBeVisible();
-  await page.getByRole('button', { name: '通知を停止' }).click();
-  await expect(page.getByText('停止中')).toBeVisible();
+  await expect(library.getByText('延期済み')).toBeVisible();
+  await library.getByRole('button', { name: '通知を停止' }).click();
+  await expect(library.getByText('停止中')).toBeVisible();
 });
 
 test('calendar week/list, edit, cancel delete, and confirmed delete work', async ({ page }) => {
@@ -114,7 +119,7 @@ test('passkey, password, and individual session controls work with confirmation'
   await expect(page.getByText('iPhone Safari')).toBeHidden();
 });
 
-test('three notification preferences and preview actions persist', async ({ page }) => {
+test('three notification preferences persist and change what the bell shows; the preview is only a sample', async ({ page }) => {
   await page.goto('/settings/notifications');
   for (const label of ['タスクの期限を通知', '予定の出発時刻を通知', '夜間は通知しない']) {
     const toggle = page.getByRole('button', { name: label });
@@ -122,10 +127,10 @@ test('three notification preferences and preview actions persist', async ({ page
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-pressed', 'false');
   }
-  await page.getByRole('button', { name: '30分後に通知' }).click();
-  await expect(page.locator('.toast-visible')).toContainText('30分後');
-  await page.getByRole('button', { name: 'この通知を停止' }).click();
-  await expect(page.getByText('停止中')).toBeVisible();
+  await expect(page.getByLabel('通知の見本')).toContainText('タスクのお知らせ');
+  await expect(page.getByRole('button', { name: '30分後に通知' })).toHaveCount(0);
+  await page.getByRole('button', { name: /通知を確認/ }).click();
+  await expect(page.getByText('新しい通知はありません。')).toBeVisible();
 });
 
 test('onboarding privacy draft toggles and saves creator-only default', async ({ page }) => {

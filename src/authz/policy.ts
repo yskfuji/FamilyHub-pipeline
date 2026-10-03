@@ -4,6 +4,7 @@ import type {
   HouseholdMembership,
   HouseholdSnapshot,
   PermissionOverride,
+  PlaceRef,
   ViewerContext,
   VisibilityPolicy,
 } from '../domain/types';
@@ -14,6 +15,7 @@ export const allCapabilities: Capability[] = [
   'task.read', 'task.create', 'task.update', 'task.delete', 'task.transition',
   'memo.read', 'memo.create', 'memo.update', 'memo.delete', 'memo.attach',
   'expense.read', 'expense.create', 'expense.settle',
+  'place.read',
   'insight.read', 'resource.read', 'settings.own', 'notification.manage',
 ];
 
@@ -84,14 +86,22 @@ export function authorizeVisibleResource(
   return visible ? { allowed: true } : { allowed: false, reason: 'SCOPE_DENIED' };
 }
 
+/** 記録した場所は place.read を持つ人にだけ返す。持たない人には項目ごと取り除いた複製を返す。 */
+export function redactPlace<T extends { place?: PlaceRef }>(item: T, viewer: ViewerContext): T {
+  if (item.place === undefined || authorize(viewer, 'place.read').allowed) return item;
+  const redacted = { ...item };
+  delete redacted.place;
+  return redacted;
+}
+
 export function projectSnapshotForViewer(source: HouseholdSnapshot, viewer: ViewerContext): HouseholdSnapshot {
   const snapshot = structuredClone(source);
   snapshot.viewer = structuredClone(viewer);
   snapshot.events = snapshot.events.filter((item) => !item.deletedAt && authorizeVisibleResource(viewer, 'event.read', item.visibility, [item.ownerMembershipId, ...item.participantMembershipIds]).allowed);
   snapshot.todos = snapshot.todos.filter((item) => !item.deletedAt && authorizeVisibleResource(viewer, 'task.read', item.visibility, [item.creatorMembershipId, item.assigneeMembershipId, ...(item.reviewerMembershipId ? [item.reviewerMembershipId] : [])]).allowed);
-  snapshot.memos = snapshot.memos.filter((item) => !item.deletedAt && authorizeVisibleResource(viewer, 'memo.read', item.visibility, [item.authorMembershipId]).allowed);
+  snapshot.memos = snapshot.memos.filter((item) => !item.deletedAt && authorizeVisibleResource(viewer, 'memo.read', item.visibility, [item.authorMembershipId]).allowed).map((item) => redactPlace(item, viewer));
   snapshot.resources = snapshot.resources.filter((item) => authorizeVisibleResource(viewer, 'resource.read', item.visibility).allowed);
-  if (!authorize(viewer, 'expense.read').allowed) snapshot.expenses = [];
+  snapshot.expenses = authorize(viewer, 'expense.read').allowed ? snapshot.expenses.filter((item) => !item.deletedAt).map((item) => redactPlace(item, viewer)) : [];
   if (!authorize(viewer, 'household.members.read').allowed) {
     const referenced = new Set([viewer.membershipId]);
     snapshot.events.forEach((item) => { referenced.add(item.ownerMembershipId); item.participantMembershipIds.forEach((id) => referenced.add(id)); });

@@ -1,20 +1,25 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react';
 import { createMockGateway } from '../data/mockGateway';
 import { baseSnapshot } from '../data/fixtures';
 import type { FamilyHubGateway } from '../data/gateway';
-import type { Capability, GatewayError, HouseholdSnapshot, Result, Scenario, Theme } from '../domain/types';
+import type { Capability, GatewayError, HouseholdSnapshot, PrivacySettings, Result, Scenario, Theme } from '../domain/types';
 import { useModalTriggerTracking } from '../design-system/components';
 import { capabilitiesFor, projectSnapshotForViewer } from '../authz/policy';
 import { EncryptedOfflineQueue, IndexedDbQueuePersistence, type QueueableCommand, type QueuedCommand } from '../offline/queue';
 
+export type QuickCreateKind = 'todo' | 'event' | 'memo' | 'expense';
 export type CommandOutcome<T> = { status: 'completed'; value: T } | { status: 'queued' } | { status: 'failed'; error: GatewayError };
 
 interface AppState {
-  gateway: FamilyHubGateway; snapshot: HouseholdSnapshot; loading: boolean; error: GatewayError | null;
+  gateway: FamilyHubGateway; snapshot: HouseholdSnapshot; loading: boolean; refreshing: boolean; error: GatewayError | null;
   scenario: Scenario; setScenario: (scenario: Scenario) => void; refresh: () => Promise<void>;
   theme: Theme; setTheme: (theme: Theme) => void; toast: string | null; announce: (message: string) => void;
   can: (capability: Capability) => boolean;
-  requestQuickCreate: (kind?: 'todo' | 'event' | 'expense') => void;
+  /** 本人のプライバシー設定。読み込み前は null。 */
+  privacy: PrivacySettings | null;
+  /** 最新の設定を取り直してから、渡した項目だけを変えて保存する（別の画面での変更を上書きしない）。 */
+  updatePrivacy: (patch: Partial<PrivacySettings>) => Promise<Result<PrivacySettings>>;
+  requestQuickCreate: (kind?: QuickCreateKind) => void;
   executeQueueable: <T>(command: QueueableCommand, execute: () => Promise<Result<T>>) => Promise<CommandOutcome<T>>;
   pendingCommands: QueuedCommand[]; retryQueued: (id?: string) => Promise<void>;
   discardQueued: (id: string) => Promise<void>; clearQueued: () => Promise<void>;
@@ -56,11 +61,15 @@ export function AppProvider({ children }: PropsWithChildren) {
   const [queue] = useState(() => new EncryptedOfflineQueue(new IndexedDbQueuePersistence()));
   const [snapshot, setSnapshot] = useState<HouseholdSnapshot>(() => initialSnapshot(actorId));
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  // 最初の読み込みと表示状態の切り替えだけ画面全体を待機表示にする。それ以外の再取得では画面と操作中の状態（取り消し・復元の案内など）を保つ。
+  const blockingLoad = useRef(true);
   const [error, setError] = useState<GatewayError | null>(null);
   const [scenario, setScenarioState] = useState<Scenario>(queryScenario);
   const [theme, setThemeState] = useState<Theme>(() => localStorage.getItem('family-hub-theme') === 'dusk' ? 'dusk' : 'light');
   const [toast, setToast] = useState<string | null>(null);
   const [pendingCommands, setPendingCommands] = useState<QueuedCommand[]>([]);
+  const [privacy, setPrivacy] = useState<PrivacySettings | null>(null);
 
   const loadQueue = useCallback(async () => {
     try {
@@ -72,20 +81,36 @@ export function AppProvider({ children }: PropsWithChildren) {
   }, [queue, snapshot.viewer.userId, snapshot.household.id]);
 
   const refresh = useCallback(async () => {
-    setLoading(true); setError(null);
+    const blocking = blockingLoad.current;
+    blockingLoad.current = false;
+    if (blocking) setLoading(true); else setRefreshing(true);
+    setError(null);
     const result = await gateway.household.getSnapshot(scenario);
     if (result.ok) setSnapshot(result.value); else setError(result.error);
-    setLoading(false);
+    if (blocking) setLoading(false); else setRefreshing(false);
   }, [gateway, scenario]);
 
   useEffect(() => { queueMicrotask(() => void refresh()); }, [refresh]);
+  useEffect(() => {
+    if (!snapshot.viewer.capabilities.includes('settings.own')) return;
+    let mounted = true;
+    void gateway.household.getPrivacySettings().then((result) => { if (mounted && result.ok) setPrivacy(result.value); });
+    return () => { mounted = false; };
+  }, [gateway, snapshot.viewer.capabilities]);
+  const updatePrivacy = useCallback(async (patch: Partial<PrivacySettings>): Promise<Result<PrivacySettings>> => {
+    const latest = await gateway.household.getPrivacySettings();
+    if (!latest.ok) return latest;
+    const result = await gateway.household.savePrivacySettings({ ...latest.value, ...patch });
+    if (result.ok) setPrivacy(result.value);
+    return result;
+  }, [gateway]);
   useEffect(() => { queueMicrotask(() => void loadQueue()); }, [loadQueue]);
   useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem('family-hub-theme', theme); }, [theme]);
   useEffect(() => { if (!toast) return; const id = window.setTimeout(() => setToast(null), 4200); return () => window.clearTimeout(id); }, [toast]);
 
-  const setScenario = (next: Scenario) => { setQueryScenario(next); setScenarioState(next); };
+  const setScenario = (next: Scenario) => { blockingLoad.current = true; setQueryScenario(next); setScenarioState(next); };
   const announce = useCallback((message: string) => setToast(message), []);
-  const requestQuickCreate = useCallback((kind?: 'todo' | 'event' | 'expense') => window.dispatchEvent(new CustomEvent('family-hub:quick-create', { detail: { kind } })), []);
+  const requestQuickCreate = useCallback((kind?: QuickCreateKind) => window.dispatchEvent(new CustomEvent('family-hub:quick-create', { detail: { kind } })), []);
   const can = useCallback((capability: Capability) => snapshot.viewer.status === 'active' && snapshot.viewer.capabilities.includes(capability), [snapshot.viewer]);
 
   const executeQueueable = useCallback(async <T,>(command: QueueableCommand, execute: () => Promise<Result<T>>): Promise<CommandOutcome<T>> => {
@@ -104,7 +129,7 @@ export function AppProvider({ children }: PropsWithChildren) {
     const context = { idempotencyKey: command.clientOperationId, expectedPermissionRevision: command.permissionRevision };
     switch (command.operation) {
       case 'event.create': return gateway.events.createEvent(command.payload.input, context);
-      case 'event.update': return gateway.events.updateEvent(command.payload.id, command.payload.scope, command.payload.input, command.payload.expectedVersion, context);
+      case 'event.update': return gateway.events.updateEvent(command.payload.id, command.payload.scope, command.payload.input, command.payload.expectedVersion, context, command.payload.occurrenceDate);
       case 'task.create': return gateway.todos.createTodo(command.payload.input, context);
       case 'task.update': return gateway.todos.updateTodo(command.payload.id, command.payload.scope, command.payload.input, command.payload.expectedVersion, context);
       case 'memo.create': return gateway.memos.createMemo(command.payload.input, context);
@@ -132,7 +157,7 @@ export function AppProvider({ children }: PropsWithChildren) {
   const discardQueued = useCallback(async (id: string) => { await queue.remove(id); await loadQueue(); announce('未送信の変更を削除しました。'); }, [announce, loadQueue, queue]);
   const clearQueued = useCallback(async () => { await queue.clear(); setPendingCommands([]); announce('未送信の変更をすべて削除しました。'); }, [announce, queue]);
 
-  const value = useMemo(() => ({ gateway, snapshot, loading, error, scenario, setScenario, refresh, theme, setTheme: setThemeState, toast, announce, can, requestQuickCreate, executeQueueable, pendingCommands, retryQueued, discardQueued, clearQueued }), [gateway, snapshot, loading, error, scenario, refresh, theme, toast, announce, can, requestQuickCreate, executeQueueable, pendingCommands, retryQueued, discardQueued, clearQueued]);
+  const value = useMemo(() => ({ gateway, snapshot, loading, refreshing, error, scenario, setScenario, refresh, theme, setTheme: setThemeState, toast, announce, can, privacy, updatePrivacy, requestQuickCreate, executeQueueable, pendingCommands, retryQueued, discardQueued, clearQueued }), [gateway, snapshot, loading, refreshing, error, scenario, refresh, theme, toast, announce, can, privacy, updatePrivacy, requestQuickCreate, executeQueueable, pendingCommands, retryQueued, discardQueued, clearQueued]);
   return <AppContext.Provider value={value}>{children}<div className="sr-only" role="status" aria-live="polite">{toast}</div>{toast && <div className="toast-visible" role="status">{toast}</div>}</AppContext.Provider>;
 }
 

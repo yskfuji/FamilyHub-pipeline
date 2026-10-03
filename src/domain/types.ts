@@ -48,6 +48,7 @@ export type Capability =
   | 'task.read' | 'task.create' | 'task.update' | 'task.delete' | 'task.transition'
   | 'memo.read' | 'memo.create' | 'memo.update' | 'memo.delete' | 'memo.attach'
   | 'expense.read' | 'expense.create' | 'expense.settle'
+  | 'place.read'
   | 'insight.read' | 'resource.read' | 'settings.own' | 'notification.manage';
 export interface PermissionOverride { membershipId: Id; capability: Capability; effect: 'allow' | 'deny'; }
 export interface ViewerContext {
@@ -132,6 +133,24 @@ export interface Attachment {
   statusMessage: string;
 }
 
+export type PlaceCaptureSource = 'device' | 'photo' | 'search' | 'manual';
+export interface PlaceProvenance {
+  provider: 'openpoi';
+  source: string;
+  licenses: string[];
+  attributions: string[];
+}
+/** 利用者が選んだ場所の記録。端末や写真から得た利用者自身の座標は含めない。 */
+export interface PlaceRef {
+  name: string;
+  address?: string;
+  coordinates?: { lat: number; lng: number };
+  category?: string;
+  provenance?: PlaceProvenance;
+  capturedVia: PlaceCaptureSource;
+  selectedAt: Rfc3339;
+}
+
 export interface Memo {
   id: Id;
   householdId: Id;
@@ -142,6 +161,7 @@ export interface Memo {
   tags: string[];
   attachments: Attachment[];
   ocrText?: string;
+  place?: PlaceRef;
   visibility: VisibilityPolicy;
   deletedAt?: Rfc3339;
   version: number;
@@ -174,6 +194,9 @@ export interface Expense {
   shares: ExpenseShare[];
   settlements: SettlementRecord[];
   note?: string;
+  place?: PlaceRef;
+  version: number;
+  deletedAt?: Rfc3339;
 }
 
 export interface ResourceLink {
@@ -190,6 +213,8 @@ export interface ContextSnapshot {
   asOf: Rfc3339;
   timezone: string;
   weather: {
+    /** 予報の対象地域（表示用）。 */
+    location: string;
     condition: 'sunny' | 'rain' | 'storm';
     temperatureC: number;
     precipitationPercent: number;
@@ -227,7 +252,8 @@ export interface HouseholdInvite {
   id: Id;
   householdId: Id;
   role: Exclude<MembershipRole, 'owner'>;
-  token: string;
+  /** 作成時の応答にだけ含まれる。一覧では返さない。 */
+  token?: string;
   expiresAt: Rfc3339;
   remainingUses: number;
   revokedAt?: Rfc3339;
@@ -254,9 +280,15 @@ export interface SecurityOverview {
   sessions: Session[];
 }
 
+export interface PlaceLookupConsent {
+  noticeVersion: string;
+  grantedAt: Rfc3339;
+}
+
 export interface PrivacySettings {
   defaultAudience: 'household' | 'creator';
   hideNotificationContent: boolean;
+  placeLookupConsent: PlaceLookupConsent | null;
 }
 
 export interface NotificationPreferences {
@@ -267,6 +299,10 @@ export interface NotificationPreferences {
 
 export interface HouseholdNotification {
   id: Id;
+  /** 通知の種類。通知設定（タスクの期限・予定の出発）による出し分けに使う。 */
+  kind: 'todoDue' | 'eventDeparture';
+  /** 通知から開く画面。 */
+  destination: string;
   title: string;
   body: string;
   remindAt: Rfc3339;

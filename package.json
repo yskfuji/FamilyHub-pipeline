@@ -17,7 +17,7 @@
     "typecheck": "tsc -b --pretty false",
     "lint": "eslint . --max-warnings 0",
     "test:unit": "vitest run",
-    "test:e2e": "npm run build:audit && PLAYWRIGHT_AUDIT=true playwright test e2e/core.spec.ts e2e/interactions.spec.ts e2e/authorization.spec.ts",
+    "test:e2e": "npm run build:audit && PLAYWRIGHT_AUDIT=true playwright test e2e/core.spec.ts e2e/interactions.spec.ts e2e/authorization.spec.ts e2e/places.spec.ts e2e/budget.spec.ts e2e/recurrence.spec.ts e2e/navigation.spec.ts",
     "audit:a11y": "npm run build:audit && PLAYWRIGHT_AUDIT=true playwright test e2e/accessibility.spec.ts --workers=1",
     "audit:visual": "npm run build:audit && PLAYWRIGHT_AUDIT=true playwright test e2e/capture.spec.ts --project=chromium && node scripts/build-gallery.mjs",
     "audit:lighthouse": "bash scripts/lighthouse.sh",
@@ -27,6 +27,7 @@
     "audit:contract": "node scripts/audit-contract.mjs",
     "audit:use-cases": "node scripts/check-use-cases.mjs",
     "render:er": "node scripts/render-er.mjs",
+    "probe:openpoi": "node scripts/probe-openpoi.mjs",
     "build:gallery": "node scripts/build-gallery.mjs",
     "verify": "npm run lint && npm run typecheck && npm run test:unit && npm run build && npm run audit:security && npm run audit:ui && npm run audit:controls && npm run audit:contract && npm run audit:use-cases && npm run audit:lighthouse && npm run test:e2e && npm run audit:a11y",
     "package": "npm run verify && npm run render:er && npm run audit:visual && bash scripts/package.sh"

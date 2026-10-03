@@ -11,6 +11,18 @@ const inventory = JSON.parse(await readFile(resolve('docs/audits/control-invento
 const patterns = inventory.contracts.map((contract) => new RegExp(contract.idPattern));
 const failures = [];
 let count = 0;
+const prefixes = [];
+
+// capability は null（公開・本人の操作）か、実在する能力、または「|」で区切った実在する能力の組み合わせ（操作ごとに異なる）だけを許す。
+const typesSource = await readFile(resolve('src/domain/types.ts'), 'utf8');
+const capabilityUnion = typesSource.match(/export type Capability =([^;]+);/)?.[1] ?? '';
+const knownCapabilities = new Set([...capabilityUnion.matchAll(/'([a-z.]+)'/g)].map((match) => match[1]));
+for (const contract of inventory.contracts) {
+  if (contract.capability === null) continue;
+  for (const capability of String(contract.capability).split('|')) {
+    if (!knownCapabilities.has(capability)) failures.push(`${contract.idPattern}: unknown capability "${capability}"`);
+  }
+}
 
 for (const file of (await filesUnder(resolve('src'))).filter((candidate) => extname(candidate) === '.tsx')) {
   const source = await readFile(file, 'utf8');
@@ -28,6 +40,7 @@ for (const file of (await filesUnder(resolve('src'))).filter((candidate) => extn
         } else {
           const raw = attribute.initializer.getText(ast);
           const candidate = raw.startsWith('"') ? raw.slice(1, -1) : raw.match(/`([^$`]*)/)?.[1] ?? '';
+          prefixes.push(candidate);
           if (!patterns.some((pattern) => pattern.test(candidate))) failures.push(`${file}: unregistered control prefix: ${raw}`);
         }
       }
@@ -35,6 +48,11 @@ for (const file of (await filesUnder(resolve('src'))).filter((candidate) => extn
     ts.forEachChild(node, visit);
   };
   visit(ast);
+}
+
+// 使われていない契約（どの操作にも当たらないパターン）は、台帳と実装のずれとして扱う。
+for (const [index, pattern] of patterns.entries()) {
+  if (!prefixes.some((prefix) => pattern.test(prefix))) failures.push(`${inventory.contracts[index].idPattern}: no control matches this inventory family`);
 }
 
 if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
