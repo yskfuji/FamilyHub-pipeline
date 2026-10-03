@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
-for (const route of ['/welcome','/auth','/onboarding','/today','/calendar','/tasks','/notes','/budget','/insights','/settings/security','/settings/location','/showcase']) {
+for (const route of ['/welcome','/auth','/onboarding','/today','/calendar','/calendar/event-clean','/tasks','/tasks/todo-form','/notes','/notes/memo-school','/budget','/budget/expense-books','/places','/places/00000000','/insights','/settings/household','/settings/security','/settings/privacy','/settings/notifications','/settings/accessibility','/settings/resources','/settings/location','/showcase','/todayx','/budget?actor=member-hana']) {
   test(`axe serious and critical: ${route}`, async ({ page }) => {
     await page.goto(route);
     await page.waitForLoadState('networkidle');
@@ -56,11 +56,12 @@ test('manual Reduced Motion switch removes effective transitions', async ({ page
   expect(longest).toBeLessThanOrEqual(0.001);
 });
 
-test('all visible buttons meet the 44 by 44 CSS pixel target at mobile width', async ({ page }) => {
+test('all visible buttons and button-like links meet the 44 by 44 CSS pixel target at mobile width', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const route of ['/today','/calendar','/tasks','/notes','/budget','/insights','/settings/household','/settings/security','/settings/notifications','/settings/accessibility','/settings/location','/showcase']) {
+  for (const route of ['/welcome','/auth','/onboarding','/today','/calendar','/calendar/event-clean','/tasks','/notes','/notes/memo-school','/budget','/budget/expense-books','/places','/insights','/settings/household','/settings/security','/settings/privacy','/settings/notifications','/settings/accessibility','/settings/resources','/settings/location','/showcase']) {
     await page.goto(route);
-    const undersized = await page.locator('button:visible').evaluateAll((buttons) => buttons.map((button) => {
+    // 文中のリンク（WCAG 2.5.8 の例外）以外の、ボタンとして振る舞うリンクも測る。
+    const undersized = await page.locator('button:visible, a.button:visible, .mobile-nav a:visible, a.nav-link:visible, a.place-card:visible, a.task-card:visible').evaluateAll((buttons) => buttons.map((button) => {
       const rect = button.getBoundingClientRect();
       return { label: button.getAttribute('aria-label') || button.textContent?.trim(), width: rect.width, height: rect.height };
     }).filter((item) => item.width < 44 || item.height < 44));

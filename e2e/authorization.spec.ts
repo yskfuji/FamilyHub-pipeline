@@ -55,18 +55,42 @@ test('offline collaborative creation is queued, reviewed, and explicitly replaye
   await expect(page.getByText('予定「再送する予定」を作成')).toBeHidden();
 });
 
-test('every visible interactive control has a stable registry id and accessible name', async ({ page }) => {
-  for (const route of ['/welcome','/auth','/onboarding','/today','/calendar','/tasks','/notes','/budget','/insights','/settings/household','/settings/security','/settings/notifications','/settings/accessibility','/settings/resources','/settings/location']) {
-    await page.goto(route);
-    await page.waitForLoadState('networkidle');
-    const failures = await page.locator('button:visible, a[href]:visible, input:visible, select:visible, textarea:visible').evaluateAll((elements) => elements.map((element) => ({
-      tag: element.tagName, id: (element as HTMLElement).dataset.controlId, name: element.getAttribute('aria-label') || element.textContent?.trim() || (element as HTMLInputElement).labels?.[0]?.textContent?.trim(),
-    })).filter((item) => !item.id || !item.name));
-    expect(failures, `${route}: ${JSON.stringify(failures)}`).toEqual([]);
-    const ids = await page.locator('button:visible, a[href]:visible, input:visible, select:visible, textarea:visible').evaluateAll((elements) => elements.map((element) => (element as HTMLElement).dataset.controlId));
-    expect(new Set(ids).size, `${route}: duplicate control registry id`).toBe(ids.length);
-  }
-});
+const interactive = 'button:visible, a[href]:visible, input:visible, select:visible, textarea:visible';
+const routes = ['/welcome','/auth','/onboarding','/today','/calendar','/calendar/event-clean','/tasks','/tasks/todo-form','/notes','/notes/memo-school','/budget','/budget/expense-books','/places','/insights','/settings/household','/settings/security','/settings/privacy','/settings/notifications','/settings/accessibility','/settings/resources','/settings/location','/todayx'];
+const actors = [['owner', ''], ['adult', 'member-ren'], ['child', 'member-hana'], ['guest', 'member-yui']] as const;
+
+async function inspectControls(page: import('@playwright/test').Page, label: string) {
+  const controls = await page.locator(interactive).evaluateAll((elements) => elements.map((element) => ({
+    tag: element.tagName, id: (element as HTMLElement).dataset.controlId, name: element.getAttribute('aria-label') || element.textContent?.trim() || (element as HTMLInputElement).labels?.[0]?.textContent?.trim(),
+  })));
+  expect(controls.filter((item) => !item.id || !item.name), `${label}: missing id or name`).toEqual([]);
+  const ids = controls.map((item) => item.id);
+  expect(ids.filter((id, index) => ids.indexOf(id) !== index), `${label}: duplicate control registry id`).toEqual([]);
+}
+
+for (const [role, actor] of actors) {
+  test(`every visible control has a registry id and accessible name (${role}), including overlays`, async ({ page }) => {
+    const suffix = actor ? `?actor=${actor}` : '';
+    for (const route of routes) {
+      await page.goto(`${route}${suffix}`);
+      await page.waitForLoadState('networkidle');
+      await inspectControls(page, `${role} ${route}`);
+    }
+    await page.goto(`/today${suffix}`);
+    for (const [name, opener] of [['search', /検索/], ['quick-create', 'すぐに追加'], ['notifications', /通知を確認/]] as const) {
+      const button = page.getByRole('button', { name: opener }).first();
+      if (!(await button.isVisible())) continue;
+      await button.click();
+      await expect(page.getByRole('dialog').first()).toBeVisible();
+      await inspectControls(page, `${role} overlay ${name}`);
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole('button', { name: 'その他', exact: true }).click();
+    await inspectControls(page, `${role} overlay more`);
+  });
+}
 
 test('control identifiers are explicit before and after overlays render', async ({ page }) => {
   await page.goto('/calendar');

@@ -94,7 +94,7 @@ test('owner attaches a nearby place from the current location; only a rounded ce
   await expect(d.getByRole('button', { name: '場所を変更' })).toBeFocused();
   await d.getByRole('button', { name: '追加する' }).click();
   await expect(page.getByRole('dialog', { name: 'すぐに追加' })).toBeHidden();
-  await expect(page.getByText(/みどり文具店 · 支払った人/)).toBeVisible();
+  await expect(page.locator('.list-row').filter({ hasText: 'ノートと鉛筆' }).locator('.place-chip')).toHaveText('みどり文具店');
   await expect(page.locator('[data-control-id="place.attribution.budget"]')).toBeVisible();
 });
 
@@ -168,7 +168,7 @@ test('name search shows nationwide fallback, and manual entry still works when t
   await d.getByLabel('支出名').fill('手土産');
   await d.getByLabel('金額（円）').fill('1200');
   await d.getByRole('button', { name: '追加する' }).click();
-  await expect(page.getByText(/祖母の家 · 支払った人/)).toBeVisible();
+  await expect(page.locator('.list-row').filter({ hasText: '手土産' }).locator('.place-chip')).toHaveText('祖母の家');
 });
 
 test('children never see recorded places or the picker; owners do', async ({ page }) => {
