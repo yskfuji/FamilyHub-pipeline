@@ -72,6 +72,7 @@ export function createMemoCommands(c: CommandContext): RuleMemoPort {
       const target = state.memos.find((memo) => memo.id === memoId && !memo.deletedAt);
       if (!target || !seen(target)) return missing('メモ');
       const decision = canMutateOwnedResource(viewer(), 'memo.attach', target.authorMembershipId); if (!decision.allowed) return denied(decision);
+      const network = offlineFailure<void>(); if (network) return network;
       if (!target.attachments.some((item) => item.id === attachmentId)) return missing('添付ファイル');
       target.attachments = target.attachments.filter((item) => item.id !== attachmentId);
       target.version += 1; target.updatedAt = now();

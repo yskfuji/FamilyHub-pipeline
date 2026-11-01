@@ -51,6 +51,9 @@ export function useModalBehavior(onClose: () => void) {
     const preferred = root.current?.querySelector<HTMLElement>('[autofocus], [data-autofocus], button, input, select, textarea, a[href]');
     preferred?.focus();
     const handler = (event: KeyboardEvent) => {
+      // 重なった画面では一番上だけを閉じる。
+      const roots = document.querySelectorAll('[data-modal-root]');
+      if (roots[roots.length - 1] !== root.current) return;
       if (event.key === 'Escape') { event.preventDefault(); close(); return; }
       if (event.key !== 'Tab' || !root.current) return;
       const items = [...root.current.querySelectorAll<HTMLElement>(focusable)].filter((element) => !element.hasAttribute('disabled') && element.getAttribute('aria-hidden') !== 'true');

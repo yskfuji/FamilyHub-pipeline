@@ -99,3 +99,13 @@ test('places list is sorted by recent use and links to its records; children can
   await page.goto('/places?actor=member-hana');
   await expect(page.getByRole('heading', { name: 'このページは表示できません' })).toBeVisible();
 });
+
+test('Escape closes only the top dialog when one opens over a drawer', async ({ page }) => {
+  await page.goto('/notes/memo-receipt');
+  await page.getByRole('button', { name: 'メモを削除' }).click();
+  const confirm = page.getByRole('dialog', { name: 'メモを削除しますか' });
+  await expect(confirm).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(confirm).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: '教材費レシート' })).toBeVisible();
+});

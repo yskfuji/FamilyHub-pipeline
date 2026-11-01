@@ -238,15 +238,26 @@ export function registerMediaRoutes(app: FastifyInstance, deps: AppDeps) {
         } catch { clean = false; }
       }
       if (!clean) await rm(path, { force: true });
+      let stillListed = true;
       deps.db.transaction(() => {
         const loaded = loadAggregate(deps.db, actor.householdId, actor.membershipId, defaults);
         createHouseholdRules(loaded.aggregate, { actorMembershipId: actor.membershipId, now: deps.clock.now, nextId: deps.ids.next, newInviteToken: deps.ids.inviteToken }).memos.finishAttachmentCheck(memoId, attachmentId, clean ? 'clean' : 'rejected');
         saveAggregate(deps.db, actor.householdId, actor.membershipId, loaded);
+        stillListed = loaded.aggregate.state.memos.some((memo) => memo.attachments.some((item) => item.id === attachmentId));
       });
+      // 確認の途中で削除された添付は、ファイルも残さない。
+      if (!stillListed) await rm(dirname(destination), { recursive: true, force: true });
     })());
     return response;
   });
-  app.delete('/v1/memos/:memoId/attachments/:attachmentId', { config: declare('deleteAttachment') }, (request, reply) => mutate(deps, request, reply, (rules) => rules.memos.deleteAttachment(param(request, 'memoId'), param(request, 'attachmentId'))));
+  app.delete('/v1/memos/:memoId/attachments/:attachmentId', {
+    config: declare('deleteAttachment'),
+    // 記録を消せたときだけ実体も消す。応答を返す前に消すので、発行済みのリンクもこの時点で開けなくなる。
+    onSend: async (request, reply, payload) => {
+      if (reply.statusCode === 204) await rm(dirname(originalPath(deps.config.mediaPath, requireActor(request).householdId, param(request, 'attachmentId'))), { recursive: true, force: true });
+      return payload;
+    },
+  }, (request, reply) => mutate(deps, request, reply, (rules) => rules.memos.deleteAttachment(param(request, 'memoId'), param(request, 'attachmentId'))));
   app.get('/v1/memos/:memoId/attachments/:attachmentId/link', { config: reading('getAttachmentLink') }, (request, reply) => read(deps, request, reply, (rules) => {
     const attachmentId = param(request, 'attachmentId');
     const readable = rules.memos.readableAttachment(param(request, 'memoId'), attachmentId);
@@ -265,6 +276,8 @@ export function registerMediaRoutes(app: FastifyInstance, deps: AppDeps) {
     if (expires <= Date.parse(deps.clock.now()) || expected.length !== presented.length || !timingSafeEqual(expected, presented)) return sendError(reply, { code: 'NOT_FOUND', message: serverMessages.notFound, retryable: false });
     const path = originalPath(deps.config.mediaPath, actor.householdId, attachmentId);
     void reply.header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(name)}`);
-    return sendFile(request, reply, path, (await stat(path)).size, ['application/pdf', 'image/jpeg', 'image/png', 'video/mp4', 'video/quicktime'].includes(mime) ? mime : 'application/octet-stream', 'private, no-store');
+    const size = (await stat(path).catch(() => null))?.size;
+    if (size === undefined) return sendError(reply, { code: 'NOT_FOUND', message: serverMessages.notFound, retryable: false });
+    return sendFile(request, reply, path, size, ['application/pdf', 'image/jpeg', 'image/png', 'video/mp4', 'video/quicktime'].includes(mime) ? mime : 'application/octet-stream', 'private, no-store');
   });
 }

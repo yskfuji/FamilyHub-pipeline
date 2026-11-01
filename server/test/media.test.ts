@@ -1,10 +1,11 @@
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createClamdScanner } from '../adapters/scanner';
 import { stripVideoLocation } from '../media/mp4Location';
+import { originalPath } from '../media/pipeline';
 import { sniff } from '../media/sniff';
 import { startFakeClamd } from '../testing/fakeClamd';
 import { createWorld } from '../testing/world';
@@ -220,6 +221,20 @@ describe('memo attachments', () => {
     await settled(world);
     const attachment = uploaded.ok ? uploaded.value.attachments.at(-1)! : null;
     expect(await world.gateway.memos.getAttachmentLink('memo-school', attachment!.id)).toMatchObject({ ok: false, error: { code: 'ATTACHMENT_REJECTED' } });
+  });
+
+  it('removes the stored file with the record, so an issued link stops working', async () => {
+    const world = open();
+    const uploaded = await world.gateway.memos.uploadAttachment('memo-school', asFile(pdf, 'a.pdf', 'application/pdf'));
+    await settled(world);
+    const attachment = uploaded.ok ? uploaded.value.attachments.at(-1)! : null;
+    const link = await world.gateway.memos.getAttachmentLink('memo-school', attachment!.id);
+    const { url, cookies } = await world.ready;
+    const headers = { Cookie: [...cookies].map(([name, value]) => `${name}=${value}`).join('; ') };
+    expect((await fetch(`${url}${link.ok ? link.value.url : ''}`, { headers })).status).toBe(200);
+    expect(await world.gateway.memos.deleteAttachment('memo-school', attachment!.id)).toEqual({ ok: true, value: undefined });
+    expect(existsSync(originalPath(world.deps.config.mediaPath, 'house-mori', attachment!.id))).toBe(false);
+    expect((await fetch(`${url}${link.ok ? link.value.url : ''}`, { headers })).status).toBe(404);
   });
 
   it('deletes an attachment', async () => {
