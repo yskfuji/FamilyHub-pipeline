@@ -36,10 +36,41 @@ describe('mock gateway state transitions', () => {
 
   it('checks versions for events and todos', async () => {
     const gateway = createMockGateway();
-    const event = await gateway.events.updateEvent('event-piano', 'this', { title: '更新' }, 99);
+    const event = await gateway.events.updateEvent('event-school', 'this', { title: '更新' }, 99);
     expect(event).toMatchObject({ ok: false, error: { code: 'CONFLICT' } });
     const todo = await gateway.todos.updateTodo('todo-form', 'this', { title: '更新' }, 99);
     expect(todo).toMatchObject({ ok: false, error: { code: 'CONFLICT' } });
+  });
+
+  it('answers NOT_FOUND for records the viewer cannot see, so existence is not disclosed', async () => {
+    const owner = createMockGateway();
+    const hidden = await owner.events.updateEvent('event-piano', 'this', { title: '更新' }, 1);
+    expect(hidden).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } });
+    const absent = await owner.events.updateEvent('event-unknown', 'this', { title: '更新' }, 1);
+    expect(hidden.ok === false && absent.ok === false && hidden.error.message === absent.error.message).toBe(true);
+    expect(await createMockGateway('member-hana').todos.deleteTodo('todo-done', 3)).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } });
+    expect(await createMockGateway('member-hana').memos.deleteMemo('memo-clinic')).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } });
+  });
+
+  it('refuses people from outside the household in every written reference', async () => {
+    const gateway = createMockGateway();
+    expect(await gateway.todos.createTodo({ title: '外の人', assigneeMembershipId: 'member-other' })).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+    expect(await gateway.todos.updateTodo('todo-form', 'series', { reviewerMembershipId: 'member-other' }, 2)).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+    expect(await gateway.events.createEvent({ title: '外の人', startsAt: '2026-10-05T09:00:00+09:00', endsAt: '2026-10-05T10:00:00+09:00', timezone: 'Asia/Tokyo', participantMembershipIds: ['member-other'] })).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+    expect(await gateway.expenses.createExpense({ title: '外の人', amountJpy: 100, incurredOn: '2026-09-30', payerMembershipId: 'member-other', shareMembershipIds: ['member-aoi'] })).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+  });
+
+  it('keeps the length of multi-day occurrences when detaching one', async () => {
+    const gateway = createMockGateway();
+    const created = await gateway.events.createEvent({ title: '合宿', startsAt: '2026-10-05T09:00:00+09:00', endsAt: '2026-10-07T17:00:00+09:00', timezone: 'Asia/Tokyo', participantMembershipIds: ['member-aoi'], recurrence: { rrule: 'FREQ=WEEKLY', timezone: 'Asia/Tokyo', exceptions: [] } });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const single = await gateway.events.updateEvent(created.value.id, 'this', { title: '合宿（延期）' }, 1, undefined, '2026-10-12');
+    expect(single).toMatchObject({ ok: true, value: { startsAt: '2026-10-12T09:00:00+09:00', endsAt: '2026-10-14T17:00:00+09:00' } });
+  });
+
+  it('answers NOT_FOUND for an unknown notification', async () => {
+    expect(await createMockGateway().notifications.markRead('notification-unknown')).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } });
   });
 
   it('snoozes and stops only the requested notification', async () => {

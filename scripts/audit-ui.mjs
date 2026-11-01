@@ -10,6 +10,7 @@ const sourceFiles = (await filesUnder(resolve('src'))).filter((file) => (
   extname(file) === '.tsx'
   || file.endsWith('/data/fixtures.ts')
   || file.endsWith('/data/mockGateway.ts')
+  || file.includes('/domain/commands/')
   || file.endsWith('/domain/schemas.ts')
   || file.endsWith('/offline/queue.ts')
   || file.endsWith('/content/ja.ts')
