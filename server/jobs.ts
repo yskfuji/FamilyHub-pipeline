@@ -4,6 +4,7 @@ import { createHouseholdRules } from '../src/domain/commands';
 import { purgeExpired } from '../src/domain/commands/trash';
 import { planNotifications } from '../src/domain/notificationPlan';
 import { loadAggregate, saveAggregate } from './db/aggregateStore';
+import { purgeReadings } from './assistant/jobs';
 import type { AppDeps } from './http/context';
 import { originalPath, quarantinePath } from './media/pipeline';
 
@@ -34,6 +35,7 @@ export async function runRetention(deps: AppDeps) {
       deps.db.run('DELETE FROM uploads WHERE id = ?', row.id);
     });
   }
+  await purgeReadings(deps);
   return files.length;
 }
 

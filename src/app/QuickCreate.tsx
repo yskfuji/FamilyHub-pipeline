@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { eventInputSchema, expenseInputSchema, memoInputSchema, todoInputSchema } from '../domain/schemas';
-import { useApp, type QuickCreateKind } from './AppContext';
+import { useApp, type QuickCreateKind, type QuickCreateSeed } from './AppContext';
 import { Dialog } from '../design-system/components';
-import { PlusIcon } from '../design-system/icons';
+import { EyeIcon, PlusIcon } from '../design-system/icons';
 import { closeGuarded, useUnsavedGuard } from '../design-system/unsavedGuard';
 import { ja } from '../content/ja';
 import { dateKeyFromRfc3339 } from '../domain/calendarDate';
@@ -31,6 +31,7 @@ export function QuickCreate({ path }: { path: string }) {
   const [place, setPlace] = useState<PlaceRef | null>(null);
   const [prefill, setPrefill] = useState<EventPrefill | null>(null);
   const [expenseKind, setExpenseKind] = useState<Expense['kind']>('expense');
+  const [seed, setSeed] = useState<QuickCreateSeed | null>(null);
   // メモの入力は送るときに読むので、触ったかどうかだけを覚える。
   const [memoTouched, setMemoTouched] = useState(false);
   const memoUnsaved = useUnsavedGuard(open && kind === 'memo' && (memoTouched || Boolean(place)), submitting);
@@ -40,13 +41,13 @@ export function QuickCreate({ path }: { path: string }) {
   const adultIds = activeAdults(snapshot.memberships).map((member) => member.id);
 
   // 開くたびに、要求された種類（なければ使える最初の種類）へ戻す。使えない種類のまま開かない。
-  const openWith = (requested?: QuickCreateKind, eventPrefill?: EventPrefill, requestedExpenseKind?: Expense['kind']) => {
+  const openWith = (requested?: QuickCreateKind, eventPrefill?: EventPrefill, requestedExpenseKind?: Expense['kind'], requestedSeed?: QuickCreateSeed) => {
     const next = requested && kinds.some(([value]) => value === requested) ? requested : kinds[0]?.[0];
     if (!next) return;
-    setKind(next); setPlace(null); setPrefill(eventPrefill ?? null); setExpenseKind(requestedExpenseKind ?? 'expense'); setError(''); setMemoTouched(false); setOpen(true);
+    setKind(next); setPlace(null); setPrefill(eventPrefill ?? null); setExpenseKind(requestedExpenseKind ?? 'expense'); setSeed(requestedSeed ?? null); setError(''); setMemoTouched(false); setOpen(true);
   };
   useEffect(() => {
-    const openRequested = (event: Event) => { const { kind: requested, prefill: eventPrefill, expenseKind: requestedExpenseKind } = (event as CustomEvent<{ kind?: QuickCreateKind; prefill?: EventPrefill; expenseKind?: Expense['kind'] }>).detail; openWith(requested, eventPrefill, requestedExpenseKind); };
+    const openRequested = (event: Event) => { const { kind: requested, prefill: eventPrefill, expenseKind: requestedExpenseKind, seed: requestedSeed } = (event as CustomEvent<{ kind?: QuickCreateKind; prefill?: EventPrefill; expenseKind?: Expense['kind']; seed?: QuickCreateSeed }>).detail; openWith(requested, eventPrefill, requestedExpenseKind, requestedSeed); };
     window.addEventListener('family-hub:quick-create', openRequested);
     return () => window.removeEventListener('family-hub:quick-create', openRequested);
   });
@@ -104,11 +105,12 @@ export function QuickCreate({ path }: { path: string }) {
   return <>
     <button type="button" className="button primary quick-create" data-control-id="quick-create.open" onClick={() => openWith()}><PlusIcon width="20"/><span>すぐに追加</span></button>
     {open && <Dialog title="すぐに追加" description="この画面を開いたまま、予定・タスク・メモ・家計の記録を追加できます。" onClose={() => { if (!submitting) setOpen(false); }}>
-      <div className="segmented" role="group" aria-label="追加する項目">{kinds.map(([value, label]) => <button data-control-id={`quick-create.kind.${value}`} key={value} type="button" aria-pressed={kind === value} disabled={submitting} onClick={() => closeGuarded(forms.current, () => { setKind(value); setError(''); setMemoTouched(false); setPlace(null); })}>{label}</button>)}</div>
+      <div className="segmented" role="group" aria-label="追加する項目">{kinds.map(([value, label]) => <button data-control-id={`quick-create.kind.${value}`} key={value} type="button" aria-pressed={kind === value} disabled={submitting} onClick={() => closeGuarded(forms.current, () => { setKind(value); setSeed(null); setError(''); setMemoTouched(false); setPlace(null); })}>{label}</button>)}</div>
+      {seed?.note && <div className="callout info mt-1" role="status"><EyeIcon/><p className="small mb-0">{seed.note}</p></div>}
       <div ref={forms}>
-      {kind === 'event' && <div className="mt-1"><EventForm formId="new" initial={newEventDraft(prefill ?? { date: today }, membershipId, defaultAudience(role, 'event', privacy?.defaultAudience))} submitLabel={ja.actions.add} busy={submitting} error={error} offerTemplates onSubmit={(draft) => void submitEvent(draft)} onCancel={() => setOpen(false)}/></div>}
-      {kind === 'todo' && <div className="mt-1"><TaskForm formId="new" initial={newTaskDraft(today, membershipId, defaultAudience(role, 'task', privacy?.defaultAudience))} submitLabel={ja.actions.add} busy={submitting} error={error} onSubmit={(draft) => void submitTask(draft)} onCancel={() => setOpen(false)}/></div>}
-      {kind === 'expense' && <div className="mt-1"><ExpenseForm formId="new" initial={newExpenseDraft(today, membershipId, adultIds, defaultAudience(role, 'expense', privacy?.defaultAudience), expenseKind)} splitLocked={false} submitLabel={ja.actions.add} busy={submitting} error={error} onSubmit={(draft) => void submitExpense(draft)} onCancel={() => setOpen(false)}/></div>}
+      {kind === 'event' && <div className="mt-1"><EventForm formId="new" initial={{ ...newEventDraft(prefill ?? { date: today }, membershipId, defaultAudience(role, 'event', privacy?.defaultAudience)), ...seed?.event }} submitLabel={ja.actions.add} busy={submitting} error={error} offerTemplates onSubmit={(draft) => void submitEvent(draft)} onCancel={() => setOpen(false)}/></div>}
+      {kind === 'todo' && <div className="mt-1"><TaskForm formId="new" initial={{ ...newTaskDraft(today, membershipId, defaultAudience(role, 'task', privacy?.defaultAudience)), ...seed?.todo }} submitLabel={ja.actions.add} busy={submitting} error={error} onSubmit={(draft) => void submitTask(draft)} onCancel={() => setOpen(false)}/></div>}
+      {kind === 'expense' && <div className="mt-1"><ExpenseForm formId="new" initial={{ ...newExpenseDraft(today, membershipId, adultIds, defaultAudience(role, 'expense', privacy?.defaultAudience), expenseKind), ...seed?.expense }} splitLocked={false} submitLabel={ja.actions.add} busy={submitting} error={error} onSubmit={(draft) => void submitExpense(draft)} onCancel={() => setOpen(false)}/></div>}
       {kind === 'memo' && <form {...memoUnsaved.formProps} className="stack mt-1" aria-busy={submitting} onInput={() => setMemoTouched(true)} onSubmit={(event) => { event.preventDefault(); void submit(event.currentTarget); }}>
         <div className="field"><label htmlFor="quick-title">タイトル</label><input data-control-id="quick-create.title" className="input" id="quick-title" name="title" required maxLength={120} autoFocus aria-describedby="quick-title-help"/><span className="field-help" id="quick-title-help">例：学校からのお知らせ</span></div>
         <div className="field"><label htmlFor="quick-body">本文</label><textarea data-control-id="quick-create.body" className="textarea" id="quick-body" name="body" required maxLength={5000}/></div>

@@ -183,6 +183,7 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AppDeps) {
       deps.db.run("UPDATE users SET email = ?, display_name = '退会したメンバー', password_hash = NULL, totp_secret = NULL, totp_enabled_at = NULL, avatar = NULL, birthdate = NULL, deleted_at = ? WHERE id = ?", `deleted+${row.id}@invalid.invalid`, deps.clock.now(), row.id);
       deps.db.run('DELETE FROM passkeys WHERE user_id = ?', row.id);
       deps.db.run('DELETE FROM recovery_codes WHERE user_id = ?', row.id);
+      deps.db.run('DELETE FROM assistant_jobs WHERE user_id = ?', row.id);
       deps.db.run('UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL', deps.clock.now(), row.id);
       audit(deps, row.id, 'deleteAccount');
       return ok(undefined);

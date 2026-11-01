@@ -9,6 +9,7 @@ import { createExpenseCommands } from './expenses';
 import { createHouseholdCommands } from './household';
 import { createMemoCommands } from './memos';
 import { createNotificationCommands } from './notifications';
+import { createAssistantCommands } from './assistant';
 import { createInsightCommands, createSearchCommands } from './search';
 import { createTodoCommands } from './todos';
 
@@ -30,6 +31,7 @@ export function createHouseholdRules(aggregate: HouseholdAggregate, env: Command
     trash: createTrashCommands(context),
     resources: createSearchCommands(context),
     insights: createInsightCommands(context),
+    assistant: createAssistantCommands(context),
     notifications: createNotificationCommands(context),
   };
 }

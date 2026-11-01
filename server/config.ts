@@ -12,9 +12,20 @@ export interface ServerConfig {
   mediaPath: string;
   clamd: { host: string; port: number; timeoutMs: number } | null;
   smtp: { host: string; port: number; user?: string; password?: string; from: string } | null;
+  /** 読み取りの補助の接続先（OpenAI 互換）。既定では使わない。 */
+  llm: { url: string; key?: string; model: string; timeoutMs: number } | null;
 }
 
 const loopback = (host: string) => host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
+
+/** 接続先の鍵と家族の画像を送るので、loopback のほかは https に限る。 */
+function loadLlm(env: NodeJS.ProcessEnv): ServerConfig['llm'] {
+  if (!env.FAMILY_HUB_LLM_URL) return null;
+  const url = new URL(env.FAMILY_HUB_LLM_URL);
+  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && loopback(url.hostname))) throw new Error('FAMILY_HUB_LLM_URL must use https, or http on a loopback host');
+  if (!env.FAMILY_HUB_LLM_MODEL) throw new Error('FAMILY_HUB_LLM_MODEL is required with FAMILY_HUB_LLM_URL');
+  return { url: url.href, key: env.FAMILY_HUB_LLM_KEY, model: env.FAMILY_HUB_LLM_MODEL, timeoutMs: Number(env.FAMILY_HUB_LLM_TIMEOUT_MS ?? 45_000) };
+}
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const production = env.NODE_ENV === 'production';
@@ -36,5 +47,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     clamd: env.FAMILY_HUB_CLAMD_HOST ? { host: env.FAMILY_HUB_CLAMD_HOST, port: Number(env.FAMILY_HUB_CLAMD_PORT ?? 3310), timeoutMs: Number(env.FAMILY_HUB_CLAMD_TIMEOUT_MS ?? 600_000) } : null,
     recentAuthMs: Number(env.FAMILY_HUB_RECENT_AUTH_MS ?? 300_000),
     smtp: env.FAMILY_HUB_SMTP_HOST ? { host: env.FAMILY_HUB_SMTP_HOST, port: Number(env.FAMILY_HUB_SMTP_PORT ?? 587), user: env.FAMILY_HUB_SMTP_USER, password: env.FAMILY_HUB_SMTP_PASSWORD, from: env.FAMILY_HUB_SMTP_FROM ?? 'no-reply@family.example' } : null,
+    llm: loadLlm(env),
   };
 }

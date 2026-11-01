@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react';
 import type { FamilyHubGateway } from '../data/gateway';
-import type { EventPrefill } from '../domain/eventForm';
+import type { EventDraft, EventPrefill } from '../domain/eventForm';
+import type { ExpenseDraft } from '../domain/expenseForm';
+import type { TaskDraft } from '../domain/taskForm';
 import type { Capability, Expense, GatewayError, HouseholdSnapshot, PrivacySettings, Result, Scenario, SessionInfo } from '../domain/types';
 import { UnsavedPrompt, useModalTriggerTracking } from '../design-system/components';
 import { EncryptedOfflineQueue, IndexedDbQueuePersistence, type QueueableCommand, type QueuedCommand } from '../offline/queue';
@@ -10,6 +12,9 @@ import type { AppRuntime } from './runtime';
 
 export type AppStage = 'restoring' | 'unreachable' | 'signed-out' | 'household-setup' | 'suspended' | 'paywall' | 'ready';
 export type QuickCreateKind = 'todo' | 'event' | 'memo' | 'expense';
+
+/** 提案をフォームへ入れて開くときの中身。開くだけで、保存は利用者が行う。 */
+export interface QuickCreateSeed { event?: Partial<EventDraft>; expense?: Partial<ExpenseDraft>; todo?: Partial<TaskDraft>; note?: string }
 export type CommandOutcome<T> = { status: 'completed'; value: T } | { status: 'queued' } | { status: 'failed'; error: GatewayError };
 
 interface AppState {
@@ -27,7 +32,7 @@ interface AppState {
   privacy: PrivacySettings | null;
   /** 最新の設定を取り直してから、渡した項目だけを変えて保存する（別の画面での変更を上書きしない）。 */
   updatePrivacy: (patch: Partial<PrivacySettings>) => Promise<Result<PrivacySettings>>;
-  requestQuickCreate: (kind?: QuickCreateKind, prefill?: EventPrefill, expenseKind?: Expense['kind']) => void;
+  requestQuickCreate: (kind?: QuickCreateKind, prefill?: EventPrefill, expenseKind?: Expense['kind'], seed?: QuickCreateSeed) => void;
   executeQueueable: <T>(command: QueueableCommand, execute: () => Promise<Result<T>>) => Promise<CommandOutcome<T>>;
   pendingCommands: QueuedCommand[]; retryQueued: (id?: string) => Promise<void>;
   discardQueued: (id: string) => Promise<void>; clearQueued: () => Promise<void>;
@@ -140,7 +145,7 @@ export function AppProvider({ runtime, children }: PropsWithChildren<{ runtime: 
 
   const setScenario = (next: Scenario) => { blockingLoad.current = true; setQueryScenario(next); setScenarioState(next); };
   const announce = useCallback((message: string) => setToast(message), []);
-  const requestQuickCreate = useCallback((kind?: QuickCreateKind, prefill?: EventPrefill, expenseKind?: Expense['kind']) => window.dispatchEvent(new CustomEvent('family-hub:quick-create', { detail: { kind, prefill, expenseKind } })), []);
+  const requestQuickCreate = useCallback((kind?: QuickCreateKind, prefill?: EventPrefill, expenseKind?: Expense['kind'], seed?: QuickCreateSeed) => window.dispatchEvent(new CustomEvent('family-hub:quick-create', { detail: { kind, prefill, expenseKind, seed } })), []);
   const can = useCallback((capability: Capability) => snapshot.viewer.status === 'active' && snapshot.viewer.capabilities.includes(capability), [snapshot.viewer]);
 
   const executeQueueable = useCallback(async <T,>(command: QueueableCommand, execute: () => Promise<Result<T>>): Promise<CommandOutcome<T>> => {

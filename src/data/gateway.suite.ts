@@ -436,6 +436,58 @@ export function runGatewaySuite(world: (actorMembershipId?: string) => FamilyHub
       expect(await owner.albums.restoreAlbum(created.value.id)).toMatchObject({ ok: true });
     });
 
+    const onePixel = () => new File([Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='), (character) => character.charCodeAt(0))], 'reading.png', { type: 'image/png' });
+    const finished = async (gateway: FamilyHubGateway, id: string) => {
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        const job = await gateway.assistant.getJob(id);
+        if (!job.ok || job.value.status === 'done' || job.value.status === 'failed') return job;
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      throw new Error('reading did not finish');
+    };
+
+    it('offers reading helpers to adults and hides them from a child', async () => {
+      expect(await world().assistant.getStatus()).toMatchObject({ ok: true, value: { available: true } });
+      expect(await world('member-ren').assistant.getStatus()).toMatchObject({ ok: true, value: { available: true } });
+      expect(await world('member-hana').assistant.getStatus()).toMatchObject({ ok: true, value: { available: false } });
+      expect(await world('member-hana').assistant.readReceipt(onePixel())).toMatchObject({ ok: false, error: { code: 'FORBIDDEN', reason: 'CAPABILITY_MISSING' } });
+      expect(await world('member-hana').assistant.readEventUrl('https://example.com/event')).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
+    });
+
+    it('turns a receipt into a proposal and saves nothing', async () => {
+      const gateway = world();
+      const before = await gateway.household.getSnapshot();
+      const started = await gateway.assistant.readReceipt(onePixel());
+      expect(started).toMatchObject({ ok: true, value: { kind: 'receipt' } });
+      if (!started.ok) return;
+      const job = await finished(gateway, started.value.id);
+      expect(job).toMatchObject({ ok: true, value: { status: 'done', receipt: { amountJpy: 2480, category: 'food' } } });
+      const after = await gateway.household.getSnapshot();
+      expect(after.ok && before.ok && after.value.expenses.length).toBe(before.ok ? before.value.expenses.length : 0);
+    });
+
+    it('turns a flyer or a page into candidates and saves nothing', async () => {
+      const gateway = world();
+      const before = await gateway.household.getSnapshot();
+      for (const start of [() => gateway.assistant.readEventImage(onePixel()), () => gateway.assistant.readEventUrl('https://example.com/event?utm_source=mail')]) {
+        const started = await start();
+        expect(started.ok).toBe(true);
+        if (!started.ok) return;
+        const job = await finished(gateway, started.value.id);
+        expect(job.ok && job.value.events?.length).toBeGreaterThan(0);
+        expect(job.ok && job.value.events?.[0]).toMatchObject({ date: '2026-10-27', startTime: '10:00', allDay: false });
+      }
+      const after = await gateway.household.getSnapshot();
+      expect(after.ok && before.ok && after.value.events.length).toBe(before.ok ? before.value.events.length : 0);
+    });
+
+    it('refuses a file that is not an image and a URL that is not https', async () => {
+      const gateway = world();
+      expect(await gateway.assistant.readReceipt(new File(['hello'], 'note.png', { type: 'image/png' }))).toMatchObject({ ok: false, error: { code: 'ATTACHMENT_REJECTED' } });
+      expect(await gateway.assistant.readEventUrl('http://example.com/')).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+      expect(await gateway.assistant.getJob('reading-unknown')).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } });
+    });
+
     it('reorders items and refuses a partial order', async () => {
       const gateway = world();
       expect(await gateway.albums.reorderItems('album-sports', ['item-sports-1'], 1)).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });

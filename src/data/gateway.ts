@@ -1,5 +1,6 @@
 import type { AlbumInput, AlbumUpdateInput, ColorLabelInput, EventInput, EventUpdateInput, ExpenseInput, ExpenseUpdateInput, HouseholdProfileInput, MemoInput, TodoInput, TodoUpdateInput } from '../domain/schemas';
 import type { AccountUpdateInput, SignUpInput } from '../domain/account';
+import type { AssistantJob, AssistantStatus } from '../domain/assistant';
 import type { AccountProfile, Album, AlbumItem, AlbumSummary, Authenticator, ColorLabel, ItemLink, LinkedItemRef, TrashItem, CalendarEvent, Expense, Household, HouseholdInvite, HouseholdNotification, HouseholdSnapshot, Id, Insight, IsoDate, Memo, MembershipRole, MutationContext, NotificationPreferences, PermissionOverride, PrivacySettings, RecurrenceScope, Result, Scenario, SecurityOverview, SessionInfo, Todo } from '../domain/types';
 
 export interface AuthPort {
@@ -158,6 +159,18 @@ export interface InsightPort {
   list(): Promise<Result<Insight[]>>;
 }
 
+export interface AssistantPort {
+  /** 読み取りの補助を今の人が使えるか。使えなければ画面に出さない。 */
+  getStatus(): Promise<Result<AssistantStatus>>;
+  /** 領収書の画像から支出の提案を作る仕事を始める。記録には何も保存しない。 */
+  readReceipt(file: File): Promise<Result<AssistantJob>>;
+  /** チラシの画像から予定の候補を作る仕事を始める。 */
+  readEventImage(file: File): Promise<Result<AssistantJob>>;
+  /** ページの URL から予定の候補を作る仕事を始める。 */
+  readEventUrl(url: string): Promise<Result<AssistantJob>>;
+  getJob(id: Id): Promise<Result<AssistantJob>>;
+}
+
 export type SearchResultKind = 'event' | 'task' | 'memo' | 'expense' | 'place' | 'resource';
 export interface SearchResult { kind: SearchResultKind; id: Id; label: string; detail?: string; destination: string }
 
@@ -178,6 +191,7 @@ export interface FamilyHubGateway {
   trash: TrashPort;
   resources: ResourcePort;
   insights: InsightPort;
+  assistant: AssistantPort;
   notifications: NotificationPort;
   credentials: CredentialClient;
 }

@@ -68,6 +68,7 @@ const operationFor = {
   'expenses.createExpense': 'createExpense', 'expenses.updateExpense': 'updateExpense', 'expenses.deleteExpense': 'deleteExpense', 'expenses.restoreExpense': 'restoreExpense',
   'expenses.recordSettlement': 'recordSettlement', 'expenses.reverseSettlement': 'reverseSettlement',
   'resources.search': 'searchHousehold', 'insights.list': 'listInsights',
+  'assistant.getStatus': 'getAssistantStatus', 'assistant.readReceipt': 'readReceipt', 'assistant.readEventImage': 'readEventImage', 'assistant.readEventUrl': 'readEventUrl', 'assistant.getJob': 'getAssistantJob',
   'notifications.list': 'listNotifications', 'notifications.markRead': 'markNotificationRead', 'notifications.snooze': 'snoozeNotification', 'notifications.stop': 'stopNotification',
   'notifications.resume': 'resumeNotification', 'notifications.getPreferences': 'getNotificationPreferences', 'notifications.updatePreferences': 'updateNotificationPreferences',
   'credentials.create': null, 'credentials.get': null,

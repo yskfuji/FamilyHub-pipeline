@@ -46,5 +46,18 @@ for (const file of production.filter((item) => item.path.startsWith('src/feature
   if (/localStorage|sessionStorage|indexedDB/.test(file.text)) failures.push(`${file.path} must not persist place data in browser storage`);
 }
 
+// 外への接続は server/adapters だけ。代役と試験のほかで、接続の部品を読み込まない。
+const serverFiles = (await filesUnder(resolve('server'))).filter((file) => file.endsWith('.ts')).map((file) => relative(resolve('.'), file)).filter((file) => !file.startsWith('server/testing/') && !file.startsWith('server/test/'));
+const outbound = /\bfetch\(|\bXMLHttpRequest\b|\bWebSocket\b|from 'node:(http|https|http2|net|tls|dns|dns\/promises|dgram)'|from '(http|https|http2|net|tls|dns|dgram|undici|axios|got)'|require\('(node:)?(http|https|net|tls|dns)'\)/;
+for (const file of serverFiles.filter((path) => !path.startsWith('server/adapters/'))) {
+  const content = await readFile(resolve(file), 'utf8');
+  if (outbound.test(content)) failures.push(`${file}: outbound network calls belong in server/adapters`);
+}
+// 利用者が指定した URL の取得は、確認を通す1か所だけ。
+const pageFetcherSource = await readFile(resolve('server/adapters/urlFetcher.ts'), 'utf8');
+for (const required of ['pinnedLookup', 'isForbiddenAddress', 'agent: false', "'Accept-Encoding': 'identity'"]) if (!pageFetcherSource.includes(required)) failures.push(`server/adapters/urlFetcher.ts must keep ${required}`);
+// 試験の緩めた設定を、本番の組み立てへ持ち込まない。
+for (const file of ['server/main.ts', 'server/dev.ts']) if (/testing:\s*\{|allowHttp|allowAnyPort/.test(await readFile(resolve(file), 'utf8'))) failures.push(`${file} must not relax the URL guard`);
+
 if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
-console.log(`Security static checks passed across ${sourceFiles.length} source files (headers in sync; one place-lookup egress).`);
+console.log(`Security static checks passed across ${sourceFiles.length} source files and ${serverFiles.length} server files (headers in sync; one place-lookup egress; outbound calls only in server/adapters).`);

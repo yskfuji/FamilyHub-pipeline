@@ -215,9 +215,9 @@ export function registerMediaRoutes(app: FastifyInstance, deps: AppDeps) {
     await mkdir(dirname(path), { recursive: true });
     await pipeline(part.file, createWriteStream(path));
     const rejected = (message: string) => { void rm(path, { force: true }); return sendError(reply, { code: 'ATTACHMENT_REJECTED', message, retryable: false }); };
-    if (part.file.truncated) return rejected('ファイルが大きすぎます。');
+    if (part.file.truncated) return rejected(serverMessages.fileTooLarge);
     const type = await sniffFile(path);
-    if ('rejected' in type) return rejected(type.rejected === 'heic' ? 'HEIC の写真は受け付けていません。JPEG で保存し直してください。' : 'この形式のファイルは受け付けていません。');
+    if ('rejected' in type) return rejected(type.rejected === 'heic' ? serverMessages.heicRejected : serverMessages.fileTypeRejected);
     const { size } = await stat(path);
     let attachmentId = '';
     const response = mutate(deps, request, reply, (rules) => {

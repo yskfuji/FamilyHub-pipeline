@@ -6,18 +6,37 @@ import type { FamilyHubGateway } from '../../src/data/gateway';
 import { createHttpGateway } from '../../src/data/httpGateway';
 import { hashPassword } from '../auth/password';
 import { cookieNames, createSession } from '../auth/sessions';
+import { createLlmClient } from '../adapters/llm';
+import type { LlmClient } from '../adapters/llm';
 import type { Scanner } from '../adapters/scanner';
+import { createPageFetcher } from '../adapters/urlFetcher';
+import type { PageFetcher } from '../adapters/urlFetcher';
 import type { ServerConfig } from '../config';
 import { Db } from '../db/db';
 import { buildApp } from '../http/app';
 import type { AppDeps } from '../http/context';
+import { startFakeLlm } from './fakeLlm';
 import { SEED_PASSWORD, seedHousehold } from './seed';
 
 const ORIGIN = 'https://family.example.test';
-export const testConfig: ServerConfig = { production: false, origin: ORIGIN, databasePath: ':memory:', secret: 'test-secret-test-secret-test-secret-00', secureCookies: true, sessionDays: 30, recentAuthMs: 300_000, smtp: null, mediaPath: '', clamd: null };
+export const testConfig: ServerConfig = { production: false, origin: ORIGIN, databasePath: ':memory:', secret: 'test-secret-test-secret-test-secret-00', secureCookies: true, sessionDays: 30, recentAuthMs: 300_000, smtp: null, mediaPath: '', clamd: null, llm: null };
 
 let cachedHash: Promise<string> | undefined;
 const passwordHash = () => (cachedHash ??= hashPassword(SEED_PASSWORD));
+
+let sharedLlm: Promise<LlmClient> | undefined;
+/** 既定の読み取りの代役。試験全体で1つを使う。 */
+const defaultLlm: LlmClient = {
+  available: true,
+  complete: async (system, user) => {
+    sharedLlm ??= startFakeLlm().then(({ url }) => createLlmClient({ url, model: 'test-double', timeoutMs: 5000 }));
+    return (await sharedLlm).complete(system, user);
+  },
+};
+
+const realCheck = createPageFetcher();
+/** 既定のページの代役。接続先の確認は本物を使う。通信の試験は urlFetcher.test.ts で行う。 */
+const defaultPages: PageFetcher = { check: realCheck.check, read: (url) => Promise.resolve({ url, text: '区民まつり 10月27日 10:00から 中央公園' }) };
 
 export interface World {
   gateway: FamilyHubGateway;
@@ -28,12 +47,12 @@ export interface World {
 }
 
 /** 実際の Fastify を起動し、Cookie を保持する fetch で httpGateway をつなぐ。時計は1回の変更の操作ごとに1分進む。 */
-export function createWorld(actorMembershipId = 'member-aoi', inspect?: (body: unknown, request: { method: string; url: string; status: number }) => void, scanner: Scanner = { scan: async () => 'clean', ready: async () => true }): World {
+export function createWorld(actorMembershipId = 'member-aoi', inspect?: (body: unknown, request: { method: string; url: string; status: number }) => void, scanner: Scanner = { scan: async () => 'clean', ready: async () => true }, reading: { llm?: LlmClient; pages?: PageFetcher } = {}): World {
   let tick = 0; let sequence = 0;
   const mail: World['mail'] = [];
   const db = new Db(':memory:');
   const deps: AppDeps = {
-    db, config: { ...testConfig, mediaPath: mkdtempSync(join(tmpdir(), 'family-hub-media-')) }, scanner, jobs: new Set(),
+    db, config: { ...testConfig, mediaPath: mkdtempSync(join(tmpdir(), 'family-hub-media-')) }, scanner, jobs: new Set(), runningReads: new Set(), llm: reading.llm ?? defaultLlm, pages: reading.pages ?? defaultPages,
     clock: { now: () => toJstRfc3339(new Date(Date.parse('2026-09-30T07:45:00+09:00') + tick * 60_000)) },
     weather: { current: () => ({ location: '東京', condition: 'rain', temperatureC: 20, precipitationPercent: 70, alert: '見本の天気' }), refresh: async () => undefined },
     mailer: { available: true, send: async (message) => { mail.push(message); } },

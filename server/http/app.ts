@@ -7,6 +7,7 @@ import { cookieNames, csrfTokenFor, csrfTokenMatches, findSession, presessionVal
 import { ApiError, sendError, unauthenticated } from './context';
 import type { AppDeps, RouteDeclaration } from './context';
 import { registerAccountRoutes } from './routes/account';
+import { registerAssistantRoutes } from './routes/assistant';
 import { registerAuthRoutes } from './routes/auth';
 import { registerContentRoutes } from './routes/content';
 import { registerHouseholdRoutes } from './routes/household';
@@ -105,5 +106,6 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerHouseholdRoutes(app, deps);
   registerContentRoutes(app, deps);
   registerMediaRoutes(app, deps);
+  registerAssistantRoutes(app, deps);
   return app;
 }

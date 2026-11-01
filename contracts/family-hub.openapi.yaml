@@ -1333,6 +1333,115 @@ paths:
             application/json:
               schema: { type: array, items: { $ref: '#/components/schemas/Insight' } }
         default: { $ref: '#/components/responses/Error' }
+  /v1/assistant/status:
+    get:
+      operationId: getAssistantStatus
+      description: Whether reading helpers can be used by the requester. False when the server has no LLM configured or the member lacks assistant.use.
+      responses:
+        '200':
+          description: Availability for the requesting member
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AssistantStatus' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/assistant/receipt:
+    post:
+      operationId: readReceipt
+      description: >-
+        Starts reading a receipt image into an expense proposal. Requires
+        assistant.use and expense.create. One reading at a time per household.
+        Nothing is saved; the image is deleted after the job.
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/PermissionRevision'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '202':
+          description: Reading accepted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AssistantJob' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/assistant/event-image:
+    post:
+      operationId: readEventImage
+      description: >-
+        Starts reading a flyer image into event candidates. Requires
+        assistant.use and event.create. Nothing is saved; the image is deleted
+        after the job.
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/PermissionRevision'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '202':
+          description: Reading accepted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AssistantJob' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/assistant/event-url:
+    post:
+      operationId: readEventUrl
+      description: >-
+        Starts reading a public https page into event candidates. Requires
+        assistant.use and event.create. The server refuses internal addresses,
+        pins the checked address, re-checks every redirect and passes the page
+        text to the LLM as data.
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/PermissionRevision'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url: { type: string, maxLength: 2048 }
+      responses:
+        '202':
+          description: Reading accepted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AssistantJob' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/assistant/jobs/{jobId}:
+    get:
+      operationId: getAssistantJob
+      description: Progress of the requester's own reading. Any other job is NOT_FOUND. Proposals are never saved by the server.
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The job
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AssistantJob' }
+        default: { $ref: '#/components/responses/Error' }
   /v1/notifications:
     get:
       operationId: listNotifications
@@ -1733,6 +1842,43 @@ components:
         id: { type: string }
         name: { type: string, maxLength: 40 }
         timezone: { const: Asia/Tokyo }
+    AssistantStatus:
+      type: object
+      required: [available]
+      properties:
+        available: { type: boolean }
+        sample: { type: boolean }
+    ReceiptProposal:
+      type: object
+      required: [amountJpy, date, merchant, category]
+      properties:
+        amountJpy: { type: [integer, 'null'] }
+        date: { type: [string, 'null'], format: date }
+        merchant: { type: [string, 'null'], maxLength: 120 }
+        category: { enum: [food, dining, transport, utilities, home, education, health, entertainment, shopping, savings, other] }
+    EventCandidate:
+      type: object
+      required: [title, date, startTime, endTime, allDay, location]
+      properties:
+        title: { type: string, maxLength: 120 }
+        date: { type: string, format: date }
+        startTime: { type: [string, 'null'] }
+        endTime: { type: [string, 'null'] }
+        allDay: { type: boolean }
+        location: { type: [string, 'null'], maxLength: 200 }
+    AssistantJob:
+      type: object
+      required: [id, kind, status]
+      properties:
+        id: { type: string }
+        kind: { enum: [receipt, event] }
+        status: { enum: [queued, running, done, failed] }
+        receipt: { $ref: '#/components/schemas/ReceiptProposal' }
+        events:
+          type: array
+          items: { $ref: '#/components/schemas/EventCandidate' }
+        message: { type: string }
+        sample: { type: boolean }
     Insight:
       type: object
       required: [id, title, summary, evidence, actionLabel, destination, confidence]

@@ -292,6 +292,13 @@ export function createHttpGateway(baseUrl: string, getCsrfToken: CsrfProvider, g
     trash: { list: () => request('/v1/recently-deleted') },
     resources: { search: (query) => request(`/v1/search?q=${encodeURIComponent(query)}`) },
     insights: { list: () => request('/v1/insights') },
+    assistant: {
+      getStatus: () => request('/v1/assistant/status'),
+      readReceipt: (file) => { const form = new FormData(); form.set('file', file); return request('/v1/assistant/receipt', { method: 'POST', body: form, csrf: true }); },
+      readEventImage: (file) => { const form = new FormData(); form.set('file', file); return request('/v1/assistant/event-image', { method: 'POST', body: form, csrf: true }); },
+      readEventUrl: (url) => request('/v1/assistant/event-url', { method: 'POST', body: JSON.stringify({ url }), csrf: true }),
+      getJob: (id) => request(`/v1/assistant/jobs/${encodeURIComponent(id)}`),
+    },
     notifications: {
       list: () => request('/v1/notifications'),
       markRead: (id) => request(`/v1/notifications/${encodeURIComponent(id)}/read`, { method: 'POST', csrf: true }),

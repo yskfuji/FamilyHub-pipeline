@@ -11,6 +11,8 @@ const sourceFiles = (await filesUnder(resolve('src'))).filter((file) => (
   || file.endsWith('/data/fixtures.ts')
   || file.endsWith('/data/mockGateway.ts')
   || file.includes('/domain/commands/')
+  || (/\/domain\/(shift|advisor)\/[^/]+\.ts$/.test(file) && !/\.(test|fixtures)\.ts$/.test(file))
+  || file.endsWith('/domain/assistant.ts')
   || file.endsWith('/domain/schemas.ts')
   || file.endsWith('/offline/queue.ts')
   || file.endsWith('/content/ja.ts')
@@ -32,6 +34,7 @@ const forbidden = [
   ['stale retry wording', /再送待ち|送信待ち|保存から24時間/],
   ['untranslated time-zone label', /タイムゾーン/],
   ['stiff security tab label', /サインインと安全/],
+  ['implied model', /\bAI\b|人工知能|ニューラル|Neural Engine|機械学習/],
 ];
 const failures = [];
 for (const file of sourceFiles) {

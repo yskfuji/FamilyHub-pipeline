@@ -1,5 +1,8 @@
 import type { FamilyHubGateway } from './gateway';
-import { baseAlbumItems, baseAlbums, baseInvites, baseNotificationPreferences, baseNotifications, basePrivacySettings, baseSecurityOverview, baseSnapshot } from './fixtures';
+import { baseAlbumItems, baseAlbums, baseInvites, baseNotificationPreferences, baseNotifications, basePrivacySettings, baseSecurityOverview, baseSnapshot, sampleEventCandidates, sampleReceipt } from './fixtures';
+import { serverMessages } from '../content/serverMessages';
+import { readingImageProblem, readingUrlProblem } from '../domain/assistant';
+import type { AssistantJob, AssistantJobKind } from '../domain/assistant';
 import { accountUpdateSchema, signUpSchema } from '../domain/account';
 import { passwordSchema } from '../domain/schemas';
 import { toJstRfc3339 } from '../domain/calendarDate';
@@ -44,6 +47,21 @@ function sampleImage(id: string) {
   return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480"><defs><linearGradient id="g" x2="1" y2="1"><stop stop-color="hsl(${hue} 45% 70%)"/><stop offset="1" stop-color="hsl(${(hue + 50) % 360} 40% 45%)"/></linearGradient></defs><rect width="640" height="480" fill="url(#g)"/><circle cx="500" cy="120" r="56" fill="hsl(45 90% 80%)"/><path d="M0 400 200 240l140 110 110-70 190 120v80H0z" fill="hsl(${(hue + 120) % 360} 30% 35%)"/></svg>`)}`;
 }
 
+const imageMarks: ReadonlyArray<readonly number[]> = [[0xff, 0xd8, 0xff], [0x89, 0x50, 0x4e, 0x47]];
+
+/** ファイルの先頭で画像かどうかを見る。実際の環境と同じ理由で断る。 */
+async function imageRejection(file: File): Promise<GatewayError | null> {
+  const problem = readingImageProblem(file);
+  if (problem) return { code: 'ATTACHMENT_REJECTED', message: problem, retryable: false };
+  const head = new Uint8Array(await new Promise<ArrayBuffer>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as ArrayBuffer);
+    reader.onerror = () => reject(new Error('unreadable'));
+    reader.readAsArrayBuffer(file.slice(0, 8));
+  }));
+  return imageMarks.some((mark) => mark.every((value, index) => head[index] === value)) ? null : { code: 'ATTACHMENT_REJECTED', message: serverMessages.fileTypeRejected, retryable: false };
+}
+
 export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyHubGateway {
   const aggregate = initialAggregate();
   const security: SecurityOverview = structuredClone(baseSecurityOverview);
@@ -63,6 +81,17 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
   const { state } = aggregate;
   let passkeyChallenge: string | null = null;
   const mediaUrls = new Map<Id, string>();
+  /** 読み取りの代わりの仕事。結果は見本で、読み取られた内容ではない。 */
+  const readings = new Map<Id, AssistantJob>();
+  const startReading = (kind: AssistantJobKind): Result<AssistantJob> => {
+    const allowed = rules.assistant.authorize(kind);
+    if (!allowed.ok) return allowed;
+    if ([...readings.values()].some((job) => job.status === 'running')) return fail({ code: 'RATE_LIMITED', message: serverMessages.readingBusy, retryable: true });
+    const job: AssistantJob = { id: nextId('reading'), kind, status: 'running', sample: true };
+    readings.set(job.id, job);
+    setTimeout(() => Object.assign(job, { status: 'done' }, kind === 'receipt' ? { receipt: structuredClone(sampleReceipt) } : { events: structuredClone(sampleEventCandidates) }), 300);
+    return ok(structuredClone(job));
+  };
   const thumbnailUrls = new Map<Id, string>();
   const actorMember = state.memberships.find((item) => item.id === actorMembershipId);
   const account: AccountProfile = { displayName: actorMember?.displayName ?? '', email: `${actorMember?.userId ?? ''}@example.test`, avatar: { kind: 'initial' }, idleTimeoutMinutes: 30, birthdateDeclared: true, adultDeclared: actorMember?.role === 'owner' || actorMember?.role === 'adult', totpEnabled: false };
@@ -200,6 +229,21 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
     },
     resources: delayed(rules.resources),
     insights: delayed(rules.insights),
+    assistant: {
+      async getStatus() { await delay(20); const status = rules.assistant.status(true); return status.ok ? ok({ ...status.value, sample: true }) : status; },
+      async readReceipt(file) { await delay(); const rejected = await imageRejection(file); return rejected ? fail(rejected) : startReading('receipt'); },
+      async readEventImage(file) { await delay(); const rejected = await imageRejection(file); return rejected ? fail(rejected) : startReading('event'); },
+      async readEventUrl(url) {
+        await delay();
+        const problem = readingUrlProblem(url);
+        return problem ? fail({ code: 'INVALID_INPUT', message: problem, retryable: false }) : startReading('event');
+      },
+      async getJob(id) {
+        await delay();
+        const job = readings.get(id);
+        return job ? ok(structuredClone(job)) : fail({ code: 'NOT_FOUND', message: serverMessages.notFound, retryable: false });
+      },
+    },
     notifications: delayed(rules.notifications),
     credentials: {
       async create() { await delay(); return ok({ id: nextId('mock-credential'), demo: true }); },

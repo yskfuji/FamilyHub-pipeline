@@ -415,6 +415,45 @@
   .place-disclosure > div { display: grid; grid-template-columns: minmax(6rem, 9rem) minmax(0, 1fr); gap: 1rem; padding: .8rem 0; border-bottom: 1px solid var(--line); }
   .place-disclosure dt { color: var(--ink-soft); font-size: .82rem; font-weight: 750; }
   .place-disclosure dd { margin: 0; }
+
+  .calendar-readers { display: flex; flex-wrap: wrap; gap: .6rem; margin-bottom: 1rem; }
+  .calendar-readers:empty { display: none; }
+  .shift-reader .textarea.shift-text { min-height: 8rem; }
+  .shift-rules { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0 .9rem; }
+  .shift-rules[open] { padding-bottom: .9rem; }
+  .shift-rules summary { min-height: 2.75rem; display: flex; align-items: center; cursor: pointer; font-weight: 700; }
+  .shift-rule-list { display: grid; gap: .8rem; margin: 0 0 .8rem; padding: 0; list-style: none; }
+  .shift-rule { display: grid; gap: .5rem; padding: .8rem; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+  .shift-rule-names, .shift-rule-times { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
+  .shift-rule-options, .shift-rule-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .9rem; }
+  .shift-rule-options .button { margin-left: auto; }
+  .shift-rule-actions { margin-bottom: .8rem; }
+  .shift-rule-actions:last-child { margin-bottom: 0; }
+  .shift-table-wrap { overflow-x: auto; }
+  .shift-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  .shift-table th { padding: .4rem .3rem; border-bottom: 1px solid var(--line); color: var(--ink-soft); font-size: .76rem; font-weight: 750; text-align: left; }
+  .shift-table td { padding: .2rem .3rem; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  .shift-table tr[data-kind='off'] .shift-time, .shift-table tr[data-kind='unknown'] .shift-time { color: var(--ink-soft); }
+  .shift-include { width: 2.75rem; }
+  .shift-check { display: flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; }
+  .shift-date { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .shift-detail { min-width: 0; line-height: 1.5; overflow-wrap: anywhere; }
+  .shift-time { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .shift-flag, .shift-failure { display: block; margin-top: .15rem; }
+  .shift-add-rule { display: block; margin-top: .3rem; }
+  .reading-candidates { display: grid; gap: .6rem; margin: .5rem 0 0; padding: 0; list-style: none; }
+  .reading-candidates li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem .75rem; padding: .7rem; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+  .reading-candidate-text { flex: 1 1 15rem; display: grid; gap: .15rem; min-width: 0; overflow-wrap: anywhere; text-wrap: pretty; }
+  .reading-candidates .button { flex: none; white-space: nowrap; }
+  .review-scope { display: flex; flex-wrap: wrap; gap: .2rem 1.5rem; }
+  .review-load { margin-top: 1rem; }
+  .review-findings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1rem; }
+  .review-finding { display: grid; align-content: start; gap: .5rem; }
+  .review-finding h3 { margin: 0; overflow-wrap: anywhere; }
+  .review-finding p { margin-bottom: 0; }
+  .review-citations { display: grid; gap: .1rem; margin: .2rem 0 0; padding: 0; list-style: none; }
+  .review-citations a { display: inline-flex; align-items: center; gap: .5rem; min-height: 2.75rem; overflow-wrap: anywhere; }
+  .review-citation-kind { flex: none; color: var(--ink-soft); font-size: .72rem; font-weight: 750; }
 }
 
 @layer utilities {
@@ -449,7 +488,7 @@
     .topbar-date { display: none; }
     .page { padding: 1.25rem 1rem 7.5rem; }
     .page-head { align-items: start; flex-direction: column; margin-bottom: 1.4rem; }
-    .grid.two, .grid.three, .calendar-layout, .task-board, .welcome, .auth-layout { grid-template-columns: minmax(0, 1fr); }
+    .grid.two, .grid.three, .calendar-layout, .task-board, .welcome, .auth-layout, .review-findings { grid-template-columns: minmax(0, 1fr); }
     .grid.three { gap: .8rem; }
     .topbar-actions .button .label { display: none; }
     .quick-create { right: 1rem; bottom: 5.5rem; will-change: transform; }

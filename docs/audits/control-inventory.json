@@ -1624,6 +1624,302 @@
       "undo": null,
       "alternative": null,
       "entity": null
+    },
+    {
+      "idPattern": "^calendar\\.shift\\.open$",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "event.create",
+      "risk": "dialog",
+      "onlineRequired": false,
+      "successObservation": "シフトの読み取りを開く",
+      "failureRecovery": "開かなければ画面の位置を保つ",
+      "undo": null,
+      "alternative": "予定を1件ずつ追加する",
+      "entity": "CalendarEvent"
+    },
+    {
+      "idPattern": "^calendar\\.shift\\.(text|month|member|person|work-label|off-label)$",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "event.create",
+      "risk": "input",
+      "onlineRequired": false,
+      "successObservation": "確認の表が入力に合わせて変わる",
+      "failureRecovery": "読めないときは理由を表示する",
+      "undo": null,
+      "alternative": null,
+      "entity": "CalendarEvent"
+    },
+    {
+      "idPattern": "^calendar\\.shift\\.row\\.",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "event.create",
+      "risk": "input",
+      "onlineRequired": false,
+      "successObservation": "保存する件数が変わる",
+      "failureRecovery": "分からない記号の行は選べない",
+      "undo": null,
+      "alternative": null,
+      "entity": "CalendarEvent"
+    },
+    {
+      "idPattern": "^calendar\\.shift\\.add-rule\\.",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "event.create",
+      "risk": "input",
+      "onlineRequired": false,
+      "successObservation": "記号の規則を追加し、時刻を編集できるように開く",
+      "failureRecovery": "規則が重なるときは理由を表示する",
+      "undo": null,
+      "alternative": null,
+      "entity": null
+    },
+    {
+      "idPattern": "^calendar\\.shift\\.rule\\.",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "event.create",
+      "risk": "input",
+      "onlineRequired": false,
+      "successObservation": "時刻の規則を変えて端末に保存し、表を読み直す",
+      "failureRecovery": "名前や別名が重なるときは理由を表示し、端末には保存しない",
+      "undo": "初期の規則に戻す",
+      "alternative": null,
+      "entity": null
+    },
+    {
+      "idPattern": "^calendar\\.shift\\.rules\\.(add|reset|sample-text|sample-save|save-legend)$",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "event.create",
+      "risk": "input",
+      "onlineRequired": false,
+      "successObservation": "規則を追加または初期に戻し、端末に保存する",
+      "failureRecovery": "読めない見本は理由を表示し、規則を変えない",
+      "undo": "初期の規則に戻す",
+      "alternative": null,
+      "entity": null
+    },
+    {
+      "idPattern": "^calendar\\.shift\\.cancel$",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "event.create",
+      "risk": "dialog",
+      "onlineRequired": false,
+      "successObservation": "閉じる。貼り付けた文字があれば確認する",
+      "failureRecovery": "確認で残すと入力を保つ",
+      "undo": null,
+      "alternative": null,
+      "entity": "CalendarEvent"
+    },
+    {
+      "idPattern": "^calendar\\.shift\\.save$",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "event.create",
+      "risk": "mutation",
+      "onlineRequired": true,
+      "successObservation": "選んだ行を予定に保存する",
+      "failureRecovery": "保存できなかった行は理由とともに表に残す",
+      "undo": "予定を個別に削除する",
+      "alternative": null,
+      "entity": "CalendarEvent"
+    },
+    {
+      "idPattern": "^assistant\\.receipt\\.(open|file|cancel)$",
+      "routes": [
+        "/budget"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "assistant.use",
+      "risk": "dialog",
+      "onlineRequired": true,
+      "successObservation": "領収書の読み取りを開き、画像を選ぶ",
+      "failureRecovery": "形式と大きさが合わなければ理由を表示する",
+      "undo": null,
+      "alternative": "支出を手で入力する",
+      "entity": "Expense"
+    },
+    {
+      "idPattern": "^assistant\\.receipt\\.submit$",
+      "routes": [
+        "/budget"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "assistant.use|expense.create",
+      "risk": "mutation",
+      "onlineRequired": true,
+      "successObservation": "読み取った内容を支出の入力に入れて開く。保存はしない",
+      "failureRecovery": "読めないときは理由を表示し、記録は変えない",
+      "undo": null,
+      "alternative": "支出を手で入力する",
+      "entity": "Expense"
+    },
+    {
+      "idPattern": "^assistant\\.event\\.(open|source\\.|url|file|cancel)",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "assistant.use",
+      "risk": "dialog",
+      "onlineRequired": true,
+      "successObservation": "読み取るURLや画像を選ぶ",
+      "failureRecovery": "形が合わなければ理由を表示する",
+      "undo": null,
+      "alternative": "予定を手で入力する",
+      "entity": "CalendarEvent"
+    },
+    {
+      "idPattern": "^assistant\\.event\\.submit$",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "assistant.use|event.create",
+      "risk": "mutation",
+      "onlineRequired": true,
+      "successObservation": "予定の候補を一覧にする。保存はしない",
+      "failureRecovery": "読めないときは理由を表示し、記録は変えない",
+      "undo": null,
+      "alternative": "予定を手で入力する",
+      "entity": "CalendarEvent"
+    },
+    {
+      "idPattern": "^assistant\\.event\\.candidate\\.",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "assistant.use|event.create",
+      "risk": "dialog",
+      "onlineRequired": true,
+      "successObservation": "候補を予定の入力に入れて開く。保存はしない",
+      "failureRecovery": "候補の一覧に戻れる",
+      "undo": null,
+      "alternative": "予定を手で入力する",
+      "entity": "CalendarEvent"
+    },
+    {
+      "idPattern": "^insights\\.review\\.scope\\.",
+      "routes": [
+        "/insights"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "insight.read",
+      "risk": "input",
+      "onlineRequired": false,
+      "successObservation": "数える記録が変わる",
+      "failureRecovery": "記録は変えない",
+      "undo": null,
+      "alternative": null,
+      "entity": null
+    },
+    {
+      "idPattern": "^insights\\.review\\.cite\\.",
+      "routes": [
+        "/insights"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "insight.read",
+      "risk": "navigation",
+      "onlineRequired": false,
+      "successObservation": "もとにした記録を開く",
+      "failureRecovery": "見えない記録は挙げない",
+      "undo": "ブラウザの戻る操作",
+      "alternative": null,
+      "entity": null
+    },
+    {
+      "idPattern": "^insights\\.review\\.draft\\.",
+      "routes": [
+        "/insights"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "insight.read",
+      "risk": "dialog",
+      "onlineRequired": false,
+      "successObservation": "下書きを入力に入れて開く。保存はしない",
+      "failureRecovery": "閉じると何も残らない",
+      "undo": null,
+      "alternative": "手で追加する",
+      "entity": null
     }
   ]
 }

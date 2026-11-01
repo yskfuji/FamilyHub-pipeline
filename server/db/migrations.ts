@@ -129,4 +129,20 @@ export const migrations: readonly string[] = [
   `
   ALTER TABLE uploads ADD COLUMN touched_at TEXT;
   `,
+  `
+  CREATE TABLE assistant_jobs (
+    id TEXT PRIMARY KEY,
+    household_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    status TEXT NOT NULL,
+    file_id TEXT,
+    result TEXT,
+    error_code TEXT,
+    created_at TEXT NOT NULL,
+    finished_at TEXT
+  );
+  CREATE UNIQUE INDEX assistant_jobs_one_active ON assistant_jobs(household_id) WHERE status IN ('queued', 'running');
+  CREATE INDEX assistant_jobs_user ON assistant_jobs(user_id);
+  `,
 ];

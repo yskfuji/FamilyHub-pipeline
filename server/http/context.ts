@@ -4,8 +4,10 @@ import type { Db } from '../db/db';
 import type { SessionRow } from '../auth/sessions';
 import { serverMessages } from '../../src/content/serverMessages';
 import type { GatewayError, Id, Rfc3339 } from '../../src/domain/types';
+import type { LlmClient } from '../adapters/llm';
 import type { Mailer } from '../adapters/mail';
 import type { Scanner } from '../adapters/scanner';
+import type { PageFetcher } from '../adapters/urlFetcher';
 import type { WeatherSource } from '../adapters/weather';
 
 export interface ServerClock { now(): Rfc3339; }
@@ -19,6 +21,10 @@ export interface AppDeps {
   mailer: Mailer;
   scanner: Scanner;
   weather: WeatherSource;
+  llm: LlmClient;
+  pages: PageFetcher;
+  /** 読み取りを進めている仕事の ID。止まって残った行を見分ける。 */
+  runningReads: Set<Id>;
   /** 受け付けた後に裏で進めている処理。終了のときと試験で待つ。 */
   jobs: Set<Promise<void>>;
 }

@@ -8,12 +8,14 @@ import { addDateKeyDays, dateKeyFromRfc3339, isCalendarView, monthKeyFromRfc3339
 import { occurrenceStartingOn, type Occurrence } from '../../domain/calendarLayout';
 import { occurrenceDates } from '../../domain/recurrence';
 import type { CalendarEvent } from '../../domain/types';
+import { EventReader } from '../assistant/EventReader';
 import { MemberScopeSelect } from '../shared/MemberScopeSelect';
 import { AgendaView } from './AgendaView';
 import { CalendarToolbar } from './CalendarToolbar';
 import { DayEntries } from './DayPanel';
 import { EventDrawer, type DeletedEvent } from './EventDrawer';
 import { MonthFlow, MonthGrid } from './MonthView';
+import { ShiftReader } from './ShiftReader';
 import { TimelineView } from './TimelineView';
 import { useIsNarrow } from './calendarHooks';
 import { dayLabel, monthHeading, weekHeading, yearDayHeading } from './calendarLabels';
@@ -105,6 +107,7 @@ export function CalendarPage({ path }: { path: string }) {
 
   return <div className="page">
     <PageHeader eyebrow="予定" title="家族の予定" description="月・週・日・一覧で、家族の予定と参加者を確認できます。" action={<div className="page-head-actions"><MemberScopeSelect/>{addButton}</div>}/>
+    {canCreate && <div className="calendar-readers" role="group" aria-label="読み取って予定を追加"><ShiftReader/><EventReader/></div>}
     {activeId && !activeEvent && <DetailNotFound what="予定" feature="calendar" backHref="/calendar"/>}
     {deleted && <div className="callout info" role="status"><CalendarIcon/><div><strong>「{deleted.event.title}」を削除しました</strong><p className="small muted mb-0">7日以内は元に戻せます。</p></div><button data-control-id={`calendar.event.restore.${deleted.event.id}`} className="button" type="button" onClick={() => void restoreDeleted()}>元に戻す</button></div>}
     <div className="calendar-layout" data-view={view}>

@@ -7,6 +7,7 @@ import { CheckIcon, YenIcon } from '../../design-system/icons';
 import { ja } from '../../content/ja';
 import { budgetSearch, latestBudgetMonth, monthChange, readBudgetLocation, type BudgetLocation } from '../../domain/budgetView';
 import { monthKeyFromRfc3339 } from '../../domain/calendarDate';
+import { ReceiptReader } from '../assistant/ReceiptReader';
 import { PlaceAttributionLink } from '../place/PlaceField';
 import { MemberScopeSelect, ScopeNote } from '../shared/MemberScopeSelect';
 import { BudgetList } from './BudgetList';
@@ -37,6 +38,7 @@ export function BudgetPage({ path }: { path: string }) {
   const hasProvenance = expenses.some((expense) => expense.place?.provenance);
   return <div className="page">
     <PageHeader eyebrow="家計と精算" title="家計と割り勘" description="金額は1円単位で保存し、負担と精算を別の記録として残します。" action={<div className="page-head-actions"><MemberScopeSelect/>{canCreate && <div className="budget-actions">
+      <ReceiptReader/>
       <button data-control-id="budget.income.create" className="button" type="button" onClick={() => requestQuickCreate('expense', undefined, 'income')}>収入を追加</button>
       <button data-control-id="budget.expense.create" className="button primary" type="button" onClick={() => requestQuickCreate('expense')}><YenIcon width="18"/>支出を追加</button>
     </div>}</div>}/>

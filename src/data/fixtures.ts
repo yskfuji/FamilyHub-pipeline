@@ -1,8 +1,16 @@
+import type { EventCandidate, ReceiptProposal } from '../domain/assistant';
 import { capabilitiesFor } from '../authz/policy';
 import type { Album, AlbumItem, HouseholdInvite, HouseholdNotification, HouseholdSnapshot, NotificationPreferences, PrivacySettings, SecurityOverview, VisibilityPolicy } from '../domain/types';
 
 export const fixedNow = '2026-09-30T07:30:00+09:00';
 const visibleTo = (creatorMembershipId: string, audience: VisibilityPolicy['audience'] = 'household', selectedMembershipIds: string[] = []): VisibilityPolicy => ({ audience, creatorMembershipId, selectedMembershipIds });
+
+/** 確認用の読み取りが返す見本。実際の画像やページは読まない。 */
+export const sampleReceipt: ReceiptProposal = { amountJpy: 2480, date: '2026-09-29', merchant: '見本スーパー 青葉店', category: 'food' };
+export const sampleEventCandidates: EventCandidate[] = [
+  { title: '見本の区民まつり', date: '2026-10-27', startTime: '10:00', endTime: '15:30', allDay: false, location: '中央公園' },
+  { title: '見本の区民まつり（予備日）', date: '2026-11-03', startTime: null, endTime: null, allDay: true, location: null },
+];
 
 export const baseSnapshot: HouseholdSnapshot = {
   viewer: { userId: 'user-aoi', membershipId: 'member-aoi', role: 'owner', status: 'active', capabilities: capabilitiesFor('owner'), permissionRevision: 1 },
