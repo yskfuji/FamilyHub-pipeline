@@ -73,16 +73,40 @@ export function calendarMonthFromUrl(urlLike: string, fallbackMonthKey: string):
   return isMonthKey(requested) ? requested : fallbackMonthKey;
 }
 
-export function urlWithCalendarMonth(urlLike: string, monthKey: string, currentMonthKey: string): string {
-  if (!isMonthKey(monthKey)) throw new Error('年月はYYYY-MM形式で指定してください。');
-  const url = new URL(urlLike, 'http://localhost');
-  if (monthKey === currentMonthKey) url.searchParams.delete('month');
-  else url.searchParams.set('month', monthKey);
-  return `${url.pathname}${url.search}${url.hash}`;
-}
-
 /** 日本時間のオフセット付き RFC 3339（例: 2026-09-30T07:45:00+09:00）。 */
 export function toJstRfc3339(date: Date): string {
   const jst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
   return `${jst.toISOString().slice(0, 19)}+09:00`;
+}
+
+/** カレンダーの表示方式。一覧は日ごとに切れ目なく読む表示。 */
+export const calendarViews = ['month', 'week', 'day', 'list'] as const;
+export type CalendarView = typeof calendarViews[number];
+export const isCalendarView = (value: string | null): value is CalendarView => calendarViews.includes(value as CalendarView);
+
+export function isDateKey(value: string | null): value is string {
+  return Boolean(value) && /^\d{4}-\d{2}-\d{2}$/.test(value as string) && isMonthKey((value as string).slice(0, 7)) && addDateKeyDays(value as string, 0) === value;
+}
+
+/** カレンダーの画面の状態。URL の ?view= ?month= ?on= と対応する。 */
+export interface CalendarLocation { view: CalendarView; monthKey: string; selected: string | null }
+
+export function readCalendarLocation(urlLike: string, todayKey: string, fallbackView: CalendarView): CalendarLocation {
+  const params = new URL(urlLike, 'http://localhost').searchParams;
+  const view = params.get('view');
+  const on = params.get('on');
+  const selected = isDateKey(on) ? on : null;
+  const monthKey = calendarMonthFromUrl(urlLike, selected?.slice(0, 7) ?? todayKey.slice(0, 7));
+  return { view: isCalendarView(view) ? view : fallbackView, monthKey, selected: selected ?? normalizeSelectedDate(todayKey, monthKey) };
+}
+
+/** 状態を URL にする。既定と同じ値は書かず、ほかの項目（actor など）は残す。occurrenceDate はその回を必ず ?on= で示す。 */
+export function writeCalendarLocation(urlLike: string, location: CalendarLocation, todayKey: string, path = '/calendar', occurrenceDate?: string): string {
+  const url = new URL(urlLike, 'http://localhost');
+  const set = (name: string, value: string | null) => { if (value) url.searchParams.set(name, value); else url.searchParams.delete(name); };
+  const on = occurrenceDate ?? location.selected;
+  set('view', location.view === 'month' ? null : location.view);
+  set('month', location.monthKey === todayKey.slice(0, 7) ? null : location.monthKey);
+  set('on', occurrenceDate || (on && on !== todayKey) ? on : null);
+  return `${path}${url.search}`;
 }

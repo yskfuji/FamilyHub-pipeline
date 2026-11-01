@@ -144,47 +144,6 @@
       "entity": "Event"
     },
     {
-      "idPattern": "^calendar\\.(view|day|selected-event|event\\.open)",
-      "routes": [
-        "/calendar"
-      ],
-      "roles": [
-        "owner",
-        "adult",
-        "child",
-        "guest"
-      ],
-      "capability": "event.read",
-      "risk": "navigation",
-      "onlineRequired": false,
-      "successObservation": "選択日または表示方式に対応する予定を表示する",
-      "failureRecovery": "空状態を明示する",
-      "undo": "別の日付または表示方式を選ぶ",
-      "alternative": "月・週・一覧",
-      "entity": "Event"
-    },
-    {
-      "idPattern": "^calendar\\.(event|resource)\\.",
-      "routes": [
-        "/calendar",
-        "/calendar/*"
-      ],
-      "roles": [
-        "owner",
-        "adult",
-        "child",
-        "guest"
-      ],
-      "capability": "event.update|event.delete|resource.read",
-      "risk": "high-impact",
-      "onlineRequired": false,
-      "successObservation": "対象予定だけを作成・変更・論理削除する",
-      "failureRecovery": "入力を保持し競合または権限変更を示す",
-      "undo": "削除後7日以内の復元",
-      "alternative": "予定詳細",
-      "entity": "Event"
-    },
-    {
       "idPattern": "^tasks\\.",
       "routes": [
         "/tasks",
@@ -632,6 +591,143 @@
       "undo": null,
       "alternative": null,
       "entity": "User"
+    },
+    {
+      "idPattern": "^calendar\\.(view|day|selected-event|event\\.open)",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "event.read",
+      "risk": "navigation",
+      "onlineRequired": true,
+      "successObservation": "選択日または表示方式に対応する予定を表示する",
+      "failureRecovery": "空状態を明示する",
+      "undo": "別の日付または表示方式を選ぶ",
+      "alternative": "月・週・日・一覧",
+      "entity": "Event"
+    },
+    {
+      "idPattern": "^calendar\\.(event|resource)\\.",
+      "routes": [
+        "/calendar",
+        "/calendar/*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "event.create|event.update|event.delete|resource.read",
+      "risk": "high-impact",
+      "onlineRequired": true,
+      "successObservation": "対象予定だけを作成・変更・論理削除する",
+      "failureRecovery": "入力を保持し競合または権限変更を示す",
+      "undo": "削除後7日以内の復元",
+      "alternative": "予定詳細",
+      "entity": "Event"
+    },
+    {
+      "idPattern": "^calendar\\.timeline\\.add",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "event.create",
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "押した30分の枠の日時を入れて予定の追加を開く",
+      "failureRecovery": "入力を保持し権限変更を示す",
+      "undo": "キャンセル",
+      "alternative": "予定を追加",
+      "entity": "Event"
+    },
+    {
+      "idPattern": "^calendar\\.agenda\\.",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "event.read",
+      "risk": "navigation",
+      "onlineRequired": true,
+      "successObservation": "一覧の後の日を読み込んで表示する",
+      "failureRecovery": "下へ進むと続けて読み込む",
+      "undo": "前月・次月・今月",
+      "alternative": "月・週・日",
+      "entity": "Event"
+    },
+    {
+      "idPattern": "^calendar\\.task\\.complete",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "task.transition",
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "その日のタスクを完了にするか確認を依頼する",
+      "failureRecovery": "理由を示し状態を保つ",
+      "undo": "タスクの詳細で状態を戻す",
+      "alternative": "タスクの詳細",
+      "entity": "Todo"
+    },
+    {
+      "idPattern": "^calendar\\.task\\.open",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "task.read",
+      "risk": "navigation",
+      "onlineRequired": true,
+      "successObservation": "タスクの詳細を開く",
+      "failureRecovery": "見つからないことを示す",
+      "undo": "閉じる",
+      "alternative": "タスク",
+      "entity": "Todo"
+    },
+    {
+      "idPattern": "^calendar\\.expense\\.open",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "expense.read",
+      "risk": "navigation",
+      "onlineRequired": true,
+      "successObservation": "支出の詳細を開く",
+      "failureRecovery": "見つからないことを示す",
+      "undo": "閉じる",
+      "alternative": "家計",
+      "entity": "Expense"
     }
   ]
 }

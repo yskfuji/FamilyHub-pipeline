@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-const listRows = (page: import('@playwright/test').Page, title: string) => page.locator('.list-row').filter({ hasText: title });
+// 一覧は下へ進むと続きを読み込むので、数えるのは10月の分だけにする。
+const listRows = (page: import('@playwright/test').Page, title: string) => page.locator('.agenda-day[data-date^="2026-10"] .list-row').filter({ hasText: title });
 
 test('weekly events are expanded across the month', async ({ page }) => {
   await page.goto('/calendar?month=2026-10');

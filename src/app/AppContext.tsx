@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react';
 import type { FamilyHubGateway } from '../data/gateway';
+import type { EventPrefill } from '../domain/eventForm';
 import type { Capability, GatewayError, HouseholdSnapshot, PrivacySettings, Result, Scenario, SessionInfo, Theme } from '../domain/types';
 import { useModalTriggerTracking } from '../design-system/components';
 import { EncryptedOfflineQueue, IndexedDbQueuePersistence, type QueueableCommand, type QueuedCommand } from '../offline/queue';
@@ -24,7 +25,7 @@ interface AppState {
   privacy: PrivacySettings | null;
   /** 最新の設定を取り直してから、渡した項目だけを変えて保存する（別の画面での変更を上書きしない）。 */
   updatePrivacy: (patch: Partial<PrivacySettings>) => Promise<Result<PrivacySettings>>;
-  requestQuickCreate: (kind?: QuickCreateKind) => void;
+  requestQuickCreate: (kind?: QuickCreateKind, prefill?: EventPrefill) => void;
   executeQueueable: <T>(command: QueueableCommand, execute: () => Promise<Result<T>>) => Promise<CommandOutcome<T>>;
   pendingCommands: QueuedCommand[]; retryQueued: (id?: string) => Promise<void>;
   discardQueued: (id: string) => Promise<void>; clearQueued: () => Promise<void>;
@@ -136,7 +137,7 @@ export function AppProvider({ runtime, children }: PropsWithChildren<{ runtime: 
 
   const setScenario = (next: Scenario) => { blockingLoad.current = true; setQueryScenario(next); setScenarioState(next); };
   const announce = useCallback((message: string) => setToast(message), []);
-  const requestQuickCreate = useCallback((kind?: QuickCreateKind) => window.dispatchEvent(new CustomEvent('family-hub:quick-create', { detail: { kind } })), []);
+  const requestQuickCreate = useCallback((kind?: QuickCreateKind, prefill?: EventPrefill) => window.dispatchEvent(new CustomEvent('family-hub:quick-create', { detail: { kind, prefill } })), []);
   const can = useCallback((capability: Capability) => snapshot.viewer.status === 'active' && snapshot.viewer.capabilities.includes(capability), [snapshot.viewer]);
 
   const executeQueueable = useCallback(async <T,>(command: QueueableCommand, execute: () => Promise<Result<T>>): Promise<CommandOutcome<T>> => {

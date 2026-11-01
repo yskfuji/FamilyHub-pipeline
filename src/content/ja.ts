@@ -88,11 +88,19 @@ export const ja = {
     weather: '荒天',
   } satisfies Record<Scenario, string>,
   visibility: {
-    household: '家族全員',
+    household: '大人のメンバーと関わる人',
     adults: '大人のメンバー',
     participants: '参加者',
     creator: '作成した本人',
     selected: '選択したメンバー',
+  } satisfies Record<VisibilityAudience, string>,
+  /** 公開範囲を選ぶときの説明。household は全員ではない（子どもは関わる予定だけ見える）。 */
+  visibilityHelp: {
+    household: '管理者と大人のメンバー、この予定に関わる人に表示します。',
+    adults: '管理者と大人のメンバーに表示します。',
+    participants: '参加者と、作成した本人に表示します。',
+    creator: '作成した本人だけに表示します。',
+    selected: '選んだメンバーと、作成した本人に表示します。',
   } satisfies Record<VisibilityAudience, string>,
   recurrence,
   resourceKinds: {

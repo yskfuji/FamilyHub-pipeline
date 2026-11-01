@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 
-export function navigate(to: string, replace = false) {
+/** keepScroll は、同じ画面の中の移動で読んでいた位置を保つとき。 */
+export function navigate(to: string, replace = false, keepScroll = false) {
   if (replace) window.history.replaceState({}, '', to);
   else window.history.pushState({}, '', to);
   window.dispatchEvent(new PopStateEvent('popstate'));
-  window.scrollTo({ top: 0, behavior: 'instant' });
+  if (!keepScroll) window.scrollTo({ top: 0, behavior: 'instant' });
 }
 
 export function usePath() {

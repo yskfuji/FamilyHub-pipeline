@@ -54,7 +54,8 @@ test('calendar week/list, edit, cancel delete, and confirmed delete work', async
   await expect(page.getByRole('heading', { name: '学校公開（更新）' })).toBeVisible();
   await page.getByRole('button', { name: '予定を削除' }).click();
   await page.getByRole('button', { name: '削除する' }).click();
-  await expect(page).toHaveURL(/\/calendar$/);
+  // 一覧を最後に使ったので、閉じた後もこの端末では一覧のまま。
+  await expect(page).toHaveURL(/\/calendar\?view=list$/);
   await expect(page.locator('.toast-visible')).toContainText('削除しました');
 });
 

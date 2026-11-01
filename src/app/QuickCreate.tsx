@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { allowedAudiencesFor } from '../authz/policy';
 import { eventInputSchema, expenseInputSchema, memoInputSchema, todoInputSchema } from '../domain/schemas';
 import { useApp, type QuickCreateKind } from './AppContext';
 import { Dialog } from '../design-system/components';
@@ -6,6 +7,8 @@ import { PlusIcon } from '../design-system/icons';
 import { ja } from '../content/ja';
 import { dateKeyFromRfc3339 } from '../domain/calendarDate';
 import { expenseCategories } from '../domain/ledger';
+import { draftToCreateInput, newEventDraft, type EventDraft, type EventPrefill } from '../domain/eventForm';
+import { EventForm } from '../features/calendar/EventForm';
 import { PlaceField } from '../features/place/PlaceField';
 import type { Capability, Expense, PlaceRef } from '../domain/types';
 
@@ -14,25 +17,26 @@ const jst = (date: string, time: string) => `${date}T${time}:00+09:00`;
 const firstIssue = (issues: Array<{ message: string }>) => issues[0]?.message ?? '入力内容を確認してください。';
 
 export function QuickCreate() {
-  const { gateway, snapshot, refresh, announce, can, executeQueueable } = useApp();
+  const { gateway, snapshot, refresh, announce, can, executeQueueable, privacy } = useApp();
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<QuickCreateKind>('todo');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [place, setPlace] = useState<PlaceRef | null>(null);
+  const [prefill, setPrefill] = useState<EventPrefill | null>(null);
   const kinds = useMemo(() => kindTable.filter(([, , capability]) => can(capability)), [can]);
   const today = dateKeyFromRfc3339(snapshot.context.asOf);
   const active = snapshot.memberships.filter((member) => member.status === 'active');
   const adults = active.filter((member) => member.role === 'owner' || member.role === 'adult');
 
   // 開くたびに、要求された種類（なければ使える最初の種類）へ戻す。使えない種類のまま開かない。
-  const openWith = (requested?: QuickCreateKind) => {
+  const openWith = (requested?: QuickCreateKind, eventPrefill?: EventPrefill) => {
     const next = requested && kinds.some(([value]) => value === requested) ? requested : kinds[0]?.[0];
     if (!next) return;
-    setKind(next); setPlace(null); setError(''); setOpen(true);
+    setKind(next); setPlace(null); setPrefill(eventPrefill ?? null); setError(''); setOpen(true);
   };
   useEffect(() => {
-    const openRequested = (event: Event) => openWith((event as CustomEvent<{ kind?: QuickCreateKind }>).detail.kind);
+    const openRequested = (event: Event) => { const { kind: requested, prefill: eventPrefill } = (event as CustomEvent<{ kind?: QuickCreateKind; prefill?: EventPrefill }>).detail; openWith(requested, eventPrefill); };
     window.addEventListener('family-hub:quick-create', openRequested);
     return () => window.removeEventListener('family-hub:quick-create', openRequested);
   });
@@ -53,14 +57,6 @@ export function QuickCreate() {
       if (outcome.status === 'queued') { setOpen(false); setSubmitting(false); return; }
       return finish('タスク');
     }
-    if (kind === 'event') {
-      const parsed = eventInputSchema.safeParse({ title, startsAt: jst(text('date'), text('start')), endsAt: jst(text('date'), text('end')), timezone: 'Asia/Tokyo', participantMembershipIds: values.getAll('participants').map(String), ...(text('location').trim() ? { location: text('location').trim() } : {}) });
-      if (!parsed.success) return stop(firstIssue(parsed.error.issues));
-      const outcome = await executeQueueable({ operation: 'event.create', summary: `予定「${title}」を作成`, payload: { input: parsed.data } }, () => gateway.events.createEvent(parsed.data));
-      if (outcome.status === 'failed') return stop(outcome.error.message);
-      if (outcome.status === 'queued') { setOpen(false); setSubmitting(false); return; }
-      return finish('予定');
-    }
     if (kind === 'memo') {
       const parsed = memoInputSchema.safeParse({ title, body: text('body'), tags: text('tags').split(/[,、]/).map((tag) => tag.trim()).filter(Boolean), ...(place ? { place } : {}) });
       if (!parsed.success) return stop(firstIssue(parsed.error.issues));
@@ -76,13 +72,26 @@ export function QuickCreate() {
     return finish('支出');
   };
 
-  const titleLabel = kind === 'todo' ? 'タスク名' : kind === 'event' ? '予定名' : kind === 'memo' ? 'タイトル' : '支出名';
-  const titleExample = kind === 'todo' ? '例：提出物を確認する' : kind === 'event' ? '例：家族で相談' : kind === 'memo' ? '例：学校からのお知らせ' : '例：学校教材';
+  const submitEvent = async (draft: EventDraft) => {
+    if (submitting) return;
+    setError(''); setSubmitting(true);
+    const stop = (message: string) => { setError(message); setSubmitting(false); };
+    const parsed = eventInputSchema.safeParse(draftToCreateInput(draft));
+    if (!parsed.success) return stop(firstIssue(parsed.error.issues));
+    const outcome = await executeQueueable({ operation: 'event.create', summary: `予定「${parsed.data.title}」を作成`, payload: { input: parsed.data } }, () => gateway.events.createEvent(parsed.data));
+    if (outcome.status === 'failed') return stop(outcome.error.message);
+    if (outcome.status === 'queued') { setOpen(false); setSubmitting(false); return; }
+    return finish('予定');
+  };
+  const titleLabel = kind === 'todo' ? 'タスク名' : kind === 'memo' ? 'タイトル' : '支出名';
+  const titleExample = kind === 'todo' ? '例：提出物を確認する' : kind === 'memo' ? '例：学校からのお知らせ' : '例：学校教材';
+  const audiences = allowedAudiencesFor(snapshot.viewer.role);
+  const defaultAudience = audiences.find((audience) => audience === privacy?.defaultAudience) ?? audiences[0];
   return <>
     <button type="button" className="button primary quick-create" data-control-id="quick-create.open" onClick={() => openWith()}><PlusIcon width="20"/><span>すぐに追加</span></button>
     {open && <Dialog title="すぐに追加" description="この画面を開いたまま、予定・タスク・メモ・支出を追加できます。" onClose={() => { if (!submitting) setOpen(false); }}>
       <div className="segmented" role="group" aria-label="追加する項目">{kinds.map(([value, label]) => <button data-control-id={`quick-create.kind.${value}`} key={value} type="button" aria-pressed={kind === value} disabled={submitting} onClick={() => { setKind(value); setError(''); }}>{label}</button>)}</div>
-      <form key={kind} className="stack mt-1" aria-busy={submitting} onSubmit={(event) => { event.preventDefault(); void submit(event.currentTarget); }}>
+      {kind === 'event' ? <div className="mt-1"><EventForm formId="new" initial={newEventDraft(prefill ?? { date: today }, snapshot.viewer.membershipId, defaultAudience)} submitLabel={ja.actions.add} busy={submitting} error={error} offerTemplates onSubmit={(draft) => void submitEvent(draft)} onCancel={() => setOpen(false)}/></div> : <form key={kind} className="stack mt-1" aria-busy={submitting} onSubmit={(event) => { event.preventDefault(); void submit(event.currentTarget); }}>
         <div className="field"><label htmlFor="quick-title">{titleLabel}</label><input data-control-id="quick-create.title" className="input" id="quick-title" name="title" required maxLength={120} autoFocus aria-describedby="quick-title-help"/><span className="field-help" id="quick-title-help">{titleExample}</span></div>
         {kind === 'todo' && <>
           <div className="grid two">
@@ -93,15 +102,6 @@ export function QuickCreate() {
             <div className="field"><label htmlFor="quick-member">担当者</label><select data-control-id="quick-create.member" className="select" id="quick-member" name="member" defaultValue={snapshot.viewer.membershipId}>{active.map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</select></div>
             <div className="field"><label htmlFor="quick-reviewer">確認する人（任意）</label><select data-control-id="quick-create.reviewer" className="select" id="quick-reviewer" name="reviewer" defaultValue=""><option value="">なし</option>{adults.map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</select></div>
           </div>
-        </>}
-        {kind === 'event' && <>
-          <div className="grid three">
-            <div className="field"><label htmlFor="quick-date">日付</label><input data-control-id="quick-create.date" className="input" id="quick-date" name="date" type="date" required defaultValue={today}/></div>
-            <div className="field"><label htmlFor="quick-start">開始</label><input data-control-id="quick-create.start" className="input" id="quick-start" name="start" type="time" required defaultValue="18:00"/></div>
-            <div className="field"><label htmlFor="quick-end">終了</label><input data-control-id="quick-create.end" className="input" id="quick-end" name="end" type="time" required defaultValue="19:00"/></div>
-          </div>
-          <div className="field"><label htmlFor="quick-location">場所（任意）</label><input data-control-id="quick-create.location" className="input" id="quick-location" name="location" maxLength={200}/></div>
-          <fieldset className="fieldset"><legend>参加者</legend><div className="choice-grid">{active.map((member) => <label key={member.id}><input data-control-id={`quick-create.participant.${member.id}`} type="checkbox" name="participants" value={member.id} defaultChecked={member.id === snapshot.viewer.membershipId}/>{member.displayName}</label>)}</div></fieldset>
         </>}
         {kind === 'memo' && <>
           <div className="field"><label htmlFor="quick-body">本文</label><textarea data-control-id="quick-create.body" className="textarea" id="quick-body" name="body" required maxLength={5000}/></div>
@@ -123,7 +123,7 @@ export function QuickCreate() {
         </>}
         {error && <p className="field-error" role="alert">{error}</p>}
         <div className="dialog-actions"><button data-control-id="quick-create.cancel" className="button" type="button" disabled={submitting} onClick={() => setOpen(false)}>{ja.actions.cancel}</button><button data-control-id="quick-create.submit" className="button primary" type="submit" disabled={submitting}>{submitting ? '追加中…' : ja.actions.add}</button></div>
-      </form>
+      </form>}
     </Dialog>}
   </>;
 }

@@ -1,9 +1,9 @@
-import type { EventInput, MemoInput, TodoInput } from '../domain/schemas';
+import type { EventInput, EventUpdateInput, MemoInput, TodoInput } from '../domain/schemas';
 import type { Id, IsoDate, RecurrenceScope } from '../domain/types';
 
 export type QueueableCommand =
   | { operation: 'event.create'; summary: string; payload: { input: EventInput } }
-  | { operation: 'event.update'; summary: string; payload: { id: Id; scope: RecurrenceScope; input: Partial<EventInput>; expectedVersion: number; occurrenceDate?: IsoDate } }
+  | { operation: 'event.update'; summary: string; payload: { id: Id; scope: RecurrenceScope; input: EventUpdateInput; expectedVersion: number; occurrenceDate?: IsoDate } }
   | { operation: 'task.create'; summary: string; payload: { input: TodoInput } }
   | { operation: 'task.update'; summary: string; payload: { id: Id; scope: RecurrenceScope; input: Partial<TodoInput>; expectedVersion: number } }
   | { operation: 'memo.create'; summary: string; payload: { input: MemoInput } }
