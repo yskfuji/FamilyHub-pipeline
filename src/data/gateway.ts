@@ -1,4 +1,4 @@
-import type { EventInput, ExpenseInput, ExpenseUpdateInput, HouseholdProfileInput, MemoInput, TodoInput } from '../domain/schemas';
+import type { EventInput, EventUpdateInput, ExpenseInput, ExpenseUpdateInput, HouseholdProfileInput, MemoInput, TodoInput, TodoUpdateInput } from '../domain/schemas';
 import type { Authenticator, CalendarEvent, Expense, Household, HouseholdInvite, HouseholdNotification, HouseholdSnapshot, Id, Insight, IsoDate, Memo, MembershipRole, MutationContext, NotificationPreferences, PermissionOverride, PrivacySettings, RecurrenceScope, Result, Scenario, SecurityOverview, Todo } from '../domain/types';
 
 export interface AuthPort {
@@ -38,15 +38,16 @@ export interface HouseholdPort {
 export interface EventPort {
   createEvent(input: EventInput, context?: MutationContext): Promise<Result<CalendarEvent>>;
   /** 繰り返しの予定では、scope が this / future のとき occurrenceDate（対象の回）が必要。 */
-  updateEvent(id: Id, scope: RecurrenceScope, input: Partial<EventInput>, expectedVersion: number, context?: MutationContext, occurrenceDate?: IsoDate): Promise<Result<CalendarEvent>>;
+  updateEvent(id: Id, scope: RecurrenceScope, input: EventUpdateInput, expectedVersion: number, context?: MutationContext, occurrenceDate?: IsoDate): Promise<Result<CalendarEvent>>;
   deleteEvent(id: Id, scope: RecurrenceScope, expectedVersion: number, occurrenceDate?: IsoDate): Promise<Result<void>>;
   restoreEvent(id: Id): Promise<Result<CalendarEvent>>;
 }
 
 export interface TodoPort {
   createTodo(input: TodoInput, context?: MutationContext): Promise<Result<Todo>>;
-  updateTodoStatus(id: Id, status: Todo['status'], expectedVersion: number): Promise<Result<Todo>>;
-  updateTodo(id: Id, scope: RecurrenceScope, input: Partial<TodoInput>, expectedVersion: number, context?: MutationContext): Promise<Result<Todo>>;
+  /** note は次の人への一言。完了のときは完了の一言として残す。 */
+  updateTodoStatus(id: Id, status: Todo['status'], expectedVersion: number, note?: string): Promise<Result<Todo>>;
+  updateTodo(id: Id, scope: RecurrenceScope, input: TodoUpdateInput, expectedVersion: number, context?: MutationContext): Promise<Result<Todo>>;
   /** 繰り返しのタスクでは、scope が this なら今回だけを飛ばして次の回へ進める。 */
   deleteTodo(id: Id, expectedVersion: number, scope?: RecurrenceScope): Promise<Result<void>>;
   restoreTodo(id: Id): Promise<Result<Todo>>;

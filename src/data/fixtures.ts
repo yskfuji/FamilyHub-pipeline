@@ -35,14 +35,22 @@ export const baseSnapshot: HouseholdSnapshot = {
     { id: 'memo-receipt', householdId: 'house-mori', title: '教材費レシート', body: '家計への登録待ち。', updatedAt: '2026-09-30T06:50:00+09:00', authorMembershipId: 'member-aoi', tags: ['家計'], attachments: [{ id: 'attachment-receipt', memoId: 'memo-receipt', originalName: 'receipt.jpg', mimeType: 'image/jpeg', byteSize: 1284300, status: 'quarantined', statusMessage: 'ファイルを確認しています。完了するまで開けません' }], ocrText: '青葉書店　教材 2,860円', visibility: visibleTo('member-aoi', 'adults'), version: 1 },
   ],
   expenses: [
-    { id: 'expense-books', householdId: 'house-mori', title: '学校教材', amountJpy: 2860, incurredOn: '2026-09-29', payerMembershipId: 'member-aoi', category: 'education', shares: [{ membershipId: 'member-aoi', amountJpy: 1430, settledJpy: 1430 }, { membershipId: 'member-ren', amountJpy: 1430, settledJpy: 0 }], settlements: [], note: '花の図工・理科教材', place: { name: '青葉書店', address: '東京都世田谷区', capturedVia: 'manual', selectedAt: '2026-09-29T18:20:00+09:00' }, version: 1 },
-    { id: 'expense-train', householdId: 'house-mori', title: '家族のおでかけ交通費', amountJpy: 3360, incurredOn: '2026-09-27', payerMembershipId: 'member-ren', category: 'transport', shares: [{ membershipId: 'member-aoi', amountJpy: 1680, settledJpy: 0 }, { membershipId: 'member-ren', amountJpy: 1680, settledJpy: 1680 }], settlements: [], version: 1 },
-    { id: 'expense-groceries', householdId: 'house-mori', title: '週末の食材', amountJpy: 5840, incurredOn: '2026-09-26', payerMembershipId: 'member-aoi', category: 'food', shares: [{ membershipId: 'member-aoi', amountJpy: 2920, settledJpy: 2920 }, { membershipId: 'member-ren', amountJpy: 2920, settledJpy: 2920 }], settlements: [{ id: 'settlement-1', amountJpy: 2920, fromMembershipId: 'member-ren', toMembershipId: 'member-aoi', recordedAt: '2026-09-28T20:00:00+09:00' }], version: 1 },
+    { id: 'expense-books', householdId: 'house-mori', kind: 'expense', creatorMembershipId: 'member-aoi', visibility: visibleTo('member-aoi'), title: '学校教材', amountJpy: 2860, incurredOn: '2026-09-29', payerMembershipId: 'member-aoi', category: 'education', shares: [{ membershipId: 'member-aoi', amountJpy: 1430, settledJpy: 1430 }, { membershipId: 'member-ren', amountJpy: 1430, settledJpy: 0 }], settlements: [], note: '花の図工・理科教材', place: { name: '青葉書店', address: '東京都世田谷区', capturedVia: 'manual', selectedAt: '2026-09-29T18:20:00+09:00' }, version: 1 },
+    { id: 'expense-train', householdId: 'house-mori', kind: 'expense', creatorMembershipId: 'member-aoi', visibility: visibleTo('member-aoi'), title: '家族のおでかけ交通費', amountJpy: 3360, incurredOn: '2026-09-27', payerMembershipId: 'member-ren', category: 'transport', shares: [{ membershipId: 'member-aoi', amountJpy: 1680, settledJpy: 0 }, { membershipId: 'member-ren', amountJpy: 1680, settledJpy: 1680 }], settlements: [], version: 1 },
+    { id: 'expense-groceries', householdId: 'house-mori', kind: 'expense', creatorMembershipId: 'member-aoi', visibility: visibleTo('member-aoi'), title: '週末の食材', amountJpy: 5840, incurredOn: '2026-09-26', payerMembershipId: 'member-aoi', category: 'food', shares: [{ membershipId: 'member-aoi', amountJpy: 2920, settledJpy: 2920 }, { membershipId: 'member-ren', amountJpy: 2920, settledJpy: 2920 }], settlements: [{ id: 'settlement-1', amountJpy: 2920, fromMembershipId: 'member-ren', toMembershipId: 'member-aoi', recordedAt: '2026-09-28T20:00:00+09:00' }], version: 1 },
   ],
   resources: [
     { id: 'resource-school', householdId: 'house-mori', label: '青葉小学校の保護者向けページ', url: 'https://example.com/family-hub/school', kind: 'school', relatedEntityId: 'event-school', visibility: visibleTo('member-aoi', 'selected', ['member-aoi','member-ren','member-hana','member-yui']) },
     { id: 'resource-city', householdId: 'house-mori', label: '世田谷区の子育て手続き', url: 'https://example.com/family-hub/city', kind: 'municipality', visibility: visibleTo('member-aoi') },
     { id: 'resource-guide', householdId: 'house-mori', label: '家族の連絡ルール', url: 'https://example.com/family-hub/guide', kind: 'document', visibility: visibleTo('member-aoi', 'selected', ['member-aoi','member-ren','member-hana','member-sora','member-yui']) },
+  ],
+  links: [
+    { id: 'link-school', householdId: 'house-mori', from: { kind: 'event', id: 'event-school' }, to: { kind: 'memo', id: 'memo-school' }, createdByMembershipId: 'member-aoi', createdAt: '2026-09-29T21:12:00+09:00' },
+  ],
+  colorLabels: [
+    { id: 'label-school', householdId: 'house-mori', name: '学校', color: '#315c80' },
+    { id: 'label-home', householdId: 'house-mori', name: '家のこと', color: '#6f7552' },
+    { id: 'label-lesson', householdId: 'house-mori', name: '習いごと', color: '#a94f38' },
   ],
   context: {
     asOf: fixedNow,

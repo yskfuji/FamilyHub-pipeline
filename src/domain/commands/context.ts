@@ -1,6 +1,6 @@
-import { authorize, capabilitiesFor, projectSnapshotForViewer, redactPlace } from '../../authz/policy';
+import { allowedAudiencesFor, authorize, capabilitiesFor, projectSnapshotForViewer, redactPlace } from '../../authz/policy';
 import { ja } from '../../content/ja';
-import type { AuthorizationDecision, CalendarEvent, Capability, Expense, GatewayError, HouseholdInvite, HouseholdMembership, HouseholdNotification, HouseholdSnapshot, Id, Memo, MutationContext, NotificationPreferences, PermissionOverride, PlaceRef, PrivacySettings, Result, Rfc3339, Todo, User, ViewerContext } from '../types';
+import type { AuthorizationDecision, CalendarEvent, Capability, Expense, GatewayError, HouseholdInvite, HouseholdMembership, HouseholdNotification, HouseholdSnapshot, Id, Memo, MutationContext, NotificationPreferences, PermissionOverride, PlaceRef, PrivacySettings, Result, Rfc3339, Todo, User, ViewerContext, VisibilityAudience, VisibilityPolicy } from '../types';
 
 /** 非同期のポートを、同じ引数で同期に結果を返す形へ置き換える。規則は同期で書き、遅延や保存は呼び出し側が担う。 */
 export type SyncPort<P> = { [K in keyof P]: P[K] extends (...args: infer A) => Promise<infer R> ? (...args: A) => R : never };
@@ -42,6 +42,14 @@ export const denied = <T,>(decision: AuthorizationDecision, message = ja.errors.
 export const missing = <T,>(label: string): Result<T> => fail({ code: 'NOT_FOUND', message: `${label}が見つからないか、表示する権限がありません。`, retryable: false });
 export const invalid = <T,>(issues: ReadonlyArray<{ message: string }>): Result<T> => fail({ code: 'INVALID_INPUT', message: issues[0]?.message ?? '入力を確認してください。', retryable: false });
 export const conflict = <T,>(label: string): Result<T> => fail({ code: 'CONFLICT', message: `別の端末で${label}が更新されています。現在の内容を確認してください。`, retryable: true, reason: 'VERSION' });
+/** 変更を当てる。null は項目を外す。undefined は変えない。 */
+export function applyPatch<T extends object>(target: T, changes: object) {
+  const record = target as Record<string, unknown>;
+  for (const [key, value] of Object.entries(changes)) {
+    if (value === undefined) continue;
+    if (value === null) delete record[key]; else record[key] = value;
+  }
+}
 export const archive = <T,>(record: Record<Id, T>, id: Id, value: T) => { record[id] = value; };
 
 export type CommandContext = ReturnType<typeof createCommandContext>;
@@ -80,13 +88,22 @@ export function createCommandContext(a: HouseholdAggregate, env: CommandEnv) {
     const known = new Set(state.memberships.map((item) => item.id));
     return ids.some((id) => id !== undefined && !known.has(id)) ? invalid<T>([{ message: '選んだ人を確認してください。' }]) : null;
   };
+  /** 入力された公開範囲を、作った人を保ったまま確かめる。 */
+  const resolveVisibility = (input: { audience: VisibilityAudience; selectedMembershipIds?: Id[] }, creatorMembershipId: Id): Result<VisibilityPolicy> => {
+    if (!allowedAudiencesFor(viewer().role).includes(input.audience)) return denied({ allowed: false, reason: 'SCOPE_DENIED' }, 'この公開範囲は選べません。');
+    const selectedMembershipIds = input.selectedMembershipIds ?? [];
+    const outsider = foreignMember<VisibilityPolicy>(selectedMembershipIds); if (outsider) return outsider;
+    if (input.audience === 'selected' && selectedMembershipIds.length === 0) return invalid([{ message: '公開する人を1人以上選んでください。' }]);
+    return ok({ audience: input.audience, creatorMembershipId, selectedMembershipIds: input.audience === 'selected' ? selectedMembershipIds : [] });
+  };
+  /** 色のリストは同じ家族のものだけを指せる。 */
+  const foreignLabel = <T,>(id: Id | null | undefined): Result<T> | null => id && !state.colorLabels.some((item) => item.id === id) ? invalid<T>([{ message: 'リストを確認してください。' }]) : null;
   const project = (): HouseholdSnapshot => {
     const current = viewer();
-    const snapshot = projectSnapshotForViewer(state, current);
-    snapshot.permissionOverrides = current.role === 'owner' ? structuredClone(a.permissionOverrides) : [];
+    const snapshot = projectSnapshotForViewer({ ...state, permissionOverrides: a.permissionOverrides }, current);
     const base = { ...snapshot.user, id: current.userId, displayName: actor().displayName };
     snapshot.user = env.describeUser?.(actor(), base) ?? base;
     return snapshot;
   };
-  return { a, state, env, now, nextId, actor, viewer, requireCapability, offlineFailure, permissionConflict, visible, placeWriteGuard, withinRestoreWindow, defaultVisibility, foreignMember, project };
+  return { a, state, env, now, nextId, actor, viewer, requireCapability, offlineFailure, permissionConflict, visible, placeWriteGuard, withinRestoreWindow, defaultVisibility, foreignMember, foreignLabel, resolveVisibility, project };
 }

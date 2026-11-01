@@ -1,14 +1,16 @@
-import type { Expense, Id, SettlementRecord } from './types';
+import type { Expense, Id, IncomeCategory, SettlementRecord, SpendingCategory } from './types';
 
 /**
  * 家計の集計。画面・ヒント・今日の画面が同じ計算を使い、表示が食い違わないようにする。
  * 入力は閲覧者に見えている支出（削除済みを除く）とする。
  */
 
-export type ExpenseCategory = Expense['category'];
-export const expenseCategories: readonly ExpenseCategory[] = ['food', 'transport', 'education', 'home', 'other'];
+export type ExpenseCategory = SpendingCategory;
+export const expenseCategories: readonly SpendingCategory[] = ['food', 'dining', 'transport', 'utilities', 'home', 'education', 'health', 'entertainment', 'shopping', 'savings', 'other'];
+export const incomeCategories: readonly IncomeCategory[] = ['income_salary', 'income_bonus', 'income_side', 'income_investment', 'income_gift', 'income_other'];
 
 const live = (expenses: Expense[]) => expenses.filter((expense) => !expense.deletedAt);
+const spending = (expenses: Expense[]) => live(expenses).filter((expense) => expense.kind !== 'income');
 
 /** 支払った人以外の負担のうち、まだ精算されていない額。 */
 export function remainingOf(expense: Expense): Array<{ membershipId: Id; amountJpy: number }> {
@@ -31,7 +33,13 @@ export function settledNet(expenses: Expense[]): number {
 }
 
 export function monthSummary(expenses: Expense[], monthKey: string) {
-  const inMonth = live(expenses).filter((expense) => expense.incurredOn.startsWith(`${monthKey}-`));
+  const inMonth = spending(expenses).filter((expense) => expense.incurredOn.startsWith(`${monthKey}-`));
+  return { totalJpy: inMonth.reduce((sum, expense) => sum + expense.amountJpy, 0), count: inMonth.length };
+}
+
+/** 月の収入の合計。支出の集計には含めない。 */
+export function monthIncome(expenses: Expense[], monthKey: string) {
+  const inMonth = live(expenses).filter((expense) => expense.kind === 'income' && expense.incurredOn.startsWith(`${monthKey}-`));
   return { totalJpy: inMonth.reduce((sum, expense) => sum + expense.amountJpy, 0), count: inMonth.length };
 }
 
@@ -49,7 +57,7 @@ function percentages(values: number[]): number[] {
 
 /** 費目別の合計（多い順）。0円の費目は出さない。 */
 export function categoryBreakdown(expenses: Expense[], monthKey: string) {
-  const inMonth = live(expenses).filter((expense) => expense.incurredOn.startsWith(`${monthKey}-`));
+  const inMonth = spending(expenses).filter((expense) => expense.incurredOn.startsWith(`${monthKey}-`));
   const totals = expenseCategories
     .map((category) => ({ category, totalJpy: inMonth.filter((expense) => expense.category === category).reduce((sum, expense) => sum + expense.amountJpy, 0) }))
     .filter((item) => item.totalJpy > 0)

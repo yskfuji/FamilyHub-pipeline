@@ -47,7 +47,9 @@ export type Capability =
   | 'event.read' | 'event.create' | 'event.update' | 'event.delete'
   | 'task.read' | 'task.create' | 'task.update' | 'task.delete' | 'task.transition'
   | 'memo.read' | 'memo.create' | 'memo.update' | 'memo.delete' | 'memo.attach'
-  | 'expense.read' | 'expense.create' | 'expense.settle'
+  | 'expense.read' | 'expense.create' | 'expense.update' | 'expense.delete' | 'expense.settle'
+  | 'album.read' | 'album.create' | 'album.update' | 'album.delete'
+  | 'link.manage' | 'assistant.use'
   | 'place.read'
   | 'insight.read' | 'resource.read' | 'settings.own' | 'notification.manage';
 export interface PermissionOverride { membershipId: Id; capability: Capability; effect: 'allow' | 'deny'; }
@@ -93,6 +95,9 @@ export interface CalendarEvent {
   endsAt: Rfc3339;
   timezone: string;
   allDay?: boolean;
+  colorLabelId?: Id;
+  /** 開始の何分前に知らせるか。 */
+  reminderMinutesBefore?: number;
   ownerMembershipId: Id;
   participantMembershipIds: Id[];
   location?: string;
@@ -105,13 +110,22 @@ export interface CalendarEvent {
   deletedAt?: Rfc3339;
 }
 
-export type TodoStatus = 'open' | 'doing' | 'review' | 'done';
+export type TodoStatus = 'open' | 'doing' | 'review' | 'waiting' | 'done';
+export type TodoPriority = 'low' | 'normal' | 'high';
 export interface Todo {
   id: Id;
   householdId: Id;
   title: string;
   dueAt?: Rfc3339;
+  /** 期間で管理するタスクの開始。dueAt を終わりとして扱う。 */
+  dueStartAt?: Rfc3339;
   status: TodoStatus;
+  priority?: TodoPriority;
+  colorLabelId?: Id;
+  /** 次の人へ渡すときの一言。 */
+  handoffNote?: string;
+  /** 完了したときの一言。 */
+  completionNote?: string;
   assigneeMembershipId: Id;
   reviewerMembershipId?: Id;
   creatorMembershipId: Id;
@@ -157,6 +171,8 @@ export interface Memo {
   title: string;
   body: string;
   updatedAt: Rfc3339;
+  /** メモが指す日。作った日と分けて持つ。 */
+  memoDate?: IsoDate;
   authorMembershipId: Id;
   tags: string[];
   attachments: Attachment[];
@@ -183,18 +199,25 @@ export interface SettlementRecord {
   reversalOfSettlementId?: Id;
 }
 
+export type SpendingCategory = 'food' | 'dining' | 'transport' | 'utilities' | 'home' | 'education' | 'health' | 'entertainment' | 'shopping' | 'savings' | 'other';
+export type IncomeCategory = 'income_salary' | 'income_bonus' | 'income_side' | 'income_investment' | 'income_gift' | 'income_other';
+
 export interface Expense {
   id: Id;
   householdId: Id;
+  /** expense は支出、income は収入。収入には負担と精算がない。 */
+  kind: 'expense' | 'income';
   title: string;
   amountJpy: number;
   incurredOn: IsoDate;
   payerMembershipId: Id;
-  category: 'food' | 'transport' | 'education' | 'home' | 'other';
+  creatorMembershipId: Id;
+  category: SpendingCategory | IncomeCategory;
   shares: ExpenseShare[];
   settlements: SettlementRecord[];
   note?: string;
   place?: PlaceRef;
+  visibility: VisibilityPolicy;
   version: number;
   deletedAt?: Rfc3339;
 }
@@ -207,6 +230,26 @@ export interface ResourceLink {
   kind: 'school' | 'municipality' | 'document' | 'other';
   relatedEntityId?: Id;
   visibility: VisibilityPolicy;
+}
+
+export type LinkedItemKind = 'event' | 'task' | 'memo' | 'expense';
+export interface LinkedItemRef { kind: LinkedItemKind; id: Id }
+/** 予定・タスク・メモ・支出のあいだの関連づけ。外部の URL を指す ResourceLink とは別のもの。 */
+export interface ItemLink {
+  id: Id;
+  householdId: Id;
+  from: LinkedItemRef;
+  to: LinkedItemRef;
+  createdByMembershipId: Id;
+  createdAt: Rfc3339;
+}
+
+/** 色に名前を付けたリスト。予定とタスクの分類に使う。 */
+export interface ColorLabel {
+  id: Id;
+  householdId: Id;
+  name: string;
+  color: string;
 }
 
 export interface ContextSnapshot {
@@ -235,6 +278,8 @@ export interface HouseholdSnapshot {
   memos: Memo[];
   expenses: Expense[];
   resources: ResourceLink[];
+  links: ItemLink[];
+  colorLabels: ColorLabel[];
   context: ContextSnapshot;
 }
 

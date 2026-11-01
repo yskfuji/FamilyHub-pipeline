@@ -60,12 +60,12 @@ test('search finds expenses, places and memo text, and opens the detail', async 
 });
 
 test('deleting a memo shows the restore option even after the data refreshes', async ({ page }) => {
-  await page.goto('/notes/memo-clinic');
+  await page.goto('/notes/memo-receipt');
   await page.getByRole('button', { name: 'メモを削除' }).click();
   await page.getByRole('dialog', { name: 'メモを削除しますか' }).getByRole('button', { name: '削除する' }).click();
-  await expect(page.getByText('「小児科の控え」を削除しました')).toBeVisible();
+  await expect(page.getByText('「教材費レシート」を削除しました')).toBeVisible();
   await page.getByRole('button', { name: '元に戻す' }).click();
-  await expect(page.getByRole('heading', { name: '小児科の控え' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '教材費レシート' })).toBeVisible();
 });
 
 test('privacy settings change sharing defaults and notification content; sign-out returns to the start', async ({ page }) => {

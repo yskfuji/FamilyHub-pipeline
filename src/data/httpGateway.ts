@@ -127,7 +127,7 @@ export function createHttpGateway(baseUrl: string, getCsrfToken: () => string, g
     },
     todos: {
       createTodo: (input, context) => request('/v1/todos', { method: 'POST', body: JSON.stringify(input), csrf: true, ...mutationHeaders(context) }),
-      updateTodoStatus: (id, status, expectedVersion) => request(`/v1/todos/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: JSON.stringify({ status, expectedVersion }), csrf: true }),
+      updateTodoStatus: (id, status, expectedVersion, note) => request(`/v1/todos/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: JSON.stringify({ status, expectedVersion, ...(note ? { note } : {}) }), csrf: true }),
       updateTodo: (id, scope, input, expectedVersion, context) => request(`/v1/todos/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ scope, input, expectedVersion }), csrf: true, ...mutationHeaders(context) }),
       deleteTodo: (id, expectedVersion, scope = 'series') => request(`/v1/todos/${encodeURIComponent(id)}?${new URLSearchParams({ scope, expectedVersion: String(expectedVersion) })}`, { method: 'DELETE', csrf: true }),
       restoreTodo: (id) => request(`/v1/todos/${encodeURIComponent(id)}/restore`, { method: 'POST', csrf: true }),

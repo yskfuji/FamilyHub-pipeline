@@ -1,8 +1,8 @@
 import type { MemoPort } from '../../data/gateway';
-import { authorizeVisibleResource, canMutateOwnedResource } from '../../authz/policy';
+import { authorizeVisibleResource, canDeleteResource, canMutateOwnedResource } from '../../authz/policy';
 import { memoInputSchema } from '../schemas';
 import type { Attachment, Id, Memo, Result } from '../types';
-import { archive, denied, invalid, missing, ok, fail } from './context';
+import { applyPatch, archive, denied, invalid, missing, ok, fail } from './context';
 import type { CommandContext, SyncPort } from './context';
 
 type RuleMemoPort = SyncPort<Omit<MemoPort, 'uploadAttachment' | 'getAttachmentLink'>> & {
@@ -14,7 +14,7 @@ type RuleMemoPort = SyncPort<Omit<MemoPort, 'uploadAttachment' | 'getAttachmentL
 };
 
 export function createMemoCommands(c: CommandContext): RuleMemoPort {
-  const { a, state, nextId, now, viewer, requireCapability, offlineFailure, permissionConflict, visible, placeWriteGuard, withinRestoreWindow, defaultVisibility } = c;
+  const { a, state, nextId, now, viewer, requireCapability, offlineFailure, permissionConflict, visible, placeWriteGuard, withinRestoreWindow, defaultVisibility, resolveVisibility } = c;
   const seen = (item: Memo) => authorizeVisibleResource(viewer(), 'memo.read', item.visibility, [item.authorMembershipId]).allowed;
   return {
     createMemo(input, context) {
@@ -24,8 +24,10 @@ export function createMemoCommands(c: CommandContext): RuleMemoPort {
       const network = offlineFailure<Memo>(); if (network) return network;
       const parsed = memoInputSchema.safeParse(input);
       if (!parsed.success) return invalid(parsed.error.issues);
-      const { place, ...fields } = parsed.data;
-      const memo: Memo = { id: nextId('memo'), householdId: state.household.id, ...fields, ...(place ? { place } : {}), updatedAt: now(), authorMembershipId: viewer().membershipId, attachments: [], visibility: defaultVisibility(), version: 1 };
+      const { place, memoDate, ocrText, visibility: requested, ...fields } = parsed.data;
+      const visibility = requested ? resolveVisibility(requested, viewer().membershipId) : ok(defaultVisibility());
+      if (!visibility.ok) return visibility;
+      const memo: Memo = { id: nextId('memo'), householdId: state.household.id, ...fields, ...(place ? { place } : {}), ...(memoDate ? { memoDate: memoDate as Memo['memoDate'] } : {}), ...(ocrText ? { ocrText } : {}), updatedAt: now(), authorMembershipId: viewer().membershipId, attachments: [], visibility: visibility.value, version: 1 };
       state.memos = [memo, ...state.memos];
       return ok(visible(memo));
     },
@@ -38,10 +40,11 @@ export function createMemoCommands(c: CommandContext): RuleMemoPort {
       if (target.version !== expectedVersion) return fail({ code: 'CONFLICT', message: '別の端末でメモが更新されています。', retryable: true, reason: 'VERSION' });
       const parsed = memoInputSchema.partial().safeParse(input);
       if (!parsed.success) return invalid(parsed.error.issues);
-      const { place, ...fields } = parsed.data;
-      Object.assign(target, fields);
-      if (place === null) delete target.place;
-      else if (place) target.place = place;
+      const { visibility: requested, ...fields } = parsed.data;
+      const visibility = requested ? resolveVisibility(requested, target.visibility.creatorMembershipId) : null;
+      if (visibility && !visibility.ok) return visibility;
+      applyPatch(target, fields);
+      if (visibility?.ok) target.visibility = visibility.value;
       target.version += 1; target.updatedAt = now(); return ok(visible(target));
     },
     acceptAttachment(memoId, file) {
@@ -73,13 +76,13 @@ export function createMemoCommands(c: CommandContext): RuleMemoPort {
     },
     deleteMemo(id) {
       const target = state.memos.find((item) => item.id === id && !item.deletedAt); if (!target || !seen(target)) return missing('メモ');
-      const decision = canMutateOwnedResource(viewer(), 'memo.delete', target.authorMembershipId); if (!decision.allowed) return denied(decision);
+      const decision = canDeleteResource(viewer(), 'memo.delete', [target.authorMembershipId]); if (!decision.allowed) return denied(decision);
       const network = offlineFailure<void>(); if (network) return network;
       target.deletedAt = now(); archive(a.archives.memos, id, structuredClone(target)); return ok(undefined);
     },
     restoreMemo(id) {
       const target = state.memos.find((item) => item.id === id) ?? a.archives.memos[id]; if (!target || !seen(target)) return missing('メモ');
-      const decision = canMutateOwnedResource(viewer(), 'memo.update', target.authorMembershipId); if (!decision.allowed) return denied(decision);
+      const decision = canDeleteResource(viewer(), 'memo.delete', [target.authorMembershipId]); if (!decision.allowed) return denied(decision);
       if (!withinRestoreWindow(target.deletedAt)) return fail({ code: 'CONFLICT', message: '削除から7日を過ぎたため、元に戻せません。', retryable: false });
       delete target.deletedAt; target.version += 1; delete a.archives.memos[id]; return ok(visible(target));
     },

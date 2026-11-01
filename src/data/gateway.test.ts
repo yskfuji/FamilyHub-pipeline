@@ -69,6 +69,63 @@ describe('mock gateway state transitions', () => {
     expect(single).toMatchObject({ ok: true, value: { startsAt: '2026-10-12T09:00:00+09:00', endsAt: '2026-10-14T17:00:00+09:00' } });
   });
 
+  it('lets only stakeholders delete, even when the viewer is the owner', async () => {
+    const owner = createMockGateway();
+    expect(await owner.todos.deleteTodo('todo-done', 3)).toMatchObject({ ok: false, error: { code: 'FORBIDDEN', reason: 'SCOPE_DENIED' } });
+    const adult = createMockGateway('member-ren');
+    expect(await adult.events.deleteEvent('event-school', 'series', 1)).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } });
+    expect(await adult.expenses.deleteExpense('expense-books', 1)).toMatchObject({ ok: false, error: { code: 'FORBIDDEN', reason: 'SCOPE_DENIED' } });
+  });
+
+  it('honors a chosen audience and refuses wide audiences for children', async () => {
+    const child = createMockGateway('member-hana');
+    expect(await child.memos.createMemo({ title: 'メモ', body: '本文', tags: [], visibility: { audience: 'household' } })).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
+    expect(await child.memos.createMemo({ title: 'メモ', body: '本文', tags: [], visibility: { audience: 'selected', selectedMembershipIds: ['member-aoi'] } })).toMatchObject({ ok: true, value: { visibility: { audience: 'selected', creatorMembershipId: 'member-hana', selectedMembershipIds: ['member-aoi'] } } });
+    const owner = createMockGateway();
+    expect(await owner.memos.createMemo({ title: 'メモ', body: '本文', tags: [], visibility: { audience: 'selected' } })).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+  });
+
+  it('clears optional event and task fields with null and refuses unknown lists', async () => {
+    const gateway = createMockGateway();
+    const cleared = await gateway.events.updateEvent('event-school', 'series', { note: null, location: null }, 1);
+    expect(cleared.ok && 'note' in cleared.value).toBe(false);
+    expect(await gateway.events.updateEvent('event-school', 'series', { colorLabelId: 'label-other' }, 2)).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+    const task = await gateway.todos.updateTodo('todo-form', 'series', { dueAt: null, priority: 'high', colorLabelId: 'label-home' }, 2);
+    expect(task).toMatchObject({ ok: true, value: { priority: 'high', colorLabelId: 'label-home' } });
+    expect(task.ok && 'dueAt' in task.value).toBe(false);
+    expect(await gateway.todos.createTodo({ title: '順序', assigneeMembershipId: 'member-aoi', dueStartAt: '2026-10-05T10:00:00+09:00', dueAt: '2026-10-05T09:00:00+09:00' })).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+  });
+
+  it('keeps one-line comments on hand-off and completion', async () => {
+    const gateway = createMockGateway();
+    const waiting = await gateway.todos.updateTodoStatus('todo-library', 'waiting', 1, '返却の窓口が開くまで');
+    expect(waiting).toMatchObject({ ok: true, value: { status: 'waiting', handoffNote: '返却の窓口が開くまで' } });
+    if (!waiting.ok) return;
+    expect(await gateway.todos.updateTodoStatus('todo-library', 'done', waiting.value.version, '返しました')).toMatchObject({ ok: true, value: { status: 'done', completionNote: '返しました' } });
+  });
+
+  it('records income without shares and accepts exact split amounts', async () => {
+    const gateway = createMockGateway();
+    const income = await gateway.expenses.createExpense({ title: '給与', amountJpy: 300000, incurredOn: '2026-09-25', payerMembershipId: 'member-aoi', kind: 'income', category: 'income_salary' });
+    expect(income).toMatchObject({ ok: true, value: { kind: 'income', shares: [] } });
+    expect(await gateway.expenses.createExpense({ title: '給与', amountJpy: 300000, incurredOn: '2026-09-25', payerMembershipId: 'member-aoi', kind: 'income', category: 'food' })).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+    expect(await gateway.expenses.createExpense({ title: '合計違い', amountJpy: 1000, incurredOn: '2026-09-25', payerMembershipId: 'member-aoi', shareAmounts: [{ membershipId: 'member-ren', amountJpy: 900 }] })).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+    const exact = await gateway.expenses.createExpense({ title: '指定', amountJpy: 1000, incurredOn: '2026-09-25', payerMembershipId: 'member-aoi', shareAmounts: [{ membershipId: 'member-aoi', amountJpy: 300 }, { membershipId: 'member-ren', amountJpy: 700 }] });
+    expect(exact).toMatchObject({ ok: true, value: { shares: [{ membershipId: 'member-aoi', amountJpy: 300, settledJpy: 300 }, { membershipId: 'member-ren', amountJpy: 700, settledJpy: 0 }] } });
+  });
+
+  it('hides links whose other end the viewer cannot see', async () => {
+    const owner = await createMockGateway().household.getSnapshot();
+    expect(owner.ok && owner.value.links.map((link) => link.id)).toEqual(['link-school']);
+    const guest = await createMockGateway('member-yui').household.getSnapshot();
+    expect(guest.ok && guest.value.links).toEqual([]);
+  });
+
+  it('refuses a recurrence the calendar cannot expand', async () => {
+    const gateway = createMockGateway();
+    expect(await gateway.events.createEvent({ title: '年1回', startsAt: '2026-10-05T09:00:00+09:00', endsAt: '2026-10-05T10:00:00+09:00', timezone: 'Asia/Tokyo', participantMembershipIds: ['member-aoi'], recurrence: { rrule: 'FREQ=YEARLY', timezone: 'Asia/Tokyo', exceptions: [] } })).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+  });
+
   it('answers NOT_FOUND for an unknown notification', async () => {
     expect(await createMockGateway().notifications.markRead('notification-unknown')).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } });
   });

@@ -97,12 +97,19 @@ export function AppProvider({ children }: PropsWithChildren) {
     void gateway.household.getPrivacySettings().then((result) => { if (mounted && result.ok) setPrivacy(result.value); });
     return () => { mounted = false; };
   }, [gateway, snapshot.viewer.capabilities]);
-  const updatePrivacy = useCallback(async (patch: Partial<PrivacySettings>): Promise<Result<PrivacySettings>> => {
-    const latest = await gateway.household.getPrivacySettings();
-    if (!latest.ok) return latest;
-    const result = await gateway.household.savePrivacySettings({ ...latest.value, ...patch });
-    if (result.ok) setPrivacy(result.value);
-    return result;
+  // 読み込みと保存の組を順に処理する。続けて操作しても、先の保存が後の変更を上書きしないようにする。
+  const privacyQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const updatePrivacy = useCallback((patch: Partial<PrivacySettings>): Promise<Result<PrivacySettings>> => {
+    const run = async (): Promise<Result<PrivacySettings>> => {
+      const latest = await gateway.household.getPrivacySettings();
+      if (!latest.ok) return latest;
+      const result = await gateway.household.savePrivacySettings({ ...latest.value, ...patch });
+      if (result.ok) setPrivacy(result.value);
+      return result;
+    };
+    const next = privacyQueue.current.then(run, run);
+    privacyQueue.current = next;
+    return next;
   }, [gateway]);
   useEffect(() => { queueMicrotask(() => void loadQueue()); }, [loadQueue]);
   useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem('family-hub-theme', theme); }, [theme]);

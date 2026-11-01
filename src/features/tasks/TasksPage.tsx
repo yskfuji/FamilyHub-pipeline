@@ -9,9 +9,9 @@ import { CheckIcon, ClockIcon, PeopleIcon } from '../../design-system/icons';
 import { ja, recurrenceLabel, taskStatusLabels } from '../../content/ja';
 
 const columns: Array<{ status: TodoStatus; label: string }> = (Object.keys(taskStatusLabels) as TodoStatus[]).map((status) => ({ status, label: taskStatusLabels[status] }));
-const nextStatus: Record<TodoStatus, TodoStatus> = { open: 'doing', doing: 'review', review: 'done', done: 'open' };
-const nextLabel: Record<TodoStatus, string> = { open: '着手する', doing: '確認を依頼する', review: '完了にする', done: '未着手に戻す' };
-const statusChangeMessage: Record<TodoStatus, string> = { open: '進行中にしました', doing: '確認を依頼しました', review: '完了にしました', done: '未着手に戻しました' };
+const nextStatus: Record<TodoStatus, TodoStatus> = { open: 'doing', doing: 'review', review: 'done', waiting: 'doing', done: 'open' };
+const nextLabel: Record<TodoStatus, string> = { open: '着手する', doing: '確認を依頼する', review: '完了にする', waiting: '再開する', done: '未着手に戻す' };
+const statusChangeMessage: Record<TodoStatus, string> = { open: '進行中にしました', doing: '確認を依頼しました', review: '完了にしました', waiting: '再開しました', done: '未着手に戻しました' };
 // 確認する人がいないタスクは「確認を依頼する」を飛ばして完了にする（依頼先がないまま確認待ちにしない）。
 const transitionOf = (todo: Todo): { status: TodoStatus; label: string; message: string } => (todo.status === 'doing' && !todo.reviewerMembershipId
   ? { status: 'done', label: '完了にする', message: '完了にしました' }

@@ -460,7 +460,8 @@ paths:
               type: object
               required: [status, expectedVersion]
               properties:
-                status: { enum: [open, doing, review, done] }
+                status: { enum: [open, doing, review, waiting, done] }
+                note: { type: string, maxLength: 500 }
                 expectedVersion: { type: integer, minimum: 1 }
       responses:
         '200':
@@ -1007,6 +1008,18 @@ components:
         assigneeMembershipId: { type: string }
         reviewerMembershipId: { type: string }
         note: { type: string, maxLength: 2000 }
+        dueStartAt: { type: string, format: date-time }
+        priority: { enum: [low, normal, high] }
+        colorLabelId: { type: string }
+        recurrence: { $ref: '#/components/schemas/Recurrence' }
+        visibility: { $ref: '#/components/schemas/VisibilityInput' }
+    VisibilityInput:
+      type: object
+      additionalProperties: false
+      required: [audience]
+      properties:
+        audience: { enum: [household, adults, participants, creator, selected] }
+        selectedMembershipIds: { type: array, maxItems: 8, items: { type: string } }
     Todo:
       allOf:
         - { $ref: '#/components/schemas/TodoInput' }
@@ -1015,9 +1028,10 @@ components:
           properties:
             id: { type: string }
             householdId: { type: string }
-            status: { enum: [open, doing, review, done] }
+            status: { enum: [open, doing, review, waiting, done] }
             creatorMembershipId: { type: string }
-            recurrence: { $ref: '#/components/schemas/Recurrence' }
+            handoffNote: { type: string }
+            completionNote: { type: string }
             version: { type: integer, minimum: 1 }
             visibility: { $ref: '#/components/schemas/VisibilityPolicy' }
             deletedAt: { type: string, format: date-time }
@@ -1061,7 +1075,19 @@ components:
           type: array
           minItems: 1
           items: { type: string }
-        category: { enum: [food, transport, education, home, other], default: other }
+        category: { enum: [food, dining, transport, utilities, home, education, health, entertainment, shopping, savings, other, income_salary, income_bonus, income_side, income_investment, income_gift, income_other] }
+        kind: { enum: [expense, income], default: expense }
+        shareAmounts:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required: [membershipId, amountJpy]
+            properties:
+              membershipId: { type: string }
+              amountJpy: { type: integer, minimum: 0 }
+        visibility: { $ref: '#/components/schemas/VisibilityInput' }
         note: { type: string, maxLength: 500 }
         place: { $ref: '#/components/schemas/PlaceRef' }
     ExpensePatch:
@@ -1073,7 +1099,9 @@ components:
         incurredOn: { type: string, format: date }
         payerMembershipId: { type: string }
         shareMembershipIds: { type: array, minItems: 1, items: { type: string } }
-        category: { enum: [food, transport, education, home, other] }
+        shareAmounts: { type: array, minItems: 1, items: { type: object, additionalProperties: false, required: [membershipId, amountJpy], properties: { membershipId: { type: string }, amountJpy: { type: integer, minimum: 0 } } } }
+        category: { enum: [food, dining, transport, utilities, home, education, health, entertainment, shopping, savings, other, income_salary, income_bonus, income_side, income_investment, income_gift, income_other] }
+        visibility: { $ref: '#/components/schemas/VisibilityInput' }
         note: { oneOf: [{ type: string, maxLength: 500 }, { type: 'null' }] }
         place: { oneOf: [{ $ref: '#/components/schemas/PlaceRef' }, { type: 'null' }] }
     ExpenseShare:
@@ -1097,15 +1125,18 @@ components:
         reversalOfSettlementId: { type: string }
     Expense:
       type: object
-      required: [id, householdId, title, amountJpy, incurredOn, payerMembershipId, category, shares, settlements, version]
+      required: [id, householdId, kind, title, amountJpy, incurredOn, payerMembershipId, creatorMembershipId, category, shares, settlements, visibility, version]
       properties:
         id: { type: string }
         householdId: { type: string }
+        kind: { enum: [expense, income] }
+        creatorMembershipId: { type: string }
+        visibility: { $ref: '#/components/schemas/VisibilityPolicy' }
         title: { type: string, maxLength: 120 }
         amountJpy: { type: integer, minimum: 1 }
         incurredOn: { type: string, format: date }
         payerMembershipId: { type: string }
-        category: { enum: [food, transport, education, home, other] }
+        category: { enum: [food, dining, transport, utilities, home, education, health, entertainment, shopping, savings, other, income_salary, income_bonus, income_side, income_investment, income_gift, income_other] }
         shares: { type: array, items: { $ref: '#/components/schemas/ExpenseShare' } }
         settlements: { type: array, items: { $ref: '#/components/schemas/SettlementRecord' } }
         note: { type: string, maxLength: 500 }
