@@ -52,9 +52,11 @@ export function createMemoCommands(c: CommandContext): RuleMemoPort {
       if (!target || !seen(target)) return missing('メモ');
       const decision = canMutateOwnedResource(viewer(), 'memo.attach', target.authorMembershipId); if (!decision.allowed) return denied(decision);
       const network = offlineFailure<Attachment>(); if (network) return network;
-      if (file.byteSize > 10_000_000 || !['application/pdf', 'image/jpeg', 'image/png'].includes(file.mimeType)) {
-        return fail({ code: 'ATTACHMENT_REJECTED', message: '形式またはサイズが許可範囲外です。PDF・JPEG・PNG、10MB以内にしてください。', retryable: false });
-      }
+      const video = ['video/mp4', 'video/quicktime'].includes(file.mimeType);
+      if (!video && !['application/pdf', 'image/jpeg', 'image/png'].includes(file.mimeType)) return fail({ code: 'ATTACHMENT_REJECTED', message: '形式が許可範囲外です。PDF・JPEG・PNG・MP4にしてください。', retryable: false });
+      if (file.byteSize > (video ? 120_000_000 : 10_000_000)) return fail({ code: 'ATTACHMENT_REJECTED', message: video ? '動画は120MB以内にしてください。' : 'サイズが許可範囲外です。10MB以内にしてください。', retryable: false });
+      const used = state.memos.flatMap((memo) => memo.attachments).reduce((sum, item) => sum + item.byteSize, 0);
+      if (used + file.byteSize > 1024 * 1024 * 1024) return fail({ code: 'ATTACHMENT_REJECTED', message: '添付の保存容量を超えます。不要な添付を削除してください。', retryable: false });
       const attachment: Attachment = { id: nextId('attachment'), memoId, originalName: file.originalName, mimeType: file.mimeType, byteSize: file.byteSize, status: 'quarantined', statusMessage: 'ファイルを確認しています。完了するまで開けません' };
       target.attachments.push(attachment);
       return ok(structuredClone(attachment));
@@ -65,6 +67,15 @@ export function createMemoCommands(c: CommandContext): RuleMemoPort {
       Object.assign(attachment, status === 'clean'
         ? { status, statusMessage: '確認が終わり、開ける状態です' }
         : { status, statusMessage: '安全を確認できなかったため、開けません' });
+    },
+    deleteAttachment(memoId, attachmentId) {
+      const target = state.memos.find((memo) => memo.id === memoId && !memo.deletedAt);
+      if (!target || !seen(target)) return missing('メモ');
+      const decision = canMutateOwnedResource(viewer(), 'memo.attach', target.authorMembershipId); if (!decision.allowed) return denied(decision);
+      if (!target.attachments.some((item) => item.id === attachmentId)) return missing('添付ファイル');
+      target.attachments = target.attachments.filter((item) => item.id !== attachmentId);
+      target.version += 1; target.updatedAt = now();
+      return ok(undefined);
     },
     readableAttachment(memoId, attachmentId) {
       const target = state.memos.find((memo) => memo.id === memoId && !memo.deletedAt);

@@ -1,9 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { serverMessages } from '../../../src/content/serverMessages';
 import { idSchema, isoDateSchema } from '../../../src/domain/schemas';
 import type { IsoDate, MutationContext, RecurrenceScope, Todo } from '../../../src/domain/types';
-import { sendError } from '../context';
 import type { AppDeps, RouteDeclaration } from '../context';
 import { parse } from '../parse';
 import { mutate, read } from '../rules';
@@ -58,11 +56,6 @@ export function registerContentRoutes(app: FastifyInstance, deps: AppDeps) {
   });
   app.delete('/v1/memos/:memoId', { config: declare('deleteMemo') }, (request, reply) => mutate(deps, request, reply, (rules) => rules.memos.deleteMemo(param(request, 'memoId'))));
   app.post('/v1/memos/:memoId/restore', { config: declare('restoreMemo') }, (request, reply) => mutate(deps, request, reply, (rules) => rules.memos.restoreMemo(param(request, 'memoId'))));
-  app.post('/v1/memos/:memoId/attachments', { config: declare('uploadAttachment') }, (_request, reply) => sendError(reply, { code: 'ATTACHMENT_REJECTED', message: serverMessages.attachmentUnavailable, retryable: true }));
-  app.get('/v1/memos/:memoId/attachments/:attachmentId/link', { config: reading('getAttachmentLink') }, (request, reply) => read(deps, request, reply, (rules) => {
-    const readable = rules.memos.readableAttachment(param(request, 'memoId'), param(request, 'attachmentId'));
-    return readable.ok ? { ok: false, error: { code: 'ATTACHMENT_REJECTED', message: serverMessages.attachmentUnavailable, retryable: true } } : readable;
-  }));
 
   app.post('/v1/expenses', { config: declare('createExpense', { successStatus: 201 }) }, (request, reply) => mutate(deps, request, reply, (rules) => rules.expenses.createExpense(request.body as never)));
   app.patch('/v1/expenses/:expenseId', { config: declare('updateExpense', { recentAuth: true }) }, (request, reply) => {

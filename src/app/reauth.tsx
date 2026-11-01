@@ -28,7 +28,7 @@ export function withReauthentication(gateway: FamilyHubGateway, ask: (reason: As
   return {
     auth: wrapPort(gateway.auth, ['getSession', 'signInWithPassword', 'reauthenticate', 'signOut', 'beginPasskey', 'finishPasskey', 'verifyTotp', 'signUp', 'requestPasswordReset', 'confirmPasswordReset']),
     household: wrapPort(gateway.household), events: wrapPort(gateway.events), todos: wrapPort(gateway.todos), memos: wrapPort(gateway.memos),
-    expenses: wrapPort(gateway.expenses), resources: wrapPort(gateway.resources), insights: wrapPort(gateway.insights), notifications: wrapPort(gateway.notifications),
+    expenses: wrapPort(gateway.expenses), albums: wrapPort(gateway.albums, ['mediaUrl']), resources: wrapPort(gateway.resources), insights: wrapPort(gateway.insights), notifications: wrapPort(gateway.notifications),
     credentials: gateway.credentials,
   };
 }

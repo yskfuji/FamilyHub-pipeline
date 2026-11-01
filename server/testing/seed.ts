@@ -1,4 +1,4 @@
-import { baseInvites, baseNotificationPreferences, baseNotifications, basePrivacySettings, baseSnapshot } from '../../src/data/fixtures';
+import { baseAlbumItems, baseAlbums, baseInvites, baseNotificationPreferences, baseNotifications, basePrivacySettings, baseSnapshot } from '../../src/data/fixtures';
 import type { HouseholdAggregate } from '../../src/domain/commands';
 import { loadAggregate, saveAggregate } from '../db/aggregateStore';
 import type { Db } from '../db/db';
@@ -24,8 +24,8 @@ export function seedHousehold(db: Db, passwordHash: string, createdAt: string) {
       permissionOverrides: [], permissionRevision: 1,
       invites: structuredClone(baseInvites).map((invite) => ({ ...invite, token: invite.token ? hashInviteToken(invite.token) : undefined })),
       notifications: structuredClone(baseNotifications), notificationPreferences: structuredClone(baseNotificationPreferences), privacy: structuredClone(basePrivacySettings),
-      archives: { events: {}, todos: {}, memos: {}, expenses: {} },
+      archives: { events: {}, todos: {}, memos: {}, expenses: {} }, albums: structuredClone(baseAlbums), albumItems: structuredClone(baseAlbumItems),
     };
-    saveAggregate(db, household.id, 'member-aoi', { aggregate: seeded, loaded: loaded.loaded });
+    saveAggregate(db, household.id, 'member-aoi', { aggregate: seeded, loaded: loaded.loaded }, { media: true });
   });
 }

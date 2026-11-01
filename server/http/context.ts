@@ -5,6 +5,7 @@ import type { SessionRow } from '../auth/sessions';
 import { serverMessages } from '../../src/content/serverMessages';
 import type { GatewayError, Id, Rfc3339 } from '../../src/domain/types';
 import type { Mailer } from '../adapters/mail';
+import type { Scanner } from '../adapters/scanner';
 
 export interface ServerClock { now(): Rfc3339; }
 export interface IdSource { next(prefix: string): Id; inviteToken(): string; }
@@ -15,6 +16,9 @@ export interface AppDeps {
   clock: ServerClock;
   ids: IdSource;
   mailer: Mailer;
+  scanner: Scanner;
+  /** 受け付けた後に裏で進めている処理。終了のときと試験で待つ。 */
+  jobs: Set<Promise<void>>;
 }
 
 /** 経路ごとに必ず宣言する。宣言のない経路は起動時に止める。 */

@@ -4,8 +4,9 @@ import type { Db } from './db';
 
 /** 配列で持つ記録と、1つだけ持つ記録の保存先。 */
 const lists = ['memberships', 'events', 'todos', 'memos', 'expenses', 'resources', 'links', 'colorLabels', 'invites', 'notifications', 'permissionOverrides'] as const;
+const mediaLists = ['albums', 'albumItems'] as const;
 const archives = ['events', 'todos', 'memos', 'expenses'] as const;
-type ListName = typeof lists[number];
+type ListName = typeof lists[number] | typeof mediaLists[number];
 
 interface RecordRow { collection: string; id: string; seq: number; body: string }
 
@@ -24,8 +25,13 @@ export interface LoadedAggregate {
   loaded: Map<string, RecordRow>;
 }
 
-export function loadAggregate(db: Db, householdId: Id, actorMembershipId: Id, defaults: Pick<HouseholdAggregate, 'privacy' | 'notificationPreferences'>): LoadedAggregate {
-  const rows = db.all<RecordRow>('SELECT collection, id, seq, body FROM records WHERE household_id = ?', householdId);
+export interface LoadOptions { media?: boolean }
+
+export function loadAggregate(db: Db, householdId: Id, actorMembershipId: Id, defaults: Pick<HouseholdAggregate, 'privacy' | 'notificationPreferences'>, options: LoadOptions = {}): LoadedAggregate {
+  // アルバムの記録は件数が多くなるので、使わない操作では読み込まない。
+  const rows = options.media
+    ? db.all<RecordRow>('SELECT collection, id, seq, body FROM records WHERE household_id = ?', householdId)
+    : db.all<RecordRow>("SELECT collection, id, seq, body FROM records WHERE household_id = ? AND collection NOT IN ('albums', 'albumItems')", householdId);
   const loaded = new Map(rows.map((row) => [`${row.collection}\u0000${row.id}`, row]));
   const single = <T,>(id: string, fallback: T): T => { const row = loaded.get(`meta\u0000${id}`); return row ? JSON.parse(row.body) as T : fallback; };
   const keys = personal(actorMembershipId);
@@ -53,20 +59,23 @@ export function loadAggregate(db: Db, householdId: Id, actorMembershipId: Id, de
     notificationPreferences: single(keys.preferences, defaults.notificationPreferences),
     privacy: single(keys.privacy, defaults.privacy),
     archives: { events: archive('events'), todos: archive('todos'), memos: archive('memos'), expenses: archive('expenses') },
+    albums: read(rows, 'albums'),
+    albumItems: read(rows, 'albumItems'),
   };
   return { aggregate, loaded };
 }
 
-export function saveAggregate(db: Db, householdId: Id, actorMembershipId: Id, { aggregate, loaded }: LoadedAggregate) {
+export function saveAggregate(db: Db, householdId: Id, actorMembershipId: Id, { aggregate, loaded }: LoadedAggregate, options: LoadOptions = {}) {
   const { state } = aggregate;
   const wanted = new Map<string, { collection: string; id: string; body: string; order?: number }>();
   const put = (collection: string, id: string, value: unknown, order?: number) => wanted.set(`${collection}\u0000${id}`, { collection, id, body: JSON.stringify(value), order });
-  const sources: Record<ListName, ReadonlyArray<object>> = {
+  const sources: Record<typeof lists[number], ReadonlyArray<object>> = {
     memberships: state.memberships, events: state.events, todos: state.todos, memos: state.memos, expenses: state.expenses, resources: state.resources,
     links: state.links, colorLabels: state.colorLabels, invites: aggregate.invites,
     notifications: aggregate.notifications.map((item) => ({ recipientMembershipId: actorMembershipId, ...item })), permissionOverrides: aggregate.permissionOverrides,
   };
   for (const collection of lists) sources[collection].forEach((item, index) => put(collection, keyOf(collection, item), item, index));
+  if (options.media) for (const collection of mediaLists) aggregate[collection].forEach((item, index) => put(collection, item.id, item, index));
   for (const name of archives) for (const [id, value] of Object.entries(aggregate.archives[name])) put(`archive.${name}`, id, value);
   const keys = personal(actorMembershipId);
   put('meta', 'household', { household: state.household, context: state.context });

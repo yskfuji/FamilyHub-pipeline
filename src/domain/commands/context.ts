@@ -1,6 +1,6 @@
 import { allowedAudiencesFor, authorize, capabilitiesFor, projectSnapshotForViewer, redactPlace } from '../../authz/policy';
 import { ja } from '../../content/ja';
-import type { AuthorizationDecision, CalendarEvent, Capability, Expense, GatewayError, HouseholdInvite, HouseholdMembership, HouseholdNotification, HouseholdSnapshot, Id, Memo, MutationContext, NotificationPreferences, PermissionOverride, PlaceRef, PrivacySettings, Result, Rfc3339, Todo, User, ViewerContext, VisibilityAudience, VisibilityPolicy } from '../types';
+import type { Album, AlbumItem, AuthorizationDecision, CalendarEvent, Capability, Expense, GatewayError, HouseholdInvite, HouseholdMembership, HouseholdNotification, HouseholdSnapshot, Id, Memo, MutationContext, NotificationPreferences, PermissionOverride, PlaceRef, PrivacySettings, Result, Rfc3339, Todo, User, ViewerContext, VisibilityAudience, VisibilityPolicy } from '../types';
 
 /** 非同期のポートを、同じ引数で同期に結果を返す形へ置き換える。規則は同期で書き、遅延や保存は呼び出し側が担う。 */
 export type SyncPort<P> = { [K in keyof P]: P[K] extends (...args: infer A) => Promise<infer R> ? (...args: A) => R : never };
@@ -22,6 +22,9 @@ export interface HouseholdAggregate {
   notificationPreferences: NotificationPreferences;
   privacy: PrivacySettings;
   archives: HouseholdArchives;
+  /** アルバムは件数が多くなるので、必要な操作のときだけ読み込む。スナップショットには含めない。 */
+  albums: Album[];
+  albumItems: AlbumItem[];
 }
 
 export interface CommandEnv {

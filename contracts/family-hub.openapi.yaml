@@ -253,6 +253,185 @@ paths:
             application/json:
               schema: { type: object, required: [householdId], properties: { householdId: { type: string } } }
         default: { $ref: '#/components/responses/Error' }
+  /v1/albums:
+    get:
+      operationId: listAlbums
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/AlbumSummary' } }
+        default: { $ref: '#/components/responses/Error' }
+    post:
+      operationId: createAlbum
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Album' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/albums/{albumId}:
+    get:
+      operationId: getAlbum
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, required: [album, items], properties: { album: { $ref: '#/components/schemas/Album' }, items: { type: array, items: { $ref: '#/components/schemas/AlbumItem' } } } }
+        default: { $ref: '#/components/responses/Error' }
+    patch:
+      operationId: updateAlbum
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Album' }
+        default: { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: deleteAlbum
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/albums/{albumId}/restore:
+    post:
+      operationId: restoreAlbum
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Album' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/albums/{albumId}/order:
+    put:
+      operationId: reorderAlbumItems
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Album' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/albums/{albumId}/items/{itemId}:
+    delete:
+      operationId: deleteAlbumItem
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/albums/{albumId}/items/{itemId}/restore:
+    post:
+      operationId: restoreAlbumItem
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AlbumItem' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/albums/{albumId}/items/{itemId}/file:
+    get:
+      operationId: getAlbumItemFile
+      x-gateway: none
+      description: Served with Range support; the viewer must be able to see the album.
+      responses:
+        '200': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/albums/{albumId}/items/{itemId}/thumbnail:
+    get:
+      operationId: getAlbumItemThumbnail
+      x-gateway: none
+      responses:
+        '200': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+    put:
+      operationId: putAlbumItemThumbnail
+      x-gateway: none
+      description: Client-made video thumbnail. Untrusted; re-encoded before storing.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/uploads:
+    post:
+      operationId: createUpload
+      x-gateway: none
+      description: Starts a resumable upload (tus 1.0.0 core). Checks quota and album access.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, required: [uploadId, itemId, offset], properties: { uploadId: { type: string }, itemId: { type: string }, offset: { type: integer } } }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/uploads/{uploadId}:
+    head:
+      operationId: getUploadOffset
+      x-gateway: none
+      responses:
+        '200': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+    patch:
+      operationId: appendUpload
+      x-gateway: none
+      description: Appends application/offset+octet-stream at Upload-Offset.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: cancelUpload
+      x-gateway: none
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/memos/{memoId}/attachments/{attachmentId}:
+    delete:
+      operationId: deleteAttachment
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/attachment-files/{attachmentId}:
+    get:
+      operationId: getAttachmentFile
+      x-gateway: none
+      description: Requires the session and a short-lived signature from getAttachmentLink.
+      responses:
+        '200': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
   /v1/auth/passkey/challenge:
     post:
       security: []
@@ -1172,6 +1351,29 @@ components:
         stage: { enum: [signed-out, household-setup, suspended, paywall, active] }
         userId: { type: string }
         idleTimeoutMinutes: { type: integer }
+    Album:
+      type: object
+      required: [id, householdId, title, creatorMembershipId, visibility, createdAt, version]
+      additionalProperties: true
+      properties:
+        id: { type: string }
+        title: { type: string, maxLength: 120 }
+        visibility: { $ref: '#/components/schemas/VisibilityPolicy' }
+        version: { type: integer }
+    AlbumSummary:
+      allOf:
+        - { $ref: '#/components/schemas/Album' }
+        - { type: object, required: [itemCount], properties: { itemCount: { type: integer } } }
+    AlbumItem:
+      type: object
+      required: [id, albumId, kind, originalName, mimeType, byteSize, status, locationKept, hasThumbnail, position]
+      additionalProperties: true
+      properties:
+        id: { type: string }
+        albumId: { type: string }
+        kind: { enum: [photo, video] }
+        status: { enum: [uploading, processing, ready, rejected] }
+        locationKept: { type: boolean }
     AccountProfile:
       type: object
       required: [displayName, email, avatar, idleTimeoutMinutes, birthdateDeclared, adultDeclared, totpEnabled]
@@ -1304,7 +1506,7 @@ components:
         id: { type: string }
         status: { enum: [selected, validating, quarantined, clean, rejected] }
         originalName: { type: string }
-        mimeType: { enum: [application/pdf, image/jpeg, image/png] }
+        mimeType: { enum: [application/pdf, image/jpeg, image/png, video/mp4, video/quicktime] }
         byteSize: { type: integer, maximum: 10000000 }
         memoId: { type: string }
         statusMessage: { type: string }

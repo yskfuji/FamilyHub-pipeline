@@ -1,5 +1,5 @@
 import type { FamilyHubGateway } from './gateway';
-import { baseInvites, baseNotificationPreferences, baseNotifications, basePrivacySettings, baseSecurityOverview, baseSnapshot } from './fixtures';
+import { baseAlbumItems, baseAlbums, baseInvites, baseNotificationPreferences, baseNotifications, basePrivacySettings, baseSecurityOverview, baseSnapshot } from './fixtures';
 import { accountUpdateSchema, signUpSchema } from '../domain/account';
 import { passwordSchema } from '../domain/schemas';
 import { toJstRfc3339 } from '../domain/calendarDate';
@@ -32,7 +32,15 @@ export function initialAggregate(): HouseholdAggregate {
     notificationPreferences: structuredClone(baseNotificationPreferences),
     privacy: structuredClone(basePrivacySettings),
     archives: { events: {}, todos: {}, memos: {}, expenses: {} },
+    albums: structuredClone(baseAlbums),
+    albumItems: structuredClone(baseAlbumItems),
   };
+}
+
+/** 見本の写真の代わりに表示する画像。 */
+function sampleImage(id: string) {
+  const hue = [...id].reduce((sum, character) => sum + character.charCodeAt(0), 0) % 360;
+  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480"><defs><linearGradient id="g" x2="1" y2="1"><stop stop-color="hsl(${hue} 45% 70%)"/><stop offset="1" stop-color="hsl(${(hue + 50) % 360} 40% 45%)"/></linearGradient></defs><rect width="640" height="480" fill="url(#g)"/><circle cx="500" cy="120" r="56" fill="hsl(45 90% 80%)"/><path d="M0 400 200 240l140 110 110-70 190 120v80H0z" fill="hsl(${(hue + 120) % 360} 30% 35%)"/></svg>`)}`;
 }
 
 export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyHubGateway {
@@ -53,6 +61,7 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
   const { project, requireCapability } = rules.context;
   const { state } = aggregate;
   let passkeyChallenge: string | null = null;
+  const mediaUrls = new Map<Id, string>();
   const actorMember = state.memberships.find((item) => item.id === actorMembershipId);
   const account: AccountProfile = { displayName: actorMember?.displayName ?? '', email: `${actorMember?.userId ?? ''}@example.test`, avatar: { kind: 'initial' }, idleTimeoutMinutes: 30, birthdateDeclared: true, adultDeclared: actorMember?.role === 'owner' || actorMember?.role === 'adult', totpEnabled: false };
 
@@ -163,6 +172,19 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
       },
     },
     expenses: delayed(rules.expenses),
+    albums: {
+      ...delayed(rules.albums),
+      async uploadItem(albumId, file, options) {
+        await delay(120);
+        const reserved = rules.albums.reserveItem(albumId, { kind: file.type.startsWith('video/') ? 'video' : 'photo', originalName: file.name, mimeType: file.type, byteSize: file.size, keepLocation: options.keepLocation });
+        if (!reserved.ok) return reserved;
+        options.onProgress?.(file.size, file.size);
+        const item = aggregate.albumItems.find((entry) => entry.id === reserved.value.id);
+        if (item) { Object.assign(item, { status: 'ready', hasThumbnail: true }); mediaUrls.set(item.id, URL.createObjectURL(file)); }
+        return ok({ itemId: reserved.value.id });
+      },
+      mediaUrl: (item) => mediaUrls.get(item.id) ?? sampleImage(item.id),
+    },
     resources: delayed(rules.resources),
     insights: delayed(rules.insights),
     notifications: delayed(rules.notifications),

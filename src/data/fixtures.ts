@@ -1,5 +1,5 @@
 import { capabilitiesFor } from '../authz/policy';
-import type { HouseholdInvite, HouseholdNotification, HouseholdSnapshot, NotificationPreferences, PrivacySettings, SecurityOverview, VisibilityPolicy } from '../domain/types';
+import type { Album, AlbumItem, HouseholdInvite, HouseholdNotification, HouseholdSnapshot, NotificationPreferences, PrivacySettings, SecurityOverview, VisibilityPolicy } from '../domain/types';
 
 export const fixedNow = '2026-09-30T07:30:00+09:00';
 const visibleTo = (creatorMembershipId: string, audience: VisibilityPolicy['audience'] = 'household', selectedMembershipIds: string[] = []): VisibilityPolicy => ({ audience, creatorMembershipId, selectedMembershipIds });
@@ -81,3 +81,17 @@ export const baseInvites: HouseholdInvite[] = [
 
 export const baseNotificationPreferences: NotificationPreferences = { todoDue: true, eventDeparture: true, quietHours: true };
 export const basePrivacySettings: PrivacySettings = { defaultAudience: 'household', hideNotificationContent: true, placeLookupConsent: null };
+
+export const baseAlbums: Album[] = [
+  { id: 'album-sports', householdId: 'house-mori', title: '運動会', description: '花の徒競走とお弁当', coverItemId: 'item-sports-1', bgmPreset: 'bright', creatorMembershipId: 'member-aoi', visibility: visibleTo('member-aoi'), createdAt: '2026-09-20T17:00:00+09:00', version: 1 },
+  { id: 'album-park', householdId: 'house-mori', title: '週末の公園', creatorMembershipId: 'member-ren', visibility: visibleTo('member-ren', 'adults'), createdAt: '2026-09-13T12:00:00+09:00', version: 1 },
+];
+
+const fixtureItem = (id: string, albumId: string, position: number, uploaderMembershipId: string): AlbumItem => ({ id, albumId, householdId: 'house-mori', kind: 'photo', originalName: `${id}.jpg`, mimeType: 'image/jpeg', byteSize: 2_400_000 + position * 1000, width: 1600, height: 1200, takenAt: '2026-09-20T10:00:00+09:00', status: 'ready', locationKept: false, hasThumbnail: true, uploaderMembershipId, position, createdAt: '2026-09-20T17:00:00+09:00' });
+
+export const baseAlbumItems: AlbumItem[] = [
+  fixtureItem('item-sports-1', 'album-sports', 0, 'member-aoi'),
+  fixtureItem('item-sports-2', 'album-sports', 1, 'member-aoi'),
+  fixtureItem('item-sports-3', 'album-sports', 2, 'member-ren'),
+  fixtureItem('item-park-1', 'album-park', 0, 'member-ren'),
+];

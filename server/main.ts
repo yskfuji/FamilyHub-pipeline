@@ -3,12 +3,13 @@ import { toJstRfc3339 } from '../src/domain/calendarDate';
 import { loadConfig } from './config';
 import { Db } from './db/db';
 import { createMailer } from './adapters/mail';
+import { createScanner } from './adapters/scanner';
 import { buildApp } from './http/app';
 
 const config = loadConfig();
 const db = new Db(config.databasePath);
 const app = await buildApp({
-  db, config, mailer: createMailer(config),
+  db, config, mailer: createMailer(config), scanner: createScanner(config), jobs: new Set(),
   clock: { now: () => toJstRfc3339(new Date()) },
   ids: { next: (prefix) => `${prefix}-${randomUUID()}`, inviteToken: () => randomBytes(18).toString('base64url') },
 });

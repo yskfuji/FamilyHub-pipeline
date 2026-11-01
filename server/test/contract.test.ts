@@ -16,7 +16,7 @@ describe('routes and contract', () => {
 
   it('protects every mutation with CSRF, except where sign-in has no session yet and is still checked', async () => {
     await world.ready;
-    const unprotected = routeTable.filter((item) => item.method !== 'GET' && !item.declaration.csrf);
+    const unprotected = routeTable.filter((item) => !['GET', 'HEAD'].includes(item.method) && !item.declaration.csrf);
     expect(unprotected).toEqual([]);
   });
 

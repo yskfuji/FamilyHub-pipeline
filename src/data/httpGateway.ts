@@ -74,6 +74,8 @@ const allowedBase = (value: string) => {
 };
 
 type FetchLike = typeof fetch;
+const UPLOAD_CHUNK_BYTES = 8 * 1024 * 1024;
+const UPLOAD_RETRIES = 6;
 
 /** token を取り直すときは true を受け取る。 */
 export type CsrfProvider = (refresh?: boolean) => string | Promise<string>;
@@ -184,6 +186,7 @@ export function createHttpGateway(baseUrl: string, getCsrfToken: CsrfProvider, g
         return request(`/v1/memos/${encodeURIComponent(memoId)}/attachments`, { method: 'POST', body: form, csrf: true });
       },
       getAttachmentLink: (memoId, attachmentId) => request(`/v1/memos/${encodeURIComponent(memoId)}/attachments/${encodeURIComponent(attachmentId)}/link`),
+      deleteAttachment: (memoId, attachmentId) => request(`/v1/memos/${encodeURIComponent(memoId)}/attachments/${encodeURIComponent(attachmentId)}`, { method: 'DELETE', csrf: true }),
       deleteMemo: (id) => request(`/v1/memos/${encodeURIComponent(id)}`, { method: 'DELETE', csrf: true }),
       restoreMemo: (id) => request(`/v1/memos/${encodeURIComponent(id)}/restore`, { method: 'POST', csrf: true }),
     },
@@ -194,6 +197,46 @@ export function createHttpGateway(baseUrl: string, getCsrfToken: CsrfProvider, g
       restoreExpense: (id) => request(`/v1/expenses/${encodeURIComponent(id)}/restore`, { method: 'POST', csrf: true }),
       recordSettlement: (expenseId, fromMembershipId, amountJpy) => request(`/v1/expenses/${encodeURIComponent(expenseId)}/settlements`, { method: 'POST', body: JSON.stringify({ fromMembershipId, amountJpy }), csrf: true }),
       reverseSettlement: (expenseId, settlementId) => request(`/v1/expenses/${encodeURIComponent(expenseId)}/settlements/${encodeURIComponent(settlementId)}/reverse`, { method: 'POST', csrf: true }),
+    },
+    albums: {
+      listAlbums: () => request('/v1/albums'),
+      getAlbum: (id) => request(`/v1/albums/${encodeURIComponent(id)}`),
+      createAlbum: (input) => request('/v1/albums', { method: 'POST', body: JSON.stringify(input), csrf: true }),
+      updateAlbum: (id, input, expectedVersion) => request(`/v1/albums/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ input, expectedVersion }), csrf: true }),
+      deleteAlbum: (id, expectedVersion) => request(`/v1/albums/${encodeURIComponent(id)}?expectedVersion=${expectedVersion}`, { method: 'DELETE', csrf: true }),
+      restoreAlbum: (id) => request(`/v1/albums/${encodeURIComponent(id)}/restore`, { method: 'POST', csrf: true }),
+      reorderItems: (albumId, itemIds, expectedVersion) => request(`/v1/albums/${encodeURIComponent(albumId)}/order`, { method: 'PUT', body: JSON.stringify({ itemIds, expectedVersion }), csrf: true }),
+      deleteItem: (albumId, itemId) => request(`/v1/albums/${encodeURIComponent(albumId)}/items/${encodeURIComponent(itemId)}`, { method: 'DELETE', csrf: true }),
+      restoreItem: (albumId, itemId) => request(`/v1/albums/${encodeURIComponent(albumId)}/items/${encodeURIComponent(itemId)}/restore`, { method: 'POST', csrf: true }),
+      uploadItem: async (albumId, file, options) => {
+        const created = await request<{ uploadId: string; itemId: string; offset: number }>('/v1/uploads', { method: 'POST', body: JSON.stringify({ albumId, name: file.name, mimeType: file.type, byteSize: file.size, keepLocation: options.keepLocation }), csrf: true });
+        if (!created.ok) return created;
+        const { uploadId, itemId } = created.value;
+        const uploadPath = `/v1/uploads/${encodeURIComponent(uploadId)}`;
+        const client = fetchImplementation ?? fetch;
+        const authHeaders = async () => ({ 'X-CSRF-Token': await getCsrfToken(), 'Tus-Resumable': '1.0.0' });
+        const currentOffset = async () => { const response = await client(new URL(uploadPath, baseUrl), { method: 'HEAD', credentials: 'include', headers: await authHeaders() }); return Number(response.headers.get('Upload-Offset') ?? 0); };
+        let offset = 0; let retries = 0;
+        while (offset < file.size) {
+          if (options.signal?.aborted) return { ok: false, error: { code: 'OFFLINE', message: '送信を止めました。', retryable: true } };
+          const chunk = file.slice(offset, offset + UPLOAD_CHUNK_BYTES);
+          try {
+            const response = await client(new URL(uploadPath, baseUrl), { method: 'PATCH', credentials: 'include', body: chunk, headers: { ...(await authHeaders()), 'Content-Type': 'application/offset+octet-stream', 'Upload-Offset': String(offset) } });
+            if (response.status === 204) { offset = Number(response.headers.get('Upload-Offset') ?? offset + chunk.size); retries = 0; options.onProgress?.(offset, file.size); continue; }
+            if (response.status !== 409) return { ok: false, error: await response.json().catch(() => responseFailure) as GatewayError };
+            offset = await currentOffset();
+          } catch {
+            // 通信が切れたら、受け取られた位置を確かめて続きから送る。
+            retries += 1;
+            if (retries > UPLOAD_RETRIES) return { ok: false, error: networkError };
+            await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** retries));
+            try { offset = await currentOffset(); } catch { /* 次の回でもう一度確かめる */ }
+          }
+        }
+        if (options.thumbnail) await client(new URL(`/v1/albums/${encodeURIComponent(albumId)}/items/${encodeURIComponent(itemId)}/thumbnail`, baseUrl), { method: 'PUT', credentials: 'include', body: options.thumbnail, headers: { 'X-CSRF-Token': await getCsrfToken(), 'Content-Type': 'application/octet-stream' } });
+        return { ok: true, value: { itemId } };
+      },
+      mediaUrl: (item, variant) => `/v1/albums/${encodeURIComponent(item.albumId)}/items/${encodeURIComponent(item.id)}/${variant}`,
     },
     resources: { search: (query) => request(`/v1/search?q=${encodeURIComponent(query)}`) },
     insights: { list: () => request('/v1/insights') },

@@ -111,4 +111,19 @@ export const migrations: readonly string[] = [
     updated_at TEXT NOT NULL
   ) WITHOUT ROWID;
   `,
+  `
+  CREATE TABLE uploads (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    household_id TEXT NOT NULL,
+    membership_id TEXT NOT NULL,
+    album_id TEXT NOT NULL,
+    item_id TEXT NOT NULL,
+    upload_length INTEGER NOT NULL,
+    upload_offset INTEGER NOT NULL,
+    keep_location INTEGER NOT NULL,
+    expires_at TEXT NOT NULL
+  );
+  CREATE INDEX uploads_user ON uploads(user_id);
+  `,
 ];

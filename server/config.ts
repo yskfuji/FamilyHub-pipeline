@@ -9,6 +9,8 @@ export interface ServerConfig {
   sessionDays: number;
   /** 金銭や権限の操作に必要な、直近の本人確認の有効時間。 */
   recentAuthMs: number;
+  mediaPath: string;
+  clamd: { host: string; port: number; timeoutMs: number } | null;
   smtp: { host: string; port: number; user?: string; password?: string; from: string } | null;
 }
 
@@ -30,6 +32,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     secureCookies,
     databasePath: env.FAMILY_HUB_DATABASE ?? 'data/family-hub.sqlite',
     sessionDays: 30,
+    mediaPath: env.FAMILY_HUB_MEDIA ?? 'data/media',
+    clamd: env.FAMILY_HUB_CLAMD_HOST ? { host: env.FAMILY_HUB_CLAMD_HOST, port: Number(env.FAMILY_HUB_CLAMD_PORT ?? 3310), timeoutMs: Number(env.FAMILY_HUB_CLAMD_TIMEOUT_MS ?? 600_000) } : null,
     recentAuthMs: Number(env.FAMILY_HUB_RECENT_AUTH_MS ?? 300_000),
     smtp: env.FAMILY_HUB_SMTP_HOST ? { host: env.FAMILY_HUB_SMTP_HOST, port: Number(env.FAMILY_HUB_SMTP_PORT ?? 587), user: env.FAMILY_HUB_SMTP_USER, password: env.FAMILY_HUB_SMTP_PASSWORD, from: env.FAMILY_HUB_SMTP_FROM ?? 'no-reply@family.example' } : null,
   };

@@ -9,7 +9,7 @@ interface Contract { paths: Record<string, Record<string, Operation>>; component
 export const contract = parse(readFileSync('contracts/family-hub.openapi.yaml', 'utf8')) as Contract;
 
 export const contractOperations = () => Object.entries(contract.paths).flatMap(([path, methods]) => Object.entries(methods)
-  .filter(([method]) => ['get', 'post', 'put', 'patch', 'delete'].includes(method))
+  .filter(([method]) => ['get', 'head', 'post', 'put', 'patch', 'delete'].includes(method))
   .map(([method, operation]) => ({ method: method.toUpperCase(), path, operationId: operation.operationId, operation })));
 
 const matcher = (path: string) => new RegExp(`^${path.replace(/\{[^}]+\}/g, '[^/]+')}$`);

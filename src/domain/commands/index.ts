@@ -1,3 +1,4 @@
+import { createAlbumCommands } from './albums';
 import { createCommandContext } from './context';
 import type { CommandEnv, HouseholdAggregate } from './context';
 import { createEventCommands } from './events';
@@ -20,6 +21,7 @@ export function createHouseholdRules(aggregate: HouseholdAggregate, env: Command
     todos: createTodoCommands(context),
     memos: createMemoCommands(context),
     expenses: createExpenseCommands(context),
+    albums: createAlbumCommands(context),
     resources: createSearchCommands(context),
     insights: createInsightCommands(context),
     notifications: createNotificationCommands(context),

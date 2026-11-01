@@ -9,6 +9,7 @@ export function registerOperationalRoutes(app: FastifyInstance, deps: AppDeps) {
   app.get('/ready', { config: open('getReadiness') }, async (_request, reply) => {
     try {
       deps.db.get('SELECT 1 AS ok');
+      if (!(await deps.scanner.ready())) return await reply.code(503).send({ status: 'unavailable' });
       return { status: 'ready' };
     } catch {
       return reply.code(503).send({ status: 'unavailable' });

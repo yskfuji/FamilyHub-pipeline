@@ -1,4 +1,5 @@
 import cookie from '@fastify/cookie';
+import multipart from '@fastify/multipart';
 import Fastify from 'fastify';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { serverMessages } from '../../src/content/serverMessages';
@@ -9,6 +10,7 @@ import { registerAccountRoutes } from './routes/account';
 import { registerAuthRoutes } from './routes/auth';
 import { registerContentRoutes } from './routes/content';
 import { registerHouseholdRoutes } from './routes/household';
+import { registerMediaRoutes } from './routes/media';
 import { registerOperationalRoutes } from './routes/operational';
 
 const safeMethods = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -77,13 +79,14 @@ export const routeTable: Array<{ method: string; url: string; declaration: Route
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   routeTable.length = 0;
-  const app = Fastify({ logger: false, bodyLimit: 2 * 1024 * 1024, trustProxy: true });
+  const app = Fastify({ logger: false, bodyLimit: 2 * 1024 * 1024, trustProxy: true, exposeHeadRoutes: false });
   await app.register(cookie);
+  await app.register(multipart);
   app.decorateRequest('session', null);
   app.decorateRequest('actor', null);
   // 宣言のない経路は作らせない（既定で拒否）。
   app.addHook('onRoute', (route) => {
-    if (route.method === 'OPTIONS' || route.method === 'HEAD') return;
+    if (route.method === 'OPTIONS') return;
     if (!route.config?.route) throw new Error(`route ${String(route.method)} ${route.url} has no declaration`);
     routeTable.push({ method: String(route.method), url: route.url, declaration: route.config.route });
   });
@@ -91,6 +94,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.setErrorHandler((error: Error & { statusCode?: number }, request, reply) => {
     if (error instanceof ApiError) return sendError(reply, error.error);
     if (error.statusCode && error.statusCode < 500) return sendError(reply, { code: 'INVALID_INPUT', message: serverMessages.invalidInput, retryable: false });
+    if (process.env.FAMILY_HUB_DEBUG) console.error(error);
     request.log.error(error);
     return sendError(reply, { code: 'UPSTREAM_FAILURE', message: serverMessages.unavailable, retryable: true });
   });
@@ -100,5 +104,6 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerAccountRoutes(app, deps);
   registerHouseholdRoutes(app, deps);
   registerContentRoutes(app, deps);
+  registerMediaRoutes(app, deps);
   return app;
 }

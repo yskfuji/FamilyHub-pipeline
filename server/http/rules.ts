@@ -5,7 +5,7 @@ import { createHouseholdRules } from '../../src/domain/commands';
 import type { HouseholdAggregate } from '../../src/domain/commands';
 import type { GatewayError, Id, NotificationPreferences, PrivacySettings, Result, User } from '../../src/domain/types';
 import { loadAggregate, saveAggregate } from '../db/aggregateStore';
-import type { LoadedAggregate } from '../db/aggregateStore';
+import type { LoadedAggregate, LoadOptions } from '../db/aggregateStore';
 import { ApiError, requireActor, sendError } from './context';
 import type { AppDeps } from './context';
 
@@ -35,9 +35,9 @@ function rulesFor(deps: AppDeps, aggregate: HouseholdAggregate, membershipId: Id
 export interface WorkContext { rules: Rules; loaded: LoadedAggregate }
 
 /** 読み取り。保存しない。 */
-export function read<T>(deps: AppDeps, request: FastifyRequest, reply: FastifyReply, work: (rules: Rules) => Result<T>) {
+export function read<T>(deps: AppDeps, request: FastifyRequest, reply: FastifyReply, work: (rules: Rules) => Result<T>, options?: LoadOptions) {
   const actor = requireActor(request);
-  const loaded = loadAggregate(deps.db, actor.householdId, actor.membershipId, defaults);
+  const loaded = loadAggregate(deps.db, actor.householdId, actor.membershipId, defaults, options);
   return respond(reply, work(rulesFor(deps, loaded.aggregate, actor.membershipId, actor.userId)));
 }
 
@@ -55,7 +55,7 @@ interface StoredResponse { request_hash: string; status: number; body: string | 
  * 変更の操作。規則の実行・保存・監査・冪等の記録を1つのトランザクションで行う。
  * 規則が失敗を返したら、途中の変更は保存しない。
  */
-export function mutate<T>(deps: AppDeps, request: FastifyRequest, reply: FastifyReply, work: (rules: Rules, context: WorkContext) => Result<T>) {
+export function mutate<T>(deps: AppDeps, request: FastifyRequest, reply: FastifyReply, work: (rules: Rules, context: WorkContext) => Result<T>, options?: LoadOptions) {
   const actor = requireActor(request);
   const key = request.headers['idempotency-key'];
   const idempotencyKey = typeof key === 'string' ? key : undefined;
@@ -70,11 +70,11 @@ export function mutate<T>(deps: AppDeps, request: FastifyRequest, reply: Fastify
         return { replay: stored };
       }
     }
-    const loaded = loadAggregate(deps.db, actor.householdId, actor.membershipId, defaults);
+    const loaded = loadAggregate(deps.db, actor.householdId, actor.membershipId, defaults, options);
     const rules = rulesFor(deps, loaded.aggregate, actor.membershipId, actor.userId);
     const result = work(rules, { rules, loaded });
     if (!result.ok) return { result };
-    saveAggregate(deps.db, actor.householdId, actor.membershipId, loaded);
+    saveAggregate(deps.db, actor.householdId, actor.membershipId, loaded, options);
     deps.db.run('INSERT INTO audit_events (id, household_id, actor_user_id, action, target, at) VALUES (?, ?, ?, ?, ?, ?)', deps.ids.next('audit'), actor.householdId, actor.userId, declaration?.operationId ?? request.url, targetOf(request), deps.clock.now());
     if (idempotencyKey) deps.db.run('INSERT INTO idempotency_records (scope, key, request_hash, status, body, created_at) VALUES (?, ?, ?, ?, ?, ?)', scope, idempotencyKey, fingerprint, result.value === undefined ? 204 : declaration?.successStatus ?? 200, result.value === undefined ? null : JSON.stringify(result.value), deps.clock.now());
     return { result };

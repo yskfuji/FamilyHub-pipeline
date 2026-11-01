@@ -1,6 +1,6 @@
-import type { EventInput, EventUpdateInput, ExpenseInput, ExpenseUpdateInput, HouseholdProfileInput, MemoInput, TodoInput, TodoUpdateInput } from '../domain/schemas';
+import type { AlbumInput, AlbumUpdateInput, EventInput, EventUpdateInput, ExpenseInput, ExpenseUpdateInput, HouseholdProfileInput, MemoInput, TodoInput, TodoUpdateInput } from '../domain/schemas';
 import type { AccountUpdateInput, SignUpInput } from '../domain/account';
-import type { AccountProfile, Authenticator, CalendarEvent, Expense, Household, HouseholdInvite, HouseholdNotification, HouseholdSnapshot, Id, Insight, IsoDate, Memo, MembershipRole, MutationContext, NotificationPreferences, PermissionOverride, PrivacySettings, RecurrenceScope, Result, Scenario, SecurityOverview, SessionInfo, Todo } from '../domain/types';
+import type { AccountProfile, Album, AlbumItem, AlbumSummary, Authenticator, CalendarEvent, Expense, Household, HouseholdInvite, HouseholdNotification, HouseholdSnapshot, Id, Insight, IsoDate, Memo, MembershipRole, MutationContext, NotificationPreferences, PermissionOverride, PrivacySettings, RecurrenceScope, Result, Scenario, SecurityOverview, SessionInfo, Todo } from '../domain/types';
 
 export interface AuthPort {
   beginPasskey(): Promise<Result<{ challengeId: Id; publicKey: PublicKeyCredentialRequestOptions | null }>>;
@@ -75,8 +75,33 @@ export interface MemoPort {
   uploadAttachment(memoId: Id, file: File): Promise<Result<Memo>>;
   /** 確認が終わった添付の、期限付きの閲覧URL。確認中・拒否の添付には発行しない。 */
   getAttachmentLink(memoId: Id, attachmentId: Id): Promise<Result<{ url: string; expiresAt: string }>>;
+  deleteAttachment(memoId: Id, attachmentId: Id): Promise<Result<void>>;
   deleteMemo(id: Id): Promise<Result<void>>;
   restoreMemo(id: Id): Promise<Result<Memo>>;
+}
+
+export interface UploadOptions {
+  keepLocation: boolean;
+  /** 動画の縮小画像。端末で作って渡す。 */
+  thumbnail?: Blob;
+  onProgress?(sentBytes: number, totalBytes: number): void;
+  signal?: AbortSignal;
+}
+
+export interface AlbumPort {
+  listAlbums(): Promise<Result<AlbumSummary[]>>;
+  getAlbum(id: Id): Promise<Result<{ album: Album; items: AlbumItem[] }>>;
+  createAlbum(input: AlbumInput): Promise<Result<Album>>;
+  updateAlbum(id: Id, input: AlbumUpdateInput, expectedVersion: number): Promise<Result<Album>>;
+  deleteAlbum(id: Id, expectedVersion: number): Promise<Result<void>>;
+  restoreAlbum(id: Id): Promise<Result<Album>>;
+  reorderItems(albumId: Id, itemIds: Id[], expectedVersion: number): Promise<Result<Album>>;
+  deleteItem(albumId: Id, itemId: Id): Promise<Result<void>>;
+  restoreItem(albumId: Id, itemId: Id): Promise<Result<AlbumItem>>;
+  /** 大きなファイルは分けて送り、途切れても続きから送る。 */
+  uploadItem(albumId: Id, file: File, options: UploadOptions): Promise<Result<{ itemId: Id }>>;
+  /** 写真や動画を開く URL。同じオリジンの画像として読み込める。 */
+  mediaUrl(item: AlbumItem, variant: 'thumbnail' | 'file'): string;
 }
 
 export interface NotificationPort {
@@ -117,6 +142,7 @@ export interface FamilyHubGateway {
   todos: TodoPort;
   memos: MemoPort;
   expenses: ExpensePort;
+  albums: AlbumPort;
   resources: ResourcePort;
   insights: InsightPort;
   notifications: NotificationPort;

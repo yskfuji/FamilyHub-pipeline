@@ -183,6 +183,51 @@ export interface Memo {
   version: number;
 }
 
+export type BgmPreset = 'calm' | 'bright' | 'gentle';
+export interface Album {
+  id: Id;
+  householdId: Id;
+  title: string;
+  description?: string;
+  coverItemId?: Id;
+  place?: PlaceRef;
+  bgmPreset?: BgmPreset;
+  creatorMembershipId: Id;
+  visibility: VisibilityPolicy;
+  createdAt: Rfc3339;
+  version: number;
+  deletedAt?: Rfc3339;
+}
+
+export type AlbumItemStatus = 'uploading' | 'processing' | 'ready' | 'rejected';
+export interface AlbumItem {
+  id: Id;
+  albumId: Id;
+  householdId: Id;
+  kind: 'photo' | 'video';
+  originalName: string;
+  mimeType: string;
+  byteSize: number;
+  width?: number;
+  height?: number;
+  takenAt?: Rfc3339;
+  sha256?: string;
+  status: AlbumItemStatus;
+  statusMessage?: string;
+  /** 撮影場所の情報を残しているか。既定では取り除く。 */
+  locationKept: boolean;
+  hasThumbnail: boolean;
+  uploaderMembershipId: Id;
+  position: number;
+  createdAt: Rfc3339;
+  deletedAt?: Rfc3339;
+}
+
+export interface AlbumSummary extends Album {
+  itemCount: number;
+  coverUrl?: string;
+}
+
 export interface ExpenseShare {
   membershipId: Id;
   amountJpy: number;
