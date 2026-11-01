@@ -728,6 +728,177 @@
       "undo": "閉じる",
       "alternative": "家計",
       "entity": "Expense"
+    },
+    {
+      "idPattern": "^tasks\\.form\\.",
+      "routes": [
+        "*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "task.create|task.update",
+      "risk": "reversible",
+      "onlineRequired": false,
+      "successObservation": "入力どおりのタスクを追加または更新する",
+      "failureRecovery": "入力を保持し、問題のある項目を示す",
+      "undo": "キャンセル、または保存後に編集・削除",
+      "alternative": "タスクの詳細",
+      "entity": "Todo"
+    },
+    {
+      "idPattern": "^tasks\\.complete\\.",
+      "routes": [
+        "/tasks"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "task.transition",
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "一覧のまま、見ている人に勧める操作（完了、確認の依頼、確認して完了）を行う",
+      "failureRecovery": "理由を示し状態を保つ",
+      "undo": "タスクの詳細で状態を戻す",
+      "alternative": "タスクの詳細",
+      "entity": "Todo"
+    },
+    {
+      "idPattern": "^tasks\\.action\\.",
+      "routes": [
+        "/tasks/*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "task.transition",
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "状態を変え、一言を次の人への一言または完了の一言として残す",
+      "failureRecovery": "理由を示し、一言の入力を保つ",
+      "undo": "タスクの詳細で状態を戻す",
+      "alternative": "タスクの一覧の丸ボタン",
+      "entity": "Todo"
+    },
+    {
+      "idPattern": "^notes\\.attachment\\.(retry|discard)\\.",
+      "routes": [
+        "/notes/*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "memo.attach",
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "送れなかったファイルを同じ内容で送り直す、または一覧から取り除く",
+      "failureRecovery": "理由を示し、ファイルを一覧に残す",
+      "undo": "取り除いた後はファイルを選び直す",
+      "alternative": "ファイルを追加",
+      "entity": "Attachment"
+    },
+    {
+      "idPattern": "^notes\\.attachment\\.delete\\.",
+      "routes": [
+        "/notes/*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "memo.attach",
+      "risk": "irreversible",
+      "onlineRequired": true,
+      "successObservation": "確認の後で添付ファイルをメモから外す",
+      "failureRecovery": "理由を示し、添付を残す",
+      "undo": null,
+      "alternative": "メモの編集",
+      "entity": "Attachment"
+    },
+    {
+      "idPattern": "^notes\\.ocr\\.",
+      "routes": [
+        "/notes/*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "memo.update",
+      "risk": "reversible",
+      "onlineRequired": false,
+      "successObservation": "文字認識の結果を修正する。空にすると外す",
+      "failureRecovery": "入力を保持し、理由を示す",
+      "undo": "もう一度修正する",
+      "alternative": "メモの編集",
+      "entity": "Memo"
+    },
+    {
+      "idPattern": "^shared\\.visibility\\.",
+      "routes": [
+        "*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "event.create|event.update|task.create|task.update|memo.create|memo.update",
+      "risk": "reversible",
+      "onlineRequired": false,
+      "successObservation": "選んだ公開範囲を入力に反映する",
+      "failureRecovery": "入力を保持し、問題を示す",
+      "undo": "選び直す",
+      "alternative": "作成した本人だけに公開",
+      "entity": "Household"
+    },
+    {
+      "idPattern": "^shared\\.recurrence\\.",
+      "routes": [
+        "*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "event.create|event.update|task.create|task.update",
+      "risk": "reversible",
+      "onlineRequired": false,
+      "successObservation": "選んだ繰り返しを入力に反映する",
+      "failureRecovery": "入力を保持し、問題を示す",
+      "undo": "選び直す",
+      "alternative": "繰り返さない",
+      "entity": "Household"
+    },
+    {
+      "idPattern": "^shared\\.color-label\\.",
+      "routes": [
+        "*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "event.create|event.update|task.create|task.update",
+      "risk": "reversible",
+      "onlineRequired": false,
+      "successObservation": "選んだリストを入力に反映する",
+      "failureRecovery": "入力を保持する",
+      "undo": "選び直す",
+      "alternative": "なし",
+      "entity": "Household"
     }
   ]
 }

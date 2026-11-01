@@ -11,9 +11,14 @@ import type {
   ResourceLink,
   Scenario,
   SpendingCategory,
+  TodoPriority,
   TodoStatus,
   VisibilityAudience,
 } from '../domain/types';
+import type { MemoSort } from '../domain/memoList';
+import type { TaskFilter } from '../domain/taskList';
+import type { TodoAction } from '../domain/todoFlow';
+import type { SharedKind } from '../domain/visibilityForm';
 
 const recurrence = {
   event: {
@@ -64,6 +69,39 @@ export const ja = {
     waiting: '相手待ち',
     done: '完了',
   } satisfies Record<TodoStatus, string>,
+  taskFilter: {
+    open: '未完了',
+    mine: '自分の担当',
+    review: '確認待ち',
+    done: '完了',
+  } satisfies Record<TaskFilter, string>,
+  taskPriority: {
+    low: '低い',
+    normal: '普通',
+    high: '高い',
+  } satisfies Record<TodoPriority, string>,
+  taskAction: {
+    complete: '完了にする',
+    'request-review': '確認を依頼する',
+    'confirm-done': '確認して完了にする',
+    start: '着手する',
+    wait: '相手待ちにする',
+    reset: '未着手に戻す',
+    reopen: '未着手に戻す',
+  } satisfies Record<TodoAction, string>,
+  taskActionDone: {
+    complete: 'を完了にしました',
+    'request-review': 'の確認を依頼しました',
+    'confirm-done': 'を確認して完了にしました',
+    start: 'を進行中にしました',
+    wait: 'を相手待ちにしました',
+    reset: 'を未着手に戻しました',
+    reopen: 'を未着手に戻しました',
+  } satisfies Record<TodoAction, string>,
+  memoSort: {
+    newest: '新しい順',
+    oldest: '古い順',
+  } satisfies Record<MemoSort, string>,
   attachmentStatus: {
     selected: '選択済み',
     validating: '確認中',
@@ -102,6 +140,20 @@ export const ja = {
     creator: '作成した本人だけに表示します。',
     selected: '選んだメンバーと、作成した本人に表示します。',
   } satisfies Record<VisibilityAudience, string>,
+  /** タスクとメモでは、公開範囲の意味が予定と少し違う。 */
+  visibilityFor: {
+    task: {
+      labels: { participants: 'タスクに関わる人' },
+      help: {
+        household: '管理者と大人のメンバー、このタスクに関わる人に表示します。',
+        participants: '作成した本人、担当する人、確認する人に表示します。',
+      },
+    },
+    memo: {
+      labels: {},
+      help: { household: '管理者と大人のメンバー、作成した本人に表示します。' },
+    },
+  } satisfies Record<Exclude<SharedKind, 'event'>, { labels: Partial<Record<VisibilityAudience, string>>; help: Partial<Record<VisibilityAudience, string>> }>,
   recurrence,
   resourceKinds: {
     school: '学校',
@@ -331,6 +383,28 @@ export const membershipStatusLabels = ja.membershipStatus;
 export const taskStatusLabels = ja.taskStatus;
 export const attachmentStatusLabels = ja.attachmentStatus;
 export const notificationStatusLabels = ja.notificationStatus;
+
+export function audienceLabel(kind: SharedKind, audience: VisibilityAudience): string {
+  const labels: Partial<Record<VisibilityAudience, string>> = kind === 'event' ? {} : ja.visibilityFor[kind].labels;
+  return labels[audience] ?? ja.visibility[audience];
+}
+
+export function audienceHelp(kind: SharedKind, audience: VisibilityAudience): string {
+  const help: Partial<Record<VisibilityAudience, string>> = kind === 'event' ? {} : ja.visibilityFor[kind].help;
+  return help[audience] ?? ja.visibilityHelp[audience];
+}
+
+/** 状態を変えるボタンの文言。戻す先が同じでも、今の状態で言い方が変わる。 */
+export function taskActionLabel(action: TodoAction, status: TodoStatus): string {
+  if (action === 'start' && status === 'waiting') return '再開する';
+  if (action === 'start' && status === 'review') return '進行中に戻す';
+  return ja.taskAction[action];
+}
+
+/** ボタンの読み上げの文言。対象のタスクの名前を含める。 */
+export function taskActionAriaLabel(action: TodoAction, status: TodoStatus, title: string): string {
+  return `「${title}」${action === 'request-review' ? 'の' : 'を'}${taskActionLabel(action, status)}`;
+}
 
 export function recurrenceLabel(kind: 'event' | 'task', scope: RecurrenceScope): string {
   return ja.recurrence[kind][scope];

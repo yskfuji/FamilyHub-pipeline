@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { allowedAudiencesFor } from '../authz/policy';
 import { eventInputSchema, expenseInputSchema, memoInputSchema, todoInputSchema } from '../domain/schemas';
 import { useApp, type QuickCreateKind } from './AppContext';
 import { Dialog } from '../design-system/components';
@@ -8,12 +7,14 @@ import { ja } from '../content/ja';
 import { dateKeyFromRfc3339 } from '../domain/calendarDate';
 import { expenseCategories } from '../domain/ledger';
 import { draftToCreateInput, newEventDraft, type EventDraft, type EventPrefill } from '../domain/eventForm';
+import { newTaskDraft, taskDraftToCreateInput, type TaskDraft } from '../domain/taskForm';
+import { defaultAudience } from '../domain/visibilityForm';
 import { EventForm } from '../features/calendar/EventForm';
+import { TaskForm } from '../features/tasks/TaskForm';
 import { PlaceField } from '../features/place/PlaceField';
 import type { Capability, Expense, PlaceRef } from '../domain/types';
 
 const kindTable: ReadonlyArray<readonly [QuickCreateKind, string, Capability]> = [['todo', 'タスク', 'task.create'], ['event', '予定', 'event.create'], ['memo', 'メモ', 'memo.create'], ['expense', '支出', 'expense.create']];
-const jst = (date: string, time: string) => `${date}T${time}:00+09:00`;
 const firstIssue = (issues: Array<{ message: string }>) => issues[0]?.message ?? '入力内容を確認してください。';
 
 export function QuickCreate() {
@@ -49,14 +50,6 @@ export function QuickCreate() {
     const text = (name: string) => String(values.get(name) ?? '');
     const title = text('title');
     const stop = (message: string) => { setError(message); setSubmitting(false); };
-    if (kind === 'todo') {
-      const parsed = todoInputSchema.safeParse({ title, dueAt: jst(text('date'), text('time')), assigneeMembershipId: text('member'), ...(text('reviewer') ? { reviewerMembershipId: text('reviewer') } : {}) });
-      if (!parsed.success) return stop(firstIssue(parsed.error.issues));
-      const outcome = await executeQueueable({ operation: 'task.create', summary: `タスク「${title}」を作成`, payload: { input: parsed.data } }, () => gateway.todos.createTodo(parsed.data));
-      if (outcome.status === 'failed') return stop(outcome.error.message);
-      if (outcome.status === 'queued') { setOpen(false); setSubmitting(false); return; }
-      return finish('タスク');
-    }
     if (kind === 'memo') {
       const parsed = memoInputSchema.safeParse({ title, body: text('body'), tags: text('tags').split(/[,、]/).map((tag) => tag.trim()).filter(Boolean), ...(place ? { place } : {}) });
       if (!parsed.success) return stop(firstIssue(parsed.error.issues));
@@ -83,26 +76,28 @@ export function QuickCreate() {
     if (outcome.status === 'queued') { setOpen(false); setSubmitting(false); return; }
     return finish('予定');
   };
-  const titleLabel = kind === 'todo' ? 'タスク名' : kind === 'memo' ? 'タイトル' : '支出名';
-  const titleExample = kind === 'todo' ? '例：提出物を確認する' : kind === 'memo' ? '例：学校からのお知らせ' : '例：学校教材';
-  const audiences = allowedAudiencesFor(snapshot.viewer.role);
-  const defaultAudience = audiences.find((audience) => audience === privacy?.defaultAudience) ?? audiences[0];
+  const submitTask = async (draft: TaskDraft) => {
+    if (submitting) return;
+    setError(''); setSubmitting(true);
+    const stop = (message: string) => { setError(message); setSubmitting(false); };
+    const parsed = todoInputSchema.safeParse(taskDraftToCreateInput(draft));
+    if (!parsed.success) return stop(firstIssue(parsed.error.issues));
+    const outcome = await executeQueueable({ operation: 'task.create', summary: `タスク「${parsed.data.title}」を作成`, payload: { input: parsed.data } }, () => gateway.todos.createTodo(parsed.data));
+    if (outcome.status === 'failed') return stop(outcome.error.message);
+    if (outcome.status === 'queued') { setOpen(false); setSubmitting(false); return; }
+    return finish('タスク');
+  };
+  const titleLabel = kind === 'memo' ? 'タイトル' : '支出名';
+  const titleExample = kind === 'memo' ? '例：学校からのお知らせ' : '例：学校教材';
+  const { role, membershipId } = snapshot.viewer;
   return <>
     <button type="button" className="button primary quick-create" data-control-id="quick-create.open" onClick={() => openWith()}><PlusIcon width="20"/><span>すぐに追加</span></button>
     {open && <Dialog title="すぐに追加" description="この画面を開いたまま、予定・タスク・メモ・支出を追加できます。" onClose={() => { if (!submitting) setOpen(false); }}>
       <div className="segmented" role="group" aria-label="追加する項目">{kinds.map(([value, label]) => <button data-control-id={`quick-create.kind.${value}`} key={value} type="button" aria-pressed={kind === value} disabled={submitting} onClick={() => { setKind(value); setError(''); }}>{label}</button>)}</div>
-      {kind === 'event' ? <div className="mt-1"><EventForm formId="new" initial={newEventDraft(prefill ?? { date: today }, snapshot.viewer.membershipId, defaultAudience)} submitLabel={ja.actions.add} busy={submitting} error={error} offerTemplates onSubmit={(draft) => void submitEvent(draft)} onCancel={() => setOpen(false)}/></div> : <form key={kind} className="stack mt-1" aria-busy={submitting} onSubmit={(event) => { event.preventDefault(); void submit(event.currentTarget); }}>
+      {kind === 'event' && <div className="mt-1"><EventForm formId="new" initial={newEventDraft(prefill ?? { date: today }, membershipId, defaultAudience(role, 'event', privacy?.defaultAudience))} submitLabel={ja.actions.add} busy={submitting} error={error} offerTemplates onSubmit={(draft) => void submitEvent(draft)} onCancel={() => setOpen(false)}/></div>}
+      {kind === 'todo' && <div className="mt-1"><TaskForm formId="new" initial={newTaskDraft(today, membershipId, defaultAudience(role, 'task', privacy?.defaultAudience))} submitLabel={ja.actions.add} busy={submitting} error={error} onSubmit={(draft) => void submitTask(draft)} onCancel={() => setOpen(false)}/></div>}
+      {(kind === 'memo' || kind === 'expense') && <form key={kind} className="stack mt-1" aria-busy={submitting} onSubmit={(event) => { event.preventDefault(); void submit(event.currentTarget); }}>
         <div className="field"><label htmlFor="quick-title">{titleLabel}</label><input data-control-id="quick-create.title" className="input" id="quick-title" name="title" required maxLength={120} autoFocus aria-describedby="quick-title-help"/><span className="field-help" id="quick-title-help">{titleExample}</span></div>
-        {kind === 'todo' && <>
-          <div className="grid two">
-            <div className="field"><label htmlFor="quick-date">期限の日付</label><input data-control-id="quick-create.date" className="input" id="quick-date" name="date" type="date" required defaultValue={today}/></div>
-            <div className="field"><label htmlFor="quick-time">期限の時刻</label><input data-control-id="quick-create.time" className="input" id="quick-time" name="time" type="time" required defaultValue="20:00"/></div>
-          </div>
-          <div className="grid two">
-            <div className="field"><label htmlFor="quick-member">担当者</label><select data-control-id="quick-create.member" className="select" id="quick-member" name="member" defaultValue={snapshot.viewer.membershipId}>{active.map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</select></div>
-            <div className="field"><label htmlFor="quick-reviewer">確認する人（任意）</label><select data-control-id="quick-create.reviewer" className="select" id="quick-reviewer" name="reviewer" defaultValue=""><option value="">なし</option>{adults.map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</select></div>
-          </div>
-        </>}
         {kind === 'memo' && <>
           <div className="field"><label htmlFor="quick-body">本文</label><textarea data-control-id="quick-create.body" className="textarea" id="quick-body" name="body" required maxLength={5000}/></div>
           <div className="field"><label htmlFor="quick-tags">タグ（任意）</label><input data-control-id="quick-create.tags" className="input" id="quick-tags" name="tags" aria-describedby="quick-tags-help"/><span className="field-help" id="quick-tags-help">読点またはカンマで区切ります（最大10件）</span></div>

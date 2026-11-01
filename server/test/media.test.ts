@@ -196,6 +196,24 @@ describe('memo attachments', () => {
     expect(tampered.status).toBe(404);
   });
 
+  it('removes the location from a video attachment, and refuses one it cannot read', async () => {
+    const world = open();
+    const uploaded = await world.gateway.memos.uploadAttachment('memo-school', asFile(sampleVideo(), 'clip.mp4', 'video/mp4'));
+    await settled(world);
+    const attachment = uploaded.ok ? uploaded.value.attachments.at(-1)! : null;
+    const link = await world.gateway.memos.getAttachmentLink('memo-school', attachment!.id);
+    expect(link.ok).toBe(true);
+    const { url, cookies } = await world.ready;
+    const opened = await fetch(`${url}${link.ok ? link.value.url : ''}`, { headers: { Cookie: [...cookies].map(([name, value]) => `${name}=${value}`).join('; ') } });
+    expect(Buffer.from(await opened.arrayBuffer()).includes(Buffer.from(LOCATION, 'latin1'))).toBe(false);
+
+    const broken = Buffer.concat([box('ftyp', Buffer.alloc(8)), Buffer.from([0, 0, 0xff, 0xff]), Buffer.from('moov', 'latin1')]);
+    const refused = await world.gateway.memos.uploadAttachment('memo-school', asFile(broken, 'broken.mp4', 'video/mp4'));
+    await settled(world);
+    const rejected = refused.ok ? refused.value.attachments.at(-1)! : null;
+    expect(await world.gateway.memos.getAttachmentLink('memo-school', rejected!.id)).toMatchObject({ ok: false, error: { code: 'ATTACHMENT_REJECTED' } });
+  });
+
   it('rejects what the scanner refuses and never issues a link', async () => {
     const world = open('member-aoi', undefined, { scan: async () => 'failed', ready: async () => true });
     const uploaded = await world.gateway.memos.uploadAttachment('memo-school', asFile(pdf, 'a.pdf', 'application/pdf'));

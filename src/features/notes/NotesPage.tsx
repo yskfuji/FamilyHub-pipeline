@@ -1,64 +1,91 @@
-import { useRef, useState } from 'react';
-import { useApp, memberName } from '../../app/AppContext';
-import { detailId, navigate, useCloseTo } from '../../app/router';
-import { DetailNotFound, Dialog, Drawer, EmptyState, PageHeader, StatusBadge, formatDate } from '../../design-system/components';
-import { EyeIcon, FileIcon, LockIcon, MapPinIcon, NoteIcon, ShieldIcon, UploadIcon } from '../../design-system/icons';
-import { keyOfPlace } from '../../domain/places';
-import type { Memo, PlaceRef, VisibilityPolicy } from '../../domain/types';
-import { attachmentStatusLabels, ja } from '../../content/ja';
-import { PlaceAttributionLink, PlaceField, PlaceSummary } from '../place/PlaceField';
+import { useMemo, useState } from 'react';
+import { memberName, useApp } from '../../app/AppContext';
+import { detailId, navigate, useSearch, withQueryParam } from '../../app/router';
+import { ja } from '../../content/ja';
+import { DetailNotFound, Dialog, EmptyState, PageHeader, StatusBadge } from '../../design-system/components';
+import { LockIcon, MapPinIcon, NoteIcon } from '../../design-system/icons';
+import { dateKeyFromRfc3339 } from '../../domain/calendarDate';
+import { memoDraftToCreateInput, newMemoDraft, type MemoAudience, type MemoDraft } from '../../domain/memoForm';
+import { memoDateKey, memoSorts, parseMemoSort, sortMemos } from '../../domain/memoList';
+import { defaultAudience } from '../../domain/visibilityForm';
+import type { Attachment, Memo } from '../../domain/types';
+import { dayLabel } from '../calendar/calendarLabels';
+import { audienceText } from '../shared/visibilityText';
+import { MemoDrawer } from './MemoDrawer';
+import { MemoForm } from './MemoForm';
+import { useAttachmentQueue } from './useAttachmentQueue';
 
-/** 公開範囲の説明。選択したメンバーの場合は名前も示す。 */
-const audienceText = (visibility: VisibilityPolicy, nameOf: (id: string) => string) => (visibility.audience === 'selected'
-  ? `${ja.visibility.selected}（${visibility.selectedMembershipIds.map(nameOf).join('、')}）`
-  : ja.visibility[visibility.audience]);
-const tone = (status: string) => status === 'clean' ? 'success' : status === 'rejected' ? 'danger' : status === 'quarantined' ? 'attention' : 'neutral';
+const attachmentTone = (attachments: readonly Attachment[]) => (attachments.some((item) => item.status === 'rejected') ? 'danger' : attachments.some((item) => item.status !== 'clean') ? 'attention' : 'success');
 
 export function NotesPage({ path }: { path: string }) {
-  const { snapshot, gateway, refresh, announce, can, executeQueueable } = useApp();
+  const { snapshot, gateway, refresh, announce, can, executeQueueable, privacy } = useApp();
   const [query, setQuery] = useState('');
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState('');
-  const [editing, setEditing] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [deleted, setDeleted] = useState<Memo | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [draftPlace, setDraftPlace] = useState<PlaceRef | null>(null);
-  const [placeChanged, setPlaceChanged] = useState(false);
-  const input = useRef<HTMLInputElement>(null);
-  const canPlace = can('place.read');
-  const changeDraftPlace = (next: PlaceRef | null) => { setDraftPlace(next); setPlaceChanged(true); };
+  const [deleted, setDeleted] = useState<Memo | null>(null);
+  const queue = useAttachmentQueue();
+  const search = useSearch();
+  const sort = parseMemoSort(new URLSearchParams(search).get('sort'));
   const activeId = detailId(path, '/notes');
   const active = snapshot.memos.find((memo) => memo.id === activeId);
-  const close = useCloseTo('/notes');
-  const filtered = snapshot.memos.filter((memo) => [memo.title, memo.body, memo.ocrText ?? '', ...memo.tags, memo.place?.name ?? ''].join(' ').toLowerCase().includes(query.trim().toLowerCase()));
-  const openAttachment = async (memo: Memo, attachmentId: string) => {
-    const result = await gateway.memos.getAttachmentLink(memo.id, attachmentId);
-    if (!result.ok) { announce(result.error.message); return; }
-    window.open(result.value.url, '_blank', 'noopener,noreferrer');
-  };
-  const upload = async (file?: File) => {
-    if (!active || !file) return;
-    const result = await gateway.memos.uploadAttachment(active.id, file);
-    if (!result.ok) { announce(result.error.message); return; }
-    await refresh(); announce('ファイルを受け付けました。確認が終わるまで開けません。');
-  };
-  const create = async (form: HTMLFormElement) => {
-    if (submitting) return; setFormError(''); setSubmitting(true); const values = new FormData(form);
-    const input = { title: String(values.get('title') ?? ''), body: String(values.get('body') ?? ''), tags: String(values.get('tags') ?? '').split(/[,、]/).map((tag) => tag.trim()).filter(Boolean), ...(canPlace && draftPlace ? { place: draftPlace } : {}) };
-    const outcome = await executeQueueable({ operation: 'memo.create', summary: `メモ「${input.title}」を作成`, payload: { input } }, () => gateway.memos.createMemo(input)); setSubmitting(false);
+  const memos = useMemo(() => {
+    const words = query.trim().toLowerCase();
+    return sortMemos(snapshot.memos.filter((memo) => [memo.title, memo.body, memo.ocrText ?? '', ...memo.tags, memo.place?.name ?? ''].join(' ').toLowerCase().includes(words)), sort);
+  }, [snapshot.memos, query, sort]);
+
+  /**
+   * ファイルを選んでいるメモは、未送信の変更として保存しない（ファイルは保存できず、失われるため）。
+   * 作った後の添付の失敗は待ち行列に残るので、メモを作り直さずに送り直せる。
+   */
+  const create = async (draft: MemoDraft, files: File[]) => {
+    if (submitting) return;
+    setFormError(''); setSubmitting(true);
+    const input = memoDraftToCreateInput(draft);
+    const outcome = files.length
+      ? await gateway.memos.createMemo(input).then((result) => (result.ok ? { status: 'completed' as const, value: result.value } : { status: 'failed' as const, error: result.error }))
+      : await executeQueueable({ operation: 'memo.create', summary: `メモ「${input.title}」を作成`, payload: { input } }, () => gateway.memos.createMemo(input));
+    setSubmitting(false);
     if (outcome.status === 'failed') { setFormError(outcome.error.message); return; }
     if (outcome.status === 'queued') { setCreating(false); return; }
-    await refresh(); setCreating(false); announce('メモを作成しました'); navigate(`/notes/${outcome.value.id}`);
+    await refresh();
+    setCreating(false);
+    announce('メモを作成しました');
+    navigate(`/notes/${outcome.value.id}${search}`);
+    if (files.length) queue.add(outcome.value.id, files);
   };
-  const update = async (memo: Memo, form: HTMLFormElement) => { if (submitting) return; setSubmitting(true); setFormError(''); const values = new FormData(form); const input = { title: String(values.get('title') ?? ''), body: String(values.get('body') ?? ''), tags: String(values.get('tags') ?? '').split(/[,、]/).map((tag) => tag.trim()).filter(Boolean), ...(canPlace && placeChanged ? { place: draftPlace } : {}) }; const outcome = await executeQueueable({ operation: 'memo.update', summary: `メモ「${memo.title}」を変更`, payload: { id: memo.id, input, expectedVersion: memo.version } }, () => gateway.memos.updateMemo(memo.id, input, memo.version)); setSubmitting(false); if (outcome.status === 'failed') return setFormError(outcome.error.message); if (outcome.status === 'queued') { setEditing(false); return; } await refresh(); setEditing(false); announce('メモを更新しました'); };
-  const remove = async () => { if (!active) return; const result = await gateway.memos.deleteMemo(active.id); if (!result.ok) return announce(`${result.error.message} 削除はオフライン中に保存できません。`); setDeleted(active); setDeleting(false); close(); await refresh(); announce(`「${active.title}」を削除しました`); };
-  const restore = async () => { if (!deleted) return; const result = await gateway.memos.restoreMemo(deleted.id); if (!result.ok) return announce(result.error.message); setDeleted(null); await refresh(); announce(`「${result.value.title}」を元に戻しました`); };
-  const ownOrAdult = active && (['owner','adult'].includes(snapshot.viewer.role) || active.authorMembershipId === snapshot.viewer.membershipId);
-  return <div className="page"><PageHeader eyebrow="メモ" title="家族のメモ" description="家族で共有する連絡や控えをまとめます。文字認識の結果は、元のファイルと照らし合わせて確認できます。" action={can('memo.create') ? <button data-control-id="notes.create.open" className="button primary" type="button" onClick={() => { setDraftPlace(null); setPlaceChanged(false); setCreating(true); }}><NoteIcon width="18"/>メモを追加</button> : undefined}/>{activeId && !active && <DetailNotFound what="メモ" feature="notes" backHref="/notes"/>}{deleted && <div className="callout info" role="status"><NoteIcon/><div><strong>「{deleted.title}」を削除しました</strong><p className="small muted mb-0">7日以内は元に戻せます。</p></div><button data-control-id="notes.restore" className="button" type="button" onClick={() => void restore()}>{ja.actions.restore}</button></div>}<div className="field" style={{ maxWidth: '32rem', marginBottom: '1.5rem' }}><label htmlFor="note-search">メモを検索</label><input data-control-id="notes.search" id="note-search" className="input" type="search" aria-describedby="note-search-help" value={query} onChange={(event) => setQuery(event.target.value)}/><span className="field-help" id="note-search-help">タイトル、本文、タグ、文字認識の結果、記録した場所の名前から検索します。</span></div>{filtered.length === 0 ? <EmptyState title="条件に合うメモはありません">検索語を短くするか、新しいメモを追加してください。</EmptyState> : <div className="grid three">{filtered.map((memo) => <a data-control-id={`notes.open.${memo.id}`} className="card" href={`/notes/${memo.id}`} data-link key={memo.id} style={{ color: 'var(--ink)', textDecoration: 'none' }}><div className="split"><NoteIcon width="24"/><span className="meta">{formatDate(memo.updatedAt)}</span></div><h2>{memo.title}</h2><p className="muted">{memo.body}</p>{memo.place && <span className="place-chip"><MapPinIcon width="14"/>{memo.place.name}</span>}<div className="split"><span className="meta">{memberName(snapshot,memo.authorMembershipId)} · {memo.tags.join(' / ')} · <LockIcon width="12" aria-hidden="true"/> {audienceText(memo.visibility, (id) => memberName(snapshot, id))}</span>{memo.attachments.length > 0 && <StatusBadge tone={tone(memo.attachments[0].status)}>添付 {memo.attachments.length}件</StatusBadge>}</div></a>)}</div>}
-    {active && <Drawer eyebrow="メモの内容" title={active.title} onClose={close}><div className="stack"><p>{active.body}</p><div><h3>タグ</h3><div className="people">{active.tags.map((tag) => <span className="person-chip" key={tag}>#{tag}</span>)}</div></div><p className="small muted mb-0"><LockIcon width="14" aria-hidden="true"/> 共有範囲：{audienceText(active.visibility, (id) => memberName(snapshot, id))}</p>{active.place && <section><h3>{ja.place.legend}</h3><PlaceSummary place={active.place}/><a data-control-id={`notes.place.open.${active.id}`} className="button mt-1" href={`/places/${keyOfPlace(active.place)}`} data-link><MapPinIcon width="17"/>この場所の記録を見る</a>{active.place.provenance && <PlaceAttributionLink where="memo"/>}</section>}<section className="card flat"><div className="section-head"><h3>添付ファイル</h3>{can('memo.attach') && ownOrAdult && <button data-control-id={`notes.attachment.choose.${active.id}`} className="button" type="button" onClick={() => input.current?.click()}><UploadIcon width="17"/>ファイルを追加</button>}<input data-control-id={`notes.attachment.file.${active.id}`} ref={input} className="sr-only" type="file" aria-label="添付するファイルを選択" accept=".pdf,.jpg,.jpeg,.png" onChange={(event) => void upload(event.target.files?.[0])}/></div>{active.attachments.length === 0 ? <p className="muted">添付ファイルはありません。</p> : <ul className="list">{active.attachments.map((attachment) => <li className="list-row" key={attachment.id}><FileIcon width="23"/><div className="row-main"><strong>{attachment.originalName}</strong><span className="meta">{(attachment.byteSize / 1_000_000).toFixed(1)} MB · {attachment.statusMessage}</span></div>{attachment.status === 'clean' ? <button data-control-id={`notes.attachment.open.${attachment.id}`} className="button" type="button" aria-label={`${attachment.originalName}を開く（新しいタブ）`} onClick={() => void openAttachment(active, attachment.id)}>開く</button> : <StatusBadge tone={tone(attachment.status)}>{attachmentStatusLabels[attachment.status]}</StatusBadge>}</li>)}</ul>}<div className="callout info mt-1"><ShieldIcon/><div><strong>確認が終わるまでファイルは開けません</strong><p className="small muted mb-0">添付できるのはPDF・JPEG・PNGのいずれかで、10MB以内のファイルです。共有相手の範囲も確認してください。</p></div></div></section>{active.ocrText && <section><div className="section-head"><h3><EyeIcon width="18"/> 文字認識の結果</h3><StatusBadge>元のファイルと照合</StatusBadge></div><div className="card flat"><p>{active.ocrText}</p><p className="small muted mb-0">文字認識には誤りが含まれることがあります。重要な日時や金額は、元のファイルで確認してください。</p></div></section>}{ownOrAdult && <div className="grid two">{can('memo.update') && <button data-control-id={`notes.edit.open.${active.id}`} className="button" type="button" onClick={() => { setDraftPlace(active.place ?? null); setPlaceChanged(false); setEditing(true); }}>内容を編集</button>}{can('memo.delete') && <button data-control-id={`notes.delete.open.${active.id}`} className="button danger" type="button" onClick={() => setDeleting(true)}>メモを削除</button>}</div>}</div></Drawer>}
-    {creating && <Dialog title="メモを作る" description="ファイルはメモを作成した後に追加できます。追加したファイルは、確認が終わるまで開けません。" onClose={() => { if (!submitting) { setCreating(false); setFormError(''); } }}><form className="stack" aria-busy={submitting} onSubmit={(event) => { event.preventDefault(); void create(event.currentTarget); }}><label className="field"><span>タイトル</span><input data-control-id="notes.create.title" className="input" name="title" required maxLength={120}/></label><label className="field"><span>本文</span><textarea data-control-id="notes.create.body" className="textarea" name="body" required maxLength={5000}/></label><label className="field"><span>タグ</span><input data-control-id="notes.create.tags" className="input" name="tags" aria-describedby="memo-tags-help"/><span className="field-help" id="memo-tags-help">例：学校、今週。読点またはカンマで区切ります（最大10件）</span></label>{canPlace && <PlaceField value={draftPlace} onChange={changeDraftPlace} disabled={submitting}/>}{formError && <p className="field-error" role="alert">{formError}</p>}<div className="dialog-actions"><button data-control-id="notes.create.cancel" className="button" type="button" disabled={submitting} onClick={() => setCreating(false)}>{ja.actions.cancel}</button><button data-control-id="notes.create.submit" className="button primary" type="submit" disabled={submitting}>{submitting ? '作成中…' : '作成する'}</button></div></form></Dialog>}
-    {active && editing && <Dialog title="メモを編集" description="保存に失敗した場合も、入力中の内容は残ります。" onClose={() => { if (!submitting) setEditing(false); }}><form className="stack" aria-busy={submitting} onSubmit={(event) => { event.preventDefault(); void update(active, event.currentTarget); }}><label className="field"><span>タイトル</span><input data-control-id={`notes.edit.title.${active.id}`} className="input" name="title" required maxLength={120} defaultValue={active.title}/></label><label className="field"><span>本文</span><textarea data-control-id={`notes.edit.body.${active.id}`} className="textarea" name="body" required maxLength={5000} defaultValue={active.body}/></label><label className="field"><span>タグ</span><input data-control-id={`notes.edit.tags.${active.id}`} className="input" name="tags" defaultValue={active.tags.join('、')}/></label>{canPlace && <PlaceField value={draftPlace} onChange={changeDraftPlace} disabled={submitting}/>}{formError && <p className="field-error" role="alert">{formError}</p>}<div className="dialog-actions"><button data-control-id={`notes.edit.cancel.${active.id}`} className="button" type="button" disabled={submitting} onClick={() => setEditing(false)}>{ja.actions.cancel}</button><button data-control-id={`notes.edit.submit.${active.id}`} className="button primary" type="submit" disabled={submitting}>{submitting ? ja.actions.saving : ja.actions.saveChanges}</button></div></form></Dialog>}
-    {active && deleting && <Dialog title="メモを削除しますか" description={`「${active.title}」を削除します。`} onClose={() => setDeleting(false)} actions={<><button data-control-id={`notes.delete.cancel.${active.id}`} className="button" type="button" onClick={() => setDeleting(false)}>{ja.actions.cancel}</button><button data-control-id={`notes.delete.confirm.${active.id}`} className="button danger" type="button" onClick={() => void remove()}>{ja.actions.delete}</button></>}><p className="muted">添付ファイルも表示されなくなります。削除後7日間は元に戻せます。</p></Dialog>}
+  const restore = async () => {
+    if (!deleted) return;
+    const result = await gateway.memos.restoreMemo(deleted.id);
+    if (!result.ok) return announce(result.error.message);
+    setDeleted(null);
+    await refresh();
+    announce(`「${result.value.title}」を元に戻しました`);
+  };
+
+  return <div className="page">
+    <PageHeader eyebrow="メモ" title="家族のメモ" description="家族で共有する連絡や控えをまとめます。文字認識の結果は、元のファイルと照らし合わせて確認できます。" action={can('memo.create') ? <button data-control-id="notes.create.open" className="button primary" type="button" onClick={() => { setFormError(''); setCreating(true); }}><NoteIcon width="18"/>メモを追加</button> : undefined}/>
+    {activeId && !active && <DetailNotFound what="メモ" feature="notes" backHref={`/notes${search}`}/>}
+    {deleted && <div className="callout info" role="status"><NoteIcon/><div><strong>「{deleted.title}」を削除しました</strong><p className="small muted mb-0">7日以内は元に戻せます。</p></div><button data-control-id="notes.restore" className="button" type="button" onClick={() => void restore()}>{ja.actions.restore}</button></div>}
+    <div className="notes-toolbar">
+      <div className="field"><label htmlFor="note-search">メモを検索</label><input data-control-id="notes.search" id="note-search" className="input" type="search" aria-describedby="note-search-help" value={query} onChange={(event) => setQuery(event.target.value)}/><span className="field-help" id="note-search-help">タイトル、本文、タグ、文字認識の結果、記録した場所の名前から検索します。</span></div>
+      <div className="segmented" role="group" aria-label="メモの並び順">{memoSorts.map((value) => <button data-control-id={`notes.sort.${value}`} key={value} type="button" aria-pressed={sort === value} onClick={() => navigate(withQueryParam('sort', value === 'newest' ? null : value), true, true)}>{ja.memoSort[value]}</button>)}</div>
+    </div>
+    {memos.length === 0
+      ? <EmptyState title="条件に合うメモはありません">検索語を短くするか、新しいメモを追加してください。</EmptyState>
+      : <div className="grid three">{memos.map((memo) => <a data-control-id={`notes.open.${memo.id}`} className="card memo-card" href={`/notes/${memo.id}${search}`} data-link key={memo.id}>
+        <div className="split"><NoteIcon width="24"/><span className="meta">{dayLabel(memoDateKey(memo))}</span></div>
+        <h2>{memo.title}</h2>
+        <p className="muted">{memo.body}</p>
+        {memo.place && <span className="place-chip"><MapPinIcon width="14"/>{memo.place.name}</span>}
+        <div className="split">
+          <span className="meta">{memberName(snapshot, memo.authorMembershipId)} · {memo.tags.join(' / ')} · <LockIcon width="12" aria-hidden="true"/> {audienceText('memo', memo.visibility, (id) => memberName(snapshot, id))}</span>
+          {memo.attachments.length > 0 && <StatusBadge tone={attachmentTone(memo.attachments)}>添付 {memo.attachments.length}件</StatusBadge>}
+        </div>
+      </a>)}</div>}
+    {active && <MemoDrawer key={active.id} memo={active} queue={queue} onClose={() => navigate(`/notes${search}`, false, true)} onDeleted={setDeleted}/>}
+    {creating && <Dialog title="メモを作る" description="ファイルも一緒に追加できます。追加したファイルは、確認が終わるまで開けません。" onClose={() => { if (!submitting) setCreating(false); }}>
+      <MemoForm formId="new" initial={newMemoDraft(dateKeyFromRfc3339(snapshot.context.asOf), defaultAudience(snapshot.viewer.role, 'memo', privacy?.defaultAudience) as MemoAudience)} submitLabel="作成する" busyLabel="作成中…" busy={submitting} error={formError} offerFiles onSubmit={(draft, files) => void create(draft, files)} onCancel={() => setCreating(false)}/>
+    </Dialog>}
   </div>;
 }

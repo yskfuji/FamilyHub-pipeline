@@ -3,29 +3,20 @@ import { useApp } from '../../app/AppContext';
 import { StatusBadge, formatYen } from '../../design-system/components';
 import { CheckIcon } from '../../design-system/icons';
 import { addDateKeyDays, dateKeyFromRfc3339 } from '../../domain/calendarDate';
-import { expensesOn, inlineTaskAction, occurrencesBetween, todosOn, type Occurrence } from '../../domain/calendarLayout';
+import { expensesOn, occurrencesBetween, todosOn, type Occurrence } from '../../domain/calendarLayout';
 import { holidaysBetween } from '../../domain/holidays';
 import type { Todo } from '../../domain/types';
 import { taskStatusLabels } from '../../content/ja';
+import { useInlineTodoAction } from '../tasks/useTodoTransition';
 import { dayLabel, labelStyle, timeOnDay } from './calendarLabels';
 
 const HOLIDAY_SEARCH_DAYS = 400;
 
 function TaskRow({ todo }: { todo: Todo }) {
-  const { snapshot, gateway, refresh, announce, can } = useApp();
-  const me = snapshot.viewer.membershipId;
-  const related = [todo.creatorMembershipId, todo.assigneeMembershipId, todo.reviewerMembershipId].includes(me) || ['owner', 'adult'].includes(snapshot.viewer.role);
-  const action = can('task.transition') && related ? inlineTaskAction(todo, me) : null;
-  const finish = async () => {
-    if (!action) return;
-    const result = await gateway.todos.updateTodoStatus(todo.id, action, todo.version);
-    if (!result.ok) return announce(result.error.message);
-    await refresh();
-    announce(action === 'review' ? `「${todo.title}」の確認を依頼しました` : `「${todo.title}」を完了にしました${todo.recurrence ? '。次の回を作成しました' : ''}`);
-  };
+  const inline = useInlineTodoAction(todo);
   return <li className="list-row day-task" data-done={todo.status === 'done' || undefined}>
-    {action
-      ? <button data-control-id={`calendar.task.complete.${todo.id}`} className="task-check" type="button" aria-label={action === 'review' ? `「${todo.title}」の確認を依頼する` : `「${todo.title}」を完了にする`} onClick={() => void finish()}><CheckIcon width="18"/></button>
+    {inline
+      ? <button data-control-id={`calendar.task.complete.${todo.id}`} className="task-check" type="button" aria-label={inline.label} onClick={() => void inline.run()}><CheckIcon width="18"/></button>
       : <span className="task-check-state" aria-hidden="true">{todo.status === 'done' && <CheckIcon width="18"/>}</span>}
     <div className="row-main"><a data-control-id={`calendar.task.open.${todo.id}`} href={`/tasks/${todo.id}`} data-link>{todo.title}</a><span className="meta">{taskStatusLabels[todo.status]}</span></div>
   </li>;

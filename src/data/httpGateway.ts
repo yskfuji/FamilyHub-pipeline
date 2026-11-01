@@ -181,9 +181,9 @@ export function createHttpGateway(baseUrl: string, getCsrfToken: CsrfProvider, g
     memos: {
       createMemo: (input, context) => request('/v1/memos', { method: 'POST', body: JSON.stringify(input), csrf: true, ...mutationHeaders(context) }),
       updateMemo: (id, input, expectedVersion, context) => request(`/v1/memos/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ input, expectedVersion }), csrf: true, ...mutationHeaders(context) }),
-      uploadAttachment: async (memoId, file) => {
+      uploadAttachment: async (memoId, file, idempotencyKey) => {
         const form = new FormData(); form.set('file', file);
-        return request(`/v1/memos/${encodeURIComponent(memoId)}/attachments`, { method: 'POST', body: form, csrf: true });
+        return request(`/v1/memos/${encodeURIComponent(memoId)}/attachments`, { method: 'POST', body: form, csrf: true, idempotencyKey });
       },
       getAttachmentLink: (memoId, attachmentId) => request(`/v1/memos/${encodeURIComponent(memoId)}/attachments/${encodeURIComponent(attachmentId)}/link`),
       deleteAttachment: (memoId, attachmentId) => request(`/v1/memos/${encodeURIComponent(memoId)}/attachments/${encodeURIComponent(attachmentId)}`, { method: 'DELETE', csrf: true }),

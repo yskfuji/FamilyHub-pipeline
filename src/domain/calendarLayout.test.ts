@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { LAST_DAY_OF_MONTH_RULE } from './recurrence';
-import { clockOf, expandEvent, expensesOn, initialTimelineMinutes, inlineTaskAction, isSpanning, lastDateOf, layoutLanes, layoutTimeline, MIN_BLOCK_MINUTES, minutesOfDay, monthWeeks, occurrencesBetween, occurrenceStartingOn, occursOn, slotMinutes, todosOn } from './calendarLayout';
+import { clockOf, expandEvent, expensesOn, initialTimelineMinutes, isSpanning, lastDateOf, layoutLanes, layoutTimeline, MIN_BLOCK_MINUTES, minutesOfDay, monthWeeks, occurrencesBetween, occurrenceStartingOn, occursOn, slotMinutes, todosOn } from './calendarLayout';
 import type { CalendarEvent, Expense, Todo } from './types';
 
 const event = (id: string, startsAt: string, endsAt: string, extra: Partial<CalendarEvent> = {}): CalendarEvent => ({ id, householdId: 'h', title: id, startsAt: `${startsAt}+09:00`, endsAt: `${endsAt}+09:00`, timezone: 'Asia/Tokyo', ownerMembershipId: 'a', participantMembershipIds: ['a'], version: 1, visibility: { audience: 'household', creatorMembershipId: 'a', selectedMembershipIds: [] }, ...extra });
@@ -182,14 +182,6 @@ describe('day entries', () => {
 
   it('lists expenses by the day they were incurred', () => {
     expect(expensesOn([{ incurredOn: '2026-10-05' } as unknown as Expense], '2026-10-05')).toHaveLength(1);
-  });
-
-  it('does not let the assignee skip the review with the inline action', () => {
-    expect(inlineTaskAction(todo({}), 'a')).toBe('done');
-    expect(inlineTaskAction(todo({ reviewerMembershipId: 'b' }), 'a')).toBe('review');
-    expect(inlineTaskAction(todo({ reviewerMembershipId: 'b', status: 'review' }), 'a')).toBeNull();
-    expect(inlineTaskAction(todo({ reviewerMembershipId: 'b', status: 'review' }), 'b')).toBe('done');
-    expect(inlineTaskAction(todo({ status: 'done' }), 'a')).toBeNull();
   });
 });
 

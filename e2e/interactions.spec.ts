@@ -137,7 +137,7 @@ test('three notification preferences persist and change what the bell shows; the
 test('onboarding privacy draft toggles and saves creator-only default', async ({ page }) => {
   await page.goto('/onboarding');
   await page.getByRole('button', { name: /次へ/ }).click();
-  const household = page.getByRole('button', { name: '家族全員と共有する' });
+  const household = page.getByRole('button', { name: '大人のメンバーと関わる人に共有する' });
   const preview = page.getByRole('button', { name: '通知の内容を表示しない' });
   await household.click(); await preview.click();
   await expect(household).toHaveAttribute('aria-pressed', 'false');

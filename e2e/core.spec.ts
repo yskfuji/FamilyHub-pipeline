@@ -35,7 +35,7 @@ test('task reviewer and state update are visible', async ({ page }) => {
   await page.goto('/tasks/todo-form');
   await expect(page.getByText('確認する人', { exact: true })).toBeVisible();
   await expect(page.getByText('蓮', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '完了にする' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: '完了にする' }).click();
   await expect(page.locator('.toast-visible')).toContainText('完了にしました');
 });
 

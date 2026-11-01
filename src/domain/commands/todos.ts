@@ -1,11 +1,19 @@
 import type { TodoPort } from '../../data/gateway';
 import { authorize, authorizeVisibleResource, canDeleteResource, canMutateOwnedResource } from '../../authz/policy';
-import { dateKeyFromRfc3339 } from '../calendarDate';
+import { dateKeyFromRfc3339, toJstRfc3339 } from '../calendarDate';
 import { nextOccurrenceAfter, occurrenceStartsAt } from '../recurrence';
 import { todoInputSchema, todoUpdateSchema } from '../schemas';
 import type { Todo } from '../types';
 import { applyPatch, archive, conflict, denied, invalid, missing, ok, fail } from './context';
 import type { CommandContext, SyncPort } from './context';
+
+/** 繰り返しのタスクを次の回へ進める。期間のタスクは開始も同じだけ動かして、長さを保つ。 */
+function moveToOccurrence(todo: Todo, occurrence: string) {
+  if (!todo.dueAt) return;
+  const moved = occurrenceStartsAt(todo.dueAt, occurrence);
+  if (todo.dueStartAt) todo.dueStartAt = toJstRfc3339(new Date(Date.parse(todo.dueStartAt) + Date.parse(moved) - Date.parse(todo.dueAt)));
+  todo.dueAt = moved;
+}
 
 export function createTodoCommands(c: CommandContext): SyncPort<TodoPort> {
   const { a, state, nextId, now, viewer, requireCapability, offlineFailure, permissionConflict, withinRestoreWindow, defaultVisibility, foreignMember, foreignLabel, resolveVisibility } = c;
@@ -45,7 +53,7 @@ export function createTodoCommands(c: CommandContext): SyncPort<TodoPort> {
         const done: Todo = { ...structuredClone(target), ...comment, id: nextId('todo'), status: 'done', version: 1 };
         delete done.recurrence;
         state.todos = [done, ...state.todos];
-        target.dueAt = occurrenceStartsAt(target.dueAt, next); target.status = 'open'; target.version += 1;
+        moveToOccurrence(target, next); target.status = 'open'; target.version += 1;
         return ok(structuredClone(done));
       }
       Object.assign(target, comment); target.status = status; target.version += 1;
@@ -75,7 +83,7 @@ export function createTodoCommands(c: CommandContext): SyncPort<TodoPort> {
         applyPatch(single, changes);
         delete single.recurrence;
         archive(a.archives.todos, target.id, structuredClone(target));
-        if (next) { target.dueAt = occurrenceStartsAt(target.dueAt, next); target.version += 1; } else target.deletedAt = now();
+        if (next) { moveToOccurrence(target, next); target.version += 1; } else target.deletedAt = now();
         state.todos = [single, ...state.todos];
         return ok(structuredClone(single));
       }
@@ -89,7 +97,7 @@ export function createTodoCommands(c: CommandContext): SyncPort<TodoPort> {
       if (target.version !== expectedVersion) return conflict('タスク');
       archive(a.archives.todos, id, structuredClone(target));
       const next = scope === 'this' && target.recurrence && target.dueAt ? nextOccurrenceAfter(dateKeyFromRfc3339(target.dueAt), target.recurrence, dateKeyFromRfc3339(target.dueAt)) : null;
-      if (next && target.dueAt) { target.dueAt = occurrenceStartsAt(target.dueAt, next); target.version += 1; }
+      if (next) { moveToOccurrence(target, next); target.version += 1; }
       else target.deletedAt = now();
       return ok(undefined);
     },

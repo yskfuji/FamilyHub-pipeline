@@ -1,11 +1,11 @@
-import type { EventInput, EventUpdateInput, MemoInput, TodoInput } from '../domain/schemas';
+import type { EventInput, EventUpdateInput, MemoInput, TodoInput, TodoUpdateInput } from '../domain/schemas';
 import type { Id, IsoDate, RecurrenceScope } from '../domain/types';
 
 export type QueueableCommand =
   | { operation: 'event.create'; summary: string; payload: { input: EventInput } }
   | { operation: 'event.update'; summary: string; payload: { id: Id; scope: RecurrenceScope; input: EventUpdateInput; expectedVersion: number; occurrenceDate?: IsoDate } }
   | { operation: 'task.create'; summary: string; payload: { input: TodoInput } }
-  | { operation: 'task.update'; summary: string; payload: { id: Id; scope: RecurrenceScope; input: Partial<TodoInput>; expectedVersion: number } }
+  | { operation: 'task.update'; summary: string; payload: { id: Id; scope: RecurrenceScope; input: TodoUpdateInput; expectedVersion: number } }
   | { operation: 'memo.create'; summary: string; payload: { input: MemoInput } }
   | { operation: 'memo.update'; summary: string; payload: { id: Id; input: Partial<MemoInput>; expectedVersion: number } };
 

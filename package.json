@@ -22,7 +22,7 @@
     "lint": "eslint . --max-warnings 0",
     "test:unit": "vitest run",
     "audit:routes": "vitest run --project server server/test/contract.test.ts",
-    "test:e2e": "npm run build:audit && PLAYWRIGHT_AUDIT=true playwright test e2e/core.spec.ts e2e/interactions.spec.ts e2e/authorization.spec.ts e2e/places.spec.ts e2e/budget.spec.ts e2e/recurrence.spec.ts e2e/calendar.spec.ts e2e/navigation.spec.ts",
+    "test:e2e": "npm run build:audit && PLAYWRIGHT_AUDIT=true playwright test e2e/core.spec.ts e2e/interactions.spec.ts e2e/authorization.spec.ts e2e/places.spec.ts e2e/budget.spec.ts e2e/recurrence.spec.ts e2e/calendar.spec.ts e2e/navigation.spec.ts e2e/tasks-notes.spec.ts",
     "test:real": "VITE_GATEWAY=http npm run build:http && VITE_GATEWAY=http playwright test --config playwright.real.config.ts",
     "audit:a11y": "npm run build:audit && PLAYWRIGHT_AUDIT=true playwright test e2e/accessibility.spec.ts --workers=1",
     "audit:visual": "npm run build:audit && PLAYWRIGHT_AUDIT=true playwright test e2e/capture.spec.ts --project=chromium && node scripts/build-gallery.mjs",

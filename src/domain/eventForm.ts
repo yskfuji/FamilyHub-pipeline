@@ -2,6 +2,7 @@ import { addDateKeyDays, dateKeyFromRfc3339, toJstRfc3339 } from './calendarDate
 import { LAST_DAY_OF_MONTH_RULE, occurrenceDates, occurrenceStartsAt, parseRRule, withUntil } from './recurrence';
 import type { EventInput, EventUpdateInput } from './schemas';
 import type { CalendarEvent, Id, RecurrenceRule, VisibilityAudience } from './types';
+import { visibilityChange, visibilityInput, visibilityProblem } from './visibilityForm';
 
 /** keep は、この画面で作れない規則をそのまま残すこと。 */
 export type RecurrenceChoice = 'none' | 'daily' | 'weekly' | 'monthly' | 'month-end' | 'every-n-days' | 'keep';
@@ -28,16 +29,16 @@ export interface EventDraft {
 /** 予定の追加を開くときの、前もって入れておく日時。 */
 export interface EventPrefill { date: string; time?: string; allDay?: boolean }
 
-export const MAX_SELECTED_MEMBERS = 8;
 export const reminderChoices = [10, 30, 60, 1440] as const;
 export const reminderLabel = (minutes: number) => (minutes % 1440 === 0 ? `${minutes / 1440}日前` : minutes % 60 === 0 ? `${minutes / 60}時間前` : `${minutes}分前`);
 
-const TIMEZONE = 'Asia/Tokyo';
-const toLocal = (iso: string) => toJstRfc3339(new Date(iso)).slice(0, 16);
-const toInstant = (local: string) => `${local}:00+09:00`;
+export const TIMEZONE = 'Asia/Tokyo';
+/** 時刻を、日時の入力欄に入れる日本時間の形にする。 */
+export const toLocal = (iso: string) => toJstRfc3339(new Date(iso)).slice(0, 16);
+export const toInstant = (local: string) => `${local}:00+09:00`;
 const addMinutes = (local: string, minutes: number) => toLocal(new Date(Date.parse(toInstant(local)) + minutes * 60_000).toISOString());
 const minutesBetween = (from: string, to: string) => (Date.parse(toInstant(to)) - Date.parse(toInstant(from))) / 60_000;
-const isValidLocal = (local: string) => Number.isFinite(Date.parse(toInstant(local)));
+export const isValidLocal = (local: string) => Number.isFinite(Date.parse(toInstant(local)));
 
 export function newEventDraft(prefill: EventPrefill, viewerMembershipId: Id, audience: VisibilityAudience): EventDraft {
   const start = `${prefill.date}T${prefill.time ?? '18:00'}`;
@@ -94,6 +95,14 @@ export function eventTimes(draft: Pick<EventDraft, 'allDay' | 'start' | 'end'>):
   return { startsAt: toInstant(draft.start), endsAt: toInstant(draft.end) };
 }
 
+/** 繰り返しの入力の確認。start は最初の回の日付、noun は「予定」のような記録の名前。 */
+export function recurrenceProblem(rule: Pick<EventDraft, 'recurrence' | 'intervalDays' | 'until'>, start: string, noun: string): string | null {
+  if (rule.recurrence === 'every-n-days' && !(Number.isInteger(rule.intervalDays) && rule.intervalDays >= 1 && rule.intervalDays <= 366)) return '繰り返す間隔は1日から366日のあいだで入力してください。';
+  const rrule = rruleOf(rule);
+  if (rrule && !occurrenceDates(start, { rrule, timezone: TIMEZONE, exceptions: [] }, start, addDateKeyDays(start, 800)).length) return `繰り返しの終了日までに${noun}が入りません。終了日を確認してください。`;
+  return null;
+}
+
 /** 入力の確認。問題があれば文言を返す。recurrenceEditable が false のときは繰り返しを見ない。 */
 export function draftProblem(draft: EventDraft, recurrenceEditable: boolean): string | null {
   if (!draft.title.trim()) return '予定名を入力してください。';
@@ -101,23 +110,14 @@ export function draftProblem(draft: EventDraft, recurrenceEditable: boolean): st
   const { startsAt, endsAt } = eventTimes(draft);
   if (Date.parse(endsAt) <= Date.parse(startsAt)) return '終了日時は開始日時より後にしてください。';
   if (!draft.participantIds.length) return '参加者を1人以上選んでください。';
-  if (draft.audience === 'selected' && !draft.selectedIds.length) return '公開する人を1人以上選んでください。';
-  if (draft.selectedIds.length > MAX_SELECTED_MEMBERS) return `選べるのは${MAX_SELECTED_MEMBERS}人までです。`;
-  if (!recurrenceEditable) return null;
-  if (draft.recurrence === 'every-n-days' && !(Number.isInteger(draft.intervalDays) && draft.intervalDays >= 1 && draft.intervalDays <= 366)) return '繰り返す間隔は1日から366日のあいだで入力してください。';
-  const rrule = rruleOf(draft);
-  if (rrule) {
-    const start = draft.start.slice(0, 10);
-    if (!occurrenceDates(start, { rrule, timezone: TIMEZONE, exceptions: [] }, start, addDateKeyDays(start, 800)).length) return '繰り返しの終了日までに予定が入りません。終了日を確認してください。';
-  }
-  return null;
+  return visibilityProblem(draft.audience, draft.selectedIds) ?? (recurrenceEditable ? recurrenceProblem(draft, draft.start.slice(0, 10), '予定') : null);
 }
 
 export function draftToCreateInput(draft: EventDraft): EventInput {
   const rrule = rruleOf(draft);
   return {
     title: draft.title.trim(), ...eventTimes(draft), timezone: TIMEZONE, participantMembershipIds: draft.participantIds,
-    visibility: { audience: draft.audience, selectedMembershipIds: draft.audience === 'selected' ? draft.selectedIds : [] },
+    visibility: visibilityInput(draft.audience, draft.selectedIds),
     ...(draft.allDay ? { allDay: true } : {}),
     ...(draft.location.trim() ? { location: draft.location.trim() } : {}),
     ...(draft.note.trim() ? { note: draft.note.trim() } : {}),
@@ -127,8 +127,6 @@ export function draftToCreateInput(draft: EventDraft): EventInput {
     ...(rrule ? { recurrence: { rrule, timezone: TIMEZONE, exceptions: [] } } : {}),
   };
 }
-
-const sameMembers = (a: readonly Id[], b: readonly Id[]) => a.length === b.length && a.every((id) => b.includes(id));
 
 /**
  * 変更の入力。空にした項目は null で外す。公開範囲と繰り返しは、変えたときだけ送る
@@ -142,8 +140,6 @@ export function draftToUpdateInput(draft: EventDraft, original: CalendarEvent, o
     times.endsAt = occurrenceStartsAt(times.endsAt, addDateKeyDays(options.seriesStart, span));
     times.startsAt = occurrenceStartsAt(times.startsAt, options.seriesStart);
   }
-  const selectedIds = draft.audience === 'selected' ? draft.selectedIds : [];
-  const visibilityChanged = draft.audience !== original.visibility.audience || !sameMembers(selectedIds, original.visibility.selectedMembershipIds);
   const before = recurrenceChoiceOf(original.recurrence, dateKeyFromRfc3339(original.startsAt));
   const rule = { recurrence: draft.recurrence, intervalDays: draft.intervalDays, until: draft.until };
   const recurrenceChanged = options.recurrenceEditable && draft.recurrence !== 'keep' && rruleOf(rule) !== rruleOf(before);
@@ -152,7 +148,7 @@ export function draftToUpdateInput(draft: EventDraft, original: CalendarEvent, o
     title: draft.title.trim(), ...times, allDay: draft.allDay, participantMembershipIds: draft.participantIds,
     location: draft.location.trim() || null, note: draft.note.trim() || null, weatherSensitive: draft.weatherSensitive,
     colorLabelId: draft.colorLabelId || null, reminderMinutesBefore: draft.reminderMinutes,
-    ...(visibilityChanged ? { visibility: { audience: draft.audience, selectedMembershipIds: selectedIds } } : {}),
+    ...visibilityChange(draft.audience, draft.selectedIds, original.visibility),
     ...(recurrenceChanged ? { recurrence: rrule ? { rrule, timezone: TIMEZONE, exceptions: original.recurrence?.exceptions ?? [] } : null } : {}),
   };
 }

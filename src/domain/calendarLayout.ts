@@ -177,10 +177,3 @@ export function todosOn(todos: readonly Todo[], date: string): Todo[] {
 }
 
 export const expensesOn = (expenses: readonly Expense[], date: string) => expenses.filter((expense) => expense.incurredOn === date);
-
-/** 日の一覧のタスクの1回の操作。確認する人がいるタスクは、確認を飛ばして完了にしない。 */
-export function inlineTaskAction(todo: Todo, viewerMembershipId: string): 'done' | 'review' | null {
-  if (todo.status === 'done') return null;
-  if (!todo.reviewerMembershipId || todo.reviewerMembershipId === viewerMembershipId) return 'done';
-  return todo.status === 'review' ? null : 'review';
-}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 
 /** keepScroll は、同じ画面の中の移動で読んでいた位置を保つとき。 */
 export function navigate(to: string, replace = false, keepScroll = false) {
@@ -26,6 +26,24 @@ export function usePath() {
     return () => { window.removeEventListener('popstate', update); document.removeEventListener('click', click); };
   }, []);
   return path;
+}
+
+function subscribeToLocation(notify: () => void) {
+  window.addEventListener('popstate', notify);
+  return () => window.removeEventListener('popstate', notify);
+}
+
+/** 今の URL のクエリ（先頭の ? を含む）。一覧と詳細のあいだで絞り込みを保つために使う。 */
+export function useSearch() {
+  return useSyncExternalStore(subscribeToLocation, () => window.location.search);
+}
+
+/** 今のパスのまま、クエリの1項目を変えた URL。null で項目を外す。 */
+export function withQueryParam(name: string, value: string | null) {
+  const params = new URLSearchParams(window.location.search);
+  if (value === null) params.delete(name); else params.set(name, value);
+  const query = params.toString();
+  return `${window.location.pathname}${query ? `?${query}` : ''}`;
 }
 
 export function useCloseTo(base: string) {

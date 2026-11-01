@@ -250,8 +250,25 @@
   .color-dot { flex: none; width: .85rem; height: .85rem; border-radius: 999px; background: var(--event-color, var(--line)); }
   .task-board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .8rem; align-items: start; }
   .task-column { min-width: 0; padding: .9rem; border-radius: var(--radius-md); background: color-mix(in srgb, var(--paper-deep) 55%, transparent); }
-  .task-card { display: grid; gap: .7rem; margin-bottom: .7rem; padding: .9rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--sheet); box-shadow: var(--shadow-soft); color: var(--ink); text-decoration: none; }
+  .task-card { display: flex; align-items: flex-start; gap: .3rem; margin-bottom: .7rem; padding: .9rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--sheet); box-shadow: var(--shadow-soft); }
   .task-card:hover { border-color: var(--indigo); }
+  .task-card > .task-check { flex: none; margin: -.5rem 0 0 -.6rem; }
+  .task-card-link { flex: 1; min-width: 0; display: grid; gap: .7rem; color: var(--ink); text-decoration: none; }
+  .task-card-link strong { overflow-wrap: anywhere; }
+  .task-board[data-columns='1'] { grid-template-columns: minmax(0, 36rem); }
+  .task-due { word-break: keep-all; overflow-wrap: anywhere; }
+  .task-label { display: inline-flex; align-items: center; gap: .3rem; }
+  .task-state { display: flex; flex-wrap: wrap; gap: .35rem; }
+  .task-sharing { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; }
+  .task-other-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: .5rem; }
+  .notes-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
+  .notes-toolbar .field { flex: 1 1 20rem; max-width: 32rem; }
+  .memo-card { color: var(--ink); text-decoration: none; }
+  .file-name { overflow-wrap: anywhere; }
+  .attachment-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .5rem; }
+  .form-file-button { justify-self: start; }
+  .ocr-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .ocr-actions { display: flex; justify-content: flex-end; gap: .7rem; }
   .people { display: flex; flex-wrap: wrap; gap: .35rem; color: var(--ink-soft); font-size: .68rem; }
   .person-chip { padding: .18rem .45rem; border-radius: 999px; background: var(--paper-deep); }
   .metric { font-family: var(--font-serif); font-size: clamp(1.6rem, 3vw, 2.4rem); font-weight: 750; font-variant-numeric: tabular-nums; }

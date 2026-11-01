@@ -35,6 +35,17 @@ export function runGatewaySuite(world: (actorMembershipId?: string) => FamilyHub
       expect(Date.parse(result.value.expiresAt) - Date.parse('2026-09-30T07:45:00+09:00')).toBe(86_400_000);
     });
 
+    it('keeps the length of a recurring task with a range when it moves to the next occurrence', async () => {
+      const gateway = world();
+      const created = await gateway.todos.createTodo({ title: '期間', assigneeMembershipId: 'member-aoi', dueStartAt: '2026-10-05T09:00:00+09:00', dueAt: '2026-10-07T18:00:00+09:00', recurrence: { rrule: 'FREQ=WEEKLY', timezone: 'Asia/Tokyo', exceptions: [] } });
+      expect(created.ok).toBe(true);
+      if (!created.ok) return;
+      expect((await gateway.todos.updateTodoStatus(created.value.id, 'done', 1)).ok).toBe(true);
+      const after = await gateway.household.getSnapshot();
+      const series = after.ok ? after.value.todos.find((todo) => todo.id === created.value.id) : undefined;
+      expect(series).toMatchObject({ dueStartAt: '2026-10-12T09:00:00+09:00', dueAt: '2026-10-14T18:00:00+09:00', status: 'open' });
+    });
+
     it('checks versions for events and todos', async () => {
       const gateway = world();
       const event = await gateway.events.updateEvent('event-school', 'this', { title: '更新' }, 99);

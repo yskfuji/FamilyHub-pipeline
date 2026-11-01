@@ -12,6 +12,7 @@ import { idSchema } from '../../../src/domain/schemas';
 import type { Memo } from '../../../src/domain/types';
 import { ok } from '../../../src/domain/commands/context';
 import { loadAggregate, saveAggregate } from '../../db/aggregateStore';
+import { stripVideoLocation } from '../../media/mp4Location';
 import { acceptClientThumbnail, originalPath, processMedia, quarantinePath, sanitizeImage, sniffFile, thumbnailPath } from '../../media/pipeline';
 import { ApiError, invalidInput, requireActor, sendError, unauthenticated } from '../context';
 import type { AppDeps, RouteDeclaration } from '../context';
@@ -229,7 +230,11 @@ export function registerMediaRoutes(app: FastifyInstance, deps: AppDeps) {
       if (clean) {
         try {
           if (type.kind === 'photo') await sanitizeImage(path, destination, false);
-          else { await mkdir(dirname(destination), { recursive: true }); await rename(path, destination); }
+          else {
+            if (type.kind === 'video') await stripVideoLocation(path);
+            await mkdir(dirname(destination), { recursive: true });
+            await rename(path, destination);
+          }
         } catch { clean = false; }
       }
       if (!clean) await rm(path, { force: true });
