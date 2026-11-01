@@ -24,7 +24,7 @@ export function seedHousehold(db: Db, passwordHash: string, createdAt: string) {
       permissionOverrides: [], permissionRevision: 1,
       invites: structuredClone(baseInvites).map((invite) => ({ ...invite, token: invite.token ? hashInviteToken(invite.token) : undefined })),
       notifications: structuredClone(baseNotifications), notificationPreferences: structuredClone(baseNotificationPreferences), privacy: structuredClone(basePrivacySettings),
-      archives: { events: {}, todos: {}, memos: {}, expenses: {} }, albums: structuredClone(baseAlbums), albumItems: structuredClone(baseAlbumItems),
+      archives: { events: {}, todos: {}, memos: {}, expenses: {} }, albums: structuredClone(baseAlbums), albumItems: structuredClone(baseAlbumItems), occurrenceDeletions: [],
     };
     saveAggregate(db, household.id, 'member-aoi', { aggregate: seeded, loaded: loaded.loaded }, { media: true });
   });

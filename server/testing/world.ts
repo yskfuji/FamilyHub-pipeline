@@ -35,6 +35,7 @@ export function createWorld(actorMembershipId = 'member-aoi', inspect?: (body: u
   const deps: AppDeps = {
     db, config: { ...testConfig, mediaPath: mkdtempSync(join(tmpdir(), 'family-hub-media-')) }, scanner, jobs: new Set(),
     clock: { now: () => toJstRfc3339(new Date(Date.parse('2026-09-30T07:45:00+09:00') + tick * 60_000)) },
+    weather: { current: () => ({ location: '東京', condition: 'rain', temperatureC: 20, precipitationPercent: 70, alert: '見本の天気' }), refresh: async () => undefined },
     mailer: { available: true, send: async (message) => { mail.push(message); } },
     ids: { next: (prefix) => `${prefix}-mock-${++sequence}`, inviteToken: () => `FAMILY-2026-${String(sequence).padStart(4, '0')}-ONE-TIME` },
   };

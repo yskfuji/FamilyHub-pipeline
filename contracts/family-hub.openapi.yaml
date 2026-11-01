@@ -432,6 +432,119 @@ paths:
       responses:
         '200': { description: OK }
         default: { $ref: '#/components/responses/Error' }
+  /v1/households/current/ownership:
+    post:
+      operationId: transferOwnership
+      description: Hands the owner role to an active declared adult.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HouseholdMembership' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/households/current/leave:
+    post:
+      operationId: leaveHousehold
+      description: The owner must hand over first.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/household-memberships/{membershipId}/status:
+    put:
+      operationId: setMemberStatus
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HouseholdMembership' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/color-labels:
+    post:
+      operationId: createColorLabel
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, required: [id, name, color], properties: { id: { type: string }, name: { type: string }, color: { type: string } } }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/color-labels/{labelId}:
+    put:
+      operationId: updateColorLabel
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, required: [id, name, color], properties: { id: { type: string }, name: { type: string }, color: { type: string } } }
+        default: { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: deleteColorLabel
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/item-links:
+    post:
+      operationId: createItemLink
+      description: Both ends must be visible to the viewer.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/item-links/{linkId}:
+    delete:
+      operationId: deleteItemLink
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/recently-deleted:
+    get:
+      operationId: listRecentlyDeleted
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { type: object, required: [kind, id, title, deletedAt], additionalProperties: true } }
+        default: { $ref: '#/components/responses/Error' }
   /v1/auth/passkey/challenge:
     post:
       security: []
@@ -653,6 +766,12 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         default: { $ref: '#/components/responses/Error' }
   /v1/household-memberships/{membershipId}:
+    delete:
+      operationId: removeMember
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: Removed }
+        default: { $ref: '#/components/responses/Error' }
     patch:
       operationId: updateMembershipRole
       parameters:

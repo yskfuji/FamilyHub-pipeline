@@ -39,6 +39,8 @@ export interface Household {
   id: Id;
   name: string;
   timezone: 'Asia/Tokyo';
+  /** 直近の名前の変更の時刻。1日の回数の上限に使う。 */
+  nameChanges?: Rfc3339[];
 }
 
 export type MembershipRole = 'owner' | 'adult' | 'child' | 'guest';
@@ -74,7 +76,7 @@ export interface HouseholdMembership {
   userId: Id;
   displayName: string;
   role: MembershipRole;
-  status: 'active' | 'invited' | 'suspended';
+  status: 'active' | 'invited' | 'suspended' | 'left';
   color: string;
   version: number;
 }
@@ -307,6 +309,8 @@ export interface ContextSnapshot {
     temperatureC: number;
     precipitationPercent: number;
     alert?: string;
+    /** 天気を取得できていないとき。表示を空にする。 */
+    unavailable?: boolean;
   };
   holidays: Array<{ date: IsoDate; name: string }>;
   sync: { state: 'synced' | 'offline' | 'syncing'; lastSyncedAt: Rfc3339 };
@@ -418,6 +422,20 @@ export interface AccountProfile {
   adultDeclared: boolean;
   totpEnabled: boolean;
 }
+
+export type TrashKind = 'event' | 'task' | 'memo' | 'expense' | 'album' | 'photo' | 'occurrence';
+/** 最近削除した記録。7日のあいだ元に戻せる。 */
+export interface TrashItem {
+  kind: TrashKind;
+  id: Id;
+  /** 写真のアルバムの ID。 */
+  parentId?: Id;
+  occurrenceDate?: IsoDate;
+  title: string;
+  deletedAt: Rfc3339;
+}
+
+export interface OccurrenceDeletion { eventId: Id; occurrenceDate: IsoDate; deletedAt: Rfc3339; title: string }
 
 export interface MutationContext {
   idempotencyKey: string;

@@ -169,7 +169,7 @@ export function createHttpGateway(baseUrl: string, getCsrfToken: CsrfProvider, g
       createEvent: (input, context) => request('/v1/events', { method: 'POST', body: JSON.stringify(input), csrf: true, ...mutationHeaders(context) }),
       updateEvent: (id, scope, input, expectedVersion, context, occurrenceDate) => request(`/v1/events/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ scope, input, expectedVersion, ...(occurrenceDate ? { occurrenceDate } : {}) }), csrf: true, ...mutationHeaders(context) }),
       deleteEvent: (id, scope, expectedVersion, occurrenceDate) => request(`/v1/events/${encodeURIComponent(id)}?${new URLSearchParams({ scope, expectedVersion: String(expectedVersion), ...(occurrenceDate ? { occurrenceDate } : {}) })}`, { method: 'DELETE', csrf: true }),
-      restoreEvent: (id) => request(`/v1/events/${encodeURIComponent(id)}/restore`, { method: 'POST', csrf: true }),
+      restoreEvent: (id, occurrenceDate) => request(`/v1/events/${encodeURIComponent(id)}/restore${occurrenceDate ? `?occurrenceDate=${occurrenceDate}` : ''}`, { method: 'POST', csrf: true }),
     },
     todos: {
       createTodo: (input, context) => request('/v1/todos', { method: 'POST', body: JSON.stringify(input), csrf: true, ...mutationHeaders(context) }),
@@ -238,6 +238,20 @@ export function createHttpGateway(baseUrl: string, getCsrfToken: CsrfProvider, g
       },
       mediaUrl: (item, variant) => `/v1/albums/${encodeURIComponent(item.albumId)}/items/${encodeURIComponent(item.id)}/${variant}`,
     },
+    family: {
+      transferOwnership: (toMembershipId, expectedVersion) => request('/v1/households/current/ownership', { method: 'POST', body: JSON.stringify({ toMembershipId, expectedVersion }), csrf: true }),
+      setMemberStatus: (membershipId, status, expectedVersion) => request(`/v1/household-memberships/${encodeURIComponent(membershipId)}/status`, { method: 'PUT', body: JSON.stringify({ status, expectedVersion }), csrf: true }),
+      removeMember: (membershipId, expectedVersion) => request(`/v1/household-memberships/${encodeURIComponent(membershipId)}?expectedVersion=${expectedVersion}`, { method: 'DELETE', csrf: true }),
+      leaveHousehold: () => request('/v1/households/current/leave', { method: 'POST', csrf: true }),
+      createColorLabel: (input) => request('/v1/color-labels', { method: 'POST', body: JSON.stringify(input), csrf: true }),
+      updateColorLabel: (id, input) => request(`/v1/color-labels/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(input), csrf: true }),
+      deleteColorLabel: (id) => request(`/v1/color-labels/${encodeURIComponent(id)}`, { method: 'DELETE', csrf: true }),
+    },
+    links: {
+      createLink: (from, to) => request('/v1/item-links', { method: 'POST', body: JSON.stringify({ from, to }), csrf: true }),
+      deleteLink: (id) => request(`/v1/item-links/${encodeURIComponent(id)}`, { method: 'DELETE', csrf: true }),
+    },
+    trash: { list: () => request('/v1/recently-deleted') },
     resources: { search: (query) => request(`/v1/search?q=${encodeURIComponent(query)}`) },
     insights: { list: () => request('/v1/insights') },
     notifications: {

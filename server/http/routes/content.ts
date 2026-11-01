@@ -32,7 +32,7 @@ export function registerContentRoutes(app: FastifyInstance, deps: AppDeps) {
     const { scope, expectedVersion, occurrenceDate } = parse(z.object({ scope: scopeSchema, expectedVersion: versionSchema, occurrenceDate: isoDateSchema.optional() }), query(request));
     return mutate(deps, request, reply, (rules) => rules.events.deleteEvent(param(request, 'eventId'), scope, expectedVersion, occurrenceDate as IsoDate | undefined));
   });
-  app.post('/v1/events/:eventId/restore', { config: declare('restoreEvent') }, (request, reply) => mutate(deps, request, reply, (rules) => rules.events.restoreEvent(param(request, 'eventId'))));
+  app.post('/v1/events/:eventId/restore', { config: declare('restoreEvent') }, (request, reply) => mutate(deps, request, reply, (rules) => rules.events.restoreEvent(param(request, 'eventId'), parse(isoDateSchema.optional(), (request.query as Record<string, unknown>).occurrenceDate) as IsoDate | undefined)));
 
   app.post('/v1/todos', { config: declare('createTodo', { successStatus: 201 }) }, (request, reply) => mutate(deps, request, reply, (rules) => rules.todos.createTodo(request.body as never, noContext)));
   app.patch('/v1/todos/:todoId/status', { config: declare('updateTodoStatus') }, (request, reply) => {

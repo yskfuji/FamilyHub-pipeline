@@ -85,12 +85,26 @@ export function createEventCommands(c: CommandContext): SyncPort<EventPort> {
       if (partial && (!occurrenceDate || !isOccurrence(seriesStart, target.recurrence!, occurrenceDate))) return invalid([{ message: '削除する回を確認してください。' }]);
       archive(a.archives.events, id, structuredClone(target));
       if (!partial) target.deletedAt = now();
-      else if (scope === 'this') target.recurrence = { ...target.recurrence!, exceptions: [...target.recurrence!.exceptions, occurrenceDate as IsoDate] };
+      else if (scope === 'this') {
+        target.recurrence = { ...target.recurrence!, exceptions: [...target.recurrence!.exceptions, occurrenceDate as IsoDate] };
+        a.occurrenceDeletions.push({ eventId: id, occurrenceDate: occurrenceDate as IsoDate, deletedAt: now(), title: target.title });
+      }
       else target.recurrence = { ...target.recurrence!, rrule: withUntil(target.recurrence!.rrule, addDateKeyDays(occurrenceDate!, -1)) };
       target.version += 1;
       return ok(undefined);
     },
-    restoreEvent(id) {
+    restoreEvent(id, occurrenceDate) {
+      if (occurrenceDate) {
+        const series = state.events.find((item) => item.id === id && !item.deletedAt);
+        const record = a.occurrenceDeletions.find((item) => item.eventId === id && item.occurrenceDate === occurrenceDate);
+        if (!series?.recurrence || !seen(series) || !record) return missing('予定');
+        const allowed = canDeleteResource(viewer(), 'event.delete', stakeholders(series)); if (!allowed.allowed) return denied(allowed);
+        if (!withinRestoreWindow(record.deletedAt)) return fail({ code: 'CONFLICT', message: '削除から7日を過ぎたため、元に戻せません。', retryable: false });
+        series.recurrence = { ...series.recurrence, exceptions: series.recurrence.exceptions.filter((date) => date !== occurrenceDate) };
+        a.occurrenceDeletions = a.occurrenceDeletions.filter((item) => item !== record);
+        series.version += 1;
+        return ok(structuredClone(series));
+      }
       const archived = a.archives.events[id]; const target = state.events.find((item) => item.id === id);
       if (!archived || !target || !seen(target)) return missing('予定');
       const decision = canDeleteResource(viewer(), 'event.delete', stakeholders(target)); if (!decision.allowed) return denied(decision);

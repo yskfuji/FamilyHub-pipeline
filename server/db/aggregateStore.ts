@@ -61,6 +61,7 @@ export function loadAggregate(db: Db, householdId: Id, actorMembershipId: Id, de
     archives: { events: archive('events'), todos: archive('todos'), memos: archive('memos'), expenses: archive('expenses') },
     albums: read(rows, 'albums'),
     albumItems: read(rows, 'albumItems'),
+    occurrenceDeletions: single('occurrenceDeletions', []),
   };
   return { aggregate, loaded };
 }
@@ -80,6 +81,7 @@ export function saveAggregate(db: Db, householdId: Id, actorMembershipId: Id, { 
   const keys = personal(actorMembershipId);
   put('meta', 'household', { household: state.household, context: state.context });
   put('meta', 'permissionRevision', aggregate.permissionRevision);
+  put('meta', 'occurrenceDeletions', aggregate.occurrenceDeletions);
   put('meta', keys.privacy, aggregate.privacy);
   put('meta', keys.preferences, aggregate.notificationPreferences);
 

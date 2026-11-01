@@ -34,6 +34,7 @@ export function initialAggregate(): HouseholdAggregate {
     archives: { events: {}, todos: {}, memos: {}, expenses: {} },
     albums: structuredClone(baseAlbums),
     albumItems: structuredClone(baseAlbumItems),
+    occurrenceDeletions: [],
   };
 }
 
@@ -172,6 +173,9 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
       },
     },
     expenses: delayed(rules.expenses),
+    family: delayed(rules.family),
+    links: delayed(rules.links),
+    trash: delayed(rules.trash),
     albums: {
       ...delayed(rules.albums),
       async uploadItem(albumId, file, options) {

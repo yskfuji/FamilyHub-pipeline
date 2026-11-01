@@ -4,7 +4,7 @@ import { externalLinkLabel, ja, placeDistanceLabel, recurrenceLabel } from './ja
 describe('日本語コンテンツカタログ', () => {
   it('内部の役割値と利用状態を日本語の表示名に変換する', () => {
     expect(ja.roles).toEqual({ owner: '管理者', adult: '大人のメンバー', child: '子どもメンバー', guest: 'ゲスト' });
-    expect(ja.membershipStatus).toEqual({ active: '利用中', invited: '招待中', suspended: '利用停止' });
+    expect(ja.membershipStatus).toEqual({ active: '利用中', invited: '招待中', suspended: '利用停止', left: '退出済み' });
   });
 
   it('繰り返しの範囲を予定とタスクの文脈に合わせる', () => {

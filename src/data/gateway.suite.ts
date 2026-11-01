@@ -333,4 +333,92 @@ export function runGatewaySuite(world: (actorMembershipId?: string) => FamilyHub
     });
 
   });
+
+  describe('gateway family, links and recently deleted', () => {
+    it('hands ownership to an adult and refuses a child', async () => {
+      const gateway = world();
+      expect(await gateway.family.transferOwnership('member-hana', 1)).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+      expect(await gateway.family.transferOwnership('member-ren', 1)).toMatchObject({ ok: true, value: { role: 'owner' } });
+      const snapshot = await gateway.household.getSnapshot();
+      expect(snapshot.ok && snapshot.value.viewer.role).toBe('adult');
+      expect(snapshot.ok && snapshot.value.viewer.capabilities).not.toContain('household.members.manage');
+    });
+
+    it('suspends and removes members, but not the owner or oneself', async () => {
+      const gateway = world();
+      expect(await gateway.family.setMemberStatus('member-aoi', 'suspended', 1)).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
+      expect(await gateway.family.setMemberStatus('member-yui', 'suspended', 1)).toMatchObject({ ok: true, value: { status: 'suspended' } });
+      expect(await gateway.family.removeMember('member-yui', 2)).toEqual({ ok: true, value: undefined });
+      expect(await gateway.family.removeMember('member-yui', 3)).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } });
+      expect(await world('member-ren').family.removeMember('member-yui', 1)).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
+    });
+
+    it('keeps the sole owner from leaving', async () => {
+      expect(await world().family.leaveHousehold()).toMatchObject({ ok: false, error: { reason: 'OWNER_REQUIRED' } });
+      expect(await world('member-ren').family.leaveHousehold()).toEqual({ ok: true, value: undefined });
+    });
+
+    it('limits household renames to three a day', async () => {
+      const gateway = world();
+      for (const name of ['一', '二', '三']) expect((await gateway.household.updateProfile({ name })).ok).toBe(true);
+      expect(await gateway.household.updateProfile({ name: '四' })).toMatchObject({ ok: false, error: { code: 'RATE_LIMITED' } });
+    });
+
+    it('manages color lists and clears them from records when deleted', async () => {
+      const gateway = world();
+      const label = await gateway.family.createColorLabel({ name: '旅行', color: '#336699' });
+      expect(label.ok).toBe(true);
+      if (!label.ok) return;
+      await gateway.events.updateEvent('event-school', 'series', { colorLabelId: label.value.id }, 1);
+      expect(await gateway.family.deleteColorLabel(label.value.id)).toEqual({ ok: true, value: undefined });
+      const snapshot = await gateway.household.getSnapshot();
+      expect(snapshot.ok && snapshot.value.events.find((item) => item.id === 'event-school')?.colorLabelId).toBeUndefined();
+    });
+
+    it('links visible records only and hides that an unseen record exists', async () => {
+      const gateway = world();
+      const created = await gateway.links.createLink({ kind: 'task', id: 'todo-form' }, { kind: 'expense', id: 'expense-books' });
+      expect(created.ok).toBe(true);
+      expect(await gateway.links.createLink({ kind: 'task', id: 'todo-form' }, { kind: 'expense', id: 'expense-books' })).toMatchObject({ ok: false, error: { code: 'CONFLICT' } });
+      expect(await gateway.links.createLink({ kind: 'task', id: 'todo-form' }, { kind: 'event', id: 'event-piano' })).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } });
+      expect(await world('member-hana').links.createLink({ kind: 'event', id: 'event-school' }, { kind: 'task', id: 'todo-practice' })).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
+      if (created.ok) expect(await gateway.links.deleteLink(created.value.id)).toEqual({ ok: true, value: undefined });
+    });
+
+    it('lists what the viewer may restore, including a single occurrence', async () => {
+      const gateway = world();
+      await gateway.memos.deleteMemo('memo-receipt');
+      await gateway.events.deleteEvent('event-clean', 'this', 1, '2026-10-08');
+      const trash = await gateway.trash.list();
+      expect(trash.ok && trash.value.map((item) => [item.kind, item.id])).toEqual(expect.arrayContaining([['memo', 'memo-receipt'], ['occurrence', 'event-clean']]));
+      expect(await gateway.events.restoreEvent('event-clean', '2026-10-08')).toMatchObject({ ok: true, value: { recurrence: { exceptions: [] } } });
+      const after = await gateway.trash.list();
+      expect(after.ok && after.value.some((item) => item.kind === 'occurrence')).toBe(false);
+    });
+
+    it('shows albums to whoever may see them and keeps them out of the snapshot', async () => {
+      const owner = world();
+      const albums = await owner.albums.listAlbums();
+      expect(albums.ok && albums.value.map((item) => item.id).sort()).toEqual(['album-park', 'album-sports']);
+      const created = await owner.albums.createAlbum({ title: '夏休み', visibility: { audience: 'creator' } });
+      expect(created.ok).toBe(true);
+      const child = await world('member-hana').albums.listAlbums();
+      expect(child.ok && child.value.map((item) => item.id)).toEqual(['album-sports']);
+      const snapshot = await owner.household.getSnapshot();
+      expect(snapshot.ok && 'albums' in snapshot.value).toBe(false);
+      if (!created.ok) return;
+      expect(await owner.albums.deleteAlbum(created.value.id, 1)).toEqual({ ok: true, value: undefined });
+      expect(await owner.albums.restoreAlbum(created.value.id)).toMatchObject({ ok: true });
+    });
+
+    it('reorders items and refuses a partial order', async () => {
+      const gateway = world();
+      expect(await gateway.albums.reorderItems('album-sports', ['item-sports-1'], 1)).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+      expect((await gateway.albums.reorderItems('album-sports', ['item-sports-3', 'item-sports-1', 'item-sports-2'], 1)).ok).toBe(true);
+      const album = await gateway.albums.getAlbum('album-sports');
+      expect(album.ok && album.value.items.map((item) => item.id)).toEqual(['item-sports-3', 'item-sports-1', 'item-sports-2']);
+      expect(await gateway.albums.deleteItem('album-sports', 'item-sports-3')).toEqual({ ok: true, value: undefined });
+      expect(await gateway.albums.restoreItem('album-sports', 'item-sports-3')).toMatchObject({ ok: true });
+    });
+  });
 }

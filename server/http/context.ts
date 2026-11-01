@@ -6,6 +6,7 @@ import { serverMessages } from '../../src/content/serverMessages';
 import type { GatewayError, Id, Rfc3339 } from '../../src/domain/types';
 import type { Mailer } from '../adapters/mail';
 import type { Scanner } from '../adapters/scanner';
+import type { WeatherSource } from '../adapters/weather';
 
 export interface ServerClock { now(): Rfc3339; }
 export interface IdSource { next(prefix: string): Id; inviteToken(): string; }
@@ -17,6 +18,7 @@ export interface AppDeps {
   ids: IdSource;
   mailer: Mailer;
   scanner: Scanner;
+  weather: WeatherSource;
   /** 受け付けた後に裏で進めている処理。終了のときと試験で待つ。 */
   jobs: Set<Promise<void>>;
 }

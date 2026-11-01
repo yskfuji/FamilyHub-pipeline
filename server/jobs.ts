@@ -1,0 +1,63 @@
+import { rm } from 'node:fs/promises';
+import { dirname } from 'node:path';
+import { createHouseholdRules } from '../src/domain/commands';
+import { purgeExpired } from '../src/domain/commands/trash';
+import { planNotifications } from '../src/domain/notificationPlan';
+import { loadAggregate, saveAggregate } from './db/aggregateStore';
+import type { AppDeps } from './http/context';
+import { originalPath, quarantinePath } from './media/pipeline';
+
+const defaults = { privacy: { defaultAudience: 'household' as const, hideNotificationContent: true, placeLookupConsent: null }, notificationPreferences: { todoDue: true, eventDeparture: true, quietHours: true } };
+const IDEMPOTENCY_KEEP_MS = 72 * 3_600_000;
+
+/** 削除から30日を過ぎた記録とファイルを消し、期限切れの一時的な記録を片付ける。 */
+export async function runRetention(deps: AppDeps) {
+  const now = deps.clock.now();
+  const files: Array<{ householdId: string; id: string }> = [];
+  for (const { household_id: householdId } of deps.db.all<{ household_id: string }>('SELECT DISTINCT household_id FROM household_members')) {
+    deps.db.transaction(() => {
+      const loaded = loadAggregate(deps.db, householdId, '', defaults, { media: true });
+      for (const id of purgeExpired(loaded.aggregate, now)) files.push({ householdId, id });
+      saveAggregate(deps.db, householdId, '', loaded, { media: true });
+    });
+  }
+  for (const file of files) await rm(dirname(originalPath(deps.config.mediaPath, file.householdId, file.id)), { recursive: true, force: true });
+  const cutoff = new Date(Date.parse(now) - IDEMPOTENCY_KEEP_MS).toISOString();
+  deps.db.run('DELETE FROM idempotency_records WHERE created_at < ?', cutoff);
+  deps.db.run('DELETE FROM sessions WHERE expires_at < ? OR revoked_at < ?', now, cutoff);
+  deps.db.run('DELETE FROM webauthn_challenges WHERE expires_at < ?', now);
+  deps.db.run('DELETE FROM password_resets WHERE expires_at < ?', cutoff);
+  for (const row of deps.db.all<{ id: string; household_id: string; item_id: string }>('SELECT id, household_id, item_id FROM uploads WHERE expires_at < ?', now)) {
+    await rm(quarantinePath(deps.config.mediaPath, row.id), { force: true });
+    deps.db.transaction(() => {
+      deps.db.run("DELETE FROM records WHERE household_id = ? AND collection = 'albumItems' AND id = ?", row.household_id, row.item_id);
+      deps.db.run('DELETE FROM uploads WHERE id = ?', row.id);
+    });
+  }
+  return files.length;
+}
+
+/** 記録からこれからの通知を作り、人ごとに保存する。すでにある通知は変えない。 */
+export function generateNotifications(deps: AppDeps) {
+  const now = deps.clock.now();
+  for (const member of deps.db.all<{ household_id: string; membership_id: string }>('SELECT household_id, membership_id FROM household_members')) {
+    deps.db.transaction(() => {
+      const loaded = loadAggregate(deps.db, member.household_id, member.membership_id, defaults);
+      const rules = createHouseholdRules(loaded.aggregate, { actorMembershipId: member.membership_id, now: deps.clock.now, nextId: deps.ids.next, newInviteToken: deps.ids.inviteToken });
+      const known = new Set(loaded.aggregate.notifications.map((item) => item.id));
+      const fresh = planNotifications(rules.context.project(), now).filter((item) => !known.has(item.id));
+      if (!fresh.length) return;
+      loaded.aggregate.notifications.push(...fresh);
+      saveAggregate(deps.db, member.household_id, member.membership_id, loaded);
+    });
+  }
+}
+
+export function startJobs(deps: AppDeps) {
+  const timers = [
+    setInterval(() => { void runRetention(deps).catch(() => undefined); }, 3_600_000),
+    setInterval(() => { try { generateNotifications(deps); } catch { /* 次の回でやり直す */ } }, 5 * 60_000),
+  ];
+  for (const timer of timers) timer.unref();
+  return () => { for (const timer of timers) clearInterval(timer); };
+}

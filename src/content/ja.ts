@@ -55,6 +55,7 @@ export const ja = {
     active: '利用中',
     invited: '招待中',
     suspended: '利用停止',
+    left: '退出済み',
   } satisfies Record<HouseholdMembership['status'], string>,
   taskStatus: {
     open: '未着手',

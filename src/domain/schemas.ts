@@ -180,6 +180,11 @@ export const albumUpdateSchema = albumInputSchema.partial().extend({
   coverItemId: idSchema.nullable().optional(),
 });
 
+export const colorLabelInputSchema = z.strictObject({
+  name: z.string().trim().min(1, 'リストの名前を入力してください。').max(40, '40文字以内で入力してください。'),
+  color: z.string().regex(/^#[0-9a-f]{6}$/i, '色を確認してください。'),
+});
+
 export const safeHttpsUrlSchema = z.string().url('リンク先の形式を確認してください。').refine((value) => new URL(value).protocol === 'https:', 'このリンクは開けません。https://で始まるリンクを入力してください。');
 
 export type TodoInput = z.input<typeof todoInputSchema>;
@@ -190,6 +195,7 @@ export type ExpenseInput = z.input<typeof expenseInputSchema>;
 export type ExpenseUpdateInput = z.input<typeof expenseUpdateSchema>;
 export type HouseholdProfileInput = z.infer<typeof householdProfileSchema>;
 export type MemoInput = z.input<typeof memoInputSchema>;
+export type ColorLabelInput = z.infer<typeof colorLabelInputSchema>;
 export type AlbumInput = z.input<typeof albumInputSchema>;
 export type AlbumUpdateInput = z.input<typeof albumUpdateSchema>;
 export type VisibilityInput = z.input<typeof visibilityInputSchema>;

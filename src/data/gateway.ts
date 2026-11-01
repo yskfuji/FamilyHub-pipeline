@@ -1,6 +1,6 @@
-import type { AlbumInput, AlbumUpdateInput, EventInput, EventUpdateInput, ExpenseInput, ExpenseUpdateInput, HouseholdProfileInput, MemoInput, TodoInput, TodoUpdateInput } from '../domain/schemas';
+import type { AlbumInput, AlbumUpdateInput, ColorLabelInput, EventInput, EventUpdateInput, ExpenseInput, ExpenseUpdateInput, HouseholdProfileInput, MemoInput, TodoInput, TodoUpdateInput } from '../domain/schemas';
 import type { AccountUpdateInput, SignUpInput } from '../domain/account';
-import type { AccountProfile, Album, AlbumItem, AlbumSummary, Authenticator, CalendarEvent, Expense, Household, HouseholdInvite, HouseholdNotification, HouseholdSnapshot, Id, Insight, IsoDate, Memo, MembershipRole, MutationContext, NotificationPreferences, PermissionOverride, PrivacySettings, RecurrenceScope, Result, Scenario, SecurityOverview, SessionInfo, Todo } from '../domain/types';
+import type { AccountProfile, Album, AlbumItem, AlbumSummary, Authenticator, ColorLabel, ItemLink, LinkedItemRef, TrashItem, CalendarEvent, Expense, Household, HouseholdInvite, HouseholdNotification, HouseholdSnapshot, Id, Insight, IsoDate, Memo, MembershipRole, MutationContext, NotificationPreferences, PermissionOverride, PrivacySettings, RecurrenceScope, Result, Scenario, SecurityOverview, SessionInfo, Todo } from '../domain/types';
 
 export interface AuthPort {
   beginPasskey(): Promise<Result<{ challengeId: Id; publicKey: PublicKeyCredentialRequestOptions | null }>>;
@@ -56,7 +56,8 @@ export interface EventPort {
   /** 繰り返しの予定では、scope が this / future のとき occurrenceDate（対象の回）が必要。 */
   updateEvent(id: Id, scope: RecurrenceScope, input: EventUpdateInput, expectedVersion: number, context?: MutationContext, occurrenceDate?: IsoDate): Promise<Result<CalendarEvent>>;
   deleteEvent(id: Id, scope: RecurrenceScope, expectedVersion: number, occurrenceDate?: IsoDate): Promise<Result<void>>;
-  restoreEvent(id: Id): Promise<Result<CalendarEvent>>;
+  /** occurrenceDate を渡すと、その1回だけを元に戻す。 */
+  restoreEvent(id: Id, occurrenceDate?: IsoDate): Promise<Result<CalendarEvent>>;
 }
 
 export interface TodoPort {
@@ -104,6 +105,25 @@ export interface AlbumPort {
   mediaUrl(item: AlbumItem, variant: 'thumbnail' | 'file'): string;
 }
 
+export interface FamilyPort {
+  transferOwnership(toMembershipId: Id, expectedVersion: number): Promise<Result<HouseholdSnapshot['memberships'][number]>>;
+  setMemberStatus(membershipId: Id, status: 'active' | 'suspended', expectedVersion: number): Promise<Result<HouseholdSnapshot['memberships'][number]>>;
+  removeMember(membershipId: Id, expectedVersion: number): Promise<Result<void>>;
+  leaveHousehold(): Promise<Result<void>>;
+  createColorLabel(input: ColorLabelInput): Promise<Result<ColorLabel>>;
+  updateColorLabel(id: Id, input: ColorLabelInput): Promise<Result<ColorLabel>>;
+  deleteColorLabel(id: Id): Promise<Result<void>>;
+}
+
+export interface LinkPort {
+  createLink(from: LinkedItemRef, to: LinkedItemRef): Promise<Result<ItemLink>>;
+  deleteLink(id: Id): Promise<Result<void>>;
+}
+
+export interface TrashPort {
+  list(): Promise<Result<TrashItem[]>>;
+}
+
 export interface NotificationPort {
   list(): Promise<Result<HouseholdNotification[]>>;
   markRead(id: Id): Promise<Result<HouseholdNotification>>;
@@ -143,6 +163,9 @@ export interface FamilyHubGateway {
   memos: MemoPort;
   expenses: ExpensePort;
   albums: AlbumPort;
+  family: FamilyPort;
+  links: LinkPort;
+  trash: TrashPort;
   resources: ResourcePort;
   insights: InsightPort;
   notifications: NotificationPort;

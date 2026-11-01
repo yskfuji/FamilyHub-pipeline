@@ -83,7 +83,7 @@ export const baseNotificationPreferences: NotificationPreferences = { todoDue: t
 export const basePrivacySettings: PrivacySettings = { defaultAudience: 'household', hideNotificationContent: true, placeLookupConsent: null };
 
 export const baseAlbums: Album[] = [
-  { id: 'album-sports', householdId: 'house-mori', title: '運動会', description: '花の徒競走とお弁当', coverItemId: 'item-sports-1', bgmPreset: 'bright', creatorMembershipId: 'member-aoi', visibility: visibleTo('member-aoi'), createdAt: '2026-09-20T17:00:00+09:00', version: 1 },
+  { id: 'album-sports', householdId: 'house-mori', title: '運動会', description: '花の徒競走とお弁当', coverItemId: 'item-sports-1', bgmPreset: 'bright', creatorMembershipId: 'member-aoi', visibility: visibleTo('member-aoi', 'selected', ['member-aoi', 'member-ren', 'member-hana', 'member-sora']), createdAt: '2026-09-20T17:00:00+09:00', version: 1 },
   { id: 'album-park', householdId: 'house-mori', title: '週末の公園', creatorMembershipId: 'member-ren', visibility: visibleTo('member-ren', 'adults'), createdAt: '2026-09-13T12:00:00+09:00', version: 1 },
 ];
 

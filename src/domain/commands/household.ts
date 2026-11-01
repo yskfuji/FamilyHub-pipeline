@@ -6,6 +6,8 @@ import type { HouseholdInvite, HouseholdSnapshot, PermissionOverride, PrivacySet
 import { fail, invalid, missing, ok } from './context';
 import type { CommandContext, SyncPort } from './context';
 
+const MAX_MEMBERS = 8;
+
 export function createHouseholdCommands(c: CommandContext): SyncPort<Omit<HouseholdPort, 'getSnapshot' | 'createHousehold'>> {
   const { a, state, env, nextId, now, requireCapability, offlineFailure, project } = c;
   return {
@@ -14,6 +16,7 @@ export function createHouseholdCommands(c: CommandContext): SyncPort<Omit<Househ
       const invite = a.invites.find((item) => item.token === code.trim());
       const usable = invite && !invite.revokedAt && invite.remainingUses > 0 && Date.parse(invite.expiresAt) > Date.parse(now());
       if (!invite || !usable) return fail({ code: 'UNAUTHENTICATED', message: '招待コードが正しくないか、有効期限が切れています。招待した人に新しいコードを依頼してください。', retryable: false });
+      if (state.memberships.filter((item) => item.status === 'active').length >= MAX_MEMBERS) return fail({ code: 'CONFLICT', message: '家族グループは8人までです。', retryable: false });
       invite.remainingUses -= 1;
       return ok({ householdId: state.household.id });
     },
@@ -22,7 +25,10 @@ export function createHouseholdCommands(c: CommandContext): SyncPort<Omit<Househ
       const network = offlineFailure<HouseholdSnapshot['household']>(); if (network) return network;
       const parsed = householdProfileSchema.safeParse(input);
       if (!parsed.success) return invalid(parsed.error.issues);
+      const recent = (state.household.nameChanges ?? []).filter((at) => Date.parse(now()) - Date.parse(at) < 86_400_000);
+      if (recent.length >= 3) return fail({ code: 'RATE_LIMITED', message: '名前の変更は1日3回までです。時間をおいてお試しください。', retryable: false });
       state.household.name = parsed.data.name;
+      state.household.nameChanges = [...recent, now()];
       return ok(structuredClone(state.household));
     },
     updateMembershipRole(id, role, expectedVersion) {
