@@ -56,7 +56,7 @@ test('offline collaborative creation is queued, reviewed, and explicitly replaye
 });
 
 const interactive = 'button:visible, a[href]:visible, input:visible, select:visible, textarea:visible';
-const routes = ['/welcome','/auth','/onboarding','/today','/calendar','/calendar?view=week','/calendar?view=day','/calendar?view=list','/calendar/event-clean','/tasks','/tasks?filter=done','/tasks?filter=review','/tasks/todo-form','/notes','/notes?sort=oldest','/notes/memo-school','/notes/memo-receipt','/budget','/budget/expense-books','/places','/insights','/settings/household','/settings/security','/settings/privacy','/settings/notifications','/settings/accessibility','/settings/resources','/settings/location','/todayx'];
+const routes = ['/welcome','/auth','/onboarding','/today','/calendar','/calendar?view=week','/calendar?view=day','/calendar?view=list','/calendar/event-clean','/tasks','/tasks?filter=done','/tasks?filter=review','/tasks/todo-form','/notes','/notes?sort=oldest','/notes/memo-school','/notes/memo-receipt','/budget','/budget?view=list','/budget?view=list&period=custom','/budget?view=members','/budget?view=settlements','/budget?month=2026-07','/budget/expense-books','/places','/insights','/settings/household','/settings/security','/settings/privacy','/settings/notifications','/settings/accessibility','/settings/resources','/settings/location','/todayx'];
 const actors = [['owner', ''], ['adult', 'member-ren'], ['child', 'member-hana'], ['guest', 'member-yui']] as const;
 
 async function inspectControls(page: import('@playwright/test').Page, label: string) {

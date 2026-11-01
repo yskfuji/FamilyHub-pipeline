@@ -3,7 +3,7 @@ import type { EventDraft } from './eventForm';
 import { dateKeyFromRfc3339 } from './calendarDate';
 import type { TodoInput, TodoUpdateInput } from './schemas';
 import type { HouseholdMembership, Id, RecurrenceRule, Todo, TodoPriority, VisibilityAudience } from './types';
-import { visibilityChange, visibilityInput, visibilityProblem } from './visibilityForm';
+import { peopleOutsideAudience, visibilityChange, visibilityInput, visibilityProblem } from './visibilityForm';
 
 export interface TaskDraft extends Pick<EventDraft, 'recurrence' | 'intervalDays' | 'until'> {
   title: string;
@@ -40,14 +40,7 @@ export function assignablePeople(memberships: readonly HouseholdMembership[], ke
 
 /** 担当する人と確認する人のうち、公開範囲の外になる人。タスクが見えなくなるので、保存の前に知らせる。 */
 export function peopleOutsideVisibility(draft: Pick<TaskDraft, 'assigneeId' | 'reviewerId' | 'audience' | 'selectedIds'>, memberships: readonly HouseholdMembership[], creatorId: Id): HouseholdMembership[] {
-  const sees = (member: HouseholdMembership) => {
-    if (member.id === creatorId) return draft.audience !== 'adults' || member.role === 'owner' || member.role === 'adult';
-    if (draft.audience === 'adults') return member.role === 'owner' || member.role === 'adult';
-    if (draft.audience === 'creator') return false;
-    return draft.audience !== 'selected' || draft.selectedIds.includes(member.id);
-  };
-  const ids = new Set([draft.assigneeId, draft.reviewerId]);
-  return memberships.filter((member) => ids.has(member.id) && !sees(member));
+  return peopleOutsideAudience([draft.assigneeId, draft.reviewerId], draft.audience, draft.selectedIds, memberships, creatorId);
 }
 
 /** 入力の確認。問題があれば文言を返す。recurrenceEditable が false のときは繰り返しを見ない。 */

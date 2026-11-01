@@ -218,7 +218,7 @@ test('revoking consent in settings makes the next lookup ask again', async ({ pa
   await expect(toggle).toHaveAttribute('aria-pressed', 'false');
   await page.getByRole('button', { name: 'すぐに追加' }).click();
   const d = dialog(page);
-  await d.getByRole('button', { name: '支出', exact: true }).click();
+  await d.getByRole('button', { name: '家計', exact: true }).click();
   await d.getByRole('button', { name: '場所を追加（任意）' }).click();
   await d.getByRole('button', { name: '名前で探す', exact: true }).click();
   await d.getByLabel('お店や場所の名前').fill('カフェ');

@@ -1,6 +1,7 @@
 import type {
   AttachmentStatus,
   Capability,
+  Expense,
   GatewayError,
   IncomeCategory,
   HouseholdMembership,
@@ -15,6 +16,8 @@ import type {
   TodoStatus,
   VisibilityAudience,
 } from '../domain/types';
+import type { BudgetSort, BudgetView } from '../domain/budgetView';
+import type { SplitMode } from '../domain/expenseForm';
 import type { MemoSort } from '../domain/memoList';
 import type { TaskFilter } from '../domain/taskList';
 import type { TodoAction } from '../domain/todoFlow';
@@ -153,6 +156,13 @@ export const ja = {
       labels: {},
       help: { household: '管理者と大人のメンバー、作成した本人に表示します。' },
     },
+    expense: {
+      labels: { participants: '記録に関わる人' },
+      help: {
+        household: '管理者と大人のメンバー、この記録に関わる人に表示します。',
+        participants: '作成した本人、支払った人、負担する人に表示します。',
+      },
+    },
   } satisfies Record<Exclude<SharedKind, 'event'>, { labels: Partial<Record<VisibilityAudience, string>>; help: Partial<Record<VisibilityAudience, string>> }>,
   recurrence,
   resourceKinds: {
@@ -235,6 +245,29 @@ export const ja = {
     income_gift: 'お祝い・贈与',
     income_other: 'その他の収入',
   } satisfies Record<SpendingCategory | IncomeCategory, string>,
+  expenseKind: {
+    expense: '支出',
+    income: '収入',
+  } satisfies Record<Expense['kind'], string>,
+  budgetView: {
+    overview: '概要',
+    list: '一覧',
+    members: 'メンバー別',
+    settlements: '精算',
+  } satisfies Record<BudgetView, string>,
+  budgetSort: {
+    'date-new': '日付の新しい順',
+    'date-old': '日付の古い順',
+    'amount-high': '金額の大きい順',
+    'amount-low': '金額の小さい順',
+    category: '費目の順',
+    payer: '支払った人の順',
+  } satisfies Record<BudgetSort, string>,
+  splitMode: {
+    equal: '大人で等分',
+    payer: '支払った人だけ',
+    custom: '金額を指定',
+  } satisfies Record<SplitMode, string>,
   place: {
     legend: '場所',
     add: '場所を追加（任意）',

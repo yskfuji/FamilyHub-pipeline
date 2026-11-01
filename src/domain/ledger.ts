@@ -44,7 +44,7 @@ export function monthIncome(expenses: Expense[], monthKey: string) {
 }
 
 /** 端数を最大剰余法で配り、表示する割合の合計を必ず100にする。 */
-function percentages(values: number[]): number[] {
+export function percentages(values: number[]): number[] {
   const total = values.reduce((sum, value) => sum + value, 0);
   if (total === 0) return values.map(() => 0);
   const raw = values.map((value) => (value / total) * 100);
@@ -66,23 +66,34 @@ export function categoryBreakdown(expenses: Expense[], monthKey: string) {
   return totals.map((item, index) => ({ ...item, percent: shares[index] }));
 }
 
-/** 誰が誰にいくら払うか。同じ2人の間の貸し借りは相殺し、残った向きだけを返す。 */
-export function whoOwesWhom(expenses: Expense[]) {
-  const balance = new Map<string, { from: Id; to: Id; amountJpy: number; expenseIds: Id[] }>();
+/**
+ * 残りのある記録をすべて相殺したうえで、誰が誰にいくら渡せば済むか。金額の大きい順。
+ * 3人以上では、記録にない組み合わせの受け渡しになることがある。精算の記録は支出ごとに残す。
+ */
+export function simplifiedTransfers(expenses: Expense[]) {
+  const net = new Map<Id, number>();
   for (const expense of live(expenses)) {
     for (const share of remainingOf(expense)) {
-      const [a, b] = [share.membershipId, expense.payerMembershipId].sort();
-      const key = `${a}|${b}`;
-      const entry = balance.get(key) ?? { from: a, to: b, amountJpy: 0, expenseIds: [] };
-      entry.amountJpy += share.membershipId === a ? share.amountJpy : -share.amountJpy;
-      entry.expenseIds.push(expense.id);
-      balance.set(key, entry);
+      net.set(share.membershipId, (net.get(share.membershipId) ?? 0) - share.amountJpy);
+      net.set(expense.payerMembershipId, (net.get(expense.payerMembershipId) ?? 0) + share.amountJpy);
     }
   }
-  return [...balance.values()]
-    .filter((entry) => entry.amountJpy !== 0)
-    .map((entry) => (entry.amountJpy > 0 ? entry : { ...entry, from: entry.to, to: entry.from, amountJpy: -entry.amountJpy }))
-    .sort((a, b) => b.amountJpy - a.amountJpy);
+  const largestFirst = (a: { amountJpy: number; id: Id }, b: { amountJpy: number; id: Id }) => b.amountJpy - a.amountJpy || a.id.localeCompare(b.id);
+  const balances = [...net].map(([id, amountJpy]) => ({ id, amountJpy }));
+  const debtors = balances.filter((item) => item.amountJpy < 0).map((item) => ({ id: item.id, amountJpy: -item.amountJpy })).sort(largestFirst);
+  const creditors = balances.filter((item) => item.amountJpy > 0).sort(largestFirst);
+  const transfers: Array<{ from: Id; to: Id; amountJpy: number }> = [];
+  let debtor = 0;
+  let creditor = 0;
+  while (debtor < debtors.length && creditor < creditors.length) {
+    const amountJpy = Math.min(debtors[debtor].amountJpy, creditors[creditor].amountJpy);
+    transfers.push({ from: debtors[debtor].id, to: creditors[creditor].id, amountJpy });
+    debtors[debtor].amountJpy -= amountJpy;
+    creditors[creditor].amountJpy -= amountJpy;
+    if (debtors[debtor].amountJpy === 0) debtor += 1;
+    if (creditors[creditor].amountJpy === 0) creditor += 1;
+  }
+  return transfers;
 }
 
 export interface SettlementHistoryEntry {

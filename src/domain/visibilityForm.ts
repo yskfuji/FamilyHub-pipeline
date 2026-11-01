@@ -1,8 +1,8 @@
 import { allowedAudiencesFor } from '../authz/policy';
-import type { Id, MembershipRole, VisibilityAudience, VisibilityPolicy } from './types';
+import type { HouseholdMembership, Id, MembershipRole, VisibilityAudience, VisibilityPolicy } from './types';
 
 /** 公開範囲を持つ記録の種類。メモには「参加者」がない。 */
-export type SharedKind = 'event' | 'task' | 'memo';
+export type SharedKind = 'event' | 'task' | 'memo' | 'expense';
 
 export const MAX_SELECTED_MEMBERS = 8;
 
@@ -34,4 +34,15 @@ export function visibilityChange<A extends VisibilityAudience>(audience: A, sele
   const before = original.selectedMembershipIds;
   const same = audience === original.audience && next.selectedMembershipIds.length === before.length && next.selectedMembershipIds.every((id) => before.includes(id));
   return same ? {} : { visibility: next };
+}
+
+/** 関わる人のうち、公開範囲の外になる人。記録が見えなくなるので、保存の前に知らせる。 */
+export function peopleOutsideAudience(relatedIds: readonly Id[], audience: VisibilityAudience, selectedIds: readonly Id[], memberships: readonly HouseholdMembership[], creatorId: Id): HouseholdMembership[] {
+  const sees = (member: HouseholdMembership) => {
+    if (member.id === creatorId) return audience !== 'adults' || member.role === 'owner' || member.role === 'adult';
+    if (audience === 'adults') return member.role === 'owner' || member.role === 'adult';
+    if (audience === 'creator') return false;
+    return audience !== 'selected' || selectedIds.includes(member.id);
+  };
+  return memberships.filter((member) => relatedIds.includes(member.id) && !sees(member));
 }

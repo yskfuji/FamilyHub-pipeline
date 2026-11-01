@@ -1648,7 +1648,8 @@ components:
         deletedAt: { type: string, format: date-time }
     ExpenseInput:
       type: object
-      required: [title, amountJpy, incurredOn, payerMembershipId, shareMembershipIds]
+      description: A spending record needs shareMembershipIds or shareAmounts. Income has neither.
+      required: [title, amountJpy, incurredOn, payerMembershipId]
       properties:
         title: { type: string, minLength: 1, maxLength: 120 }
         amountJpy: { type: integer, minimum: 1 }

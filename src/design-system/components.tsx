@@ -90,6 +90,8 @@ export function StatusBadge({ tone = 'neutral', children }: PropsWithChildren<{ 
 }
 
 export const formatYen = (value: number) => new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' }).format(value);
+/** 増減を表す金額。0円には符号を付けない。 */
+export const formatSignedYen = (value: number) => (value === 0 ? formatYen(0) : `${value > 0 ? '+' : '−'}${formatYen(Math.abs(value))}`);
 export const formatTime = (value?: string) => value ? new Intl.DateTimeFormat('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' }).format(new Date(value)) : ja.states.noDueDate;
 export const formatDate = (value: string) => new Intl.DateTimeFormat('ja-JP', { month: 'long', day: 'numeric', weekday: 'short', timeZone: 'Asia/Tokyo' }).format(new Date(value));
 export const formatDateOnly = (value: string) => new Intl.DateTimeFormat('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Tokyo' }).format(new Date(`${value}T12:00:00+09:00`));

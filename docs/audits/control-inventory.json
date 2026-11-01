@@ -195,7 +195,7 @@
         "owner",
         "adult"
       ],
-      "capability": "expense.read|expense.create|expense.settle",
+      "capability": "expense.read|expense.create|expense.update|expense.delete|expense.settle",
       "risk": "high-impact",
       "onlineRequired": true,
       "successObservation": "対象支出または追記型の精算記録だけを更新する",
@@ -853,7 +853,7 @@
         "adult",
         "child"
       ],
-      "capability": "event.create|event.update|task.create|task.update|memo.create|memo.update",
+      "capability": "event.create|event.update|task.create|task.update|memo.create|memo.update|expense.create|expense.update",
       "risk": "reversible",
       "onlineRequired": false,
       "successObservation": "選んだ公開範囲を入力に反映する",
@@ -899,6 +899,157 @@
       "undo": "選び直す",
       "alternative": "なし",
       "entity": "Household"
+    },
+    {
+      "idPattern": "^budget\\.view\\.",
+      "routes": [
+        "/budget",
+        "/budget/*"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "expense.read",
+      "risk": "navigation",
+      "onlineRequired": false,
+      "successObservation": "選んだ表示に切り替わり、URLの?view=が変わる",
+      "failureRecovery": "現在の表示を保つ",
+      "undo": "ブラウザの戻る操作",
+      "alternative": "表示の切り替えは主ナビゲーションの家計からも開ける",
+      "entity": "Expense"
+    },
+    {
+      "idPattern": "^budget\\.month\\.",
+      "routes": [
+        "/budget",
+        "/budget/*"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "expense.read",
+      "risk": "navigation",
+      "onlineRequired": false,
+      "successObservation": "選んだ月の集計に切り替わり、URLの?month=が変わる",
+      "failureRecovery": "最後の月より先へは進めず、ボタンを無効にする",
+      "undo": "ブラウザの戻る操作または今月",
+      "alternative": "一覧の日付の指定",
+      "entity": "Expense"
+    },
+    {
+      "idPattern": "^budget\\.list\\.",
+      "routes": [
+        "/budget",
+        "/budget/*"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "expense.read",
+      "risk": "navigation",
+      "onlineRequired": false,
+      "successObservation": "費目・期間・並び順に合う記録だけを表示し、件数を知らせる",
+      "failureRecovery": "該当がなければ絞り込みを外す操作を示す",
+      "undo": "絞り込みを外す",
+      "alternative": null,
+      "entity": "Expense"
+    },
+    {
+      "idPattern": "^budget\\.category\\.open\\.",
+      "routes": [
+        "/budget",
+        "/budget/*"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "expense.read",
+      "risk": "navigation",
+      "onlineRequired": false,
+      "successObservation": "その費目で絞り込んだ一覧を開く",
+      "failureRecovery": "現在の画面を維持する",
+      "undo": "ブラウザの戻る操作",
+      "alternative": "一覧の費目の絞り込み",
+      "entity": "Expense"
+    },
+    {
+      "idPattern": "^budget\\.(recent|unsettled)\\.",
+      "routes": [
+        "/budget",
+        "/budget/*"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "expense.read",
+      "risk": "navigation",
+      "onlineRequired": false,
+      "successObservation": "一覧または精算の表示を開く",
+      "failureRecovery": "現在の画面を維持する",
+      "undo": "ブラウザの戻る操作",
+      "alternative": "家計の表示の切り替え",
+      "entity": "Expense"
+    },
+    {
+      "idPattern": "^budget\\.form\\.",
+      "routes": [
+        "*"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "expense.create|expense.update",
+      "risk": "high-impact",
+      "onlineRequired": true,
+      "successObservation": "入力どおりの支出または収入を保存する。金額を指定した負担は合計が金額と一致するときだけ保存する",
+      "failureRecovery": "入力を保持して理由を示す。精算の記録があれば金額と負担は変えられない",
+      "undo": "キャンセル、作成後の編集または削除",
+      "alternative": null,
+      "entity": "Expense"
+    },
+    {
+      "idPattern": "^budget\\.income\\.create$",
+      "routes": [
+        "/budget",
+        "/budget/*"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "expense.create",
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "収入の入力を開く",
+      "failureRecovery": "現在の画面を維持する",
+      "undo": "キャンセル",
+      "alternative": "すぐに追加の支出で種類を収入にする",
+      "entity": "Expense"
+    },
+    {
+      "idPattern": "^budget\\.settlement\\.(amount|preset)\\.",
+      "routes": [
+        "/budget",
+        "/budget/*"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "expense.settle",
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "精算額の入力を変える。保存はしない",
+      "failureRecovery": "残りを超える額は記録せず理由を示す",
+      "undo": "入力を変える",
+      "alternative": null,
+      "entity": "SettlementRecord"
     }
   ]
 }

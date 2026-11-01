@@ -352,12 +352,35 @@
   .detail-list > div { display: grid; grid-template-columns: minmax(5.5rem, 8rem) minmax(0, 1fr); gap: 1rem; padding: .7rem 0; border-bottom: 1px solid var(--line); }
   .detail-list dt { color: var(--ink-soft); font-size: .82rem; font-weight: 750; }
   .detail-list dd { margin: 0; }
+  .ledger-scroll { overflow-x: auto; }
   .ledger-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
   .ledger-table th, .ledger-table td { padding: .6rem .4rem; border-bottom: 1px solid var(--line); text-align: right; font-variant-numeric: tabular-nums; }
   .ledger-table th:first-child, .ledger-table thead th:first-child { text-align: left; }
   .ledger-table thead th { color: var(--ink-soft); font-size: .76rem; font-weight: 750; }
   .category-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .9rem; }
   .category-list .amount .muted { margin-left: .2rem; font-weight: 600; }
+  .category-link { min-height: 2.75rem; display: grid; gap: .3rem; align-content: center; color: var(--ink); text-decoration: none; }
+  .category-link:hover strong, .category-link:focus-visible strong { text-decoration: underline; text-underline-offset: .2em; }
+  .category-link .bar { display: block; }
+  .category-link .split { flex-wrap: wrap; gap: 0 1rem; }
+  .category-link strong { white-space: nowrap; }
+  .balance-bar { margin-top: .6rem; }
+  .balance-bar[data-over] > span { background: var(--danger); }
+  .budget-actions { display: flex; flex-wrap: wrap; gap: .6rem; }
+  .budget-tabs { margin-bottom: .75rem; }
+  .budget-month { display: grid; grid-template-columns: minmax(4.5rem, auto) minmax(7rem, 1fr) minmax(4.5rem, auto) minmax(4.5rem, auto); gap: .6rem; align-items: center; margin-bottom: 1rem; }
+  .budget-month-heading { min-width: 0; text-align: center; font-family: var(--font-serif); font-size: clamp(1.25rem, 2vw, 1.65rem); font-weight: 800; white-space: nowrap; }
+  .budget-column { align-content: start; }
+  .budget-note, .budget-form .field-help { text-wrap: pretty; }
+  .split-choice { display: flex; flex-wrap: wrap; gap: 0 1.25rem; }
+  .split-choice label { min-height: 2.75rem; display: flex; align-items: center; gap: .55rem; white-space: nowrap; }
+  .budget-filters .grid { gap: .8rem; }
+  .ledger-group + .ledger-group { margin-top: 1.25rem; }
+  .ledger-day { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .25rem 1rem; padding-bottom: .5rem; border-bottom: 1px solid var(--line-strong); }
+  .ledger-day h2 { margin: 0; font-size: 1rem; }
+  .expense-side { display: grid; justify-items: end; gap: .35rem; }
+  .settlement-form { display: grid; gap: .6rem; padding: .9rem; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+  .settlement-presets { display: flex; flex-wrap: wrap; gap: .5rem; }
   .history-list .list-row { align-items: start; }
   .history-mark { width: 2.25rem; aspect-ratio: 1; display: grid; place-items: center; border-radius: 50%; background: var(--success-soft); color: var(--success); font-weight: 800; }
   .history-mark.reversal { background: var(--paper-deep); color: var(--ink-soft); }
@@ -416,7 +439,7 @@
   @media (max-width: 760px) {
     .place-disclosure > div { grid-template-columns: minmax(0, 1fr); gap: .2rem; }
     .detail-list > div { grid-template-columns: minmax(0, 1fr); gap: .2rem; }
-    .history-side { justify-items: start; }
+    .history-side, .expense-side { justify-items: start; }
     .app-shell { display: block; }
     .rail { display: none; }
     .topbar { min-height: 4.4rem; padding: .65rem 1rem; will-change: transform; }
@@ -489,6 +512,8 @@
     .timeline::before { left: 3.05rem; }
     .callout { grid-template-columns: auto minmax(0, 1fr); }
     .callout > :last-child { grid-column: 2; justify-self: start; }
+    .budget-month { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .4rem; }
+    .budget-month-heading { grid-column: 1 / -1; grid-row: 1; }
   }
 
   @media (prefers-reduced-motion: reduce) {

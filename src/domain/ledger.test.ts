@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { baseSnapshot } from '../data/fixtures';
-import { categoryBreakdown, monthSummary, settledNet, settlementHistory, splitShares, unsettledSummary, whoOwesWhom } from './ledger';
+import { categoryBreakdown, monthSummary, settledNet, settlementHistory, simplifiedTransfers, splitShares, unsettledSummary } from './ledger';
 import type { Expense } from './types';
 
 const expenses = baseSnapshot.expenses;
@@ -20,7 +20,15 @@ describe('ledger', () => {
   });
 
   it('nets debts between the same two people', () => {
-    expect(whoOwesWhom(expenses)).toEqual([{ from: 'member-aoi', to: 'member-ren', amountJpy: 250, expenseIds: ['expense-books', 'expense-train'] }]);
+    expect(simplifiedTransfers(expenses)).toEqual([{ from: 'member-aoi', to: 'member-ren', amountJpy: 250 }]);
+  });
+
+  it('collapses a chain of debts into fewer transfers and ignores settled shares', () => {
+    const owed = (id: string, payer: string, debtor: string, amountJpy: number, settledJpy = 0): Expense => ({ ...expenses[0], id, payerMembershipId: payer, shares: [{ membershipId: debtor, amountJpy, settledJpy }], settlements: [] });
+    expect(simplifiedTransfers([owed('e1', 'b', 'a', 1000), owed('e2', 'c', 'b', 1000)])).toEqual([{ from: 'a', to: 'c', amountJpy: 1000 }]);
+    expect(simplifiedTransfers([owed('e1', 'b', 'a', 1000, 400)])).toEqual([{ from: 'a', to: 'b', amountJpy: 600 }]);
+    expect(simplifiedTransfers([owed('e1', 'b', 'a', 700), owed('e2', 'c', 'a', 300), owed('e3', 'b', 'd', 100)])).toEqual([{ from: 'a', to: 'b', amountJpy: 800 }, { from: 'a', to: 'c', amountJpy: 200 }, { from: 'd', to: 'c', amountJpy: 100 }]);
+    expect(simplifiedTransfers([owed('e1', 'b', 'a', 500, 500), { ...owed('e2', 'b', 'a', 500), deletedAt: '2026-09-30T00:00:00+09:00' }])).toEqual([]);
   });
 
   it('links reversals to the original settlement and only allows reversing live records', () => {
