@@ -56,7 +56,7 @@ for (const reason of ['CAPABILITY_MISSING', 'SCOPE_DENIED', 'OWNER_REQUIRED', 'V
 const operationFor = {
   'auth.beginPasskey': 'beginPasskey', 'auth.finishPasskey': 'finishPasskey', 'auth.signInWithPassword': 'signInWithPassword', 'auth.signOut': 'signOut',
   'auth.getSecurityOverview': 'getSecurityOverview', 'auth.beginPasskeyRegistration': 'beginPasskeyRegistration', 'auth.finishPasskeyRegistration': 'finishPasskeyRegistration',
-  'auth.getSession': 'getSession', 'auth.changePassword': 'changePassword', 'auth.revokeSession': 'revokeSession',
+  'auth.getSession': 'getSession', 'auth.verifyTotp': 'verifyTotp', 'auth.signUp': 'signUp', 'auth.requestPasswordReset': 'requestPasswordReset', 'auth.confirmPasswordReset': 'confirmPasswordReset', 'auth.reauthenticate': 'reauthenticate', 'auth.getAccount': 'getAccount', 'auth.updateAccount': 'updateAccount', 'auth.changeEmail': 'changeEmail', 'auth.deleteAccount': 'deleteAccount', 'auth.beginTotpEnrollment': 'beginTotpEnrollment', 'auth.confirmTotpEnrollment': 'confirmTotpEnrollment', 'auth.disableTotp': 'disableTotp', 'household.createHousehold': 'createHousehold', 'auth.changePassword': 'changePassword', 'auth.revokeSession': 'revokeSession',
   'household.getSnapshot': 'getHouseholdSnapshot', 'household.acceptInvite': 'acceptInvite', 'household.updateProfile': 'updateHouseholdProfile',
   'household.updateMembershipRole': 'updateMembershipRole', 'household.createInvite': 'createHouseholdInvite', 'household.listInvites': 'listHouseholdInvites',
   'household.revokeInvite': 'revokeHouseholdInvite', 'household.getPermissionOverrides': 'getPermissionOverrides', 'household.updatePermissionOverrides': 'updatePermissionOverrides',

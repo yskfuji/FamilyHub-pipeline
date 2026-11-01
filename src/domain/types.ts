@@ -25,7 +25,7 @@ export interface GatewayError {
   message: string;
   retryable: boolean;
   fieldErrors?: Record<string, string>;
-  reason?: 'CAPABILITY_MISSING' | 'SCOPE_DENIED' | 'MEMBERSHIP_INACTIVE' | 'OWNER_REQUIRED' | 'VERSION' | 'PERMISSION_REVISION' | 'IDEMPOTENCY' | 'CSRF';
+  reason?: 'CAPABILITY_MISSING' | 'SCOPE_DENIED' | 'MEMBERSHIP_INACTIVE' | 'OWNER_REQUIRED' | 'VERSION' | 'PERMISSION_REVISION' | 'IDEMPOTENCY' | 'CSRF' | 'REAUTH_FAILED' | 'SESSION_EXPIRED';
 }
 
 export interface User {
@@ -362,6 +362,16 @@ export interface SessionInfo {
   userId?: Id;
   /** 操作がないときにサインアウトするまでの分数。 */
   idleTimeoutMinutes: number;
+}
+
+export interface AccountProfile {
+  displayName: string;
+  email: string;
+  avatar: { kind: 'initial' } | { kind: 'preset'; preset: string } | { kind: 'image'; dataUrl: string };
+  idleTimeoutMinutes: number;
+  birthdateDeclared: boolean;
+  adultDeclared: boolean;
+  totpEnabled: boolean;
 }
 
 export interface MutationContext {

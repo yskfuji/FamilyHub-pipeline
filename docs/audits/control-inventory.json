@@ -532,6 +532,106 @@
       "undo": null,
       "alternative": null,
       "entity": "Session"
+    },
+    {
+      "idPattern": "^sign-up\\.",
+      "routes": [
+        "/sign-up"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "アカウントが作られ家族の設定へ進む",
+      "failureRecovery": "入力を保ったまま理由を示す",
+      "undo": "サインインに戻る",
+      "alternative": null,
+      "entity": "User"
+    },
+    {
+      "idPattern": "^reset\\.",
+      "routes": [
+        "/reset-password"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "コードを送り、新しいパスワードを設定する",
+      "failureRecovery": "入力を保ったまま理由を示す",
+      "undo": "サインインに戻る",
+      "alternative": null,
+      "entity": "User"
+    },
+    {
+      "idPattern": "^reauth\\.",
+      "routes": [
+        "/today"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "safe",
+      "onlineRequired": true,
+      "successObservation": "本人確認のあと元の操作を続ける",
+      "failureRecovery": "画面の入力を保ったまま再入力できる",
+      "undo": "やめると元の操作は行われない",
+      "alternative": null,
+      "entity": "Session"
+    },
+    {
+      "idPattern": "^idle\\.",
+      "routes": [
+        "/today"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "safe",
+      "onlineRequired": true,
+      "successObservation": "残り時間の案内を閉じて操作を続ける",
+      "failureRecovery": "時間が過ぎるとサインアウトする",
+      "undo": null,
+      "alternative": null,
+      "entity": "Session"
+    },
+    {
+      "idPattern": "^settings\\.account\\.",
+      "routes": [
+        "/settings/account"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "settings.own",
+      "risk": "irreversible",
+      "onlineRequired": true,
+      "successObservation": "アカウントの内容を更新する",
+      "failureRecovery": "入力を保ったまま理由を示す",
+      "undo": null,
+      "alternative": null,
+      "entity": "User"
     }
   ]
 }

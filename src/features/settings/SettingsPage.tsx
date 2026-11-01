@@ -11,9 +11,12 @@ import { OPENPOI_ATTRIBUTION_URL, OPENPOI_TERMS_URL } from '../place/openPoi';
 import type { Capability, HouseholdInvite, HouseholdMembership, MembershipRole, NotificationPreferences, PermissionOverride, SecurityOverview } from '../../domain/types';
 
 /** 設定のタブと、その表示に必要な能力。経路の許可（App.tsx）とタブの表示はこの表だけを参照する。 */
+import { AccountSection } from './AccountSection';
+
 export const settingsTabs: ReadonlyArray<{ href: string; label: string; capability: Capability }> = [
   { href: '/settings/household', label: '家族', capability: 'household.members.read' },
   { href: '/settings/security', label: 'サインインとセキュリティ', capability: 'settings.own' },
+  { href: '/settings/account', label: 'アカウント', capability: 'settings.own' },
   { href: '/settings/privacy', label: '共有とプライバシー', capability: 'settings.own' },
   { href: '/settings/notifications', label: '通知', capability: 'notification.manage' },
   { href: '/settings/location', label: ja.place.settings.tab, capability: 'place.read' },
@@ -47,7 +50,8 @@ export function SettingsPage({ path }: { path: string }) {
     <nav ref={tabsRef} className="segmented settings-tabs" aria-label="設定項目">
       {settingsTabs.filter((tab) => can(tab.capability)).map(({ href, label }) => <a data-control-id={`settings.section.${href.split("/").at(-1)}`} key={href} className="button" href={href} data-link aria-current={path.startsWith(href) ? 'page' : undefined}>{label}</a>)}
     </nav>
-    {path.startsWith('/settings/security') ? <Security/>
+    {path.startsWith('/settings/account') ? <AccountSection/>
+      : path.startsWith('/settings/security') ? <Security/>
       : path.startsWith('/settings/privacy') ? <Privacy/>
       : path.startsWith('/settings/notifications') ? <Notifications/>
         : path.startsWith('/settings/location') ? <LocationPrivacy/>

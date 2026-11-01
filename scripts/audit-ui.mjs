@@ -14,6 +14,7 @@ const sourceFiles = (await filesUnder(resolve('src'))).filter((file) => (
   || file.endsWith('/domain/schemas.ts')
   || file.endsWith('/offline/queue.ts')
   || file.endsWith('/content/ja.ts')
+  || file.endsWith('/content/serverMessages.ts')
   || (/\/features\/place\/[^/]+\.ts$/.test(file) && !file.endsWith('.test.ts'))
 ));
 sourceFiles.push(resolve('index.html'), resolve('scripts/build-gallery.mjs'));

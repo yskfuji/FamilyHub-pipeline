@@ -5,12 +5,12 @@ import { serverMessages } from '../../src/content/serverMessages';
 import { cookieNames, csrfTokenFor, csrfTokenMatches, findSession, presessionValue } from '../auth/sessions';
 import { ApiError, sendError, unauthenticated } from './context';
 import type { AppDeps, RouteDeclaration } from './context';
+import { registerAccountRoutes } from './routes/account';
 import { registerAuthRoutes } from './routes/auth';
 import { registerContentRoutes } from './routes/content';
 import { registerHouseholdRoutes } from './routes/household';
 import { registerOperationalRoutes } from './routes/operational';
 
-const RECENT_AUTH_MS = 5 * 60_000;
 const safeMethods = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 function verifyOrigin(deps: AppDeps, request: FastifyRequest) {
@@ -35,6 +35,13 @@ function verifyPermissionRevision(deps: AppDeps, request: FastifyRequest) {
   if (row && Number(expected) !== Number(row.body)) throw new ApiError(409, { code: 'CONFLICT', message: serverMessages.permissionChanged, retryable: false, reason: 'PERMISSION_REVISION' });
 }
 
+/** 利用できる期間かどうか。支払いの仕組みはなく、運営者が手で延ばす。 */
+export function entitlementActive(deps: AppDeps, householdId: string, now: string) {
+  const row = deps.db.get<{ status: string; ends_at: string | null }>('SELECT status, ends_at FROM entitlements WHERE household_id = ?', householdId);
+  if (!row || row.status === 'expired') return false;
+  return !row.ends_at || Date.parse(row.ends_at) > Date.parse(now);
+}
+
 async function guard(deps: AppDeps, request: FastifyRequest) {
   const declaration = request.routeOptions.config.route;
   if (!declaration) throw new ApiError(404, { code: 'NOT_FOUND', message: serverMessages.notFound, retryable: false });
@@ -51,9 +58,12 @@ async function guard(deps: AppDeps, request: FastifyRequest) {
     if (declaration.csrf) verifyCsrf(deps, request);
     verifyPermissionRevision(deps, request);
   }
+  if (declaration.capability === 'rule' && request.actor && !entitlementActive(deps, request.actor.householdId, now)) {
+    throw new ApiError(403, { code: 'FORBIDDEN', message: serverMessages.entitlementEnded, retryable: false, reason: 'MEMBERSHIP_INACTIVE' });
+  }
   if (declaration.recentAuth) {
     const at = request.session?.reauthenticated_at;
-    if (!at || Date.parse(now) - Date.parse(at) > RECENT_AUTH_MS) throw new ApiError(403, { code: 'REAUTH_REQUIRED', message: serverMessages.reauthRequired, retryable: true });
+    if (!at || Date.parse(now) - Date.parse(at) > deps.config.recentAuthMs) throw new ApiError(403, { code: 'REAUTH_REQUIRED', message: serverMessages.reauthRequired, retryable: true });
   }
 }
 
@@ -87,6 +97,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.setNotFoundHandler((_request, reply) => sendError(reply, { code: 'NOT_FOUND', message: serverMessages.notFound, retryable: false }));
   registerOperationalRoutes(app, deps);
   registerAuthRoutes(app, deps);
+  registerAccountRoutes(app, deps);
   registerHouseholdRoutes(app, deps);
   registerContentRoutes(app, deps);
   return app;

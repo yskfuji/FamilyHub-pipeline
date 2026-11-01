@@ -3,6 +3,8 @@ import { Shell } from './Shell';
 import { usePath } from './router';
 import { WelcomePage } from '../features/auth/WelcomePage';
 import { AuthPage } from '../features/auth/AuthPage';
+import { ResetPasswordPage } from '../features/auth/ResetPasswordPage';
+import { SignUpPage } from '../features/auth/SignUpPage';
 import { OnboardingPage } from '../features/auth/OnboardingPage';
 import { TodayPage } from '../features/today/TodayPage';
 import { CalendarPage } from '../features/calendar/CalendarPage';
@@ -16,6 +18,7 @@ import { navigate } from './router';
 import { useEffect } from 'react';
 import { EmptyState } from '../design-system/components';
 import { useApp } from './AppContext';
+import { IdleGuard } from './IdleGuard';
 import { StageScreen } from './StageScreens';
 import type { Capability } from '../domain/types';
 import { AuditPage, auditPath } from '@audit-surface';
@@ -46,6 +49,8 @@ export default function App() {
   const settingsTab = settingsTabFor(path);
   if (path === '/' || path === '/welcome') return <WelcomePage/>;
   if (path === '/auth') return <AuthPage/>;
+  if (path === '/sign-up') return <SignUpPage/>;
+  if (path === '/reset-password') return <ResetPasswordPage/>;
   if (path === '/onboarding') return <OnboardingPage/>;
   if (appStage !== 'ready') return <StageScreen stage={appStage}/>;
   let page;
@@ -60,5 +65,5 @@ export default function App() {
   else if (settingsTab) page = <PermissionBoundary capability={settingsTab.capability}><SettingsPage path={path}/></PermissionBoundary>;
   else if (auditPath && at(auditPath)) page = <AuditPage/>;
   else page = <NotFound/>;
-  return <Shell path={path}>{page}</Shell>;
+  return <><Shell path={path}>{page}</Shell><IdleGuard/></>;
 }

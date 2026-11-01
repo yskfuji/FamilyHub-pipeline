@@ -10,7 +10,7 @@ import type { AppDeps } from '../http/context';
 import { SEED_PASSWORD, seedHousehold } from './seed';
 
 const ORIGIN = 'https://family.example.test';
-export const testConfig: ServerConfig = { production: false, origin: ORIGIN, databasePath: ':memory:', secret: 'test-secret-test-secret-test-secret-00', secureCookies: true, sessionDays: 30 };
+export const testConfig: ServerConfig = { production: false, origin: ORIGIN, databasePath: ':memory:', secret: 'test-secret-test-secret-test-secret-00', secureCookies: true, sessionDays: 30, recentAuthMs: 300_000, smtp: null };
 
 let cachedHash: Promise<string> | undefined;
 const passwordHash = () => (cachedHash ??= hashPassword(SEED_PASSWORD));
@@ -18,6 +18,7 @@ const passwordHash = () => (cachedHash ??= hashPassword(SEED_PASSWORD));
 export interface World {
   gateway: FamilyHubGateway;
   deps: AppDeps;
+  mail: Array<{ to: string; subject: string; text: string }>;
   ready: Promise<{ url: string; cookies: Map<string, string> }>;
   close(): Promise<void>;
 }
@@ -25,10 +26,12 @@ export interface World {
 /** 実際の Fastify を起動し、Cookie を保持する fetch で httpGateway をつなぐ。時計は1回の変更の操作ごとに1分進む。 */
 export function createWorld(actorMembershipId = 'member-aoi', inspect?: (body: unknown, request: { method: string; url: string; status: number }) => void): World {
   let tick = 0; let sequence = 0;
+  const mail: World['mail'] = [];
   const db = new Db(':memory:');
   const deps: AppDeps = {
     db, config: testConfig,
     clock: { now: () => toJstRfc3339(new Date(Date.parse('2026-09-30T07:45:00+09:00') + tick * 60_000)) },
+    mailer: { available: true, send: async (message) => { mail.push(message); } },
     ids: { next: (prefix) => `${prefix}-mock-${++sequence}`, inviteToken: () => `FAMILY-2026-${String(sequence).padStart(4, '0')}-ONE-TIME` },
   };
   const cookies = new Map<string, string>();
@@ -65,5 +68,5 @@ export function createWorld(actorMembershipId = 'member-aoi', inspect?: (body: u
     return token;
   };
   const gateway = createHttpGateway(ORIGIN, csrf, () => undefined, cookieJar);
-  return { gateway, deps, ready: boot.then(({ url }) => ({ url, cookies })), close: async () => { const { app } = await boot; await app.close(); db.close(); } };
+  return { gateway, deps, mail, ready: boot.then(({ url }) => ({ url, cookies })), close: async () => { const { app } = await boot; await app.close(); db.close(); } };
 }

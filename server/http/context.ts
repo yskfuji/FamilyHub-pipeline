@@ -4,6 +4,7 @@ import type { Db } from '../db/db';
 import type { SessionRow } from '../auth/sessions';
 import { serverMessages } from '../../src/content/serverMessages';
 import type { GatewayError, Id, Rfc3339 } from '../../src/domain/types';
+import type { Mailer } from '../adapters/mail';
 
 export interface ServerClock { now(): Rfc3339; }
 export interface IdSource { next(prefix: string): Id; inviteToken(): string; }
@@ -13,6 +14,7 @@ export interface AppDeps {
   config: ServerConfig;
   clock: ServerClock;
   ids: IdSource;
+  mailer: Mailer;
 }
 
 /** 経路ごとに必ず宣言する。宣言のない経路は起動時に止める。 */
@@ -54,7 +56,7 @@ export function sendError(reply: FastifyReply, error: GatewayError) {
   return reply.code(statusOf(error)).type('application/problem+json').send(error);
 }
 
-export const unauthenticated = () => new ApiError(401, { code: 'UNAUTHENTICATED', message: serverMessages.signInRequired, retryable: false });
+export const unauthenticated = () => new ApiError(401, { code: 'UNAUTHENTICATED', message: serverMessages.signInRequired, retryable: false, reason: 'SESSION_EXPIRED' });
 export const invalidInput = (message: string = serverMessages.invalidInput) => new ApiError(422, { code: 'INVALID_INPUT', message, retryable: false });
 
 export function requireActor(request: FastifyRequest) {

@@ -4,6 +4,7 @@ import type { Capability, GatewayError, HouseholdSnapshot, PrivacySettings, Resu
 import { useModalTriggerTracking } from '../design-system/components';
 import { EncryptedOfflineQueue, IndexedDbQueuePersistence, type QueueableCommand, type QueuedCommand } from '../offline/queue';
 
+import { ReauthDialog, useReauthPrompt, withReauthentication } from './reauth';
 import type { AppRuntime } from './runtime';
 
 export type AppStage = 'restoring' | 'unreachable' | 'signed-out' | 'household-setup' | 'suspended' | 'paywall' | 'ready';
@@ -45,7 +46,8 @@ function setQueryScenario(next: Scenario) {
 
 export function AppProvider({ runtime, children }: PropsWithChildren<{ runtime: AppRuntime }>) {
   useModalTriggerTracking();
-  const { gateway } = runtime;
+  const { pending: reauthPending, setPending: setReauthPending, ask: askReauth } = useReauthPrompt();
+  const gateway = useMemo(() => withReauthentication(runtime.gateway, askReauth), [askReauth, runtime.gateway]);
   const [session, setSession] = useState<SessionInfo | null>(runtime.initialSession);
   const [unreachable, setUnreachable] = useState(false);
   const [queue] = useState(() => new EncryptedOfflineQueue(new IndexedDbQueuePersistence()));
@@ -181,10 +183,21 @@ export function AppProvider({ runtime, children }: PropsWithChildren<{ runtime: 
   const discardQueued = useCallback(async (id: string) => { await queue.remove(id); await loadQueue(); announce('未送信の変更を削除しました。'); }, [announce, loadQueue, queue]);
   const clearQueued = useCallback(async () => { await queue.clear(); setPendingCommands([]); announce('未送信の変更をすべて削除しました。'); }, [announce, queue]);
 
+  const submitReauth = async (password: string) => {
+    if (!reauthPending) return null;
+    const result = reauthPending.reason === 'expired' ? await runtime.gateway.auth.signInWithPassword(snapshot.user.email, password) : await runtime.gateway.auth.reauthenticate(password);
+    if (!result.ok) return result.error.message;
+    reauthPending.resolve(true); setReauthPending(null);
+    return null;
+  };
+  const cancelReauth = () => {
+    if (reauthPending?.reason === 'expired') setSession({ stage: 'signed-out', idleTimeoutMinutes: 30 });
+    reauthPending?.resolve(false); setReauthPending(null);
+  };
   const appStage: AppStage = unreachable ? 'unreachable' : session === null ? 'restoring'
     : session.stage === 'active' ? 'ready' : session.stage;
   const value = useMemo(() => ({ gateway, runtimeMode: runtime.mode, appStage, session, finishSignIn, endSession, snapshot, loading, refreshing, error, scenario, setScenario, refresh, theme, setTheme: setThemeState, toast, announce, can, privacy, updatePrivacy, requestQuickCreate, executeQueueable, pendingCommands, retryQueued, discardQueued, clearQueued }), [appStage, endSession, finishSignIn, runtime.mode, session, gateway, snapshot, loading, refreshing, error, scenario, refresh, theme, toast, announce, can, privacy, updatePrivacy, requestQuickCreate, executeQueueable, pendingCommands, retryQueued, discardQueued, clearQueued]);
-  return <AppContext.Provider value={value}>{children}<div className="sr-only" role="status" aria-live="polite">{toast}</div>{toast && <div className="toast-visible" role="status">{toast}</div>}</AppContext.Provider>;
+  return <AppContext.Provider value={value}>{children}{reauthPending && <ReauthDialog pending={reauthPending} onSubmit={submitReauth} onCancel={cancelReauth}/>}<div className="sr-only" role="status" aria-live="polite">{toast}</div>{toast && <div className="toast-visible" role="status">{toast}</div>}</AppContext.Provider>;
 }
 
 export function useApp() {

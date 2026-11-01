@@ -33,8 +33,10 @@ export function issueSessionCookie(reply: FastifyReply, config: ServerConfig, to
 
 export function findSession(db: Db, token: string | undefined, nowIso: string): SessionRow | null {
   if (!token) return null;
-  const row = db.get<SessionRow>('SELECT id, user_id, label, location, created_at, last_seen_at, expires_at, reauthenticated_at, revoked_at FROM sessions WHERE token_hash = ?', hash(token));
+  const row = db.get<SessionRow & { idle_timeout_minutes: number }>('SELECT s.id, s.user_id, s.label, s.location, s.created_at, s.last_seen_at, s.expires_at, s.reauthenticated_at, s.revoked_at, u.idle_timeout_minutes FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND u.deleted_at IS NULL', hash(token));
   if (!row || row.revoked_at || Date.parse(row.expires_at) <= Date.parse(nowIso)) return null;
+  // 無操作の時間切れはサーバーで判定する。画面の残り時間の表示は案内にすぎない。
+  if (Date.parse(nowIso) - Date.parse(row.last_seen_at) > row.idle_timeout_minutes * 60_000) { db.run('UPDATE sessions SET revoked_at = ? WHERE id = ?', nowIso, row.id); return null; }
   return row;
 }
 

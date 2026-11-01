@@ -74,6 +74,185 @@ paths:
                 required: [token]
                 properties:
                   token: { type: string }
+  /v1/auth/totp/verify:
+    post:
+      security: []
+      operationId: verifyTotp
+      description: Completes a password sign-in for an account with a confirmation code. Each time step and recovery code works once.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [challengeId, code], properties: { challengeId: { type: string }, code: { type: string, maxLength: 20 } } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, required: [userId], properties: { userId: { type: string } } }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/auth/sign-up:
+    post:
+      security: []
+      operationId: signUp
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, required: [userId], properties: { userId: { type: string } } }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/auth/password-reset:
+    post:
+      security: []
+      operationId: requestPasswordReset
+      description: Answers the same way whether or not the address exists.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [email], properties: { email: { type: string } } }
+      responses:
+        '202':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, required: [resendAfterSeconds], properties: { resendAfterSeconds: { type: integer } } }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/auth/password-reset/confirm:
+    post:
+      security: []
+      operationId: confirmPasswordReset
+      description: Never signs in; ends every session of the account.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '204': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/auth/reauthenticate:
+    post:
+      operationId: reauthenticate
+      description: Confirms the password again for operations that need recent authentication.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [password], properties: { password: { type: string } } }
+      responses:
+        '204': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/account:
+    get:
+      operationId: getAccount
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountProfile' }
+        default: { $ref: '#/components/responses/Error' }
+    patch:
+      operationId: updateAccount
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountProfile' }
+        default: { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: deleteAccount
+      description: An owner with other active members must hand over first.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/account/email:
+    post:
+      operationId: changeEmail
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [email], properties: { email: { type: string } } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountProfile' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/account/totp:
+    post:
+      operationId: beginTotpEnrollment
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, required: [otpauthUri], properties: { otpauthUri: { type: string } } }
+        default: { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: disableTotp
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/account/totp/confirm:
+    post:
+      operationId: confirmTotpEnrollment
+      description: Recovery codes are shown once and stored hashed.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [code], properties: { code: { type: string } } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, required: [recoveryCodes], properties: { recoveryCodes: { type: array, items: { type: string } } } }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/households:
+    post:
+      operationId: createHousehold
+      description: Requires a declared adult. Starts a 14-day trial.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [name], properties: { name: { type: string, maxLength: 40 } } }
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, required: [householdId], properties: { householdId: { type: string } } }
+        default: { $ref: '#/components/responses/Error' }
   /v1/auth/passkey/challenge:
     post:
       security: []
@@ -126,14 +305,13 @@ paths:
                 password: { type: string, maxLength: 200 }
       responses:
         '200':
-          description: Signed in; session cookie set by server
+          description: Signed in, or a confirmation code is needed next
           content:
             application/json:
               schema:
-                type: object
-                required: [userId]
-                properties:
-                  userId: { type: string }
+                oneOf:
+                  - { type: object, required: [userId], properties: { userId: { type: string } } }
+                  - { type: object, required: [totpChallengeId], properties: { totpChallengeId: { type: string } } }
         default: { $ref: '#/components/responses/Error' }
   /v1/auth/session:
     get:
@@ -994,6 +1172,17 @@ components:
         stage: { enum: [signed-out, household-setup, suspended, paywall, active] }
         userId: { type: string }
         idleTimeoutMinutes: { type: integer }
+    AccountProfile:
+      type: object
+      required: [displayName, email, avatar, idleTimeoutMinutes, birthdateDeclared, adultDeclared, totpEnabled]
+      properties:
+        displayName: { type: string }
+        email: { type: string }
+        avatar: { type: object, additionalProperties: true }
+        idleTimeoutMinutes: { enum: [1, 5, 15, 30, 60] }
+        birthdateDeclared: { type: boolean }
+        adultDeclared: { type: boolean }
+        totpEnabled: { type: boolean }
     GatewayError:
       type: object
       required: [code, message, retryable]
@@ -1003,7 +1192,7 @@ components:
         message: { type: string }
         retryable: { type: boolean }
         reason:
-          enum: [CAPABILITY_MISSING, SCOPE_DENIED, MEMBERSHIP_INACTIVE, OWNER_REQUIRED, VERSION, PERMISSION_REVISION, IDEMPOTENCY, CSRF]
+          enum: [CAPABILITY_MISSING, SCOPE_DENIED, MEMBERSHIP_INACTIVE, OWNER_REQUIRED, VERSION, PERMISSION_REVISION, IDEMPOTENCY, CSRF, REAUTH_FAILED, SESSION_EXPIRED]
         fieldErrors:
           type: object
           additionalProperties: { type: string }

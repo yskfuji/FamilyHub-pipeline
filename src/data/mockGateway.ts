@@ -1,11 +1,12 @@
 import type { FamilyHubGateway } from './gateway';
 import { baseInvites, baseNotificationPreferences, baseNotifications, basePrivacySettings, baseSecurityOverview, baseSnapshot } from './fixtures';
+import { accountUpdateSchema, signUpSchema } from '../domain/account';
 import { passwordSchema } from '../domain/schemas';
 import { toJstRfc3339 } from '../domain/calendarDate';
 import { createHouseholdRules } from '../domain/commands';
 import type { HouseholdAggregate } from '../domain/commands';
 import { fail, missing, ok } from '../domain/commands/context';
-import type { Authenticator, GatewayError, HouseholdSnapshot, Id, Result, Scenario, SecurityOverview } from '../domain/types';
+import type { AccountProfile, Authenticator, GatewayError, HouseholdSnapshot, Id, Result, Scenario, SecurityOverview } from '../domain/types';
 
 const delay = (ms = 90) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -52,6 +53,8 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
   const { project, requireCapability } = rules.context;
   const { state } = aggregate;
   let passkeyChallenge: string | null = null;
+  const actorMember = state.memberships.find((item) => item.id === actorMembershipId);
+  const account: AccountProfile = { displayName: actorMember?.displayName ?? '', email: `${actorMember?.userId ?? ''}@example.test`, avatar: { kind: 'initial' }, idleTimeoutMinutes: 30, birthdateDeclared: true, adultDeclared: actorMember?.role === 'owner' || actorMember?.role === 'adult', totpEnabled: false };
 
   return {
     auth: {
@@ -69,6 +72,28 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
         return ok({ userId: state.user.id });
       },
       async signOut() { await delay(); return ok(undefined); },
+      // 確認用データにはサインインの記録がないので、形だけを返す。実際の検証は API が行う。
+      async verifyTotp() { await delay(); return ok({ userId: state.user.id }); },
+      async signUp(input) { await delay(); const parsed = signUpSchema.safeParse(input); return parsed.success ? ok({ userId: state.user.id }) : fail({ code: 'INVALID_INPUT', message: parsed.error.issues[0]?.message ?? '入力を確認してください。', retryable: false }); },
+      async requestPasswordReset() { await delay(); return ok({ resendAfterSeconds: 60 }); },
+      async confirmPasswordReset(input) { await delay(); const parsed = passwordSchema.safeParse(input.newPassword); return parsed.success ? ok(undefined) : fail({ code: 'INVALID_INPUT', message: parsed.error.issues[0]?.message ?? '新しいパスワードを確認してください。', retryable: false }); },
+      async reauthenticate() { await delay(); return ok(undefined); },
+      async getAccount() { await delay(); return ok(structuredClone(account)); },
+      async updateAccount(input) {
+        await delay();
+        const parsed = accountUpdateSchema.safeParse(input);
+        if (!parsed.success) return fail({ code: 'INVALID_INPUT', message: parsed.error.issues[0]?.message ?? '入力を確認してください。', retryable: false });
+        const { birthdate, ...fields } = parsed.data;
+        Object.assign(account, fields, birthdate ? { birthdateDeclared: true } : {});
+        const member = state.memberships.find((item) => item.id === actorMembershipId);
+        if (member && fields.displayName) member.displayName = fields.displayName;
+        return ok(structuredClone(account));
+      },
+      async changeEmail(email) { await delay(); account.email = email; return ok(structuredClone(account)); },
+      async deleteAccount() { await delay(); return fail({ code: 'CONFLICT', message: 'この確認用データではアカウントを削除できません。', retryable: false }); },
+      async beginTotpEnrollment() { await delay(); return ok({ otpauthUri: 'otpauth://totp/demo?secret=DEMO' }); },
+      async confirmTotpEnrollment() { await delay(); account.totpEnabled = true; return ok({ recoveryCodes: ['DEMO1-00000'] }); },
+      async disableTotp() { await delay(); account.totpEnabled = false; return ok(undefined); },
       async getSession() { await delay(10); return ok({ stage: 'active' as const, userId: state.user.id, idleTimeoutMinutes: 30 }); },
       async getSecurityOverview() { await delay(); const guard = requireCapability<SecurityOverview>('settings.own'); return guard ?? ok(structuredClone(security)); },
       async beginPasskeyRegistration() { await delay(); const guard = requireCapability<{ challengeId: Id; publicKey: null }>('settings.own'); return guard ?? ok({ challengeId: nextId('challenge'), publicKey: null }); },
@@ -99,6 +124,7 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
     },
     household: {
       ...delayed(rules.household),
+      async createHousehold() { await delay(); return ok({ householdId: state.household.id }); },
       async getSnapshot(scenario): Promise<Result<HouseholdSnapshot>> {
         await delay(scenario === 'loading' ? 700 : 80);
         offline = scenario === 'offline';

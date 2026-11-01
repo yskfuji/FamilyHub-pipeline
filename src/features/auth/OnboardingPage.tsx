@@ -5,7 +5,7 @@ import { Brand } from '../../design-system/components';
 import { ArrowIcon, PeopleIcon, ShieldIcon } from '../../design-system/icons';
 
 export function OnboardingPage() {
-  const { gateway, announce, snapshot, updatePrivacy } = useApp();
+  const { gateway, announce, snapshot, updatePrivacy, runtimeMode, finishSignIn } = useApp();
   const [householdName, setHouseholdName] = useState(snapshot.household.name);
   const demoDate = new Intl.DateTimeFormat('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Tokyo' }).format(new Date(snapshot.context.asOf));
   const [step, setStep] = useState(1);
@@ -21,10 +21,12 @@ export function OnboardingPage() {
     if (step === 1 && mode === 'join') {
       const result = await gateway.household.acceptInvite(inviteCode);
       if (!result.ok) { setError(result.error.message); return; }
+      await finishSignIn('/onboarding');
     }
     if (step === 1 && mode === 'create') {
-      const result = await gateway.household.updateProfile({ name: householdName });
+      const result = runtimeMode === 'http' ? await gateway.household.createHousehold(householdName) : await gateway.household.updateProfile({ name: householdName });
       if (!result.ok) { setError(result.error.message); return; }
+      await finishSignIn('/onboarding');
     }
     if (step === 2) {
       // 共有範囲と通知の表示だけを変え、ほかの設定（外部検索への同意など）は保存済みの値のまま残す。

@@ -7,6 +7,9 @@ export interface ServerConfig {
   secret: string;
   secureCookies: boolean;
   sessionDays: number;
+  /** 金銭や権限の操作に必要な、直近の本人確認の有効時間。 */
+  recentAuthMs: number;
+  smtp: { host: string; port: number; user?: string; password?: string; from: string } | null;
 }
 
 const loopback = (host: string) => host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
@@ -27,5 +30,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     secureCookies,
     databasePath: env.FAMILY_HUB_DATABASE ?? 'data/family-hub.sqlite',
     sessionDays: 30,
+    recentAuthMs: Number(env.FAMILY_HUB_RECENT_AUTH_MS ?? 300_000),
+    smtp: env.FAMILY_HUB_SMTP_HOST ? { host: env.FAMILY_HUB_SMTP_HOST, port: Number(env.FAMILY_HUB_SMTP_PORT ?? 587), user: env.FAMILY_HUB_SMTP_USER, password: env.FAMILY_HUB_SMTP_PASSWORD, from: env.FAMILY_HUB_SMTP_FROM ?? 'no-reply@family.example' } : null,
   };
 }

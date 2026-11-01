@@ -2,12 +2,13 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { toJstRfc3339 } from '../src/domain/calendarDate';
 import { loadConfig } from './config';
 import { Db } from './db/db';
+import { createMailer } from './adapters/mail';
 import { buildApp } from './http/app';
 
 const config = loadConfig();
 const db = new Db(config.databasePath);
 const app = await buildApp({
-  db, config,
+  db, config, mailer: createMailer(config),
   clock: { now: () => toJstRfc3339(new Date()) },
   ids: { next: (prefix) => `${prefix}-${randomUUID()}`, inviteToken: () => randomBytes(18).toString('base64url') },
 });

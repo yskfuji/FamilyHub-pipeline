@@ -9,13 +9,16 @@ import { clearSessionCookie, createSession, issueSessionCookie } from '../../aut
 import { sendError, unauthenticated } from '../context';
 import type { AppDeps, RouteDeclaration } from '../context';
 import { parse } from '../parse';
+import { limit } from '../rateLimit';
+import { verifySecondFactor } from './account';
+import { entitlementActive } from '../app';
 
 const declare = (operationId: string, overrides: Partial<RouteDeclaration> = {}) => ({ route: { operationId, auth: 'session', csrf: true, capability: 'own', idempotent: false, ...overrides } as RouteDeclaration });
 const anonymous = (operationId: string) => declare(operationId, { auth: 'public', capability: 'none' });
 
 const rejected = { code: 'UNAUTHENTICATED' as const, message: serverMessages.signInFailed, retryable: false };
 
-interface UserRow { id: string; email: string; display_name: string; password_hash: string | null }
+interface UserRow { id: string; email: string; display_name: string; password_hash: string | null; totp_enabled_at: string | null }
 
 const deviceLabel = (request: FastifyRequest) => {
   const agent = request.headers['user-agent'] ?? '';
@@ -33,12 +36,13 @@ function startSession(deps: AppDeps, request: FastifyRequest, reply: FastifyRepl
 function sessionStage(deps: AppDeps, request: FastifyRequest) {
   if (!request.actor) return 'household-setup' as const;
   const row = deps.db.get<{ body: string }>("SELECT body FROM records WHERE household_id = ? AND collection = 'memberships' AND id = ?", request.actor.householdId, request.actor.membershipId);
-  return row && (JSON.parse(row.body) as { status: string }).status === 'suspended' ? 'suspended' as const : 'active' as const;
+  if (row && (JSON.parse(row.body) as { status: string }).status === 'suspended') return 'suspended' as const;
+  return entitlementActive(deps, request.actor.householdId, deps.clock.now()) ? 'active' as const : 'paywall' as const;
 }
 
 const currentUser = (deps: AppDeps, request: FastifyRequest) => {
   if (!request.session) throw unauthenticated();
-  const user = deps.db.get<UserRow>('SELECT id, email, display_name, password_hash FROM users WHERE id = ? AND deleted_at IS NULL', request.session.user_id);
+  const user = deps.db.get<UserRow>('SELECT id, email, display_name, password_hash, totp_enabled_at FROM users WHERE id = ? AND deleted_at IS NULL', request.session.user_id);
   if (!user) throw unauthenticated();
   return user;
 };
@@ -46,9 +50,26 @@ const currentUser = (deps: AppDeps, request: FastifyRequest) => {
 export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
   app.post('/v1/auth/password', { config: anonymous('signInWithPassword') }, async (request, reply) => {
     const { email, password } = parse(z.object({ email: z.string().max(254), password: z.string().max(200) }), request.body);
-    const user = deps.db.get<UserRow>('SELECT id, email, display_name, password_hash FROM users WHERE email = ? AND deleted_at IS NULL', email.trim());
+    const user = deps.db.get<UserRow>('SELECT id, email, display_name, password_hash, totp_enabled_at FROM users WHERE email = ? AND deleted_at IS NULL', email.trim());
+    limit(deps, `sign-in:${request.ip}`, 50, 900_000);
+    limit(deps, `sign-in:${email.trim().toLowerCase()}`, 10, 900_000);
     const matched = await verifyPassword(password, user?.password_hash);
     if (!user || !matched) return sendError(reply, rejected);
+    if (user.totp_enabled_at) {
+      const challengeId = deps.ids.next('totp');
+      deps.db.run("INSERT INTO webauthn_challenges (id, purpose, user_id, challenge, expires_at) VALUES (?, 'totp', ?, '', ?)", challengeId, user.id, new Date(Date.parse(deps.clock.now()) + 300_000).toISOString());
+      return { totpChallengeId: challengeId };
+    }
+    startSession(deps, request, reply, user.id);
+    return { userId: user.id };
+  });
+  app.post('/v1/auth/totp/verify', { config: anonymous('verifyTotp') }, async (request, reply) => {
+    const body = parse(z.object({ challengeId: idSchema, code: z.string().max(20) }), request.body);
+    limit(deps, `totp-sign-in:${body.challengeId}`, 5, 300_000);
+    const challenge = deps.db.get<{ user_id: string; expires_at: string }>("SELECT user_id, expires_at FROM webauthn_challenges WHERE id = ? AND purpose = 'totp'", body.challengeId);
+    const user = challenge ? deps.db.get<UserRow & { id: string; totp_secret: string | null; totp_last_step: number | null }>('SELECT id, email, display_name, password_hash, totp_enabled_at, totp_secret, totp_last_step FROM users WHERE id = ?', challenge.user_id) : undefined;
+    if (!challenge || !user || Date.parse(challenge.expires_at) <= Date.parse(deps.clock.now()) || !verifySecondFactor(deps, user, body.code)) return sendError(reply, { code: 'UNAUTHENTICATED', message: serverMessages.totpInvalid, retryable: true });
+    deps.db.run('DELETE FROM webauthn_challenges WHERE id = ?', body.challengeId);
     startSession(deps, request, reply, user.id);
     return { userId: user.id };
   });
@@ -62,7 +83,8 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
   });
   app.get('/v1/auth/session', { config: declare('getSession', { auth: 'public', csrf: false, capability: 'none' }) }, (request) => {
     if (!request.session) return { stage: 'signed-out' as const, idleTimeoutMinutes: 30 };
-    return { stage: sessionStage(deps, request), userId: request.session.user_id, idleTimeoutMinutes: 30 };
+    const row = deps.db.get<{ idle_timeout_minutes: number }>('SELECT idle_timeout_minutes FROM users WHERE id = ?', request.session.user_id);
+    return { stage: sessionStage(deps, request), userId: request.session.user_id, idleTimeoutMinutes: row?.idle_timeout_minutes ?? 30 };
   });
   app.delete('/v1/auth/session', { config: declare('signOut', { capability: 'none' }) }, (request, reply) => {
     if (request.session) deps.db.run('UPDATE sessions SET revoked_at = ? WHERE id = ?', deps.clock.now(), request.session.id);

@@ -79,4 +79,36 @@ export const migrations: readonly string[] = [
   );
   CREATE INDEX audit_events_household ON audit_events(household_id, at);
   `,
+  `
+  ALTER TABLE users ADD COLUMN birthdate TEXT;
+  ALTER TABLE users ADD COLUMN adult_declared_at TEXT;
+  ALTER TABLE users ADD COLUMN avatar TEXT;
+  ALTER TABLE users ADD COLUMN idle_timeout_minutes INTEGER NOT NULL DEFAULT 30;
+  ALTER TABLE users ADD COLUMN totp_secret TEXT;
+  ALTER TABLE users ADD COLUMN totp_enabled_at TEXT;
+  ALTER TABLE users ADD COLUMN totp_last_step INTEGER;
+  CREATE TABLE recovery_codes (
+    user_id TEXT NOT NULL REFERENCES users(id),
+    code_hash TEXT NOT NULL,
+    used_at TEXT,
+    PRIMARY KEY (user_id, code_hash)
+  ) WITHOUT ROWID;
+  CREATE TABLE password_resets (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    token_hash TEXT NOT NULL UNIQUE,
+    code_hash TEXT NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    used_at TEXT
+  );
+  CREATE INDEX password_resets_user ON password_resets(user_id, created_at);
+  CREATE TABLE entitlements (
+    household_id TEXT PRIMARY KEY,
+    status TEXT NOT NULL,
+    ends_at TEXT,
+    updated_at TEXT NOT NULL
+  ) WITHOUT ROWID;
+  `,
 ];

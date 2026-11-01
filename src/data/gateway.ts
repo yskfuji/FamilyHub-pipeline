@@ -1,11 +1,25 @@
 import type { EventInput, EventUpdateInput, ExpenseInput, ExpenseUpdateInput, HouseholdProfileInput, MemoInput, TodoInput, TodoUpdateInput } from '../domain/schemas';
-import type { Authenticator, CalendarEvent, Expense, Household, HouseholdInvite, HouseholdNotification, HouseholdSnapshot, Id, Insight, IsoDate, Memo, MembershipRole, MutationContext, NotificationPreferences, PermissionOverride, PrivacySettings, RecurrenceScope, Result, Scenario, SecurityOverview, SessionInfo, Todo } from '../domain/types';
+import type { AccountUpdateInput, SignUpInput } from '../domain/account';
+import type { AccountProfile, Authenticator, CalendarEvent, Expense, Household, HouseholdInvite, HouseholdNotification, HouseholdSnapshot, Id, Insight, IsoDate, Memo, MembershipRole, MutationContext, NotificationPreferences, PermissionOverride, PrivacySettings, RecurrenceScope, Result, Scenario, SecurityOverview, SessionInfo, Todo } from '../domain/types';
 
 export interface AuthPort {
   beginPasskey(): Promise<Result<{ challengeId: Id; publicKey: PublicKeyCredentialRequestOptions | null }>>;
   /** 端末で本人確認した結果をサーバーへ渡し、検証が通ったときだけサインインを完了する。 */
   finishPasskey(challengeId: Id, assertion: unknown): Promise<Result<{ userId: Id }>>;
-  signInWithPassword(email: string, password: string): Promise<Result<{ userId: Id }>>;
+  /** 確認コードを設定している人は totpChallengeId を受け取り、verifyTotp で完了する。 */
+  signInWithPassword(email: string, password: string): Promise<Result<{ userId: Id } | { totpChallengeId: Id }>>;
+  verifyTotp(challengeId: Id, code: string): Promise<Result<{ userId: Id }>>;
+  signUp(input: SignUpInput): Promise<Result<{ userId: Id }>>;
+  requestPasswordReset(email: string): Promise<Result<{ resendAfterSeconds: number }>>;
+  confirmPasswordReset(input: { email?: string; code?: string; token?: string; newPassword: string }): Promise<Result<void>>;
+  reauthenticate(password: string): Promise<Result<void>>;
+  getAccount(): Promise<Result<AccountProfile>>;
+  updateAccount(input: AccountUpdateInput): Promise<Result<AccountProfile>>;
+  changeEmail(email: string): Promise<Result<AccountProfile>>;
+  deleteAccount(): Promise<Result<void>>;
+  beginTotpEnrollment(): Promise<Result<{ otpauthUri: string }>>;
+  confirmTotpEnrollment(code: string): Promise<Result<{ recoveryCodes: string[] }>>;
+  disableTotp(): Promise<Result<void>>;
   signOut(): Promise<Result<void>>;
   getSession(): Promise<Result<SessionInfo>>;
   getSecurityOverview(): Promise<Result<SecurityOverview>>;
@@ -22,6 +36,7 @@ export interface CredentialClient {
 }
 
 export interface HouseholdPort {
+  createHousehold(name: string): Promise<Result<{ householdId: Id }>>;
   getSnapshot(scenario?: Scenario): Promise<Result<HouseholdSnapshot>>;
   acceptInvite(code: string): Promise<Result<{ householdId: Id }>>;
   updateProfile(input: HouseholdProfileInput): Promise<Result<Household>>;

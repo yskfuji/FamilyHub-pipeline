@@ -377,5 +377,12 @@
 }
 
 @layer components {
+  .auth-layout-single { grid-template-columns: minmax(0, 1fr); }
+  .field-error { color: var(--danger); font-size: .85rem; }
+  .check-row { display: flex; gap: .5rem; align-items: center; min-height: 44px; }
+  .choice-row { display: flex; flex-wrap: wrap; gap: .5rem; }
+  .wrap-anywhere { overflow-wrap: anywhere; font-size: .8rem; }
+  .link-button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; color: var(--ink-soft); }
+  .idle-card { position: fixed; inset-block-end: 1rem; inset-inline-end: 1rem; z-index: 60; display: grid; gap: .5rem; max-width: 20rem; padding: 1rem; background: var(--surface, #fff); border: 1px solid var(--line); border-radius: var(--radius-md, 12px); box-shadow: var(--shadow, 0 8px 24px rgb(0 0 0 / .15)); }
   .stage-screen { min-height: 100dvh; display: grid; place-content: center; justify-items: center; gap: var(--space-4, 16px); padding: 24px; text-align: center; }
 }

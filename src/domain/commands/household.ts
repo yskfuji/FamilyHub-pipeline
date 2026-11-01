@@ -6,7 +6,7 @@ import type { HouseholdInvite, HouseholdSnapshot, PermissionOverride, PrivacySet
 import { fail, invalid, missing, ok } from './context';
 import type { CommandContext, SyncPort } from './context';
 
-export function createHouseholdCommands(c: CommandContext): SyncPort<Omit<HouseholdPort, 'getSnapshot'>> {
+export function createHouseholdCommands(c: CommandContext): SyncPort<Omit<HouseholdPort, 'getSnapshot' | 'createHousehold'>> {
   const { a, state, env, nextId, now, requireCapability, offlineFailure, project } = c;
   return {
     acceptInvite(code) {

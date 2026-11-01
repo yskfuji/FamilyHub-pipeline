@@ -15,6 +15,8 @@ export function seedHousehold(db: Db, passwordHash: string, createdAt: string) {
       db.run('INSERT INTO users (id, email, display_name, avatar_tone, password_hash, created_at) VALUES (?, ?, ?, ?, ?, ?)', member.userId, `${name}@example.test`, member.displayName, 'indigo', passwordHash, createdAt);
       db.run('INSERT INTO household_members (user_id, household_id, membership_id) VALUES (?, ?, ?)', member.userId, household.id, member.id);
     }
+    db.run("INSERT INTO entitlements (household_id, status, updated_at) VALUES (?, 'active', ?)", household.id, createdAt);
+    db.run('UPDATE users SET adult_declared_at = ? WHERE id IN (?, ?)', createdAt, 'user-aoi', 'user-ren');
     const defaults = { privacy: basePrivacySettings, notificationPreferences: baseNotificationPreferences };
     const loaded = loadAggregate(db, household.id, 'member-aoi', defaults);
     const seeded: HouseholdAggregate = {
