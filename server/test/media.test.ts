@@ -142,7 +142,7 @@ describe('album uploads', () => {
     await settled(world);
     const album = await world.gateway.albums.getAlbum('album-sports');
     const item = album.ok ? album.value.items.find((entry) => uploaded.ok && entry.id === uploaded.value.itemId) : undefined;
-    expect(item).toMatchObject({ status: 'ready', kind: 'video', hasThumbnail: true });
+    expect(item, JSON.stringify(item)).toMatchObject({ status: 'ready', kind: 'video', hasThumbnail: true });
     const { url, cookies } = await world.ready;
     const file = await fetch(`${url}${world.gateway.albums.mediaUrl(item!, 'file')}`, { headers: { Cookie: [...cookies].map(([name, value]) => `${name}=${value}`).join('; ') } });
     expect(Buffer.from(await file.arrayBuffer()).includes(Buffer.from(LOCATION, 'latin1'))).toBe(false);

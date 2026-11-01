@@ -72,5 +72,5 @@ export function createWorld(actorMembershipId = 'member-aoi', inspect?: (body: u
     return token;
   };
   const gateway = createHttpGateway(ORIGIN, csrf, () => undefined, cookieJar);
-  return { gateway, deps, mail, ready: boot.then(({ url }) => ({ url, cookies })), close: async () => { const { app } = await boot; await app.close(); db.close(); } };
+  return { gateway, deps, mail, ready: boot.then(({ url }) => ({ url, cookies })), close: async () => { const { app } = await boot; await Promise.all([...deps.jobs]); app.server.closeAllConnections(); await app.close(); db.close(); } };
 }
