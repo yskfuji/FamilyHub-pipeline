@@ -10,7 +10,7 @@ const relyingParty = (deps: AppDeps) => new URL(deps.config.origin).hostname;
 
 function saveChallenge(deps: AppDeps, purpose: string, userId: string | null, challenge: string) {
   const id = deps.ids.next('challenge');
-  deps.db.run('DELETE FROM webauthn_challenges WHERE expires_at < ?', deps.clock.now());
+  deps.db.run('DELETE FROM webauthn_challenges WHERE unixepoch(expires_at) < unixepoch(?)', deps.clock.now());
   deps.db.run('INSERT INTO webauthn_challenges (id, purpose, user_id, challenge, expires_at) VALUES (?, ?, ?, ?, ?)', id, purpose, userId, challenge, new Date(Date.parse(deps.clock.now()) + CHALLENGE_TTL_MS).toISOString());
   return id;
 }

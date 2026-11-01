@@ -23,11 +23,11 @@ export async function runRetention(deps: AppDeps) {
   }
   for (const file of files) await rm(dirname(originalPath(deps.config.mediaPath, file.householdId, file.id)), { recursive: true, force: true });
   const cutoff = new Date(Date.parse(now) - IDEMPOTENCY_KEEP_MS).toISOString();
-  deps.db.run('DELETE FROM idempotency_records WHERE created_at < ?', cutoff);
-  deps.db.run('DELETE FROM sessions WHERE expires_at < ? OR revoked_at < ?', now, cutoff);
-  deps.db.run('DELETE FROM webauthn_challenges WHERE expires_at < ?', now);
-  deps.db.run('DELETE FROM password_resets WHERE expires_at < ?', cutoff);
-  for (const row of deps.db.all<{ id: string; household_id: string; item_id: string }>('SELECT id, household_id, item_id FROM uploads WHERE expires_at < ?', now)) {
+  deps.db.run('DELETE FROM idempotency_records WHERE unixepoch(created_at) < unixepoch(?)', cutoff);
+  deps.db.run('DELETE FROM sessions WHERE unixepoch(expires_at) < unixepoch(?) OR unixepoch(revoked_at) < unixepoch(?)', now, cutoff);
+  deps.db.run('DELETE FROM webauthn_challenges WHERE unixepoch(expires_at) < unixepoch(?)', now);
+  deps.db.run('DELETE FROM password_resets WHERE unixepoch(expires_at) < unixepoch(?)', cutoff);
+  for (const row of deps.db.all<{ id: string; household_id: string; item_id: string }>('SELECT id, household_id, item_id FROM uploads WHERE unixepoch(expires_at) < unixepoch(?)', now)) {
     await rm(quarantinePath(deps.config.mediaPath, row.id), { force: true });
     deps.db.transaction(() => {
       deps.db.run("DELETE FROM records WHERE household_id = ? AND collection = 'albumItems' AND id = ?", row.household_id, row.item_id);

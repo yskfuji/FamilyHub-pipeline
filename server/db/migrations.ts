@@ -126,4 +126,7 @@ export const migrations: readonly string[] = [
   );
   CREATE INDEX uploads_user ON uploads(user_id);
   `,
+  `
+  ALTER TABLE uploads ADD COLUMN touched_at TEXT;
+  `,
 ];

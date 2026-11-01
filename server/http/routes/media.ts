@@ -13,6 +13,7 @@ import type { Memo } from '../../../src/domain/types';
 import { ok } from '../../../src/domain/commands/context';
 import { loadAggregate, saveAggregate } from '../../db/aggregateStore';
 import { stripVideoLocation } from '../../media/mp4Location';
+import type { ProcessOutcome } from '../../media/pipeline';
 import { acceptClientThumbnail, originalPath, processMedia, quarantinePath, sanitizeImage, sniffFile, thumbnailPath } from '../../media/pipeline';
 import { ApiError, invalidInput, requireActor, sendError, unauthenticated } from '../context';
 import type { AppDeps, RouteDeclaration } from '../context';
@@ -26,6 +27,7 @@ const media = { media: true };
 
 const UPLOAD_TTL_MS = 24 * 3_600_000;
 const MAX_ACTIVE_UPLOADS = 3;
+const UPLOAD_ACTIVE_MS = 10 * 60_000;
 const ATTACHMENT_FILE_MAX = 130 * 1024 * 1024;
 const LINK_TTL_MS = 5 * 60_000;
 const contentPolicy = "default-src 'none'; sandbox";
@@ -57,10 +59,11 @@ function track(deps: AppDeps, work: Promise<void>) {
 async function finishUpload(deps: AppDeps, upload: UploadRow) {
   const source = quarantinePath(deps.config.mediaPath, upload.id);
   deps.db.transaction(() => updateItem(deps, upload, (item) => { item.status = 'processing'; }));
+  // 予期しない失敗でも「処理中」のまま残さず、拒否として記録する。
   const outcome = await processMedia({
     root: deps.config.mediaPath, householdId: upload.household_id, itemId: upload.item_id, source, keepLocation: Boolean(upload.keep_location), scanner: deps.scanner,
     findDuplicate: (sha256) => deps.db.get<{ id: string }>("SELECT id FROM records WHERE household_id = ? AND collection = 'albumItems' AND json_extract(body, '$.albumId') = ? AND json_extract(body, '$.sha256') = ? AND json_extract(body, '$.status') = 'ready' AND json_extract(body, '$.deletedAt') IS NULL", upload.household_id, upload.album_id, sha256)?.id ?? null,
-  });
+  }).catch(async (): Promise<ProcessOutcome> => { await rm(source, { force: true }); return { status: 'rejected', message: '処理できなかったため、保存しませんでした。もう一度追加してください。' }; });
   deps.db.transaction(() => {
     updateItem(deps, upload, (item) => {
       if (outcome.status === 'ready') Object.assign(item, { status: 'ready', sha256: outcome.sha256, mimeType: outcome.mimeType, kind: outcome.kind, ...outcome.media, hasThumbnail: Boolean(item.hasThumbnail) || outcome.media.hasThumbnail });
@@ -149,13 +152,15 @@ export function registerMediaRoutes(app: FastifyInstance, deps: AppDeps) {
   app.post('/v1/uploads', { config: declare('createUpload', { successStatus: 201 }) }, (request, reply) => {
     const body = parse(uploadBody, request.body);
     const actor = requireActor(request);
-    const active = deps.db.get<{ count: number }>('SELECT count(*) AS count FROM uploads WHERE user_id = ? AND expires_at > ?', actor.userId, deps.clock.now());
+    // 閉じたタブの送信が枠をふさがないよう、しばらく動きのないものは数えない（続きからは送れる）。
+    const activeSince = new Date(Date.parse(deps.clock.now()) - UPLOAD_ACTIVE_MS).toISOString();
+    const active = deps.db.get<{ count: number }>('SELECT count(*) AS count FROM uploads WHERE user_id = ? AND unixepoch(expires_at) > unixepoch(?) AND unixepoch(coalesce(touched_at, ?)) > unixepoch(?)', actor.userId, deps.clock.now(), deps.clock.now(), activeSince);
     if ((active?.count ?? 0) >= MAX_ACTIVE_UPLOADS) throw new ApiError(429, { code: 'RATE_LIMITED', message: '同時に送れるのは3件までです。', retryable: true });
     return mutate(deps, request, reply, (rules) => {
       const reserved = rules.albums.reserveItem(body.albumId, { kind: body.mimeType.startsWith('video/') ? 'video' : 'photo', originalName: body.name, mimeType: body.mimeType, byteSize: body.byteSize, keepLocation: body.keepLocation });
       if (!reserved.ok) return reserved;
       const id = deps.ids.next('upload');
-      deps.db.run('INSERT INTO uploads (id, user_id, household_id, membership_id, album_id, item_id, upload_length, upload_offset, keep_location, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)', id, actor.userId, actor.householdId, actor.membershipId, body.albumId, reserved.value.id, body.byteSize, body.keepLocation ? 1 : 0, new Date(Date.parse(deps.clock.now()) + UPLOAD_TTL_MS).toISOString());
+      deps.db.run('INSERT INTO uploads (id, user_id, household_id, membership_id, album_id, item_id, upload_length, upload_offset, keep_location, expires_at, touched_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)', id, actor.userId, actor.householdId, actor.membershipId, body.albumId, reserved.value.id, body.byteSize, body.keepLocation ? 1 : 0, new Date(Date.parse(deps.clock.now()) + UPLOAD_TTL_MS).toISOString(), deps.clock.now());
       return ok({ uploadId: id, itemId: reserved.value.id, offset: 0 });
     }, media);
   });
@@ -186,7 +191,7 @@ export function registerMediaRoutes(app: FastifyInstance, deps: AppDeps) {
       // 途中で切れた分も受け取った分として記録し、続きから送れるようにする。
     }
     const next = (await stat(path).catch(() => ({ size: 0 }))).size;
-    deps.db.run('UPDATE uploads SET upload_offset = ? WHERE id = ?', next, upload.id);
+    deps.db.run('UPDATE uploads SET upload_offset = ?, touched_at = ? WHERE id = ?', next, deps.clock.now(), upload.id);
     if (next === upload.upload_length) track(deps, finishUpload(deps, { ...upload, upload_offset: next }));
     return reply.code(204).header('Tus-Resumable', '1.0.0').header('Upload-Offset', next).send();
   });

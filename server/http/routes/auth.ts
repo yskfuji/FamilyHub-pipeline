@@ -94,7 +94,7 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
   app.get('/v1/auth/security', { config: declare('getSecurityOverview', { csrf: false }) }, (request) => {
     const user = currentUser(deps, request);
     const passkeys = deps.db.all<{ id: string; label: string; created_at: string }>('SELECT id, label, created_at FROM passkeys WHERE user_id = ? ORDER BY created_at', user.id);
-    const sessions = deps.db.all<{ id: string; label: string; location: string; last_seen_at: string }>('SELECT id, label, location, last_seen_at FROM sessions WHERE user_id = ? AND revoked_at IS NULL AND expires_at > ? ORDER BY last_seen_at DESC', user.id, deps.clock.now());
+    const sessions = deps.db.all<{ id: string; label: string; location: string; last_seen_at: string }>('SELECT id, label, location, last_seen_at FROM sessions WHERE user_id = ? AND revoked_at IS NULL AND unixepoch(expires_at) > unixepoch(?) ORDER BY unixepoch(last_seen_at) DESC', user.id, deps.clock.now());
     return {
       authenticators: passkeys.map((item) => ({ id: item.id, label: item.label, createdAt: item.created_at, kind: 'passkey' as const, demo: false })),
       sessions: sessions.map((item) => ({ id: item.id, label: item.label, location: item.location, lastSeenAt: item.last_seen_at, current: item.id === request.session?.id })),

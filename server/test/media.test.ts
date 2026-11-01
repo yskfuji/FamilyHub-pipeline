@@ -186,6 +186,26 @@ describe('album uploads', () => {
     expect(album.ok && album.value.items.some((item) => item.originalName === 'a.jpg' && item.status === 'ready')).toBe(true);
   });
 
+  it('does not let abandoned uploads block new ones', async () => {
+    const world = open();
+    const { url, cookies } = await world.ready;
+    const headers = { Origin: 'https://family.example.test', Cookie: [...cookies].map(([name, value]) => `${name}=${value}`).join('; ') };
+    const { token } = await (await fetch(`${url}/v1/auth/csrf`, { headers })).json() as { token: string };
+    const start = (name: string) => fetch(`${url}/v1/uploads`, { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json', 'X-CSRF-Token': token }, body: JSON.stringify({ albumId: 'album-sports', name, mimeType: 'image/jpeg', byteSize: 10 }) });
+    for (const name of ['a', 'b', 'c']) expect((await start(name)).status).toBe(201);
+    expect((await start('d')).status).toBe(429);
+    world.deps.db.run("UPDATE uploads SET touched_at = '2026-09-30T06:00:00+09:00'");
+    expect((await start('d')).status).toBe(201);
+  });
+
+  it('records a failure instead of staying in processing when handling throws', async () => {
+    const world = open('member-aoi', undefined, { scan: async () => { throw new Error('scanner crashed'); }, ready: async () => true });
+    const uploaded = await world.gateway.albums.uploadItem('album-sports', asFile(await imageWithGps(), 'a.jpg', 'image/jpeg'), { keepLocation: false });
+    await settled(world);
+    const album = await world.gateway.albums.getAlbum('album-sports');
+    expect(album.ok && album.value.items.find((entry) => uploaded.ok && entry.id === uploaded.value.itemId)).toMatchObject({ status: 'rejected' });
+  });
+
   it('checks album access on media', async () => {
     const owner = open();
     const { url, cookies } = await owner.ready;

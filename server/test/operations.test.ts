@@ -24,6 +24,16 @@ describe('retention', () => {
     expect(ids('memos')).toContain('memo-receipt');
   });
 
+  it('compares stored times as instants, whichever offset they were written with', async () => {
+    const world = open();
+    await world.ready;
+    // 現在は 2026-09-30T07:45+09:00。UTC で書いた未来の期限は、文字列では過去に見える。
+    world.deps.db.run("INSERT INTO webauthn_challenges (id, purpose, challenge, expires_at) VALUES ('future', 'sign-in', 'x', '2026-09-30T00:00:00.000Z')");
+    world.deps.db.run("INSERT INTO webauthn_challenges (id, purpose, challenge, expires_at) VALUES ('past', 'sign-in', 'x', '2026-09-29T20:00:00.000Z')");
+    await runRetention(world.deps);
+    expect(world.deps.db.all<{ id: string }>('SELECT id FROM webauthn_challenges').map((row) => row.id)).toEqual(['future']);
+  });
+
   it('clears old idempotency records and sessions', async () => {
     const world = open();
     await world.ready;
