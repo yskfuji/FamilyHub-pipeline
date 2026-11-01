@@ -9,3 +9,10 @@ release/SHA256SUMS
 .DS_Store
 *.log
 *.tsbuildinfo
+dist-server/
+data/
+.env
+.env.*
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm

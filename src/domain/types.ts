@@ -25,7 +25,7 @@ export interface GatewayError {
   message: string;
   retryable: boolean;
   fieldErrors?: Record<string, string>;
-  reason?: 'CAPABILITY_MISSING' | 'SCOPE_DENIED' | 'MEMBERSHIP_INACTIVE' | 'OWNER_REQUIRED' | 'VERSION' | 'PERMISSION_REVISION' | 'IDEMPOTENCY';
+  reason?: 'CAPABILITY_MISSING' | 'SCOPE_DENIED' | 'MEMBERSHIP_INACTIVE' | 'OWNER_REQUIRED' | 'VERSION' | 'PERMISSION_REVISION' | 'IDEMPOTENCY' | 'CSRF';
 }
 
 export interface User {

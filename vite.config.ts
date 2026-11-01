@@ -16,8 +16,10 @@ export default defineConfig(() => {
     sourcemap: false,
   },
   test: {
-    environment: 'jsdom',
-    include: ['src/**/*.test.ts'],
+    projects: [
+      { extends: true as const, test: { name: 'client', environment: 'jsdom', include: ['src/**/*.test.ts'] } },
+      { extends: true as const, test: { name: 'server', environment: 'node', include: ['server/**/*.test.ts'], testTimeout: 15_000 } },
+    ],
   },
   };
 });

@@ -82,7 +82,9 @@ for (const method of declared) {
 }
 for (const method of Object.keys(operationFor)) if (!declared.includes(method)) failures.push(`mapping refers to a gateway method that no longer exists: ${method}`);
 const mapped = new Set(Object.values(operationFor).filter(Boolean));
-for (const id of operationIds) if (!mapped.has(id)) failures.push(`OpenAPI operation is not used by any gateway method: ${id}`);
+// 運用の確認や CSRF の取得など、画面の Gateway を通らない操作は契約に x-gateway: none と書く。
+const exempt = new Set([...contract.matchAll(/operationId:\s*([A-Za-z0-9]+)\n\s+x-gateway: none/g)].map((match) => match[1]));
+for (const id of operationIds) if (!mapped.has(id) && !exempt.has(id)) failures.push(`OpenAPI operation is not used by any gateway method: ${id}`);
 
 if (failures.length) {
   console.error(failures.join('\n'));

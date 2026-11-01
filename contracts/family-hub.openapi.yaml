@@ -26,6 +26,54 @@ x-mutation-policy:
   permissionRevisionHeader: If-Permission-Revision
   csrfHeader: X-CSRF-Token
 paths:
+  /health:
+    get:
+      security: []
+      operationId: getHealth
+      x-gateway: none
+      responses:
+        '200': { description: The process is running }
+  /ready:
+    get:
+      security: []
+      operationId: getReadiness
+      x-gateway: none
+      responses:
+        '200': { description: Ready to serve }
+        '503': { description: A dependency is unavailable }
+  /v1/version:
+    get:
+      security: []
+      operationId: getVersion
+      x-gateway: none
+      responses:
+        '200':
+          description: Build identifier, used for the new-version notice
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [build]
+                properties:
+                  build: { type: string }
+  /v1/auth/csrf:
+    get:
+      security: []
+      operationId: getCsrfToken
+      x-gateway: none
+      description: >-
+        Returns an HMAC token bound to the session, or to an anonymous
+        pre-session cookie before sign-in so login CSRF is covered as well.
+      responses:
+        '200':
+          description: CSRF token
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token]
+                properties:
+                  token: { type: string }
   /v1/auth/passkey/challenge:
     post:
       security: []
@@ -75,9 +123,17 @@ paths:
               required: [email, password]
               properties:
                 email: { type: string, format: email }
-                password: { type: string, minLength: 15, maxLength: 64 }
+                password: { type: string, maxLength: 200 }
       responses:
-        '204': { description: Session cookie set by server }
+        '200':
+          description: Signed in; session cookie set by server
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [userId]
+                properties:
+                  userId: { type: string }
         default: { $ref: '#/components/responses/Error' }
   /v1/auth/session:
     delete:
@@ -930,7 +986,7 @@ components:
         message: { type: string }
         retryable: { type: boolean }
         reason:
-          enum: [CAPABILITY_MISSING, SCOPE_DENIED, MEMBERSHIP_INACTIVE, OWNER_REQUIRED, VERSION, PERMISSION_REVISION, IDEMPOTENCY]
+          enum: [CAPABILITY_MISSING, SCOPE_DENIED, MEMBERSHIP_INACTIVE, OWNER_REQUIRED, VERSION, PERMISSION_REVISION, IDEMPOTENCY, CSRF]
         fieldErrors:
           type: object
           additionalProperties: { type: string }

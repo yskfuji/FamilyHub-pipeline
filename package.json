@@ -5,18 +5,22 @@
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=24.7.0"
   },
   "scripts": {
     "dev": "vite",
     "dev:audit": "VITE_INCLUDE_AUDIT_SURFACE=true vite",
+    "dev:server": "tsx watch server/dev.ts",
+    "dev:stack": "VITE_GATEWAY=http vite --port 4174 --host localhost",
     "build": "tsc -b && vite build",
+    "build:server": "vite build --ssr server/main.ts --outDir dist-server",
     "build:audit": "VITE_INCLUDE_AUDIT_SURFACE=true tsc -b && VITE_INCLUDE_AUDIT_SURFACE=true vite build --outDir dist-audit --sourcemap",
     "preview": "vite preview --host 127.0.0.1",
     "preview:audit": "vite preview --host 127.0.0.1 --outDir dist-audit",
     "typecheck": "tsc -b --pretty false",
     "lint": "eslint . --max-warnings 0",
     "test:unit": "vitest run",
+    "audit:routes": "vitest run --project server server/test/contract.test.ts",
     "test:e2e": "npm run build:audit && PLAYWRIGHT_AUDIT=true playwright test e2e/core.spec.ts e2e/interactions.spec.ts e2e/authorization.spec.ts e2e/places.spec.ts e2e/budget.spec.ts e2e/recurrence.spec.ts e2e/navigation.spec.ts",
     "audit:a11y": "npm run build:audit && PLAYWRIGHT_AUDIT=true playwright test e2e/accessibility.spec.ts --workers=1",
     "audit:visual": "npm run build:audit && PLAYWRIGHT_AUDIT=true playwright test e2e/capture.spec.ts --project=chromium && node scripts/build-gallery.mjs",
@@ -29,33 +33,40 @@
     "render:er": "node scripts/render-er.mjs",
     "probe:openpoi": "node scripts/probe-openpoi.mjs",
     "build:gallery": "node scripts/build-gallery.mjs",
-    "verify": "npm run lint && npm run typecheck && npm run test:unit && npm run build && npm run audit:security && npm run audit:ui && npm run audit:controls && npm run audit:contract && npm run audit:use-cases && npm run audit:lighthouse && npm run test:e2e && npm run audit:a11y",
+    "verify": "npm run lint && npm run typecheck && npm run test:unit && npm run build && npm run audit:security && npm run audit:ui && npm run audit:controls && npm run audit:contract && npm run audit:routes && npm run audit:use-cases && npm run audit:lighthouse && npm run test:e2e && npm run audit:a11y",
     "package": "npm run verify && npm run render:er && npm run audit:visual && bash scripts/package.sh"
   },
   "dependencies": {
+    "@fastify/cookie": "11.1.5",
     "@fontsource-variable/noto-sans-jp": "5.2.8",
     "@fontsource-variable/noto-serif-jp": "5.2.8",
+    "@simplewebauthn/server": "14.0.3",
+    "fastify": "5.12.7",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "zod": "4.1.11"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.11.3",
-    "@mermaid-js/mermaid-cli": "11.16.0",
-    "puppeteer": "24.34.0",
     "@eslint/js": "9.39.4",
+    "@mermaid-js/mermaid-cli": "11.16.0",
     "@playwright/test": "1.59.1",
     "@types/node": "24.10.1",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
     "@vitejs/plugin-react": "6.0.1",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
     "eslint": "9.39.4",
     "eslint-plugin-react-hooks": "7.0.1",
     "globals": "17.4.0",
     "jsdom": "27.2.0",
+    "puppeteer": "24.34.0",
+    "tsx": "4.23.15",
     "typescript": "6.0.2",
     "typescript-eslint": "8.71.0",
     "vite": "8.3.1",
-    "vitest": "4.1.11"
+    "vitest": "4.1.11",
+    "yaml": "2.9.1"
   }
 }

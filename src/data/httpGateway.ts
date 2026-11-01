@@ -4,6 +4,7 @@ import type { GatewayError, Result } from '../domain/types';
 type RequestOptions = RequestInit & { csrf?: boolean; idempotencyKey?: string };
 
 const networkError: GatewayError = { code: 'OFFLINE', message: 'ネットワークに接続できません。', retryable: true };
+const responseFailure: GatewayError = { code: 'UPSTREAM_FAILURE', message: '応答を受け取れませんでした。少し待ってからお試しください。', retryable: true };
 const mutationHeaders = (context?: { idempotencyKey: string; expectedPermissionRevision: number }) => ({
   idempotencyKey: context?.idempotencyKey,
   headers: context ? { 'If-Permission-Revision': String(context.expectedPermissionRevision) } : undefined,
@@ -63,31 +64,60 @@ function serializeRegistration(credential: PublicKeyCredential) {
   };
 }
 
-export function createHttpGateway(baseUrl: string, getCsrfToken: () => string, getPermissionRevision: () => number | undefined): FamilyHubGateway {
-  if (!baseUrl || !baseUrl.startsWith('https://')) throw new Error('本番HTTPアダプタにはHTTPSのbaseUrlが必要です');
+const allowedBase = (value: string) => {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' || (url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname));
+  } catch {
+    return false;
+  }
+};
+
+type FetchLike = typeof fetch;
+
+/** token を取り直すときは true を受け取る。 */
+export type CsrfProvider = (refresh?: boolean) => string | Promise<string>;
+
+export function createHttpGateway(baseUrl: string, getCsrfToken: CsrfProvider, getPermissionRevision: () => number | undefined, fetchImplementation?: FetchLike): FamilyHubGateway {
+  if (!allowedBase(baseUrl)) throw new Error('本番HTTPアダプタにはHTTPSのbaseUrlが必要です');
   if (typeof getCsrfToken !== 'function') throw new Error('本番HTTPアダプタには実行時CSRF token providerが必要です');
   if (typeof getPermissionRevision !== 'function') throw new Error('本番HTTPアダプタには実行時の権限リビジョンproviderが必要です');
 
-  async function request<T>(path: string, options: RequestOptions = {}): Promise<Result<T>> {
+  async function send<T>(path: string, options: RequestOptions, idempotencyKey: string | undefined, refreshCsrf: boolean): Promise<Result<T>> {
+    const isMutation = Boolean(options.method && !['GET', 'HEAD'].includes(options.method));
+    const permissionRevision = isMutation ? getPermissionRevision() : undefined;
+    const csrfToken = options.csrf ? await getCsrfToken(refreshCsrf) : undefined;
+    const response = await (fetchImplementation ?? fetch)(new URL(path, baseUrl), {
+      ...options,
+      credentials: 'include',
+      headers: {
+        Accept: 'application/json',
+        ...(typeof options.body === 'string' ? { 'Content-Type': 'application/json' } : {}),
+        ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+        ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
+        ...(isMutation && permissionRevision !== undefined ? { 'If-Permission-Revision': String(permissionRevision) } : {}),
+        ...options.headers,
+      },
+    });
+    if (response.status === 204 || response.headers.get('content-length') === '0') return response.ok ? { ok: true, value: undefined as T } : { ok: false, error: responseFailure };
+    let payload: T | GatewayError;
     try {
-      const isMutation = Boolean(options.method && !['GET', 'HEAD'].includes(options.method));
-      const permissionRevision = isMutation ? getPermissionRevision() : undefined;
-      const response = await fetch(new URL(path, baseUrl), {
-        ...options,
-        credentials: 'include',
-        headers: {
-          Accept: 'application/json',
-          ...(!(options.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
-          ...(options.csrf ? { 'X-CSRF-Token': getCsrfToken() } : {}),
-          ...(isMutation ? { 'Idempotency-Key': options.idempotencyKey ?? crypto.randomUUID() } : {}),
-          ...(isMutation && permissionRevision !== undefined ? { 'If-Permission-Revision': String(permissionRevision) } : {}),
-          ...options.headers,
-        },
-      });
-      const empty = response.status === 204 || response.headers.get('content-length') === '0';
-      const payload = empty ? undefined : await response.json() as T | GatewayError;
-      if (!response.ok) return { ok: false, error: payload as GatewayError };
-      return { ok: true, value: payload as T };
+      payload = await response.json() as T | GatewayError;
+    } catch {
+      // 中継の機器が返す本文のない失敗などは、オフラインの待ち行列へ回さない。
+      return { ok: false, error: responseFailure };
+    }
+    return response.ok ? { ok: true, value: payload as T } : { ok: false, error: payload as GatewayError };
+  }
+
+  async function request<T>(path: string, options: RequestOptions = {}): Promise<Result<T>> {
+    const isMutation = Boolean(options.method && !['GET', 'HEAD'].includes(options.method));
+    const idempotencyKey = isMutation ? options.idempotencyKey ?? crypto.randomUUID() : undefined;
+    try {
+      const result = await send<T>(path, options, idempotencyKey, false);
+      if (result.ok || result.error.reason !== 'CSRF') return result;
+      // token が古いときは取り直し、同じ冪等キーで一度だけ送り直す。
+      return await send<T>(path, options, idempotencyKey, true);
     } catch {
       return { ok: false, error: networkError };
     }

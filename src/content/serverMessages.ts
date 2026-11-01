@@ -1,0 +1,20 @@
+/** API が利用者へ返す文言。文言の検査の対象にするため、ここに集める。 */
+export const serverMessages = {
+  signInRequired: 'サインインしてください。',
+  signInFailed: 'メールアドレスまたはパスワードが正しくありません。',
+  reauthRequired: '本人確認が必要です。パスワードを入力してください。',
+  csrfFailed: '画面を読み込み直して、もう一度お試しください。',
+  originRejected: 'この画面からは操作できません。',
+  invalidInput: '入力を確認してください。',
+  notFound: 'ページが見つかりません。',
+  rateLimited: '操作が続いたため、少し待ってからお試しください。',
+  unavailable: 'ただいま処理できません。少し待ってからお試しください。',
+  idempotencyReused: '同じ操作を別の内容で送ろうとしました。画面を確認してください。',
+  noHousehold: '家族グループに参加していません。',
+  permissionChanged: '権限が変更されています。現在の権限で内容を確認してください。',
+  passkeyFailed: 'パスキーで本人確認できませんでした。もう一度お試しください。',
+  passkeyRegistrationFailed: 'パスキー登録を完了できませんでした。',
+  currentPasswordWrong: '現在のパスワードを確認してください。',
+  sessionNotRevocable: 'この端末はここからサインアウトできません。',
+  attachmentUnavailable: 'ファイルを受け付けられませんでした。少し待ってからお試しください。',
+} as const;
