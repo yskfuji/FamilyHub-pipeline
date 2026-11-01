@@ -60,7 +60,7 @@ test.describe('album list', () => {
     await expect(page.getByRole('navigation', { name: '主な機能' }).getByRole('link', { name: 'アルバム' })).toBeVisible();
     await page.setViewportSize({ width: 390, height: 844 });
     const mobile = page.getByRole('navigation', { name: 'モバイルの主な機能' });
-    await expect(mobile.getByRole('link')).toHaveText(['今日', '予定', 'タスク', 'メモ']);
+    await expect(mobile.getByRole('link')).toHaveText(['今日', '予定', /^タスク/, 'メモ']);
     await mobile.getByRole('button', { name: 'その他', exact: true }).click();
     await page.getByRole('navigation', { name: 'その他の機能' }).getByRole('link', { name: 'アルバム' }).click();
     await expect(page).toHaveURL(/\/albums$/);

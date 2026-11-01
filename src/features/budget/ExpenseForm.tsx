@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useApp } from '../../app/AppContext';
 import { ja } from '../../content/ja';
 import { AlertIcon } from '../../design-system/icons';
+import { useUnsavedGuard } from '../../design-system/unsavedGuard';
 import { activeAdults, defaultCategory, expenseDraftProblem, expenseTitleLabel, payerChoices, peopleOutsideExpense, type ExpenseDraft } from '../../domain/expenseForm';
 import { expenseCategories, incomeCategories } from '../../domain/ledger';
 import type { Expense } from '../../domain/types';
@@ -32,6 +33,7 @@ export function ExpenseForm({ formId, initial, original, splitLocked, submitLabe
   const [draft, setDraft] = useState(initial);
   const [problem, setProblem] = useState('');
   const patch = (changes: Partial<ExpenseDraft>) => setDraft((current) => ({ ...current, ...changes }));
+  const unsaved = useUnsavedGuard(draft, busy);
   const income = draft.kind === 'income';
   const adultIds = activeAdults(snapshot.memberships).map((member) => member.id);
   const payers = payerChoices(snapshot.memberships, initial.payerId);
@@ -45,7 +47,7 @@ export function ExpenseForm({ formId, initial, original, splitLocked, submitLabe
     if (!found) onSubmit(draft);
   };
   const shown = problem || error;
-  return <form className="stack budget-form" aria-busy={busy} noValidate onSubmit={submit}>
+  return <form {...unsaved.formProps} className="stack budget-form" aria-busy={busy} noValidate onSubmit={submit}>
     {original
       ? <p className="small muted mb-0">種類：{ja.expenseKind[original.kind]}（記録したあとは変えられません）</p>
       : <fieldset className="fieldset"><legend>種類</legend><div className="choice-grid">{kinds.map((kind) => <label key={kind}><input data-control-id={`budget.form.kind.${formId}.${kind}`} type="radio" name={`kind-${formId}`} value={kind} checked={draft.kind === kind} onChange={() => patch({ kind, category: defaultCategory(kind) })}/>{ja.expenseKind[kind]}</label>)}</div></fieldset>}
@@ -69,7 +71,7 @@ export function ExpenseForm({ formId, initial, original, splitLocked, submitLabe
     {!income && can('place.read') && <PlaceField value={draft.place} onChange={(place) => patch({ place })} disabled={busy}/>}
     {shown && <p className="field-error" role="alert">{shown}</p>}
     <div className="dialog-actions">
-      <button data-control-id={`budget.form.cancel.${formId}`} className="button" type="button" disabled={busy} onClick={onCancel}>{ja.actions.cancel}</button>
+      <button data-control-id={`budget.form.cancel.${formId}`} className="button" type="button" disabled={busy} onClick={() => unsaved.leave(onCancel)}>{ja.actions.cancel}</button>
       <button data-control-id={`budget.form.submit.${formId}`} className="button primary" type="submit" disabled={busy}>{busy ? ja.actions.saving : submitLabel}</button>
     </div>
   </form>;

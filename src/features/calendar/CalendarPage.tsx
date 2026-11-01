@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useApp } from '../../app/AppContext';
+import { useMemberScope } from '../../app/useMemberScope';
 import { detailId, navigate } from '../../app/router';
 import { DetailNotFound, PageHeader } from '../../design-system/components';
 import { CalendarIcon, CloseIcon } from '../../design-system/icons';
@@ -7,6 +8,7 @@ import { addDateKeyDays, dateKeyFromRfc3339, isCalendarView, monthKeyFromRfc3339
 import { occurrenceStartingOn, type Occurrence } from '../../domain/calendarLayout';
 import { occurrenceDates } from '../../domain/recurrence';
 import type { CalendarEvent } from '../../domain/types';
+import { MemberScopeSelect } from '../shared/MemberScopeSelect';
 import { AgendaView } from './AgendaView';
 import { CalendarToolbar } from './CalendarToolbar';
 import { DayEntries } from './DayPanel';
@@ -36,6 +38,7 @@ export function CalendarPage({ path }: { path: string }) {
   const todayKey = dateKeyFromRfc3339(snapshot.context.asOf);
   const currentMonthKey = monthKeyFromRfc3339(snapshot.context.asOf);
   const narrow = useIsNarrow();
+  const { expenses: scopedExpenses } = useMemberScope();
   const [location, setLocation] = useState<CalendarLocation>(() => readCalendarLocation(window.location.href, todayKey, rememberedView()));
   const [sheetOpen, setSheetOpen] = useState(false);
   const [deleted, setDeleted] = useState<DeletedEvent | null>(null);
@@ -83,7 +86,7 @@ export function CalendarPage({ path }: { path: string }) {
   const activeId = detailId(path, '/calendar');
   const activeEvent = snapshot.events.find((event) => event.id === activeId);
   const active = useMemo(() => (activeEvent ? occurrenceToOpen(activeEvent, new URLSearchParams(window.location.search).get('on'), todayKey) : undefined), [activeEvent, todayKey]);
-  const expenseDays = useMemo(() => new Set(can('expense.read') ? snapshot.expenses.map((expense) => expense.incurredOn) : []), [snapshot.expenses, can]);
+  const expenseDays = useMemo(() => new Set(can('expense.read') ? scopedExpenses.map((expense) => expense.incurredOn) : []), [scopedExpenses, can]);
 
   const restoreDeleted = async () => {
     if (!deleted) return;
@@ -101,7 +104,7 @@ export function CalendarPage({ path }: { path: string }) {
   const addButton = canCreate ? <button data-control-id="calendar.event.create" className="button primary" type="button" onClick={() => createAt(selected ?? todayKey)}>予定を追加</button> : undefined;
 
   return <div className="page">
-    <PageHeader eyebrow="予定" title="家族の予定" description="月・週・日・一覧で、家族の予定と参加者を確認できます。" action={addButton}/>
+    <PageHeader eyebrow="予定" title="家族の予定" description="月・週・日・一覧で、家族の予定と参加者を確認できます。" action={<div className="page-head-actions"><MemberScopeSelect/>{addButton}</div>}/>
     {activeId && !activeEvent && <DetailNotFound what="予定" feature="calendar" backHref="/calendar"/>}
     {deleted && <div className="callout info" role="status"><CalendarIcon/><div><strong>「{deleted.event.title}」を削除しました</strong><p className="small muted mb-0">7日以内は元に戻せます。</p></div><button data-control-id={`calendar.event.restore.${deleted.event.id}`} className="button" type="button" onClick={() => void restoreDeleted()}>元に戻す</button></div>}
     <div className="calendar-layout" data-view={view}>

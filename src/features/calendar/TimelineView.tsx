@@ -1,5 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useApp } from '../../app/AppContext';
+import { useMemberScope } from '../../app/useMemberScope';
 import { formatTime } from '../../design-system/components';
 import { MINUTES_IN_DAY, clockOf, initialTimelineMinutes, isSpanning, layoutLanes, layoutTimeline, occurrencesBetween, slotMinutes, type Occurrence, type TimelineBlock } from '../../domain/calendarLayout';
 import { dayLabel, dayTone, holidayMap, labelStyle } from './calendarLabels';
@@ -52,9 +53,10 @@ function AllDayRow({ dates, occurrences, narrow, onOpen }: Pick<Props, 'dates' |
 /** 週と日の時間軸。何もない所を押すと、その30分の枠で予定の追加を開く。 */
 export function TimelineView({ dates, label, narrow, todayKey, selected, canCreate, onOpen, onSelect, onCreate }: Props) {
   const { snapshot } = useApp();
+  const { events } = useMemberScope();
   const from = dates[0];
   const to = dates[dates.length - 1];
-  const occurrences = useMemo(() => occurrencesBetween(snapshot.events, from, to), [snapshot.events, from, to]);
+  const occurrences = useMemo(() => occurrencesBetween(events, from, to), [events, from, to]);
   const holidays = useMemo(() => holidayMap(from, to), [from, to]);
   const nowMinutes = useNowMinutes(snapshot.context.asOf);
   const week = dates.length > 1;

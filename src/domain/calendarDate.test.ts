@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   calendarMonthFromUrl,
+  isCalendarDayKey,
+  movedDateKey,
   dateKeyFromRfc3339,
   monthGrid,
   monthKeyFromRfc3339,
@@ -75,5 +77,29 @@ describe('calendar location', () => {
 
   it('always names the occurrence on a detail URL, even today', () => {
     expect(writeCalendarLocation('/calendar', { view: 'month', monthKey: '2026-09', selected: today }, today, '/calendar/event-clean', today)).toBe('/calendar/event-clean?on=2026-09-30');
+  });
+});
+
+describe('movedDateKey', () => {
+  it('左右は1日、上下は1週', () => {
+    expect(movedDateKey('2026-10-01', 'ArrowLeft')).toBe('2026-09-30');
+    expect(movedDateKey('2026-10-31', 'ArrowRight')).toBe('2026-11-01');
+    expect(movedDateKey('2026-10-14', 'ArrowUp')).toBe('2026-10-07');
+    expect(movedDateKey('2026-10-14', 'ArrowDown')).toBe('2026-10-21');
+  });
+  it('Home と End は週の端（日曜と土曜）', () => {
+    expect(movedDateKey('2026-10-14', 'Home')).toBe('2026-10-11');
+    expect(movedDateKey('2026-10-14', 'End')).toBe('2026-10-17');
+    expect(movedDateKey('2026-10-11', 'Home')).toBe('2026-10-11');
+  });
+  it('PageUp と PageDown は前後の月で、ない日は月末にする', () => {
+    expect(movedDateKey('2026-01-31', 'PageDown')).toBe('2026-02-28');
+    expect(movedDateKey('2026-03-31', 'PageUp')).toBe('2026-02-28');
+    expect(movedDateKey('2026-12-15', 'PageDown')).toBe('2027-01-15');
+    expect(movedDateKey('2024-01-31', 'PageDown')).toBe('2024-02-29');
+  });
+  it('対象のキーだけを受け付ける', () => {
+    expect(isCalendarDayKey('PageDown')).toBe(true);
+    expect(isCalendarDayKey('Enter')).toBe(false);
   });
 });

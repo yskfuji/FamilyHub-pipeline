@@ -346,6 +346,20 @@ export function runGatewaySuite(world: (actorMembershipId?: string) => FamilyHub
   });
 
   describe('gateway family, links and recently deleted', () => {
+    it('reports a build identifier without signing in the caller again', async () => {
+      const result = await world().auth.getVersion();
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.value.build).toEqual(expect.any(String));
+    });
+
+    it('keeps the household rename history visible and stops at three a day', async () => {
+      const gateway = world();
+      for (const name of ['一回目の名前', '二回目の名前', '三回目の名前']) expect((await gateway.household.updateProfile({ name })).ok).toBe(true);
+      const snapshot = await gateway.household.getSnapshot();
+      expect(snapshot.ok && snapshot.value.household.nameChanges).toHaveLength(3);
+      expect(await gateway.household.updateProfile({ name: '四回目の名前' })).toMatchObject({ ok: false, error: { code: 'RATE_LIMITED' } });
+    });
+
     it('hands ownership to an adult and refuses a child', async () => {
       const gateway = world();
       expect(await gateway.family.transferOwnership('member-hana', 1)).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });

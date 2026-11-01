@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { devicePreferences } from '../../app/devicePreferences';
 import { ja } from '../../content/ja';
 import { Dialog, StatusBadge } from '../../design-system/components';
 import { AlertIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, ImageIcon, UploadIcon, VideoIcon } from '../../design-system/icons';
@@ -37,7 +38,7 @@ function EntryRow({ entry, position, stagedCount, uploads }: { entry: UploadEntr
 
 export function AlbumUpload({ albumId, uploads, onClose }: { albumId: Id; uploads: AlbumUploads; onClose: () => void }) {
   const { queue } = uploads;
-  const [keepLocation, setKeepLocation] = useState(false);
+  const [keepLocation, setKeepLocation] = useState(() => devicePreferences().keepPhotoLocation);
   const picker = useRef<HTMLInputElement>(null);
   const entries = uploads.entries.filter((entry) => entry.albumId === albumId);
   const summary = summarizeUploads(entries);

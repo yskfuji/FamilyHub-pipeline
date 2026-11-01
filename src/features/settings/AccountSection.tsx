@@ -4,6 +4,7 @@ import { useApp } from '../../app/AppContext';
 import { Dialog } from '../../design-system/components';
 import { IDLE_TIMEOUT_CHOICES } from '../../domain/account';
 import type { AccountProfile } from '../../domain/types';
+import { LeaveHousehold } from './MemberActions';
 
 export const avatarPresets = [['leaf', '葉'], ['sun', '陽'], ['wave', '波'], ['mountain', '山'], ['star', '星'], ['flower', '花']] as const;
 
@@ -79,6 +80,7 @@ export function AccountSection() {
         {runtimeMode === 'mock' && <p className="small muted">このデモでは実際のコードは発行されません。</p>}
       </div>
     </section>
+    <LeaveHousehold/>
     <section className="card stack"><h2>アカウントの削除</h2><p className="muted">削除すると、この端末からサインアウトし、元に戻せません。{can('household.members.manage') ? '管理者は、先に別の大人へ役割を渡してください。' : ''}</p><button data-control-id="settings.account.delete" className="button danger" type="button" onClick={() => setDeleting(true)}>アカウントを削除</button></section>
     {deleting && <Dialog title="アカウントを削除しますか" description="名前は「退会したメンバー」に置き換わります。この操作は取り消せません。" onClose={() => setDeleting(false)} actions={<><button data-control-id="settings.account.delete-cancel" className="button" type="button" onClick={() => setDeleting(false)}>やめる</button><button data-control-id="settings.account.delete-confirm" className="button danger" type="button" onClick={() => void deleteAccount()}>削除する</button></>}/>}
     {enrollment && <Dialog title="確認コードの設定" description="認証アプリに次の設定用の文字列を登録し、表示された6桁のコードを入力してください。" onClose={() => setEnrollment(null)}><form className="stack" onSubmit={(event) => void confirmTotp(event)}><code className="wrap-anywhere">{enrollment}</code><div className="field"><label htmlFor="totp-code">6桁のコード</label><input data-control-id="settings.account.totp-code" className="input" id="totp-code" name="code" inputMode="numeric" autoComplete="one-time-code" required/></div><button data-control-id="settings.account.totp-confirm" className="button primary" type="submit">設定する</button></form></Dialog>}

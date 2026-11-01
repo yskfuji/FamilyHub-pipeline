@@ -1,16 +1,44 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { askToLeave, guardLeaving, hasUnsavedForms } from '../design-system/unsavedGuard';
+
+const hereUrl = () => `${window.location.pathname}${window.location.search}${window.location.hash}`;
+/** アプリの中の移動で送る合図。ブラウザの戻る・進むと区別する。 */
+let internalMove = false;
+/** 確認のあとに自分で履歴を動かすとき。 */
+let confirmedMove = false;
+/** 今表示している URL。戻るを止めるときに元へ戻す先。 */
+let shownUrl = '';
 
 /** keepScroll は、同じ画面の中の移動で読んでいた位置を保つとき。 */
 export function navigate(to: string, replace = false, keepScroll = false) {
   if (replace) window.history.replaceState({}, '', to);
   else window.history.pushState({}, '', to);
+  shownUrl = hereUrl();
+  internalMove = true;
   window.dispatchEvent(new PopStateEvent('popstate'));
+  internalMove = false;
   if (!keepScroll) window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+/** 利用者の操作で別の画面へ移る。保存していない入力があれば先に確かめる。 */
+export const navigateGuarded = (to: string, keepScroll = false) => guardLeaving(() => navigate(to, false, keepScroll));
+
+/**
+ * ブラウザの戻る・進むは起きたあとにしか分からない。保存していない入力があれば、
+ * 元の URL を積み直して画面を残し、確認のあとで同じ移動をやり直す。
+ */
+function holdHistoryMove(event: PopStateEvent) {
+  if (internalMove) return;
+  if (confirmedMove || !hasUnsavedForms()) { confirmedMove = false; shownUrl = hereUrl(); return; }
+  event.stopImmediatePropagation();
+  window.history.pushState({}, '', shownUrl);
+  askToLeave(() => { confirmedMove = true; window.history.go(-1); });
 }
 
 export function usePath() {
   const [path, setPath] = useState(window.location.pathname);
   useEffect(() => {
+    shownUrl = hereUrl();
     const update = () => setPath(window.location.pathname);
     const click = (event: MouseEvent) => {
       const target = event.target as Element | null;
@@ -19,11 +47,12 @@ export function usePath() {
       const url = new URL(anchor.href);
       if (url.origin !== window.location.origin) return;
       event.preventDefault();
-      navigate(`${url.pathname}${url.search}${url.hash}`);
+      navigateGuarded(`${url.pathname}${url.search}${url.hash}`, anchor.hasAttribute('data-keep-scroll'));
     };
+    window.addEventListener('popstate', holdHistoryMove, true);
     window.addEventListener('popstate', update);
     document.addEventListener('click', click);
-    return () => { window.removeEventListener('popstate', update); document.removeEventListener('click', click); };
+    return () => { window.removeEventListener('popstate', holdHistoryMove, true); window.removeEventListener('popstate', update); document.removeEventListener('click', click); };
   }, []);
   return path;
 }

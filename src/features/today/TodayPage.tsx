@@ -1,10 +1,14 @@
 import { useApp, memberName } from '../../app/AppContext';
+import { useMemberScope } from '../../app/useMemberScope';
 import { EmptyState, PageHeader, StatusBadge, formatDue, formatTime, formatYen } from '../../design-system/components';
+import { SeasonMark } from '../../design-system/SeasonMark';
 import { AlertIcon, ArrowIcon, CheckIcon, RainIcon, SunIcon } from '../../design-system/icons';
 import { dateKeyFromRfc3339 } from '../../domain/calendarDate';
 import { unsettledSummary } from '../../domain/ledger';
 import { occurrenceDates, occurrenceStartsAt } from '../../domain/recurrence';
 import type { CalendarEvent } from '../../domain/types';
+import { MemberScopeSelect } from '../shared/MemberScopeSelect';
+import { SyncStatus } from '../shared/SyncStatus';
 
 const monthDay = (asOf: string) => new Intl.DateTimeFormat('ja-JP', { month: 'long', day: 'numeric', timeZone: 'Asia/Tokyo' }).format(new Date(asOf));
 const greeting = (asOf: string) => {
@@ -21,32 +25,31 @@ const weatherTitle = { rain: '雨と予定', storm: '荒天と予定', sunny: '�
 
 export function TodayPage() {
   const { snapshot, loading, can, requestQuickCreate } = useApp();
-  const { asOf, weather, sync } = snapshot.context;
+  const { asOf, weather } = snapshot.context;
+  const scoped = useMemberScope();
   const today = dateKeyFromRfc3339(asOf);
   const me = snapshot.viewer.membershipId;
-  const mine = snapshot.todos.filter((todo) => todo.assigneeMembershipId === me && todo.status !== 'done').sort((a, b) => (a.dueAt ?? '9').localeCompare(b.dueAt ?? '9'));
-  const unsettled = unsettledSummary(snapshot.expenses);
-  const reviewTodo = snapshot.todos.find((todo) => todo.status === 'review' && (todo.reviewerMembershipId === me || todo.assigneeMembershipId === me));
-  const events = todaysEvents(snapshot.events, today);
+  const mine = scoped.todos.filter((todo) => todo.assigneeMembershipId === me && todo.status !== 'done').sort((a, b) => (a.dueAt ?? '9').localeCompare(b.dueAt ?? '9'));
+  const unsettled = unsettledSummary(scoped.expenses);
+  const reviewTodo = scoped.todos.find((todo) => todo.status === 'review' && (todo.reviewerMembershipId === me || todo.assigneeMembershipId === me));
+  const events = todaysEvents(scoped.events, today);
   const affected = events.filter((event) => event.weatherSensitive);
   // 「先に確認すること」には、今日の予定に影響する天気だけを出す（影響がなければ下の天気欄で足りる）。
   const showWeather = weather.condition !== 'sunny' && Boolean(weather.alert) && affected.length > 0;
   const timeline = [
     ...events.map((event) => ({ key: `event-${event.id}`, at: event.startsAt, title: event.title, meta: event.location ?? memberName(snapshot, event.ownerMembershipId), href: `/calendar/${event.id}?on=${today}`, id: event.id, kind: '予定' as const })),
-    ...snapshot.todos.filter((todo) => todo.status !== 'done' && todo.dueAt && dateKeyFromRfc3339(todo.dueAt) === today).map((todo) => ({ key: `todo-${todo.id}`, at: todo.dueAt!, title: todo.title, meta: `担当：${memberName(snapshot, todo.assigneeMembershipId)}`, href: `/tasks/${todo.id}`, id: todo.id, kind: 'タスク' as const })),
+    ...scoped.todos.filter((todo) => todo.status !== 'done' && todo.dueAt && dateKeyFromRfc3339(todo.dueAt) === today).map((todo) => ({ key: `todo-${todo.id}`, at: todo.dueAt!, title: todo.title, meta: `担当：${memberName(snapshot, todo.assigneeMembershipId)}`, href: `/tasks/${todo.id}`, id: todo.id, kind: 'タスク' as const })),
   ].sort((a, b) => a.at.localeCompare(b.at));
   const title = `${greeting(asOf)}、${snapshot.user.displayName}さん`;
   // 見出しの番号は、この閲覧者に表示する欄だけで振る（権限で欄が隠れても番号が飛ばないように）。
   const sections = [reviewTodo || showWeather ? 'attention' : '', 'timeline', 'mine', can('expense.read') ? 'settle' : '', 'weather'].filter(Boolean);
   const no = (key: string) => String(sections.indexOf(key) + 1).padStart(2, '0');
-  const syncBadge = sync.state === 'synced' ? <span className="badge success"><span className="status-dot"/>最終更新 {formatTime(sync.lastSyncedAt)}</span>
-    : sync.state === 'syncing' ? <span className="badge attention">更新しています</span>
-      : <span className="badge attention">オフライン（最終更新 {formatTime(sync.lastSyncedAt)}）</span>;
+  const seasonMark = <SeasonMark date={today}/>;
 
   if (loading) return <div className="page" aria-busy="true" aria-label="今日の情報を読み込んでいます"><PageHeader eyebrow="今日" title={title} description="今日の予定とタスクを読み込んでいます。"/><div className="grid two"><div className="skeleton"/><div className="skeleton"/><div className="skeleton"/><div className="skeleton"/></div></div>;
-  if (snapshot.events.length + snapshot.todos.length + snapshot.expenses.length === 0) return <div className="page"><PageHeader eyebrow={`今日 · ${monthDay(asOf)}`} title={title} description="今日の予定やタスクを確認できます。"/><EmptyState title="今日の予定やタスクはありません" action={can('event.create') ? <button data-control-id="today.event.create" className="button primary" type="button" onClick={() => requestQuickCreate('event')}>予定を追加</button> : undefined}>共有された予定やタスクが追加されると、時刻順に表示されます。</EmptyState></div>;
+  if (snapshot.events.length + snapshot.todos.length + snapshot.expenses.length === 0) return <div className="page"><PageHeader eyebrow={`今日 · ${monthDay(asOf)}`} title={title} description="今日の予定やタスクを確認できます。" mark={seasonMark}/><EmptyState title="今日の予定やタスクはありません" action={can('event.create') ? <button data-control-id="today.event.create" className="button primary" type="button" onClick={() => requestQuickCreate('event')}>予定を追加</button> : undefined}>共有された予定やタスクが追加されると、時刻順に表示されます。</EmptyState></div>;
 
-  return <div className="page"><PageHeader eyebrow={`今日 · ${monthDay(asOf)}`} title={title} description="確認が必要な予定やタスクから順に表示しています。" action={syncBadge}/>
+  return <div className="page"><PageHeader eyebrow={`今日 · ${monthDay(asOf)}`} title={title} description="確認が必要な予定やタスクから順に表示しています。" mark={seasonMark} action={<div className="page-head-actions"><MemberScopeSelect/><SyncStatus/></div>}/>
     <div className="stack">
       {(reviewTodo || showWeather) && <section className="card accent" aria-labelledby="attention-title"><div className="section-head"><div><p className="eyebrow">{no('attention')} · 要確認</p><h2 id="attention-title">先に確認すること</h2></div><StatusBadge tone="attention">{Number(Boolean(reviewTodo)) + Number(showWeather)}件</StatusBadge></div><div className="grid two">
         {reviewTodo && <div className="callout"><AlertIcon/><div><strong>{reviewTodo.reviewerMembershipId === me ? '確認を頼まれたタスクがあります' : '確認待ちのタスクがあります'}</strong><p className="muted small">{reviewTodo.title} · 担当：{memberName(snapshot, reviewTodo.assigneeMembershipId)} · 確認する人：{memberName(snapshot, reviewTodo.reviewerMembershipId)}</p></div><a data-control-id={`today.review.open.${reviewTodo.id}`} className="button" href={`/tasks/${reviewTodo.id}`} data-link>タスクを確認 <ArrowIcon width="16"/></a></div>}

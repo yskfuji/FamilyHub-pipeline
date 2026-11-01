@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useApp } from '../../app/AppContext';
 import { allowedAudiencesFor } from '../../authz/policy';
 import { ja } from '../../content/ja';
+import { useUnsavedGuard } from '../../design-system/unsavedGuard';
 import { applyTemplate, draftProblem, pastEventTemplates, reminderChoices, reminderLabel, withStart, type EventDraft } from '../../domain/eventForm';
 import { ColorLabelFields } from '../shared/ColorLabelFields';
 import { RecurrenceFields } from '../shared/RecurrenceFields';
@@ -29,6 +30,7 @@ export function EventForm({ formId, initial, submitLabel, busy, error, offerTemp
   const [draft, setDraft] = useState(initial);
   const [problem, setProblem] = useState('');
   const patch = (changes: Partial<EventDraft>) => setDraft((current) => ({ ...current, ...changes }));
+  const unsaved = useUnsavedGuard(draft, busy);
   const allowed = allowedAudiencesFor(snapshot.viewer.role);
   const people = snapshot.memberships.filter((member) => member.status === 'active' || draft.participantIds.includes(member.id) || draft.selectedIds.includes(member.id));
   const templates = useMemo(() => (offerTemplates ? pastEventTemplates(snapshot.events, snapshot.context.asOf) : []), [offerTemplates, snapshot.events, snapshot.context.asOf]);
@@ -40,7 +42,7 @@ export function EventForm({ formId, initial, submitLabel, busy, error, offerTemp
     if (!found) onSubmit(draft);
   };
   const shown = problem || error;
-  return <form className="stack" aria-busy={busy} noValidate onSubmit={submit}>
+  return <form {...unsaved.formProps} className="stack" aria-busy={busy} noValidate onSubmit={submit}>
     {templates.length > 0 && <div className="event-templates" role="group" aria-label="過去の予定から入力">
       <span className="field-help">過去の予定から入力</span>
       <div className="event-template-list">{templates.map((template) => <button data-control-id={`calendar.event.template.${template.id}`} className="button" type="button" key={template.id} aria-label={`「${template.title}」の内容を入れる`} onClick={() => setDraft((current) => applyTemplate(current, template, { allowedAudiences: allowed, memberIds: people.map((member) => member.id) }))}>{template.title}</button>)}</div>
@@ -69,7 +71,7 @@ export function EventForm({ formId, initial, submitLabel, busy, error, offerTemp
     <label className="check-row"><input data-control-id={`calendar.event.weather-sensitive.${formId}`} type="checkbox" checked={draft.weatherSensitive} onChange={(event) => patch({ weatherSensitive: event.target.checked })}/>天気の影響を表示する</label>
     {shown && <p className="field-error" role="alert">{shown}</p>}
     <div className="dialog-actions">
-      <button data-control-id={`calendar.event.form-cancel.${formId}`} className="button" type="button" disabled={busy} onClick={onCancel}>{ja.actions.cancel}</button>
+      <button data-control-id={`calendar.event.form-cancel.${formId}`} className="button" type="button" disabled={busy} onClick={() => unsaved.leave(onCancel)}>{ja.actions.cancel}</button>
       <button data-control-id={`calendar.event.form-save.${formId}`} className="button primary" type="submit" disabled={busy}>{busy ? ja.actions.saving : submitLabel}</button>
     </div>
   </form>;

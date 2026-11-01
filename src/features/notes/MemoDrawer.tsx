@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { memberName, useApp } from '../../app/AppContext';
 import { canDeleteResource, canMutateOwnedResource } from '../../authz/policy';
 import { ja } from '../../content/ja';
-import { Dialog, Drawer } from '../../design-system/components';
+import { Dialog } from '../../design-system/components';
+import { DetailSurface } from '../../design-system/DetailSurface';
 import { LockIcon, MapPinIcon } from '../../design-system/icons';
 import { memoDraftToUpdateInput, memoToDraft, type MemoDraft } from '../../domain/memoForm';
 import { memoDateKey } from '../../domain/memoList';
@@ -53,7 +54,7 @@ export function MemoDrawer({ memo, queue, onClose, onDeleted }: Props) {
   };
 
   return <>
-    <Drawer eyebrow="メモの内容" title={memo.title} onClose={onClose}><div className="stack">
+    <DetailSurface eyebrow="メモの内容" title={memo.title} onClose={onClose}><div className="stack">
       <p className="meta mb-0">{dayLabel(memoDateKey(memo))}</p>
       <p>{memo.body}</p>
       <div><h3>タグ</h3><div className="people">{memo.tags.map((tag) => <span className="person-chip" key={tag}>#{tag}</span>)}</div></div>
@@ -70,7 +71,7 @@ export function MemoDrawer({ memo, queue, onClose, onDeleted }: Props) {
         {canEdit && <button data-control-id={`notes.edit.open.${memo.id}`} className="button" type="button" onClick={() => setEditing(true)}>内容を編集</button>}
         {canDelete && <button data-control-id={`notes.delete.open.${memo.id}`} className="button danger" type="button" onClick={() => setDeleting(true)}>メモを削除</button>}
       </div>}
-    </div></Drawer>
+    </div></DetailSurface>
     {editing && <Dialog title="メモを編集" description="保存に失敗した場合も、入力中の内容は残ります。" onClose={() => { if (!submitting) setEditing(false); }}>
       <MemoForm formId={memo.id} initial={memoToDraft(memo)} submitLabel={ja.actions.saveChanges} busyLabel={ja.actions.saving} busy={submitting} error={formError} onSubmit={(draft) => void update(draft)} onCancel={() => setEditing(false)}/>
     </Dialog>}

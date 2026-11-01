@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useApp } from '../../app/AppContext';
+import { useMemberScope } from '../../app/useMemberScope';
 import { StatusBadge, formatYen } from '../../design-system/components';
 import { CheckIcon } from '../../design-system/icons';
 import { addDateKeyDays, dateKeyFromRfc3339 } from '../../domain/calendarDate';
@@ -33,16 +34,17 @@ interface Props {
 /** 選んだ日の予定、タスク、支出。 */
 export function DayEntries({ selected, onOpen, onCreate, headingId }: Props) {
   const { snapshot, can } = useApp();
+  const { events: scopedEvents, todos: scopedTodos, expenses: scopedExpenses } = useMemberScope();
   const today = dateKeyFromRfc3339(snapshot.context.asOf);
-  const events = useMemo(() => (selected ? occurrencesBetween(snapshot.events, selected, selected) : []), [snapshot.events, selected]);
+  const events = useMemo(() => (selected ? occurrencesBetween(scopedEvents, selected, selected) : []), [scopedEvents, selected]);
   const nextHoliday = useMemo(() => {
     const from = selected ?? today;
     return holidaysBetween(from, addDateKeyDays(from, HOLIDAY_SEARCH_DAYS))[0] ?? null;
   }, [selected, today]);
   if (!selected) return <><p className="eyebrow">選択した日</p><h2 id={headingId}>日付を選んでください</h2><p className="muted">カレンダーの日付を選ぶと、その日の予定を確認できます。</p></>;
   const holiday = nextHoliday?.date === selected ? nextHoliday.name : undefined;
-  const todos = can('task.read') ? todosOn(snapshot.todos, selected) : [];
-  const expenses = can('expense.read') ? expensesOn(snapshot.expenses, selected) : [];
+  const todos = can('task.read') ? todosOn(scopedTodos, selected) : [];
+  const expenses = can('expense.read') ? expensesOn(scopedExpenses, selected) : [];
   return <>
     <p className="eyebrow">選択した日</p>
     <h2 id={headingId}>{dayLabel(selected)}</h2>

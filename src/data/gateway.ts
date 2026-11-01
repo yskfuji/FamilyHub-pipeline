@@ -22,6 +22,8 @@ export interface AuthPort {
   disableTotp(): Promise<Result<void>>;
   signOut(): Promise<Result<void>>;
   getSession(): Promise<Result<SessionInfo>>;
+  /** 配信中の版の印。開いている画面より新しい版があるかを確かめる。 */
+  getVersion(): Promise<Result<{ build: string }>>;
   getSecurityOverview(): Promise<Result<SecurityOverview>>;
   beginPasskeyRegistration(): Promise<Result<{ challengeId: Id; publicKey: PublicKeyCredentialCreationOptions | null }>>;
   finishPasskeyRegistration(challengeId: Id, credential: unknown): Promise<Result<Authenticator>>;

@@ -1,10 +1,11 @@
 import type { TrashPort } from '../../data/gateway';
 import { authorize, authorizeVisibleResource, canDeleteResource } from '../../authz/policy';
+import { RETENTION_DAYS } from '../restoreWindow';
 import type { TrashItem } from '../types';
 import { ok } from './context';
 import type { CommandContext, SyncPort } from './context';
 
-const RETENTION_MS = 30 * 86_400_000;
+const RETENTION_MS = RETENTION_DAYS * 86_400_000;
 
 export function createTrashCommands(c: CommandContext): SyncPort<TrashPort> {
   const { a, state, viewer, withinRestoreWindow } = c;

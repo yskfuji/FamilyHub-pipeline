@@ -15,7 +15,7 @@ export function TaskCard({ todo, search }: { todo: Todo; search: string }) {
   const label = snapshot.colorLabels.find((item) => item.id === todo.colorLabelId);
   return <div className="task-card">
     {inline && <button data-control-id={`tasks.complete.${todo.id}`} className="task-check" type="button" aria-label={inline.label} onClick={() => void inline.run()}><CheckIcon width="18"/></button>}
-    <a data-control-id={`tasks.open.${todo.id}`} className="task-card-link" href={`/tasks/${todo.id}${search}`} data-link>
+    <a data-control-id={`tasks.open.${todo.id}`} className="task-card-link" href={`/tasks/${todo.id}${search}`} data-link data-keep-scroll>
       <strong>{todo.title}</strong>
       <span className="meta task-due"><ClockIcon width="14"/> {dueText(todo, snapshot.context.asOf)}</span>
       <span className="people">

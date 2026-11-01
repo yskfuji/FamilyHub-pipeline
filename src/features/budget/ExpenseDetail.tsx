@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { memberName, useApp } from '../../app/AppContext';
 import { canDeleteResource } from '../../authz/policy';
-import { Dialog, Drawer, formatDateOnly, formatYen } from '../../design-system/components';
+import { Dialog, formatDateOnly, formatYen } from '../../design-system/components';
+import { DetailSurface } from '../../design-system/DetailSurface';
 import { MapPinIcon } from '../../design-system/icons';
 import { ja } from '../../content/ja';
 import { activeAdults, expenseDraftToUpdateInput, expenseToDraft, type ExpenseDraft } from '../../domain/expenseForm';
@@ -53,7 +54,7 @@ export function ExpenseDetail({ expense, onClose, actions }: { expense: Expense;
   // 削除できるのは作った人と支払った人だけ。それ以外の人にはボタンを出さない。
   const canDelete = canDeleteResource(snapshot.viewer, 'expense.delete', [expense.creatorMembershipId, expense.payerMembershipId]).allowed;
   return <>
-    <Drawer eyebrow={`${kindLabel}の内容`} title={expense.title} onClose={onClose}>
+    <DetailSurface eyebrow={`${kindLabel}の内容`} title={expense.title} onClose={onClose}>
       <div className="stack">
         <dl className="detail-list">
           <div><dt>金額</dt><dd className="amount">{formatYen(expense.amountJpy)}</dd></div>
@@ -77,7 +78,7 @@ export function ExpenseDetail({ expense, onClose, actions }: { expense: Expense;
         </div>}
         {canDelete && locked && <p className="small muted mb-0" id={`delete-help-${expense.id}`}>精算の記録があるため削除できません。削除するには、先に精算を取り消してください。</p>}
       </div>
-    </Drawer>
+    </DetailSurface>
     {editing && <ExpenseEditDialog expense={expense} locked={locked} onClose={() => setEditing(false)} onSave={(input) => actions.update(expense, input)}/>}
     {deleting && <Dialog title={`${kindLabel}を削除しますか`} description={`「${expense.title}」（${formatYen(expense.amountJpy)}）を削除します。`} onClose={() => setDeleting(false)} actions={<><button data-control-id={`budget.expense.delete-cancel.${expense.id}`} className="button" type="button" onClick={() => setDeleting(false)}>{ja.actions.cancel}</button><button data-control-id={`budget.expense.delete-confirm.${expense.id}`} className="button danger" type="button" disabled={actions.busy !== null} onClick={async () => { await actions.remove(expense); setDeleting(false); }}>{ja.actions.delete}</button></>}><p className="muted">{income ? '月の集計からも外れます。' : '未精算の集計からも外れます。'}削除後7日間は元に戻せます。</p></Dialog>}
   </>;

@@ -45,7 +45,6 @@ paths:
     get:
       security: []
       operationId: getVersion
-      x-gateway: none
       responses:
         '200':
           description: Build identifier, used for the new-version notice

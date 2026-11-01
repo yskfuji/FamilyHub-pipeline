@@ -44,6 +44,7 @@ test('recurring tasks show their rule and move to the next occurrence when compl
   await expect(drawer.getByText('毎週木曜')).toBeVisible();
   await expect(drawer.getByLabel('対象とするタスク').locator('option')).toHaveText(['このタスクだけ', 'すべてのタスク']);
   await drawer.getByRole('button', { name: '着手する' }).click();
+  await expect(drawer).toHaveCount(0);
   await page.getByRole('link', { name: /資源ごみをまとめる/ }).click();
   await page.getByRole('dialog', { name: '資源ごみをまとめる' }).getByRole('button', { name: '完了にする' }).click();
   await expect(page.locator('.toast-visible')).toContainText('次の回を作成しました');

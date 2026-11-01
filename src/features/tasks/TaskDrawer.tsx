@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { memberName, useApp } from '../../app/AppContext';
+import { detailId } from '../../app/router';
 import { canDeleteResource, canMutateOwnedResource } from '../../authz/policy';
 import { ja, recurrenceLabel, taskActionLabel, taskStatusLabels } from '../../content/ja';
-import { Dialog, Drawer, StatusBadge } from '../../design-system/components';
+import { Dialog, StatusBadge } from '../../design-system/components';
+import { DetailSurface } from '../../design-system/DetailSurface';
 import { CheckIcon, LockIcon, PeopleIcon } from '../../design-system/icons';
 import { dateKeyFromRfc3339 } from '../../domain/calendarDate';
 import { describeRule } from '../../domain/recurrence';
@@ -64,6 +66,8 @@ export function TaskDrawer({ todo, onClose, onDeleted }: Props) {
   const rule = todo.recurrence && todo.dueAt ? describeRule(dateKeyFromRfc3339(todo.dueAt), todo.recurrence) : undefined;
   const label = colorLabels.find((item) => item.id === todo.colorLabelId);
   const closeForm = () => { if (!submitting) { setEditing(false); setFormError(''); } };
+  // 横に並べて開いているときは、待っている間に別のタスクへ移れる。移った先を閉じない。
+  const closeIfShown = () => { if (detailId(window.location.pathname, '/tasks') === todo.id) onClose(); };
 
   const update = async (draft: TaskDraft) => {
     if (submitting) return;
@@ -85,7 +89,7 @@ export function TaskDrawer({ todo, onClose, onDeleted }: Props) {
 
   const scopeControl = todo.recurrence && <label className="field"><span>対象とするタスク</span><select data-control-id={`tasks.recurrence-scope.${todo.id}`} className="select" value={scope} onChange={(event) => setScope(event.target.value as RecurrenceScope)}>{taskScopes.map((value) => <option key={value} value={value}>{recurrenceLabel('task', value)}</option>)}</select></label>;
   return <>
-    <Drawer eyebrow="タスクの内容" title={todo.title} onClose={onClose}><div className="stack">
+    <DetailSurface eyebrow="タスクの内容" title={todo.title} onClose={onClose}><div className="stack">
       <div className="grid two">
         <div className="card flat"><span className="meta">状態</span><p className="task-state"><StatusBadge tone={todo.status === 'review' ? 'attention' : todo.status === 'done' ? 'success' : 'neutral'}>{taskStatusLabels[todo.status]}</StatusBadge>{todo.priority && todo.priority !== 'normal' && <StatusBadge tone={todo.priority === 'high' ? 'attention' : 'neutral'}>優先度：{ja.taskPriority[todo.priority]}</StatusBadge>}</p></div>
         <div className="card flat"><span className="meta">期限</span><p><strong className="task-due">{dueText(todo, snapshot.context.asOf)}</strong></p>{rule && <p className="small muted mb-0">{rule}</p>}</div>
@@ -99,10 +103,10 @@ export function TaskDrawer({ todo, onClose, onDeleted }: Props) {
       {todo.handoffNote && <div><h3>引き継ぎの一言</h3><p>{todo.handoffNote}</p></div>}
       {todo.completionNote && <div><h3>完了の一言</h3><p>{todo.completionNote}</p></div>}
       <p className="small muted mb-0 task-sharing"><LockIcon width="14" aria-hidden="true"/> 公開範囲：{audienceText('task', todo.visibility, (id) => memberName(snapshot, id))}{label && <span className="person-chip task-label"><span className="color-dot" style={labelStyle(colorLabels, label.id)} aria-hidden="true"/>{label.name}</span>}</p>
-      <TaskActions todo={todo} scopeControl={scopeControl} onDone={onClose}/>
+      <TaskActions todo={todo} scopeControl={scopeControl} onDone={closeIfShown}/>
       {canEdit && <button data-control-id={`tasks.edit.open.${todo.id}`} className="button full" type="button" onClick={() => setEditing(true)}>内容を編集</button>}
       {canDelete && <button data-control-id={`tasks.delete.open.${todo.id}`} className="button danger full" type="button" onClick={() => setDeleting(true)}>タスクを削除</button>}
-    </div></Drawer>
+    </div></DetailSurface>
     {editing && <Dialog title="タスクを編集" description={todo.recurrence ? `変更する範囲：${recurrenceLabel('task', scope)}` : undefined} onClose={closeForm}>
       <TaskForm formId={todo.id} initial={todoToDraft(todo)} creatorId={todo.visibility.creatorMembershipId} submitLabel={ja.actions.saveChanges} busy={submitting} error={formError} recurrenceNote={recurrenceEditable ? undefined : '繰り返しを変えるときは、対象を「すべてのタスク」にしてください。'} keptRuleLabel={rule} onSubmit={(draft) => void update(draft)} onCancel={closeForm}/>
     </Dialog>}

@@ -142,6 +142,7 @@ export function createHttpGateway(baseUrl: string, getCsrfToken: CsrfProvider, g
       signInWithPassword: (email, password) => request('/v1/auth/password', { method: 'POST', body: JSON.stringify({ email, password }), csrf: true }),
       signOut: () => request('/v1/auth/session', { method: 'DELETE', csrf: true }),
       getSession: () => request('/v1/auth/session'),
+      getVersion: () => request('/v1/version'),
       verifyTotp: (challengeId, code) => request('/v1/auth/totp/verify', { method: 'POST', body: JSON.stringify({ challengeId, code }), csrf: true }),
       signUp: (input) => request('/v1/auth/sign-up', { method: 'POST', body: JSON.stringify(input), csrf: true }),
       requestPasswordReset: (email) => request('/v1/auth/password-reset', { method: 'POST', body: JSON.stringify({ email }), csrf: true }),

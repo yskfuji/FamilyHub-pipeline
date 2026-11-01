@@ -1,7 +1,8 @@
 export type Id = string;
 export type IsoDate = `${number}-${number}-${number}`;
 export type Rfc3339 = string;
-export type Theme = 'light' | 'dusk';
+/** data-theme の値。light と dusk が既定の組で、残りは昼と夜の組（-night が夜）。 */
+export type Theme = 'light' | 'dusk' | 'warm' | 'warm-night' | 'modern' | 'modern-night' | 'matcha' | 'matcha-night' | 'sakura' | 'sakura-night';
 export type Scenario = 'normal' | 'empty' | 'loading' | 'offline' | 'conflict' | 'expired-invite' | 'expired-session' | 'quarantined' | 'weather';
 
 export type Result<T> =

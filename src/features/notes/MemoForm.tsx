@@ -2,6 +2,7 @@ import { useRef, useState, type FormEvent } from 'react';
 import { useApp } from '../../app/AppContext';
 import { ja } from '../../content/ja';
 import { FileIcon, UploadIcon } from '../../design-system/icons';
+import { useUnsavedGuard } from '../../design-system/unsavedGuard';
 import { attachmentAccept, attachmentLimitsText, attachmentProblem, formatFileSize } from '../../domain/memoAttachments';
 import { memoDraftProblem, type MemoDraft } from '../../domain/memoForm';
 import { PlaceField } from '../place/PlaceField';
@@ -28,6 +29,7 @@ export function MemoForm({ formId, initial, submitLabel, busyLabel, busy, error,
   const [problem, setProblem] = useState('');
   const picker = useRef<HTMLInputElement>(null);
   const patch = (changes: Partial<MemoDraft>) => setDraft((current) => ({ ...current, ...changes }));
+  const unsaved = useUnsavedGuard({ draft, files: files.map((file) => file.name) }, busy);
   const people = snapshot.memberships.filter((member) => member.status === 'active' || draft.selectedIds.includes(member.id));
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -36,7 +38,7 @@ export function MemoForm({ formId, initial, submitLabel, busyLabel, busy, error,
     if (!found) onSubmit(draft, files);
   };
   const shown = problem || error;
-  return <form className="stack" aria-busy={busy} noValidate onSubmit={submit}>
+  return <form {...unsaved.formProps} className="stack" aria-busy={busy} noValidate onSubmit={submit}>
     <label className="field"><span>タイトル</span><input data-control-id={`notes.form.title.${formId}`} className="input" name="title" autoFocus required maxLength={120} value={draft.title} onChange={(event) => patch({ title: event.target.value })}/></label>
     <label className="field"><span>本文</span><textarea data-control-id={`notes.form.body.${formId}`} className="textarea" name="body" required maxLength={5000} value={draft.body} onChange={(event) => patch({ body: event.target.value })}/></label>
     <div className="grid two">
@@ -57,7 +59,7 @@ export function MemoForm({ formId, initial, submitLabel, busyLabel, busy, error,
     </div>}
     {shown && <p className="field-error" role="alert">{shown}</p>}
     <div className="dialog-actions">
-      <button data-control-id={`notes.form.cancel.${formId}`} className="button" type="button" disabled={busy} onClick={onCancel}>{ja.actions.cancel}</button>
+      <button data-control-id={`notes.form.cancel.${formId}`} className="button" type="button" disabled={busy} onClick={() => unsaved.leave(onCancel)}>{ja.actions.cancel}</button>
       <button data-control-id={`notes.form.submit.${formId}`} className="button primary" type="submit" disabled={busy}>{busy ? busyLabel : submitLabel}</button>
     </div>
   </form>;

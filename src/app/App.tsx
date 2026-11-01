@@ -15,6 +15,7 @@ import { AlbumsPage } from '../features/albums/AlbumsPage';
 import { InsightsPage } from '../features/insights/InsightsPage';
 import { SettingsPage, settingsTabFor, settingsTabs } from '../features/settings/SettingsPage';
 import { PlacesPage } from '../features/places/PlacesPage';
+import { PublicLegalPage } from '../features/settings/PublicLegalPage';
 import { navigate } from './router';
 import { useEffect } from 'react';
 import { EmptyState } from '../design-system/components';
@@ -53,6 +54,8 @@ export default function App() {
   if (path === '/sign-up') return <SignUpPage/>;
   if (path === '/reset-password') return <ResetPasswordPage/>;
   if (path === '/onboarding') return <OnboardingPage/>;
+  // 規約は登録の前に読めるようにする。
+  if (path === '/settings/legal' && appStage !== 'ready') return <PublicLegalPage/>;
   if (appStage !== 'ready') return <StageScreen stage={appStage}/>;
   let page;
   if (at('/today')) page = <TodayPage/>;

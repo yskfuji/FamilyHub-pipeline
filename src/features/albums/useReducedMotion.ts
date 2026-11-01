@@ -1,17 +1,16 @@
 import { useSyncExternalStore } from 'react';
+import { devicePreferences, subscribeDevicePreferences } from '../../app/devicePreferences';
 
 const QUERY = '(prefers-reduced-motion: reduce)';
-const STORAGE_KEY = 'family-hub-reduced-motion';
 
 function subscribe(notify: () => void) {
   const media = window.matchMedia(QUERY);
   media.addEventListener('change', notify);
-  return () => media.removeEventListener('change', notify);
+  const stop = subscribeDevicePreferences(notify);
+  return () => { media.removeEventListener('change', notify); stop(); };
 }
 
-/** 端末の設定か、アプリの「動きを減らす」。アプリの設定は設定画面を開くまで画面に反映されないので、保存した値も見る。 */
-const prefersReducedMotion = () => window.matchMedia(QUERY).matches
-  || document.documentElement.dataset.reduceMotion === 'true'
-  || localStorage.getItem(STORAGE_KEY) === 'true';
+/** 端末の設定か、アプリの「動きを減らす」。 */
+const prefersReducedMotion = () => window.matchMedia(QUERY).matches || devicePreferences().reducedMotion;
 
 export const useReducedMotion = () => useSyncExternalStore(subscribe, prefersReducedMotion);

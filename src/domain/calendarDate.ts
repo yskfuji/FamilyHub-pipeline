@@ -110,3 +110,30 @@ export function writeCalendarLocation(urlLike: string, location: CalendarLocatio
   set('on', occurrenceDate || (on && on !== todayKey) ? on : null);
   return `${path}${url.search}`;
 }
+
+/** 月の表の中で日を動かすキー。 */
+export const calendarDayKeys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'] as const;
+export type CalendarDayKey = typeof calendarDayKeys[number];
+export const isCalendarDayKey = (key: string): key is CalendarDayKey => calendarDayKeys.includes(key as CalendarDayKey);
+
+/** 同じ日のある月へ移す。その日がない月では月末にする（1月31日の次の月は2月28日）。 */
+function shiftDateKeyMonth(dateKey: string, delta: number): string {
+  const month = shiftMonthKey(dateKey.slice(0, 7), delta);
+  const last = addDateKeyDays(`${shiftMonthKey(month, 1)}-01`, -1);
+  return `${month}-${String(Math.min(Number(dateKey.slice(8, 10)), Number(last.slice(8, 10)))).padStart(2, '0')}`;
+}
+
+/** キーで動かした先の日。Home と End はその週の日曜と土曜、PageUp と PageDown は前後の月。 */
+export function movedDateKey(dateKey: string, key: CalendarDayKey): string {
+  const weekday = new Date(`${dateKey}T00:00:00Z`).getUTCDay();
+  switch (key) {
+    case 'ArrowLeft': return addDateKeyDays(dateKey, -1);
+    case 'ArrowRight': return addDateKeyDays(dateKey, 1);
+    case 'ArrowUp': return addDateKeyDays(dateKey, -7);
+    case 'ArrowDown': return addDateKeyDays(dateKey, 7);
+    case 'Home': return addDateKeyDays(dateKey, -weekday);
+    case 'End': return addDateKeyDays(dateKey, 6 - weekday);
+    case 'PageUp': return shiftDateKeyMonth(dateKey, -1);
+    case 'PageDown': return shiftDateKeyMonth(dateKey, 1);
+  }
+}

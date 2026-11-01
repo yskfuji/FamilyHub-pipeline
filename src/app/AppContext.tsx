@@ -1,8 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react';
 import type { FamilyHubGateway } from '../data/gateway';
 import type { EventPrefill } from '../domain/eventForm';
-import type { Capability, Expense, GatewayError, HouseholdSnapshot, PrivacySettings, Result, Scenario, SessionInfo, Theme } from '../domain/types';
-import { useModalTriggerTracking } from '../design-system/components';
+import type { Capability, Expense, GatewayError, HouseholdSnapshot, PrivacySettings, Result, Scenario, SessionInfo } from '../domain/types';
+import { UnsavedPrompt, useModalTriggerTracking } from '../design-system/components';
 import { EncryptedOfflineQueue, IndexedDbQueuePersistence, type QueueableCommand, type QueuedCommand } from '../offline/queue';
 
 import { ReauthDialog, useReauthPrompt, withReauthentication } from './reauth';
@@ -18,8 +18,10 @@ interface AppState {
   finishSignIn: (fallback: string) => Promise<string>;
   endSession: () => Promise<Result<void>>;
   snapshot: HouseholdSnapshot; loading: boolean; refreshing: boolean; error: GatewayError | null;
-  scenario: Scenario; setScenario: (scenario: Scenario) => void; refresh: () => Promise<void>;
-  theme: Theme; setTheme: (theme: Theme) => void; toast: string | null; announce: (message: string) => void;
+  scenario: Scenario; setScenario: (scenario: Scenario) => void;
+  /** 最新の内容を読み直す。読み直せなかったときは false。 */
+  refresh: () => Promise<boolean>;
+  toast: string | null; announce: (message: string) => void;
   can: (capability: Capability) => boolean;
   /** 本人のプライバシー設定。読み込み前は null。 */
   privacy: PrivacySettings | null;
@@ -59,7 +61,6 @@ export function AppProvider({ runtime, children }: PropsWithChildren<{ runtime: 
   const blockingLoad = useRef(true);
   const [error, setError] = useState<GatewayError | null>(null);
   const [scenario, setScenarioState] = useState<Scenario>(queryScenario);
-  const [theme, setThemeState] = useState<Theme>(() => localStorage.getItem('family-hub-theme') === 'dusk' ? 'dusk' : 'light');
   const [toast, setToast] = useState<string | null>(null);
   const [pendingCommands, setPendingCommands] = useState<QueuedCommand[]>([]);
   const [privacy, setPrivacy] = useState<PrivacySettings | null>(null);
@@ -80,16 +81,19 @@ export function AppProvider({ runtime, children }: PropsWithChildren<{ runtime: 
     setError(null);
     if (runtime.mode === 'http') {
       const current = await gateway.auth.getSession();
+      // 使っている途中で接続が切れたら、画面を残したまま知らせる。全画面の案内は最初の読み込みのときだけ。
+      if (!current.ok && !blocking) { setError(current.error); setRefreshing(false); return false; }
       setUnreachable(!current.ok);
       if (current.ok) setSession(current.value);
       if (!current.ok || current.value.stage !== 'active') {
         if (blocking) setLoading(false); else setRefreshing(false);
-        return;
+        return current.ok;
       }
     }
     const result = await gateway.household.getSnapshot(scenario);
     if (result.ok) { setSnapshot(result.value); runtime.setPermissionRevision(result.value.viewer.permissionRevision); } else setError(result.error);
     if (blocking) setLoading(false); else setRefreshing(false);
+    return result.ok;
   }, [gateway, runtime, scenario]);
 
   const finishSignIn = useCallback(async (fallback: string) => {
@@ -132,7 +136,6 @@ export function AppProvider({ runtime, children }: PropsWithChildren<{ runtime: 
     return next;
   }, [gateway]);
   useEffect(() => { queueMicrotask(() => void loadQueue()); }, [loadQueue]);
-  useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem('family-hub-theme', theme); }, [theme]);
   useEffect(() => { if (!toast) return; const id = window.setTimeout(() => setToast(null), 4200); return () => window.clearTimeout(id); }, [toast]);
 
   const setScenario = (next: Scenario) => { blockingLoad.current = true; setQueryScenario(next); setScenarioState(next); };
@@ -197,8 +200,8 @@ export function AppProvider({ runtime, children }: PropsWithChildren<{ runtime: 
   };
   const appStage: AppStage = unreachable ? 'unreachable' : session === null ? 'restoring'
     : session.stage === 'active' ? 'ready' : session.stage;
-  const value = useMemo(() => ({ gateway, runtimeMode: runtime.mode, appStage, session, finishSignIn, endSession, snapshot, loading, refreshing, error, scenario, setScenario, refresh, theme, setTheme: setThemeState, toast, announce, can, privacy, updatePrivacy, requestQuickCreate, executeQueueable, pendingCommands, retryQueued, discardQueued, clearQueued }), [appStage, endSession, finishSignIn, runtime.mode, session, gateway, snapshot, loading, refreshing, error, scenario, refresh, theme, toast, announce, can, privacy, updatePrivacy, requestQuickCreate, executeQueueable, pendingCommands, retryQueued, discardQueued, clearQueued]);
-  return <AppContext.Provider value={value}>{children}{reauthPending && <ReauthDialog pending={reauthPending} onSubmit={submitReauth} onCancel={cancelReauth}/>}<div className="sr-only" role="status" aria-live="polite">{toast}</div>{toast && <div className="toast-visible" role="status">{toast}</div>}</AppContext.Provider>;
+  const value = useMemo(() => ({ gateway, runtimeMode: runtime.mode, appStage, session, finishSignIn, endSession, snapshot, loading, refreshing, error, scenario, setScenario, refresh, toast, announce, can, privacy, updatePrivacy, requestQuickCreate, executeQueueable, pendingCommands, retryQueued, discardQueued, clearQueued }), [appStage, endSession, finishSignIn, runtime.mode, session, gateway, snapshot, loading, refreshing, error, scenario, refresh, toast, announce, can, privacy, updatePrivacy, requestQuickCreate, executeQueueable, pendingCommands, retryQueued, discardQueued, clearQueued]);
+  return <AppContext.Provider value={value}>{children}<UnsavedPrompt/>{reauthPending && <ReauthDialog pending={reauthPending} onSubmit={submitReauth} onCancel={cancelReauth}/>}<div className="sr-only" role="status" aria-live="polite">{toast}</div>{toast && <div className="toast-visible" role="status">{toast}</div>}</AppContext.Provider>;
 }
 
 export function useApp() {

@@ -106,6 +106,7 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
       async confirmTotpEnrollment() { await delay(); account.totpEnabled = true; return ok({ recoveryCodes: ['DEMO1-00000'] }); },
       async disableTotp() { await delay(); account.totpEnabled = false; return ok(undefined); },
       async getSession() { await delay(10); return ok({ stage: 'active' as const, userId: state.user.id, idleTimeoutMinutes: 30 }); },
+      async getVersion() { await delay(10); return ok({ build: 'development' }); },
       async getSecurityOverview() { await delay(); const guard = requireCapability<SecurityOverview>('settings.own'); return guard ?? ok(structuredClone(security)); },
       async beginPasskeyRegistration() { await delay(); const guard = requireCapability<{ challengeId: Id; publicKey: null }>('settings.own'); return guard ?? ok({ challengeId: nextId('challenge'), publicKey: null }); },
       async finishPasskeyRegistration(challengeId, credential) {

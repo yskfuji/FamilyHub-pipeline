@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../../app/AppContext';
+import { useMemberScope } from '../../app/useMemberScope';
 import { EmptyState } from '../../design-system/components';
 import { addDateKeyDays } from '../../domain/calendarDate';
 import { lastDayOfMonth, occurrencesBetween, occursOn, type Occurrence } from '../../domain/calendarLayout';
@@ -19,10 +20,11 @@ interface Props {
 /** 一覧。月の初めから日ごとに読み、下へ進むと後の日を足す。日付の見出しは上に留まる。 */
 export function AgendaView({ monthKey, todayKey, selected, onOpen }: Props) {
   const { snapshot } = useApp();
+  const { events } = useMemberScope();
   const from = `${monthKey}-01`;
   const limit = addDateKeyDays(from, MAX_DAYS);
   const [to, setTo] = useState(() => lastDayOfMonth(monthKey));
-  const occurrences = useMemo(() => occurrencesBetween(snapshot.events, from, to), [snapshot.events, from, to]);
+  const occurrences = useMemo(() => occurrencesBetween(events, from, to), [events, from, to]);
   const holidays = useMemo(() => holidayMap(from, to), [from, to]);
   const days = useMemo(() => {
     const anchors = [todayKey, selected].filter((date): date is string => Boolean(date) && (date as string) >= from && (date as string) <= to);

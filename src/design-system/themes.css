@@ -1,0 +1,242 @@
+/*
+ * 追加の配色。昼と夜の組で、light と dusk（tokens.css）は変えない。
+ * 文字色、面、線、状態の色は共通の配色の値から作り、面には各組の色を薄く混ぜる。
+ * 文字と面の組み合わせの濃さは src/design-system/themes.test.ts で確かめる。
+ */
+@layer tokens {
+  [data-theme='warm'] {
+    color-scheme: light;
+    --paper: #fff8f5;
+    --paper-deep: #fef0e8;
+    --sheet: #fffdfc;
+    --sheet-raised: #ffffff;
+    --ink: #141c28;
+    --ink-soft: #3d4a5c;
+    --ink-faint: #5c6570;
+    --line: #e2cec4;
+    --line-strong: #64748b;
+    --indigo: #a8380a;
+    --indigo-strong: #7c3013;
+    --persimmon: #a8380a;
+    --persimmon-soft: #f5e1d8;
+    --moss: #1f6f55;
+    --moss-soft: #e0ebe7;
+    --plum: #7a5299;
+    --gold: #8a5a00;
+    --danger: #b42318;
+    --danger-soft: #f6e5e3;
+    --success: #1f6f55;
+    --success-soft: #e0ebe7;
+    --focus: #c2410c;
+    --on-accent: #ffffff;
+    --shadow: 0 18px 48px rgb(47 39 28 / 10%);
+    --shadow-soft: 0 8px 24px rgb(47 39 28 / 7%);
+  }
+
+  [data-theme='warm-night'] {
+    color-scheme: dark;
+    --paper: #181c2c;
+    --paper-deep: #121622;
+    --sheet: #282e3d;
+    --sheet-raised: #333847;
+    --ink: #f8fafc;
+    --ink-soft: #e2e8f0;
+    --ink-faint: #a8b4c4;
+    --line: #4a4b56;
+    --line-strong: #94a3b8;
+    --indigo: #f0915a;
+    --indigo-strong: #f5a574;
+    --persimmon: #f0915a;
+    --persimmon-soft: #4a3f42;
+    --moss: #6fc3ad;
+    --moss-soft: #31404a;
+    --plum: #b79ae0;
+    --gold: #f2c25c;
+    --danger: #fca5a5;
+    --danger-soft: #4e4350;
+    --success: #6fd3ae;
+    --success-soft: #354c51;
+    --focus: #fb923c;
+    --on-accent: #1f0d04;
+    --shadow: 0 18px 48px rgb(0 0 0 / 28%);
+    --shadow-soft: 0 8px 24px rgb(0 0 0 / 20%);
+  }
+
+  [data-theme='modern'] {
+    color-scheme: light;
+    --paper: #f0f7ff;
+    --paper-deep: #ddeeff;
+    --sheet: #fafcff;
+    --sheet-raised: #ffffff;
+    --ink: #141c28;
+    --ink-soft: #3d4a5c;
+    --ink-faint: #5c6570;
+    --line: #ced4d6;
+    --line-strong: #64748b;
+    --indigo: #005fa3;
+    --indigo-strong: #064b7e;
+    --persimmon: #005fa3;
+    --persimmon-soft: #d6e9f5;
+    --moss: #1f6f55;
+    --moss-soft: #e0ebe7;
+    --plum: #7a5299;
+    --gold: #8a5a00;
+    --danger: #b42318;
+    --danger-soft: #f6e5e3;
+    --success: #1f6f55;
+    --success-soft: #e0ebe7;
+    --focus: #0077c2;
+    --on-accent: #ffffff;
+    --shadow: 0 18px 48px rgb(47 39 28 / 10%);
+    --shadow-soft: 0 8px 24px rgb(47 39 28 / 7%);
+  }
+
+  [data-theme='modern-night'] {
+    color-scheme: dark;
+    --paper: #121d31;
+    --paper-deep: #0e1726;
+    --sheet: #212f43;
+    --sheet-raised: #2c394c;
+    --ink: #f8fafc;
+    --ink-soft: #e2e8f0;
+    --ink-faint: #a8b4c4;
+    --line: #384e65;
+    --line-strong: #94a3b8;
+    --indigo: #60aadc;
+    --indigo-strong: #74b8e6;
+    --persimmon: #60aadc;
+    --persimmon-soft: #2c445d;
+    --moss: #6fc3ad;
+    --moss-soft: #2a4150;
+    --plum: #b79ae0;
+    --gold: #f2c25c;
+    --danger: #fca5a5;
+    --danger-soft: #484455;
+    --success: #6fd3ae;
+    --success-soft: #2f4d56;
+    --focus: #60aadc;
+    --on-accent: #040e1c;
+    --shadow: 0 18px 48px rgb(0 0 0 / 28%);
+    --shadow-soft: 0 8px 24px rgb(0 0 0 / 20%);
+  }
+
+  [data-theme='matcha'] {
+    color-scheme: light;
+    --paper: #f4f9f5;
+    --paper-deep: #e8f4eb;
+    --sheet: #fbfdfc;
+    --sheet-raised: #ffffff;
+    --ink: #141c28;
+    --ink-soft: #3d4a5c;
+    --ink-faint: #5c6570;
+    --line: #d4d3ca;
+    --line-strong: #64748b;
+    --indigo: #2f5c3b;
+    --indigo-strong: #274935;
+    --persimmon: #3a7047;
+    --persimmon-soft: #dfe8e2;
+    --moss: #1f6f55;
+    --moss-soft: #e0ebe7;
+    --plum: #7a5299;
+    --gold: #8a5a00;
+    --danger: #b42318;
+    --danger-soft: #f6e5e3;
+    --success: #1f6f55;
+    --success-soft: #e0ebe7;
+    --focus: #3a7047;
+    --on-accent: #ffffff;
+    --shadow: 0 18px 48px rgb(47 39 28 / 10%);
+    --shadow-soft: 0 8px 24px rgb(47 39 28 / 7%);
+  }
+
+  [data-theme='matcha-night'] {
+    color-scheme: dark;
+    --paper: #131d2d;
+    --paper-deep: #0e1723;
+    --sheet: #22303e;
+    --sheet-raised: #2d3a48;
+    --ink: #f8fafc;
+    --ink-soft: #e2e8f0;
+    --ink-faint: #a8b4c4;
+    --line: #3a4e5a;
+    --line-strong: #94a3b8;
+    --indigo: #6aae7e;
+    --indigo-strong: #7bbf8e;
+    --persimmon: #6aae7e;
+    --persimmon-soft: #2e4549;
+    --moss: #6fc3ad;
+    --moss-soft: #2b424b;
+    --plum: #b79ae0;
+    --gold: #f2c25c;
+    --danger: #fca5a5;
+    --danger-soft: #494551;
+    --success: #6fd3ae;
+    --success-soft: #304d52;
+    --focus: #6aae7e;
+    --on-accent: #0f1f14;
+    --shadow: 0 18px 48px rgb(0 0 0 / 28%);
+    --shadow-soft: 0 8px 24px rgb(0 0 0 / 20%);
+  }
+
+  [data-theme='sakura'] {
+    color-scheme: light;
+    --paper: #fef5f8;
+    --paper-deep: #fce8f0;
+    --sheet: #fffcfd;
+    --sheet-raised: #ffffff;
+    --ink: #141c28;
+    --ink-soft: #3d4a5c;
+    --ink-faint: #5c6570;
+    --line: #e0cece;
+    --line-strong: #64748b;
+    --indigo: #943256;
+    --indigo-strong: #6e2b48;
+    --persimmon: #b04070;
+    --persimmon-soft: #f2e0e8;
+    --moss: #1f6f55;
+    --moss-soft: #e0ebe7;
+    --plum: #7a5299;
+    --gold: #8a5a00;
+    --danger: #b42318;
+    --danger-soft: #f6e5e3;
+    --success: #1f6f55;
+    --success-soft: #e0ebe7;
+    --focus: #b04070;
+    --on-accent: #ffffff;
+    --shadow: 0 18px 48px rgb(47 39 28 / 10%);
+    --shadow-soft: 0 8px 24px rgb(47 39 28 / 7%);
+  }
+
+  [data-theme='sakura-night'] {
+    color-scheme: dark;
+    --paper: #171b2f;
+    --paper-deep: #111524;
+    --sheet: #282d41;
+    --sheet-raised: #33384a;
+    --ink: #f8fafc;
+    --ink-soft: #e2e8f0;
+    --ink-faint: #a8b4c4;
+    --line: #48495f;
+    --line-strong: #94a3b8;
+    --indigo: #e080aa;
+    --indigo-strong: #ea92b7;
+    --persimmon: #e080aa;
+    --persimmon-soft: #473b53;
+    --moss: #6fc3ad;
+    --moss-soft: #313f4e;
+    --plum: #b79ae0;
+    --gold: #f2c25c;
+    --danger: #fca5a5;
+    --danger-soft: #4e4353;
+    --success: #6fd3ae;
+    --success-soft: #354b55;
+    --focus: #e080aa;
+    --on-accent: #1f0b14;
+    --shadow: 0 18px 48px rgb(0 0 0 / 28%);
+    --shadow-soft: 0 8px 24px rgb(0 0 0 / 20%);
+  }
+}
+
+@layer components {
+  [data-theme$='-night'] .button.primary { color: var(--on-accent); }
+}

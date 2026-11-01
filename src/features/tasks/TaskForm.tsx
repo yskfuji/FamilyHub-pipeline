@@ -2,6 +2,7 @@ import { useState, type FormEvent, type ReactNode } from 'react';
 import { useApp } from '../../app/AppContext';
 import { ja } from '../../content/ja';
 import { AlertIcon } from '../../design-system/icons';
+import { useUnsavedGuard } from '../../design-system/unsavedGuard';
 import { assignablePeople, peopleOutsideVisibility, taskDraftProblem, type TaskDraft } from '../../domain/taskForm';
 import type { TodoPriority } from '../../domain/types';
 import { ColorLabelFields } from '../shared/ColorLabelFields';
@@ -32,6 +33,7 @@ export function TaskForm({ formId, initial, creatorId, submitLabel, busy, error,
   const [draft, setDraft] = useState(initial);
   const [problem, setProblem] = useState('');
   const patch = (changes: Partial<TaskDraft>) => setDraft((current) => ({ ...current, ...changes }));
+  const unsaved = useUnsavedGuard(draft, busy);
   const assignable = assignablePeople(snapshot.memberships, [initial.assigneeId, initial.reviewerId]);
   const selectable = snapshot.memberships.filter((member) => member.status === 'active' || draft.selectedIds.includes(member.id));
   const outside = peopleOutsideVisibility(draft, snapshot.memberships, creatorId ?? snapshot.viewer.membershipId);
@@ -43,7 +45,7 @@ export function TaskForm({ formId, initial, creatorId, submitLabel, busy, error,
   };
   const shown = problem || error;
   const formKey = `task-${formId}`;
-  return <form className="stack" aria-busy={busy} noValidate onSubmit={submit}>
+  return <form {...unsaved.formProps} className="stack" aria-busy={busy} noValidate onSubmit={submit}>
     <label className="field"><span>タスク名</span><input data-control-id={`tasks.form.title.${formId}`} className="input" name="title" autoFocus required maxLength={120} placeholder="例：提出物を確認する" value={draft.title} onChange={(event) => patch({ title: event.target.value })}/></label>
     <label className="field"><span>メモ（任意）</span><textarea data-control-id={`tasks.form.note.${formId}`} className="textarea" maxLength={2000} value={draft.note} onChange={(event) => patch({ note: event.target.value })}/></label>
     <div className="grid two">
@@ -61,7 +63,7 @@ export function TaskForm({ formId, initial, creatorId, submitLabel, busy, error,
     <ColorLabelFields formKey={formKey} value={draft.colorLabelId} onChange={(colorLabelId) => patch({ colorLabelId })}/>
     {shown && <p className="field-error" role="alert">{shown}</p>}
     <div className="dialog-actions">
-      <button data-control-id={`tasks.form.cancel.${formId}`} className="button" type="button" disabled={busy} onClick={onCancel}>{ja.actions.cancel}</button>
+      <button data-control-id={`tasks.form.cancel.${formId}`} className="button" type="button" disabled={busy} onClick={() => unsaved.leave(onCancel)}>{ja.actions.cancel}</button>
       <button data-control-id={`tasks.form.submit.${formId}`} className="button primary" type="submit" disabled={busy}>{busy ? ja.actions.saving : submitLabel}</button>
     </div>
   </form>;

@@ -1,19 +1,31 @@
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { useApp } from '../../app/AppContext';
+import { setDevicePreferences, useDevicePreferences, type Density } from '../../app/devicePreferences';
+import { densityLabels } from '../../app/paletteCommands';
 import { capabilityCeilingFor, defaultCapabilitiesFor } from '../../authz/policy';
 import { externalLinkLabel, ja, membershipStatusLabels, roleLabels } from '../../content/ja';
+import { settingsRoutes } from '../../content/settingsRoutes';
 import { Dialog, PageHeader, StatusBadge, formatDate, formatRelative, formatTime } from '../../design-system/components';
 import { navigate } from '../../app/router';
 import { ArrowIcon, LinkIcon, LockIcon, PeopleIcon, ShieldIcon } from '../../design-system/icons';
+import { MAX_HOUSEHOLD_MEMBERS, MAX_NAME_CHANGES_PER_DAY, activeMemberCount, nameChangesLeft } from '../../domain/householdLimits';
 import { passwordSchema, safeHttpsUrlSchema } from '../../domain/schemas';
+import { colorModes, themePalettes } from '../../domain/theme';
 import { usePlaceLookupConsent } from '../place/PlaceField';
 import { OPENPOI_ATTRIBUTION_URL, OPENPOI_TERMS_URL } from '../place/openPoi';
 import type { Capability, HouseholdInvite, HouseholdMembership, MembershipRole, NotificationPreferences, PermissionOverride, SecurityOverview } from '../../domain/types';
 
-/** 設定のタブと、その表示に必要な能力。経路の許可（App.tsx）とタブの表示はこの表だけを参照する。 */
+import { SyncStatus } from '../shared/SyncStatus';
 import { AccountSection } from './AccountSection';
+import { ColorLists } from './ColorLists';
+import { LeaveHousehold, MemberActions } from './MemberActions';
+import { RecentlyDeleted } from './RecentlyDeleted';
 
-export const settingsTabs: ReadonlyArray<{ href: string; label: string; capability: Capability }> = [
+const HelpSection = lazy(() => import('./HelpSection'));
+const LegalSection = lazy(() => import('./LegalSection'));
+
+/** 設定のタブと、その表示に必要な能力。経路の許可（App.tsx）とタブの表示はこの表だけを参照する。 */
+export const settingsTabs: ReadonlyArray<{ href: typeof settingsRoutes[number]; label: string; capability: Capability }> = [
   { href: '/settings/household', label: '家族', capability: 'household.members.read' },
   { href: '/settings/security', label: 'サインインとセキュリティ', capability: 'settings.own' },
   { href: '/settings/account', label: 'アカウント', capability: 'settings.own' },
@@ -22,20 +34,16 @@ export const settingsTabs: ReadonlyArray<{ href: string; label: string; capabili
   { href: '/settings/location', label: ja.place.settings.tab, capability: 'place.read' },
   { href: '/settings/accessibility', label: '表示・操作', capability: 'settings.own' },
   { href: '/settings/resources', label: '関連リンク', capability: 'resource.read' },
+  { href: '/settings/recently-deleted', label: '最近削除', capability: 'settings.own' },
+  { href: '/settings/help', label: 'ヘルプ', capability: 'settings.own' },
+  { href: '/settings/legal', label: '規約（草案）', capability: 'settings.own' },
 ];
 export const settingsTabFor = (path: string) => settingsTabs.find((tab) => path === tab.href || path.startsWith(`${tab.href}/`));
 const inviteRoles: Array<Exclude<MembershipRole, 'owner'>> = ['adult', 'child', 'guest'];
 
 export function SettingsPage({ path }: { path: string }) {
-  const { theme, setTheme, can } = useApp();
+  const { can } = useApp();
   const current = settingsTabFor(path)?.label ?? '';
-  const [reduced, setReducedState] = useState(() => localStorage.getItem('family-hub-reduced-motion') === 'true');
-  const setReduced = (value: boolean) => {
-    setReducedState(value);
-    document.documentElement.dataset.reduceMotion = String(value);
-    localStorage.setItem('family-hub-reduced-motion', String(value));
-  };
-  useEffect(() => { document.documentElement.dataset.reduceMotion = String(reduced); }, [reduced]);
   // 狭い画面ではタブが横にスクロールするため、表示中のタブが隠れないよう横方向だけ寄せる（縦には動かさない）。
   const tabsRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -48,17 +56,20 @@ export function SettingsPage({ path }: { path: string }) {
   return <div className="page">
     <PageHeader eyebrow="設定" title={current} description="家族との共有範囲や、表示・通知・サインイン方法を変更できます。"/>
     <nav ref={tabsRef} className="segmented settings-tabs" aria-label="設定項目">
-      {settingsTabs.filter((tab) => can(tab.capability)).map(({ href, label }) => <a data-control-id={`settings.section.${href.split("/").at(-1)}`} key={href} className="button" href={href} data-link aria-current={path.startsWith(href) ? 'page' : undefined}>{label}</a>)}
+      {settingsTabs.filter((tab) => can(tab.capability)).map(({ href, label }) => <a data-control-id={`settings.section.${href.split("/").at(-1)}`} key={href} className="button" href={href} data-link aria-current={settingsTabFor(path)?.href === href ? 'page' : undefined}>{label}</a>)}
     </nav>
     {path.startsWith('/settings/account') ? <AccountSection/>
       : path.startsWith('/settings/security') ? <Security/>
       : path.startsWith('/settings/privacy') ? <Privacy/>
       : path.startsWith('/settings/notifications') ? <Notifications/>
         : path.startsWith('/settings/location') ? <LocationPrivacy/>
-        : path.startsWith('/settings/accessibility') ? <Accessibility theme={theme} setTheme={setTheme} reduced={reduced} setReduced={setReduced}/>
+        : path.startsWith('/settings/accessibility') ? <Accessibility/>
           : path.startsWith('/settings/resources') ? <Resources/>
             : path.startsWith('/settings/household') ? <Household/>
-              : null}
+              : path.startsWith('/settings/recently-deleted') ? <RecentlyDeleted/>
+                : path.startsWith('/settings/help') ? <Suspense fallback={<div className="skeleton"/>}><HelpSection/></Suspense>
+                  : path.startsWith('/settings/legal') ? <Suspense fallback={<div className="skeleton"/>}><LegalSection/></Suspense>
+                    : null}
   </div>;
 }
 
@@ -74,6 +85,10 @@ function Household() {
   const [invites, setInvites] = useState<HouseholdInvite[]>([]);
   const canManage = can('household.members.manage');
   const canInvite = can('household.invites.manage');
+  const people = snapshot.memberships.filter((item) => item.status !== 'left');
+  const activeCount = activeMemberCount(snapshot.memberships);
+  const atCapacity = activeCount >= MAX_HOUSEHOLD_MEMBERS;
+  const renamesLeft = nameChangesLeft(snapshot.household.nameChanges, snapshot.context.asOf);
 
   const loadInvites = async () => {
     if (!canInvite) return;
@@ -149,11 +164,11 @@ function Household() {
     await refresh(); announce(`家族グループの名前を「${result.value.name}」にしました。`);
   };
   return <>
-    {canManage && <section className="card household-profile"><h2>家族グループの名前</h2><form className="inline-form" onSubmit={(event) => { event.preventDefault(); void renameHousehold(event.currentTarget); }}><label className="field"><span>名前</span><input data-control-id="settings.household.name" className="input" name="householdName" required maxLength={40} defaultValue={snapshot.household.name} key={snapshot.household.name}/></label><button data-control-id="settings.household.name-save" className="button" type="submit">名前を保存</button></form><p className="small muted mb-0">日時は日本時間で表示します。</p></section>}
+    {canManage && <section className="card household-profile"><h2>家族グループの名前</h2><form className="inline-form" onSubmit={(event) => { event.preventDefault(); void renameHousehold(event.currentTarget); }}><label className="field"><span>名前</span><input data-control-id="settings.household.name" className="input" name="householdName" required maxLength={40} defaultValue={snapshot.household.name} key={snapshot.household.name}/></label><button data-control-id="settings.household.name-save" className="button" type="submit" disabled={renamesLeft === 0}>名前を保存</button></form><p className="small muted mb-0">{renamesLeft > 0 ? `あと${renamesLeft}回変更できます（24時間で${MAX_NAME_CHANGES_PER_DAY}回まで）。` : `名前の変更は24時間で${MAX_NAME_CHANGES_PER_DAY}回までです。時間をおいてお試しください。`} 日時は日本時間で表示します。</p></section>}
     <div className="grid two">
       <section className="card">
-        <p className="eyebrow">家族</p><h2>{snapshot.household.name}</h2><p className="muted">日時の表示 · 日本時間</p>
-        <ul className="list">{snapshot.memberships.map((item) => <li className="list-row" key={item.id}>
+        <p className="eyebrow">家族</p><h2>{snapshot.household.name}</h2><p className="muted">利用中 {activeCount}人 / {MAX_HOUSEHOLD_MEMBERS}人まで · 日時の表示 · 日本時間</p>
+        <ul className="list">{people.map((item) => <li className="list-row" key={item.id}>
           <span className="avatar" style={{ background: item.color }} aria-hidden="true">{item.displayName.slice(0, 1)}</span>
           <div className="row-main"><strong>{item.displayName}</strong><span className="meta">{roleLabels[item.role]} · {membershipStatusLabels[item.status]}</span></div>
           {canManage ? <button data-control-id={`settings.member.permissions.${item.id}`} className="button" type="button" aria-label={`${item.displayName}さんの権限を設定`} onClick={() => void openPermissions(item)}>権限を設定</button> : <StatusBadge>{roleLabels[item.role]}</StatusBadge>}
@@ -163,8 +178,9 @@ function Household() {
       {canInvite && <section className="card">
         <p className="eyebrow">招待</p><h2>家族を招待</h2>
         <p>招待コードは24時間以内に1回だけ使えます。招待された人は、サインイン後に共有された情報を表示できます。</p>
+        {atCapacity && <p className="notice error">家族グループは{MAX_HOUSEHOLD_MEMBERS}人までです。招待するには、先にメンバーを一時停止するか外してください。</p>}
         <div className="field"><label htmlFor="invite-role">役割</label><select data-control-id="settings.invite.role" className="select" id="invite-role" value={inviteRole} onChange={(event) => setInviteRole(event.target.value as Exclude<MembershipRole, 'owner'>)}>{inviteRoles.map((value) => <option key={value} value={value}>{roleLabels[value]}</option>)}</select></div>
-        <button data-control-id="settings.invite.create" className="button primary full mt-1" type="button" onClick={() => void createInvite()}><PeopleIcon width="18"/>招待コードを作成</button>
+        <button data-control-id="settings.invite.create" className="button primary full mt-1" type="button" disabled={atCapacity} onClick={() => void createInvite()}><PeopleIcon width="18"/>招待コードを作成</button>
         <p className="small muted mt-1">有効期間：24時間 · 使用回数：1回 · 管理者はいつでも無効にできます</p>
         {invite && <div className="notice invite-result" role="status"><strong>この画面でのみ表示する招待コード</strong><code>{invite.token}</code><span className="small">有効期限：{formatDate(invite.expiresAt)} {formatTime(invite.expiresAt)} · 残り{invite.remainingUses}回</span><button data-control-id="settings.invite.copy" className="button" type="button" onClick={() => void copyInvite()}>招待コードをコピー</button></div>}
         <h3 className="mt-1">作成した招待</h3>
@@ -175,11 +191,14 @@ function Household() {
         }}>無効にする</button>}</li>)}</ul>}
       </section>}
     </div>
+    <ColorLists/>
+    <LeaveHousehold/>
     {member && <Dialog title={`${member.displayName}さんの権限`} description="役割の標準設定を基準に、必要な項目だけを個別に変更できます。" onClose={() => { if (!saving) setMember(null); }}>
       <div className="stack">
         <label className="field" htmlFor="member-role"><span>メンバーの役割</span></label><select data-control-id={`settings.member.role.${member.id}`} className="select" id="member-role" value={role} disabled={saving} onChange={(event) => { setRole(event.target.value as MembershipRole); setOverrides([]); }}>{(Object.keys(roleLabels) as MembershipRole[]).map((value) => <option key={value} value={value}>{roleLabels[value]}</option>)}</select>
         {role !== member.role && <div className="notice"><strong>役割を変更すると、個別設定の確認が必要です。</strong><p className="small mb-0">まず役割を保存し、もう一度この画面を開いて個別設定を確認してください。</p></div>}
         <fieldset className="fieldset" disabled={role !== member.role || saving}><legend>個別設定</legend><div className="stack">{editableCapabilities.map((capability) => <label className="setting-row" key={capability}><span><strong>{permissionLabels[capability]}</strong><span className="small muted">標準：{defaultCapabilitiesFor(role).includes(capability) ? '利用できる' : '利用できない'}</span></span><select data-control-id={`settings.member.permission.${member.id}.${capability}`} className="select permission-select" aria-label={`${permissionLabels[capability]}の個別設定`} value={overrideValue(capability)} onChange={(event) => changeOverride(capability, event.target.value as 'default' | 'allow' | 'deny')}><option value="default">役割の標準</option><option value="allow">利用を許可</option><option value="deny">利用を制限</option></select></label>)}</div></fieldset>
+        <MemberActions member={member} onDone={() => setMember(null)}/>
         {roleError && <p className="field-error" role="alert">{roleError}</p>}
         <div className="dialog-actions"><button data-control-id={`settings.member.cancel.${member.id}`} className="button" type="button" disabled={saving} onClick={() => setMember(null)}>{ja.actions.cancel}</button>{role === member.role ? <><button data-control-id={`settings.member.reset.${member.id}`} className="button" type="button" disabled={saving || overrides.length === 0} onClick={() => void resetOverrides()}>標準に戻す</button><button data-control-id={`settings.member.save-overrides.${member.id}`} className="button primary" type="button" disabled={saving} onClick={() => void saveOverrides()}>{saving ? ja.actions.saving : '個別設定を保存'}</button></> : <button data-control-id={`settings.member.save-role.${member.id}`} className="button primary" type="button" disabled={saving} onClick={() => void saveRole()}>{saving ? ja.actions.saving : '役割を保存'}</button>}</div>
       </div>
@@ -308,6 +327,7 @@ function Notifications() {
 /** 共有の初期値と、通知に内容を表示するかどうか。保存は AppContext 経由で、別の画面の変更を上書きしない。 */
 function Privacy() {
   const { privacy: saved, updatePrivacy, announce } = useApp();
+  const { privacyBlur, keepPhotoLocation } = useDevicePreferences();
   const [saving, setSaving] = useState(false);
   // 操作をすぐ画面に反映し、保存に失敗したら保存済みの値へ戻す。
   const [draft, setDraft] = useState<Partial<NonNullable<typeof saved>>>({});
@@ -328,13 +348,27 @@ function Privacy() {
       </fieldset>
     </section>
     <section className="card"><h2>通知の内容</h2><div className="setting-row"><div><strong>通知の題名と内容を表示しない</strong><p className="small muted mb-0">ほかの人に画面を見られても、予定やタスクの中身が分からないようにします。開いたときだけ表示します。</p></div><button data-control-id="settings.privacy.hide-notification-content" type="button" className="toggle" aria-label="通知の題名と内容を表示しない" aria-pressed={privacy.hideNotificationContent} disabled={saving} onClick={() => void save({ hideNotificationContent: !privacy.hideNotificationContent }, privacy.hideNotificationContent ? '通知の題名と内容を表示するようにしました。' : '通知の題名と内容を表示しないようにしました。')}/></div></section>
+    <section className="card"><h2>この端末での扱い</h2><p className="muted">この端末だけの設定です。別の端末には反映されません。</p>
+      <div className="setting-row"><div><strong>隠れている間は画面をぼかす</strong><p className="small muted mb-0">別のタブへ移ったり、ウィンドウを最小化したりしている間、画面の内容をぼかします。戻るとすぐ元に戻ります。アプリの切り替え画面に映る内容まで隠せるとは限りません。</p></div><button data-control-id="settings.privacy.blur-hidden" type="button" className="toggle" aria-label="隠れている間は画面をぼかす" aria-pressed={privacyBlur} onClick={() => { setDevicePreferences({ privacyBlur: !privacyBlur }); announce(privacyBlur ? '画面をぼかさないようにしました。' : '隠れている間は画面をぼかすようにしました。'); }}/></div>
+      <div className="setting-row"><div><strong>写真の撮影場所を残す</strong><p className="small muted mb-0">アルバムに追加するときの初期値です。オフなら撮影場所を取り除いて保存します。追加の画面で1回ごとに変えられます。</p></div><button data-control-id="settings.privacy.keep-photo-location" type="button" className="toggle" aria-label="写真の撮影場所を残す" aria-pressed={keepPhotoLocation} onClick={() => { setDevicePreferences({ keepPhotoLocation: !keepPhotoLocation }); announce(keepPhotoLocation ? '写真の撮影場所を取り除くようにしました。' : '写真の撮影場所を残すようにしました。'); }}/></div>
+    </section>
   </div>;
 }
 
-function Accessibility({ theme, setTheme, reduced, setReduced }: { theme: 'light' | 'dusk'; setTheme: (value: 'light' | 'dusk') => void; reduced: boolean; setReduced: (value: boolean) => void }) {
+function Accessibility() {
+  const { announce } = useApp();
+  const { palette, colorMode, density, reducedMotion } = useDevicePreferences();
   return <div className="grid two">
-    <section className="card"><h2>表示テーマ</h2><div className="segmented"><button data-control-id="settings.theme.light" type="button" aria-pressed={theme === 'light'} onClick={() => setTheme('light')}>明るいテーマ</button><button data-control-id="settings.theme.dusk" type="button" aria-pressed={theme === 'dusk'} onClick={() => setTheme('dusk')}>暗いテーマ</button></div><div className="setting-row"><div><strong>動きを減らす</strong><p className="small muted mb-0">端末の設定で動きを減らしている場合にも適用されます。</p></div><button data-control-id="settings.motion.reduce" type="button" className="toggle" aria-label="動きを減らす" aria-pressed={reduced} onClick={() => setReduced(!reduced)}/></div></section>
-    <section className="card"><h2>操作と読みやすさ</h2><p>文字を大きくした場合も、項目が重なったり、操作ボタンが隠れたりしないように調整しています。</p><p className="small muted">色だけで状態を区別せず、キーボードで操作中の場所も画面に表示します。</p></section>
+    <section className="card"><h2>表示テーマ</h2><p className="muted">この端末だけの設定です。</p>
+      <fieldset className="fieldset"><legend>テーマ</legend><div className="theme-grid">{themePalettes.map(({ value, label }) => <label className="theme-choice" key={value}><input data-control-id={`settings.theme.palette.${value}`} type="radio" name="theme-palette" value={value} checked={palette === value} onChange={() => setDevicePreferences({ palette: value })}/><span className="theme-swatch" data-swatch={value} aria-hidden="true"/>{label}</label>)}</div></fieldset>
+      <fieldset className="fieldset mt-1"><legend>昼と夜</legend><div className="choice-grid mode-grid">{colorModes.map(({ value, label }) => <label key={value}><input data-control-id={`settings.theme.mode.${value}`} type="radio" name="theme-mode" value={value} checked={colorMode === value} onChange={() => setDevicePreferences({ colorMode: value })}/>{label}</label>)}</div></fieldset>
+      <fieldset className="fieldset mt-1"><legend>表示の密度</legend><div className="choice-grid">{(Object.keys(densityLabels) as Density[]).map((value) => <label key={value}><input data-control-id={`settings.density.${value}`} type="radio" name="density" value={value} checked={density === value} onChange={() => { setDevicePreferences({ density: value }); announce(`表示の密度を「${densityLabels[value]}」にしました。`); }}/>{densityLabels[value]}</label>)}</div></fieldset>
+      <div className="setting-row"><div><strong>動きを減らす</strong><p className="small muted mb-0">端末の設定で動きを減らしている場合にも適用されます。</p></div><button data-control-id="settings.motion.reduce" type="button" className="toggle" aria-label="動きを減らす" aria-pressed={reducedMotion} onClick={() => setDevicePreferences({ reducedMotion: !reducedMotion })}/></div>
+    </section>
+    <div className="stack">
+      <section className="card"><h2>データの更新</h2><p className="muted">別の端末で変えた内容を、すぐに確かめたいときに使います。</p><SyncStatus/></section>
+      <section className="card"><h2>操作と読みやすさ</h2><p>文字を大きくした場合も、項目が重なったり、操作ボタンが隠れたりしないように調整しています。</p><p className="small muted">色だけで状態を区別せず、キーボードで操作中の場所も画面に表示します。</p></section>
+    </div>
   </div>;
 }
 

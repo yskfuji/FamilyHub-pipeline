@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Dialog } from '../../design-system/components';
+import { SeasonMark } from '../../design-system/SeasonMark';
 import type { CalendarView } from '../../domain/calendarDate';
 
 const viewLabels: ReadonlyArray<readonly [CalendarView, string]> = [['month', '月'], ['week', '週'], ['day', '日'], ['list', '一覧']];
@@ -29,7 +30,7 @@ export function CalendarToolbar({ view, heading, monthKey, onView, onStep, onTod
   return <div className="calendar-toolbar">
     <div className="calendar-month-navigation" role="group" aria-label="表示する期間の移動">
       <button data-control-id="calendar.month.previous" className="button" type="button" onClick={() => onStep(-1)}>{previous}</button>
-      <button data-control-id="calendar.month.choose" className="calendar-month-heading" type="button" aria-haspopup="dialog" aria-expanded={picker} onClick={openPicker}><span aria-live="polite">{heading}</span><span aria-hidden="true">⌄</span></button>
+      <button data-control-id="calendar.month.choose" className="calendar-month-heading" type="button" aria-haspopup="dialog" aria-expanded={picker} onClick={openPicker}><SeasonMark date={monthKey}/><span aria-live="polite">{heading}</span><span aria-hidden="true">⌄</span></button>
       <button data-control-id="calendar.month.today" className="button" type="button" onClick={onToday}>{today}</button>
       <button data-control-id="calendar.month.next" className="button" type="button" onClick={() => onStep(1)}>{next}</button>
     </div>

@@ -23,7 +23,7 @@ export function ExpenseRow({ expense, search, showDate = true }: { expense: Expe
   return <li className="list-row">
     <span className="avatar" aria-hidden="true">{payer.slice(0, 1)}</span>
     <div className="row-main">
-      <a data-control-id={`budget.expense.open.${expense.id}`} className="row-link" href={`/budget/${expense.id}${search}`} data-link><strong>{expense.title}</strong></a>
+      <a data-control-id={`budget.expense.open.${expense.id}`} className="row-link" href={`/budget/${expense.id}${search}`} data-link data-keep-scroll><strong>{expense.title}</strong></a>
       <span className="meta">{parts.join(' · ')}</span>
       {expense.place && <span className="place-chip"><MapPinIcon width="14"/>{expense.place.name}</span>}
     </div>
