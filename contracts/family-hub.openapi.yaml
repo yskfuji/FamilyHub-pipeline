@@ -136,6 +136,16 @@ paths:
                   userId: { type: string }
         default: { $ref: '#/components/responses/Error' }
   /v1/auth/session:
+    get:
+      security: []
+      operationId: getSession
+      description: Tells the client which stage to show. Never fails for a signed-out visitor.
+      responses:
+        '200':
+          description: Current stage
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionInfo' }
     delete:
       operationId: signOut
       parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
@@ -977,6 +987,13 @@ components:
         application/problem+json:
           schema: { $ref: '#/components/schemas/GatewayError' }
   schemas:
+    SessionInfo:
+      type: object
+      required: [stage, idleTimeoutMinutes]
+      properties:
+        stage: { enum: [signed-out, household-setup, suspended, paywall, active] }
+        userId: { type: string }
+        idleTimeoutMinutes: { type: integer }
     GatewayError:
       type: object
       required: [code, message, retryable]

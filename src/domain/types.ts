@@ -355,6 +355,15 @@ export interface HouseholdNotification {
   status: 'active' | 'snoozed' | 'stopped';
 }
 
+export type SessionStage = 'signed-out' | 'household-setup' | 'suspended' | 'paywall' | 'active';
+/** サインインの状態と、本編に入れるかどうか。 */
+export interface SessionInfo {
+  stage: SessionStage;
+  userId?: Id;
+  /** 操作がないときにサインアウトするまでの分数。 */
+  idleTimeoutMinutes: number;
+}
+
 export interface MutationContext {
   idempotencyKey: string;
   expectedPermissionRevision: number;

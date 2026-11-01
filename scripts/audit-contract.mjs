@@ -56,7 +56,7 @@ for (const reason of ['CAPABILITY_MISSING', 'SCOPE_DENIED', 'OWNER_REQUIRED', 'V
 const operationFor = {
   'auth.beginPasskey': 'beginPasskey', 'auth.finishPasskey': 'finishPasskey', 'auth.signInWithPassword': 'signInWithPassword', 'auth.signOut': 'signOut',
   'auth.getSecurityOverview': 'getSecurityOverview', 'auth.beginPasskeyRegistration': 'beginPasskeyRegistration', 'auth.finishPasskeyRegistration': 'finishPasskeyRegistration',
-  'auth.changePassword': 'changePassword', 'auth.revokeSession': 'revokeSession',
+  'auth.getSession': 'getSession', 'auth.changePassword': 'changePassword', 'auth.revokeSession': 'revokeSession',
   'household.getSnapshot': 'getHouseholdSnapshot', 'household.acceptInvite': 'acceptInvite', 'household.updateProfile': 'updateHouseholdProfile',
   'household.updateMembershipRole': 'updateMembershipRole', 'household.createInvite': 'createHouseholdInvite', 'household.listInvites': 'listHouseholdInvites',
   'household.revokeInvite': 'revokeHouseholdInvite', 'household.getPermissionOverrides': 'getPermissionOverrides', 'household.updatePermissionOverrides': 'updatePermissionOverrides',

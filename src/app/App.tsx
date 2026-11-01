@@ -16,6 +16,7 @@ import { navigate } from './router';
 import { useEffect } from 'react';
 import { EmptyState } from '../design-system/components';
 import { useApp } from './AppContext';
+import { StageScreen } from './StageScreens';
 import type { Capability } from '../domain/types';
 import { AuditPage, auditPath } from '@audit-surface';
 
@@ -39,12 +40,14 @@ function SettingsIndex() {
 
 export default function App() {
   const path = usePath();
+  const { appStage } = useApp();
   // 接頭辞だけで一致させると /todayx なども通るため、区切りまで確認する。
   const at = (base: string) => path === base || path.startsWith(`${base}/`);
   const settingsTab = settingsTabFor(path);
   if (path === '/' || path === '/welcome') return <WelcomePage/>;
   if (path === '/auth') return <AuthPage/>;
   if (path === '/onboarding') return <OnboardingPage/>;
+  if (appStage !== 'ready') return <StageScreen stage={appStage}/>;
   let page;
   if (at('/today')) page = <TodayPage/>;
   else if (at('/calendar')) page = <PermissionBoundary capability="event.read"><CalendarPage path={path}/></PermissionBoundary>;

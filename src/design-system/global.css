@@ -375,3 +375,7 @@
     .badge, .person-chip, .calendar-event { border: 1px solid currentColor; }
   }
 }
+
+@layer components {
+  .stage-screen { min-height: 100dvh; display: grid; place-content: center; justify-items: center; gap: var(--space-4, 16px); padding: 24px; text-align: center; }
+}

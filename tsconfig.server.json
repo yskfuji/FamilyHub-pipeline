@@ -11,5 +11,5 @@
     "types": ["node"]
   },
   "include": ["server/**/*.ts", "src/domain/**/*.ts", "src/authz/**/*.ts", "src/content/*.ts", "src/data/gateway.ts"],
-  "exclude": ["server/test/**", "server/testing/**", "src/**/*.test.ts", "src/**/*.suite.ts"]
+  "exclude": ["server/test/**", "server/testing/**", "server/dev.ts", "src/**/*.test.ts", "src/**/*.suite.ts"]
 }

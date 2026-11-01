@@ -30,6 +30,12 @@ function startSession(deps: AppDeps, request: FastifyRequest, reply: FastifyRepl
   deps.db.run('INSERT INTO audit_events (id, actor_user_id, action, at) VALUES (?, ?, ?, ?)', deps.ids.next('audit'), userId, 'signIn', deps.clock.now());
 }
 
+function sessionStage(deps: AppDeps, request: FastifyRequest) {
+  if (!request.actor) return 'household-setup' as const;
+  const row = deps.db.get<{ body: string }>("SELECT body FROM records WHERE household_id = ? AND collection = 'memberships' AND id = ?", request.actor.householdId, request.actor.membershipId);
+  return row && (JSON.parse(row.body) as { status: string }).status === 'suspended' ? 'suspended' as const : 'active' as const;
+}
+
 const currentUser = (deps: AppDeps, request: FastifyRequest) => {
   if (!request.session) throw unauthenticated();
   const user = deps.db.get<UserRow>('SELECT id, email, display_name, password_hash FROM users WHERE id = ? AND deleted_at IS NULL', request.session.user_id);
@@ -53,6 +59,10 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
     if (!userId) return sendError(reply, { code: 'UNAUTHENTICATED', message: serverMessages.passkeyFailed, retryable: true });
     startSession(deps, request, reply, userId);
     return { userId };
+  });
+  app.get('/v1/auth/session', { config: declare('getSession', { auth: 'public', csrf: false, capability: 'none' }) }, (request) => {
+    if (!request.session) return { stage: 'signed-out' as const, idleTimeoutMinutes: 30 };
+    return { stage: sessionStage(deps, request), userId: request.session.user_id, idleTimeoutMinutes: 30 };
   });
   app.delete('/v1/auth/session', { config: declare('signOut', { capability: 'none' }) }, (request, reply) => {
     if (request.session) deps.db.run('UPDATE sessions SET revoked_at = ? WHERE id = ?', deps.clock.now(), request.session.id);

@@ -1,5 +1,5 @@
 import type { EventInput, EventUpdateInput, ExpenseInput, ExpenseUpdateInput, HouseholdProfileInput, MemoInput, TodoInput, TodoUpdateInput } from '../domain/schemas';
-import type { Authenticator, CalendarEvent, Expense, Household, HouseholdInvite, HouseholdNotification, HouseholdSnapshot, Id, Insight, IsoDate, Memo, MembershipRole, MutationContext, NotificationPreferences, PermissionOverride, PrivacySettings, RecurrenceScope, Result, Scenario, SecurityOverview, Todo } from '../domain/types';
+import type { Authenticator, CalendarEvent, Expense, Household, HouseholdInvite, HouseholdNotification, HouseholdSnapshot, Id, Insight, IsoDate, Memo, MembershipRole, MutationContext, NotificationPreferences, PermissionOverride, PrivacySettings, RecurrenceScope, Result, Scenario, SecurityOverview, SessionInfo, Todo } from '../domain/types';
 
 export interface AuthPort {
   beginPasskey(): Promise<Result<{ challengeId: Id; publicKey: PublicKeyCredentialRequestOptions | null }>>;
@@ -7,6 +7,7 @@ export interface AuthPort {
   finishPasskey(challengeId: Id, assertion: unknown): Promise<Result<{ userId: Id }>>;
   signInWithPassword(email: string, password: string): Promise<Result<{ userId: Id }>>;
   signOut(): Promise<Result<void>>;
+  getSession(): Promise<Result<SessionInfo>>;
   getSecurityOverview(): Promise<Result<SecurityOverview>>;
   beginPasskeyRegistration(): Promise<Result<{ challengeId: Id; publicKey: PublicKeyCredentialCreationOptions | null }>>;
   finishPasskeyRegistration(challengeId: Id, credential: unknown): Promise<Result<Authenticator>>;

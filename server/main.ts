@@ -11,6 +11,6 @@ const app = await buildApp({
   clock: { now: () => toJstRfc3339(new Date()) },
   ids: { next: (prefix) => `${prefix}-${randomUUID()}`, inviteToken: () => randomBytes(18).toString('base64url') },
 });
-const port = Number(process.env.PORT ?? 8787);
+const port = Number(process.env.PORT ?? 8799);
 await app.listen({ port, host: process.env.HOST ?? '127.0.0.1' });
 for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => { void app.close().then(() => { db.close(); process.exit(0); }); });
