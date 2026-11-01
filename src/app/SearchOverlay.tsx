@@ -6,7 +6,7 @@ import { CloseIcon } from '../design-system/icons';
 import { useModalBehavior } from '../design-system/components';
 import type { SearchResult, SearchResultKind } from '../data/gateway';
 
-const kindLabels: Record<SearchResultKind, string> = { event: '予定', task: 'タスク', memo: 'メモ', expense: '支出', place: '場所', resource: '関連リンク' };
+const kindLabels: Record<SearchResultKind, string> = { event: '予定', task: 'タスク', memo: 'メモ', expense: '家計', place: '場所', resource: '関連リンク' };
 
 export function SearchOverlay({ onClose }: { onClose: () => void }) {
   const { gateway } = useApp();

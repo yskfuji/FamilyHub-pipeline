@@ -56,7 +56,7 @@ export function DayEntries({ selected, onOpen, onCreate, headingId }: Props) {
     </ul>}
     {onCreate && <button data-control-id="calendar.event.create-on-day" className="button" type="button" onClick={() => onCreate(selected)}>この日に予定を追加</button>}
     {todos.length > 0 && <div className="day-section"><h3>タスク</h3><ul className="list">{todos.map((todo) => <TaskRow todo={todo} key={todo.id}/>)}</ul></div>}
-    {expenses.length > 0 && <div className="day-section"><h3>支出</h3><ul className="list">{expenses.map((expense) => <li className="list-row day-expense" key={expense.id}>
+    {expenses.length > 0 && <div className="day-section"><h3>家計</h3><ul className="list">{expenses.map((expense) => <li className="list-row day-expense" key={expense.id}>
       <div className="row-main"><a data-control-id={`calendar.expense.open.${expense.id}`} href={`/budget/${expense.id}`} data-link>{expense.title}</a></div>
       <span className="amount">{expense.kind === 'income' && <StatusBadge tone="success">収入</StatusBadge>} {formatYen(expense.amountJpy)}</span>
     </li>)}</ul></div>}

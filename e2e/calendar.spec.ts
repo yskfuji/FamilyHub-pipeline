@@ -111,11 +111,11 @@ test('expense marks and the expense list only reach viewers who can read expense
   await page.goto('/calendar');
   await expect(page.locator('.day-yen').first()).toBeVisible();
   await page.locator('.day:has(.day-yen)').first().click();
-  await expect(page.locator('.calendar-day-panel').getByRole('heading', { name: '支出' })).toBeVisible();
+  await expect(page.locator('.calendar-day-panel').getByRole('heading', { name: '家計' })).toBeVisible();
   await page.goto('/calendar?actor=member-hana');
   await expect(dayCell(page, '2026-09-30')).toBeVisible();
   await expect(page.locator('.day-yen')).toHaveCount(0);
-  await expect(page.getByRole('heading', { name: '支出' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: '家計' })).toHaveCount(0);
 });
 
 test('a task is completed from the day panel and a reviewed task asks for review instead', async ({ page }) => {

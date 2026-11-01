@@ -132,6 +132,7 @@ const snapshotProjection: Record<keyof HouseholdSnapshot, Projector> = {
     snapshot.events.forEach((item) => { referenced.add(item.ownerMembershipId); item.participantMembershipIds.forEach((id) => referenced.add(id)); });
     snapshot.todos.forEach((item) => { referenced.add(item.creatorMembershipId); referenced.add(item.assigneeMembershipId); if (item.reviewerMembershipId) referenced.add(item.reviewerMembershipId); });
     snapshot.memos.forEach((item) => referenced.add(item.authorMembershipId));
+    snapshot.expenses.forEach((item) => { referenced.add(item.payerMembershipId); referenced.add(item.creatorMembershipId); item.shares.forEach((share) => referenced.add(share.membershipId)); });
     snapshot.memberships = snapshot.memberships.filter((item) => referenced.has(item.id));
   },
 };

@@ -48,7 +48,7 @@ test('search finds expenses, places and memo text, and opens the detail', async 
   await page.getByRole('button', { name: /検索/ }).click();
   await page.getByRole('searchbox').fill('青葉書店');
   await expect(page.getByRole('link', { name: '場所「青葉書店」を開く' })).toBeVisible();
-  await page.getByRole('link', { name: '支出「学校教材」を開く' }).click();
+  await page.getByRole('link', { name: '家計「学校教材」を開く' }).click();
   await expect(page).toHaveURL(/\/budget\/expense-books$/);
   await expect(page.getByRole('dialog', { name: '学校教材' })).toBeVisible();
   await page.getByRole('button', { name: '閉じる' }).click();

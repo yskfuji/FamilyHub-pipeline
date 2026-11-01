@@ -41,7 +41,7 @@ export function aggregatePlaces(expenses: Expense[], memos: Memo[]): PlaceSummar
     if (use.date >= group.lastUsedOn) { group.lastUsedOn = use.date; group.place = place; }
     groups.set(key, group);
   };
-  for (const expense of expenses) if (expense.place && !expense.deletedAt) add(expense.place, { kind: 'expense', id: expense.id, title: expense.title, date: expense.incurredOn, amountJpy: expense.amountJpy });
+  for (const expense of expenses.filter((item) => item.kind !== 'income')) if (expense.place && !expense.deletedAt) add(expense.place, { kind: 'expense', id: expense.id, title: expense.title, date: expense.incurredOn, amountJpy: expense.amountJpy });
   for (const memo of memos) if (memo.place && !memo.deletedAt) add(memo.place, { kind: 'memo', id: memo.id, title: memo.title, date: memo.updatedAt.slice(0, 10) });
   for (const group of groups.values()) group.uses.sort((a, b) => b.date.localeCompare(a.date) || a.title.localeCompare(b.title, 'ja'));
   return [...groups.values()];
