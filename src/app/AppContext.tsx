@@ -94,17 +94,21 @@ export function AppProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     if (!snapshot.viewer.capabilities.includes('settings.own')) return;
     let mounted = true;
-    void gateway.household.getPrivacySettings().then((result) => { if (mounted && result.ok) setPrivacy(result.value); });
+    void gateway.household.getPrivacySettings().then((result) => { if (mounted && result.ok) { setPrivacy(result.value); privacyBefore.current = result.value; } });
     return () => { mounted = false; };
   }, [gateway, snapshot.viewer.capabilities]);
   // 読み込みと保存の組を順に処理する。続けて操作しても、先の保存が後の変更を上書きしないようにする。
   const privacyQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const privacyBefore = useRef<PrivacySettings | null>(null);
   const updatePrivacy = useCallback((patch: Partial<PrivacySettings>): Promise<Result<PrivacySettings>> => {
+    // 同意の取り消しなどは保存を待たずに全画面へ反映する。保存できなければ記録された内容へ戻す。
+    setPrivacy((current) => current && { ...current, ...patch });
     const run = async (): Promise<Result<PrivacySettings>> => {
       const latest = await gateway.household.getPrivacySettings();
-      if (!latest.ok) return latest;
+      if (!latest.ok) { setPrivacy((current) => current && { ...current, ...Object.fromEntries(Object.keys(patch).map((key) => [key, privacyBefore.current?.[key as keyof PrivacySettings]])) }); return latest; }
       const result = await gateway.household.savePrivacySettings({ ...latest.value, ...patch });
-      if (result.ok) setPrivacy(result.value);
+      setPrivacy(result.ok ? result.value : latest.value);
+      if (result.ok) privacyBefore.current = result.value;
       return result;
     };
     const next = privacyQueue.current.then(run, run);
