@@ -136,6 +136,26 @@ describe('album uploads', () => {
     expect(album.ok && album.value.items.find((entry) => uploaded.ok && entry.id === uploaded.value.itemId)).toMatchObject({ status: 'rejected' });
   });
 
+  it('an upload stopped with its signal gives the slot back, so stopping never uses up the limit', async () => {
+    const world = open();
+    await world.ready;
+    for (let round = 0; round < 5; round += 1) {
+      const controller = new AbortController();
+      controller.abort();
+      const stopped = await world.gateway.albums.uploadItem('album-sports', asFile(await imageWithGps(), `stop-${round}.jpg`, 'image/jpeg'), { keepLocation: false, signal: controller.signal });
+      expect(stopped.ok).toBe(false);
+    }
+    const album = await world.gateway.albums.getAlbum('album-sports');
+    expect(album.ok && album.value.items.filter((item) => item.originalName.startsWith('stop-'))).toEqual([]);
+    expect((await world.gateway.albums.uploadItem('album-sports', asFile(await imageWithGps(), 'after.jpg', 'image/jpeg'), { keepLocation: false })).ok).toBe(true);
+  });
+
+  it('cancelling a file that was never sent is harmless', async () => {
+    const world = open();
+    await world.ready;
+    expect((await world.gateway.albums.cancelUpload(asFile(Buffer.from('x'), 'never-sent.jpg', 'image/jpeg'))).ok).toBe(true);
+  });
+
   it('strips location atoms from a video and accepts a client thumbnail only after re-encoding', async () => {
     const world = open();
     const thumbnail = new Blob([new Uint8Array(await sharp({ create: { width: 32, height: 18, channels: 3, background: '#000' } }).png().toBuffer())]);

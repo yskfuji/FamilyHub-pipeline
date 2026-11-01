@@ -1,5 +1,5 @@
 import type { FamilyHubGateway } from './gateway';
-import type { GatewayError, Result } from '../domain/types';
+import type { GatewayError, Id, Result } from '../domain/types';
 
 type RequestOptions = RequestInit & { csrf?: boolean; idempotencyKey?: string };
 
@@ -84,6 +84,16 @@ export function createHttpGateway(baseUrl: string, getCsrfToken: CsrfProvider, g
   if (!allowedBase(baseUrl)) throw new Error('本番HTTPアダプタにはHTTPSのbaseUrlが必要です');
   if (typeof getCsrfToken !== 'function') throw new Error('本番HTTPアダプタには実行時CSRF token providerが必要です');
   if (typeof getPermissionRevision !== 'function') throw new Error('本番HTTPアダプタには実行時の権限リビジョンproviderが必要です');
+
+  /** 送り終えていないファイルの枠。送り直しで続きから送るために、File ごとに覚えておく。 */
+  const openUploads = new WeakMap<File, { albumId: Id; uploadId: string; itemId: Id }>();
+  /** 枠を手放す。接続できないときは枠の期限が切れるのを待つ。 */
+  async function cancelOpenUpload(file: File) {
+    const open = openUploads.get(file);
+    if (!open) return;
+    openUploads.delete(file);
+    await (fetchImplementation ?? fetch)(new URL(`/v1/uploads/${encodeURIComponent(open.uploadId)}`, baseUrl), { method: 'DELETE', credentials: 'include', headers: { 'X-CSRF-Token': await getCsrfToken(), 'Tus-Resumable': '1.0.0' } }).catch(() => undefined);
+  }
 
   async function send<T>(path: string, options: RequestOptions, idempotencyKey: string | undefined, refreshCsrf: boolean): Promise<Result<T>> {
     const isMutation = Boolean(options.method && !['GET', 'HEAD'].includes(options.method));
@@ -209,33 +219,60 @@ export function createHttpGateway(baseUrl: string, getCsrfToken: CsrfProvider, g
       deleteItem: (albumId, itemId) => request(`/v1/albums/${encodeURIComponent(albumId)}/items/${encodeURIComponent(itemId)}`, { method: 'DELETE', csrf: true }),
       restoreItem: (albumId, itemId) => request(`/v1/albums/${encodeURIComponent(albumId)}/items/${encodeURIComponent(itemId)}/restore`, { method: 'POST', csrf: true }),
       uploadItem: async (albumId, file, options) => {
-        const created = await request<{ uploadId: string; itemId: string; offset: number }>('/v1/uploads', { method: 'POST', body: JSON.stringify({ albumId, name: file.name, mimeType: file.type, byteSize: file.size, keepLocation: options.keepLocation }), csrf: true });
-        if (!created.ok) return created;
-        const { uploadId, itemId } = created.value;
-        const uploadPath = `/v1/uploads/${encodeURIComponent(uploadId)}`;
         const client = fetchImplementation ?? fetch;
         const authHeaders = async () => ({ 'X-CSRF-Token': await getCsrfToken(), 'Tus-Resumable': '1.0.0' });
-        const currentOffset = async () => { const response = await client(new URL(uploadPath, baseUrl), { method: 'HEAD', credentials: 'include', headers: await authHeaders() }); return Number(response.headers.get('Upload-Offset') ?? 0); };
-        let offset = 0; let retries = 0;
+        const pathOf = (uploadId: string) => `/v1/uploads/${encodeURIComponent(uploadId)}`;
+        /** 受け取られた位置。枠がなくなっていれば null。 */
+        const receivedOffset = async (uploadId: string) => {
+          const response = await client(new URL(pathOf(uploadId), baseUrl), { method: 'HEAD', credentials: 'include', headers: await authHeaders() });
+          return response.ok ? Number(response.headers.get('Upload-Offset') ?? 0) : null;
+        };
+        // 前回の失敗で残っている枠があれば、続きから送る。枠を作り直すと、上限の3件を使い切ってしまう。
+        let open = openUploads.get(file);
+        let offset = 0;
+        if (open?.albumId === albumId) {
+          const received = await receivedOffset(open.uploadId).catch(() => 0);
+          if (received === null) open = undefined; else offset = received;
+        } else open = undefined;
+        if (!open) {
+          const created = await request<{ uploadId: string; itemId: string; offset: number }>('/v1/uploads', { method: 'POST', body: JSON.stringify({ albumId, name: file.name, mimeType: file.type, byteSize: file.size, keepLocation: options.keepLocation }), csrf: true });
+          if (!created.ok) return created;
+          open = { albumId, uploadId: created.value.uploadId, itemId: created.value.itemId };
+          openUploads.set(file, open);
+        }
+        const { uploadId, itemId } = open;
+        options.onReserved?.();
+        const cancelled = async (): Promise<Result<{ itemId: string }>> => {
+          await cancelOpenUpload(file);
+          return { ok: false, error: { code: 'OFFLINE', message: '送信を止めました。', retryable: true } };
+        };
+        let retries = 0;
         while (offset < file.size) {
-          if (options.signal?.aborted) return { ok: false, error: { code: 'OFFLINE', message: '送信を止めました。', retryable: true } };
+          if (options.signal?.aborted) return cancelled();
           const chunk = file.slice(offset, offset + UPLOAD_CHUNK_BYTES);
           try {
-            const response = await client(new URL(uploadPath, baseUrl), { method: 'PATCH', credentials: 'include', body: chunk, headers: { ...(await authHeaders()), 'Content-Type': 'application/offset+octet-stream', 'Upload-Offset': String(offset) } });
+            const response = await client(new URL(pathOf(uploadId), baseUrl), { method: 'PATCH', credentials: 'include', body: chunk, signal: options.signal, headers: { ...(await authHeaders()), 'Content-Type': 'application/offset+octet-stream', 'Upload-Offset': String(offset) } });
             if (response.status === 204) { offset = Number(response.headers.get('Upload-Offset') ?? offset + chunk.size); retries = 0; options.onProgress?.(offset, file.size); continue; }
-            if (response.status !== 409) return { ok: false, error: await response.json().catch(() => responseFailure) as GatewayError };
-            offset = await currentOffset();
+            if (response.status !== 409) {
+              const error = await response.json().catch(() => responseFailure) as GatewayError;
+              if (!error.retryable) await cancelOpenUpload(file);
+              return { ok: false, error };
+            }
+            offset = (await receivedOffset(uploadId)) ?? offset;
           } catch {
+            if (options.signal?.aborted) return cancelled();
             // 通信が切れたら、受け取られた位置を確かめて続きから送る。
             retries += 1;
             if (retries > UPLOAD_RETRIES) return { ok: false, error: networkError };
             await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** retries));
-            try { offset = await currentOffset(); } catch { /* 次の回でもう一度確かめる */ }
+            try { offset = (await receivedOffset(uploadId)) ?? offset; } catch { /* 次の回でもう一度確かめる */ }
           }
         }
-        if (options.thumbnail) await client(new URL(`/v1/albums/${encodeURIComponent(albumId)}/items/${encodeURIComponent(itemId)}/thumbnail`, baseUrl), { method: 'PUT', credentials: 'include', body: options.thumbnail, headers: { 'X-CSRF-Token': await getCsrfToken(), 'Content-Type': 'application/octet-stream' } });
+        openUploads.delete(file);
+        if (options.thumbnail) await client(new URL(`/v1/albums/${encodeURIComponent(albumId)}/items/${encodeURIComponent(itemId)}/thumbnail`, baseUrl), { method: 'PUT', credentials: 'include', body: options.thumbnail, headers: { 'X-CSRF-Token': await getCsrfToken(), 'Content-Type': 'application/octet-stream' } }).catch(() => undefined);
         return { ok: true, value: { itemId } };
       },
+      cancelUpload: async (file) => { await cancelOpenUpload(file); return { ok: true, value: undefined }; },
       mediaUrl: (item, variant) => `/v1/albums/${encodeURIComponent(item.albumId)}/items/${encodeURIComponent(item.id)}/${variant}`,
     },
     family: {

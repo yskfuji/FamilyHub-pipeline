@@ -11,6 +11,7 @@ import { CalendarPage } from '../features/calendar/CalendarPage';
 import { TasksPage } from '../features/tasks/TasksPage';
 import { NotesPage } from '../features/notes/NotesPage';
 import { BudgetPage } from '../features/budget/BudgetPage';
+import { AlbumsPage } from '../features/albums/AlbumsPage';
 import { InsightsPage } from '../features/insights/InsightsPage';
 import { SettingsPage, settingsTabFor, settingsTabs } from '../features/settings/SettingsPage';
 import { PlacesPage } from '../features/places/PlacesPage';
@@ -59,6 +60,7 @@ export default function App() {
   else if (at('/tasks')) page = <PermissionBoundary capability="task.read"><TasksPage path={path}/></PermissionBoundary>;
   else if (at('/notes')) page = <PermissionBoundary capability="memo.read"><NotesPage path={path}/></PermissionBoundary>;
   else if (at('/budget')) page = <PermissionBoundary capability="expense.read"><BudgetPage path={path}/></PermissionBoundary>;
+  else if (at('/albums')) page = <PermissionBoundary capability="album.read"><AlbumsPage path={path}/></PermissionBoundary>;
   else if (at('/places')) page = <PermissionBoundary capability="place.read"><PlacesPage path={path}/></PermissionBoundary>;
   else if (at('/insights')) page = <PermissionBoundary capability="insight.read"><InsightsPage/></PermissionBoundary>;
   else if (path === '/settings' || path === '/settings/') page = <SettingsIndex/>;

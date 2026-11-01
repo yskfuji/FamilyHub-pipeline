@@ -86,6 +86,8 @@ export interface UploadOptions {
   keepLocation: boolean;
   /** 動画の縮小画像。端末で作って渡す。 */
   thumbnail?: Blob;
+  /** 送信の枠を受け取ったとき。アルバムの中の並びは、枠を受け取った順に決まる。 */
+  onReserved?(): void;
   onProgress?(sentBytes: number, totalBytes: number): void;
   signal?: AbortSignal;
 }
@@ -100,10 +102,15 @@ export interface AlbumPort {
   reorderItems(albumId: Id, itemIds: Id[], expectedVersion: number): Promise<Result<Album>>;
   deleteItem(albumId: Id, itemId: Id): Promise<Result<void>>;
   restoreItem(albumId: Id, itemId: Id): Promise<Result<AlbumItem>>;
-  /** 大きなファイルは分けて送り、途切れても続きから送る。 */
+  /**
+   * 大きなファイルは分けて送り、途切れても続きから送る。同じ File でもう一度呼ぶと、前回の続きから送る。
+   * signal で止めたときは、途中まで送った分を取り消す。
+   */
   uploadItem(albumId: Id, file: File, options: UploadOptions): Promise<Result<{ itemId: Id }>>;
+  /** 送り直さないと決めたファイルの送信を取り消す。途中まで受け取った分と枠を手放す。 */
+  cancelUpload(file: File): Promise<Result<void>>;
   /** 写真や動画を開く URL。同じオリジンの画像として読み込める。 */
-  mediaUrl(item: AlbumItem, variant: 'thumbnail' | 'file'): string;
+  mediaUrl(item: Pick<AlbumItem, 'id' | 'albumId'>, variant: 'thumbnail' | 'file'): string;
 }
 
 export interface FamilyPort {

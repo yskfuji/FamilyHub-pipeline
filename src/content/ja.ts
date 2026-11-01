@@ -1,4 +1,5 @@
 import type {
+  BgmPreset,
   AttachmentStatus,
   Capability,
   Expense,
@@ -48,6 +49,7 @@ export const ja = {
     tasks: 'タスク',
     notes: 'メモ',
     budget: '家計',
+    albums: 'アルバム',
     places: '場所',
     insights: 'ヒント',
     settings: '設定',
@@ -153,6 +155,10 @@ export const ja = {
       },
     },
     memo: {
+      labels: {},
+      help: { household: '管理者と大人のメンバー、作成した本人に表示します。' },
+    },
+    album: {
       labels: {},
       help: { household: '管理者と大人のメンバー、作成した本人に表示します。' },
     },
@@ -416,6 +422,8 @@ export const membershipStatusLabels = ja.membershipStatus;
 export const taskStatusLabels = ja.taskStatus;
 export const attachmentStatusLabels = ja.attachmentStatus;
 export const notificationStatusLabels = ja.notificationStatus;
+
+export const bgmLabels: Record<BgmPreset, string> = { calm: '落ち着いた曲', bright: '明るい曲', gentle: 'やさしい曲' };
 
 export function audienceLabel(kind: SharedKind, audience: VisibilityAudience): string {
   const labels: Partial<Record<VisibilityAudience, string>> = kind === 'event' ? {} : ja.visibilityFor[kind].labels;

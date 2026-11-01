@@ -1,12 +1,12 @@
 import { allowedAudiencesFor } from '../authz/policy';
 import type { HouseholdMembership, Id, MembershipRole, VisibilityAudience, VisibilityPolicy } from './types';
 
-/** 公開範囲を持つ記録の種類。メモには「参加者」がない。 */
-export type SharedKind = 'event' | 'task' | 'memo' | 'expense';
+/** 公開範囲を持つ記録の種類。メモとアルバムには「参加者」がない。 */
+export type SharedKind = 'event' | 'task' | 'memo' | 'album' | 'expense';
 
 export const MAX_SELECTED_MEMBERS = 8;
 
-const chooseable = (role: MembershipRole, kind: SharedKind) => allowedAudiencesFor(role).filter((audience) => kind !== 'memo' || audience !== 'participants');
+const chooseable = (role: MembershipRole, kind: SharedKind) => allowedAudiencesFor(role).filter((audience) => (kind !== 'memo' && kind !== 'album') || audience !== 'participants');
 
 /** 選べる公開範囲。選べない範囲の記録でも、今の範囲は表示する（変えなければ送らない）。 */
 export function audienceChoices(role: MembershipRole, kind: SharedKind, current?: VisibilityAudience): readonly VisibilityAudience[] {

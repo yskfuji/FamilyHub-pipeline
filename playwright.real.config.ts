@@ -16,7 +16,7 @@ export default defineConfig({
   reporter: [['list']],
   use: { baseURL: 'http://localhost:4174', locale: 'ja-JP', timezoneId: 'Asia/Tokyo', trace: 'retain-on-failure' },
   webServer: [
-    { command: 'npx tsx server/dev.ts', env: { FAMILY_HUB_DATABASE: database, FAMILY_HUB_ORIGIN: 'http://localhost:4174', PORT: '8799', FAMILY_HUB_RECENT_AUTH_MS: '1000' }, url: 'http://127.0.0.1:8799/health', reuseExistingServer: false, timeout: 60_000 },
+    { command: 'npx tsx server/dev.ts', env: { FAMILY_HUB_DATABASE: database, FAMILY_HUB_MEDIA: 'test-results/real-media', FAMILY_HUB_ORIGIN: 'http://localhost:4174', PORT: '8799', FAMILY_HUB_RECENT_AUTH_MS: '1000' }, url: 'http://127.0.0.1:8799/health', reuseExistingServer: false, timeout: 60_000 },
     { command: 'npx vite preview --outDir dist-http --port 4174 --host localhost --strictPort', env: { VITE_GATEWAY: 'http' }, url: 'http://localhost:4174/', reuseExistingServer: false, timeout: 60_000 },
   ],
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],

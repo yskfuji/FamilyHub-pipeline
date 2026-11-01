@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type PropsWithChildren, type ReactNode } f
 import { useApp } from './AppContext';
 import { Brand, Drawer, EmptyState, PageHeader, StatusBadge, formatTime } from '../design-system/components';
 import type { HouseholdNotification } from '../domain/types';
-import { BellIcon, CalendarIcon, CheckIcon, EyeIcon, HomeIcon, MapPinIcon, MoonIcon, MoreIcon, NoteIcon, SearchIcon, SettingsIcon, SparkIcon, SunIcon, YenIcon } from '../design-system/icons';
+import { BellIcon, CalendarIcon, CheckIcon, EyeIcon, HomeIcon, ImageIcon, MapPinIcon, MoonIcon, MoreIcon, NoteIcon, SearchIcon, SettingsIcon, SparkIcon, SunIcon, YenIcon } from '../design-system/icons';
 import { QuickCreate } from './QuickCreate';
 import { SearchOverlay } from './SearchOverlay';
 import type { Capability } from '../domain/types';
@@ -16,6 +16,7 @@ const primary: Array<{ href: string; label: string; icon: (props: any) => ReactN
   { href: '/tasks', label: ja.navigation.tasks, icon: CheckIcon, capability: 'task.read' },
   { href: '/notes', label: ja.navigation.notes, icon: NoteIcon, capability: 'memo.read' },
   { href: '/budget', label: ja.navigation.budget, icon: YenIcon, capability: 'expense.read' },
+  { href: '/albums', label: ja.navigation.albums, icon: ImageIcon, capability: 'album.read' },
   { href: '/places', label: ja.navigation.places, icon: MapPinIcon, capability: 'place.read' },
   { href: '/insights', label: ja.navigation.insights, icon: SparkIcon, capability: 'insight.read' },
   { href: '/settings', label: ja.navigation.settings, icon: SettingsIcon, capability: 'settings.own', match: '/settings' },

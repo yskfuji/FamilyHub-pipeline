@@ -63,6 +63,7 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
   const { state } = aggregate;
   let passkeyChallenge: string | null = null;
   const mediaUrls = new Map<Id, string>();
+  const thumbnailUrls = new Map<Id, string>();
   const actorMember = state.memberships.find((item) => item.id === actorMembershipId);
   const account: AccountProfile = { displayName: actorMember?.displayName ?? '', email: `${actorMember?.userId ?? ''}@example.test`, avatar: { kind: 'initial' }, idleTimeoutMinutes: 30, birthdateDeclared: true, adultDeclared: actorMember?.role === 'owner' || actorMember?.role === 'adult', totpEnabled: false };
 
@@ -182,12 +183,19 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
         await delay(120);
         const reserved = rules.albums.reserveItem(albumId, { kind: file.type.startsWith('video/') ? 'video' : 'photo', originalName: file.name, mimeType: file.type, byteSize: file.size, keepLocation: options.keepLocation });
         if (!reserved.ok) return reserved;
+        options.onReserved?.();
         options.onProgress?.(file.size, file.size);
         const item = aggregate.albumItems.find((entry) => entry.id === reserved.value.id);
-        if (item) { Object.assign(item, { status: 'ready', hasThumbnail: true }); mediaUrls.set(item.id, URL.createObjectURL(file)); }
+        if (item) {
+          const isVideo = item.kind === 'video';
+          Object.assign(item, { status: 'ready', hasThumbnail: !isVideo || Boolean(options.thumbnail) });
+          mediaUrls.set(item.id, URL.createObjectURL(file));
+          if (isVideo && options.thumbnail) thumbnailUrls.set(item.id, URL.createObjectURL(options.thumbnail));
+        }
         return ok({ itemId: reserved.value.id });
       },
-      mediaUrl: (item) => mediaUrls.get(item.id) ?? sampleImage(item.id),
+      async cancelUpload() { return ok(undefined); },
+      mediaUrl: (item, variant) => (variant === 'thumbnail' ? thumbnailUrls.get(item.id) : undefined) ?? mediaUrls.get(item.id) ?? sampleImage(item.id),
     },
     resources: delayed(rules.resources),
     insights: delayed(rules.insights),

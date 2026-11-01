@@ -93,7 +93,7 @@ test('expired session hides household content until sign-in', async ({ page }) =
 for (const width of [320, 390, 768, 1024, 1440, 1920]) {
   test(`no horizontal overflow at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
-    for (const route of ['/today','/calendar','/tasks','/notes','/budget','/insights','/settings/security','/showcase']) {
+    for (const route of ['/today','/calendar','/tasks','/notes','/budget','/albums','/albums/album-sports','/insights','/settings/security','/showcase']) {
       await page.goto(route);
       await page.waitForLoadState('networkidle');
       const metrics = await page.evaluate(() => ({ document: document.documentElement.scrollWidth - document.documentElement.clientWidth, body: document.body.scrollWidth - document.body.clientWidth, main: (() => { const el = document.querySelector('main'); return el ? el.scrollWidth - el.clientWidth : 0; })() }));
