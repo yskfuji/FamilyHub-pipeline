@@ -1,0 +1,22 @@
+# 例。この環境では動かしていない。パスとユーザーは配備先に合わせる。
+[Unit]
+Description=よりどころ API
+After=network.target
+
+[Service]
+Type=simple
+User=family-hub
+WorkingDirectory=/opt/family-hub
+# NODE_ENV=production と FAMILY_HUB_* をここに書く。読めるのは実行するユーザーだけにする。
+EnvironmentFile=/etc/family-hub/api.env
+ExecStart=/usr/bin/node dist-server/main.js
+Restart=on-failure
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+# データベースとメディアの置き場所だけ書けるようにする。
+ReadWritePaths=/var/lib/family-hub
+
+[Install]
+WantedBy=multi-user.target

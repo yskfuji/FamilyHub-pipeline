@@ -1,4 +1,5 @@
 import type { ContextSnapshot } from '../../src/domain/types';
+import { serverMessages } from '../../src/content/serverMessages';
 
 export type Weather = ContextSnapshot['weather'];
 const FRESH_MS = 30 * 60_000;
@@ -14,10 +15,10 @@ function conditionOf(code: number): Weather['condition'] {
 
 export interface WeatherSource { current(): Weather; refresh(): Promise<void> }
 
-const unavailable: Weather = { location: '東京', condition: 'sunny', temperatureC: 0, precipitationPercent: 0, unavailable: true };
+const unavailable: Weather = { location: serverMessages.defaultWeatherPlace, condition: 'sunny', temperatureC: 0, precipitationPercent: 0, unavailable: true };
 
 /** 外部の天気の取得はこのファイルだけで行う。要求を待たせないよう、古ければ裏で取り直す。 */
-export function createWeatherSource(now: () => number, endpoint = 'https://api.open-meteo.com/v1/forecast', location = { name: '東京', latitude: 35.68, longitude: 139.77 }): WeatherSource {
+export function createWeatherSource(now: () => number, endpoint = 'https://api.open-meteo.com/v1/forecast', location = { name: serverMessages.defaultWeatherPlace, latitude: 35.68, longitude: 139.77 }): WeatherSource {
   let cached: { value: Weather; at: number } | null = null;
   let running: Promise<void> | null = null;
   const refresh = () => {
@@ -29,7 +30,7 @@ export function createWeatherSource(now: () => number, endpoint = 'https://api.o
         const body = await response.json() as { current: { temperature_2m: number; weather_code: number }; hourly: { precipitation_probability: Array<number | null> } };
         const percent = Math.max(0, ...body.hourly.precipitation_probability.map((value) => value ?? 0));
         const condition = percent >= 60 && body.current.weather_code < 51 ? 'rain' : conditionOf(body.current.weather_code);
-        cached = { at: now(), value: { location: location.name, condition, temperatureC: Math.round(body.current.temperature_2m), precipitationPercent: percent, ...(condition === 'sunny' ? {} : { alert: condition === 'storm' ? '雷を伴う雨のおそれがあります' : `12時間以内の降水確率は${percent}%です` }) } };
+        cached = { at: now(), value: { location: location.name, condition, temperatureC: Math.round(body.current.temperature_2m), precipitationPercent: percent, ...(condition === 'sunny' ? {} : { alert: condition === 'storm' ? serverMessages.stormAlert : serverMessages.rainAlert(percent) }) } };
       } catch {
         // 取得できないときは前の値を使い続ける（下で期限を見る）。
       } finally {

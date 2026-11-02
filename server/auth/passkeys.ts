@@ -1,6 +1,7 @@
 import { generateAuthenticationOptions, generateRegistrationOptions, verifyAuthenticationResponse, verifyRegistrationResponse } from '@simplewebauthn/server';
 import type { AuthenticationResponseJSON, AuthenticatorTransport, RegistrationResponseJSON } from '@simplewebauthn/server';
 import type { AppDeps } from '../http/context';
+import { serverMessages } from '../../src/content/serverMessages';
 
 const CHALLENGE_TTL_MS = 5 * 60_000;
 interface ChallengeRow { id: string; purpose: string; user_id: string | null; challenge: string; expires_at: string }
@@ -50,7 +51,7 @@ export async function finishAuthentication(deps: AppDeps, challengeId: string, a
 export async function beginRegistration(deps: AppDeps, user: { id: string; email: string; displayName: string }) {
   const existing = deps.db.all<{ credential_id: string; transports: string }>('SELECT credential_id, transports FROM passkeys WHERE user_id = ?', user.id);
   const options = await generateRegistrationOptions({
-    rpName: 'よりどころ', rpID: relyingParty(deps), userName: user.email, userDisplayName: user.displayName, userID: new TextEncoder().encode(user.id),
+    rpName: serverMessages.brand, rpID: relyingParty(deps), userName: user.email, userDisplayName: user.displayName, userID: new TextEncoder().encode(user.id),
     attestationType: 'none', authenticatorSelection: { residentKey: 'required', userVerification: 'required' },
     excludeCredentials: existing.map((item) => ({ id: item.credential_id, transports: JSON.parse(item.transports) as AuthenticatorTransport[] })),
   });
@@ -66,7 +67,7 @@ export async function finishRegistration(deps: AppDeps, userId: string, challeng
     const { credential: created } = result.registrationInfo;
     const id = deps.ids.next('passkey');
     const createdAt = deps.clock.now();
-    const label = 'パスキー';
+    const label = serverMessages.passkeyLabel;
     deps.db.run('INSERT INTO passkeys (id, user_id, credential_id, public_key, counter, transports, label, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', id, userId, created.id, created.publicKey, created.counter, JSON.stringify(created.transports ?? []), label, createdAt);
     return { id, label, createdAt, kind: 'passkey' as const, demo: false };
   } catch {

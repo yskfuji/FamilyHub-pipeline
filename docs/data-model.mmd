@@ -1,203 +1,201 @@
 erDiagram
-  User ||--o{ HouseholdMembership : belongs_through
-  Household ||--o{ HouseholdMembership : has
-  HouseholdMembership ||--o{ PermissionOverride : receives
-  User ||--o{ Authenticator : registers
-  User ||--o{ Session : owns
-  Household ||--o{ HouseholdInvite : issues
-  HouseholdInvite }o--|| HouseholdMembership : accepted_as
-  Household ||--o{ Event : contains
-  Household ||--o{ Todo : contains
-  Household ||--o{ Memo : contains
-  Household ||--o{ Expense : contains
-  Household ||--o{ ResourceLink : contains
-  Household ||--o{ AuditEvent : records
-  Household ||--o{ IdempotencyRecord : deduplicates
-  Event ||--o| RecurrenceRule : repeats_by
-  Event ||--o{ RecurrenceOverride : excepts
-  Todo ||--o| RecurrenceRule : repeats_by
-  Todo ||--o{ RecurrenceOverride : excepts
-  HouseholdMembership ||--o{ Todo : assigned_to
-  HouseholdMembership ||--o{ Todo : reviewed_by
-  HouseholdMembership ||--o{ Todo : created_by
-  Memo ||--o{ Attachment : has
-  Expense ||--|{ ExpenseShare : splits_into
-  Expense ||--o{ SettlementRecord : settled_by
-  SettlementRecord o|--o| SettlementRecord : reverses
-  HouseholdMembership ||--o{ ExpenseShare : owes
-  Memo ||--o| PlaceSnapshot : located_at
-  Expense ||--o| PlaceSnapshot : located_at
-  HouseholdMembership ||--o{ PlaceLookupConsent : grants
-  HouseholdMembership ||--o{ Notification : receives
+  users ||--o| household_members : belongs_through
+  users ||--o{ sessions : owns
+  users ||--o{ passkeys : registers
+  users ||--o{ recovery_codes : holds
+  users ||--o{ password_resets : requests
+  users ||--o{ uploads : sends
+  users ||--o{ assistant_jobs : starts
+  household_members }o--|| records : household_id
+  records ||--o{ entitlements : household_id
+  records ||--o{ audit_events : household_id
+  records ||--o{ memberships : collection
+  records ||--o{ events : collection
+  records ||--o{ todos : collection
+  records ||--o{ memos : collection
+  records ||--o{ expenses : collection
+  records ||--o{ resources : collection
+  records ||--o{ links : collection
+  records ||--o{ colorLabels : collection
+  records ||--o{ invites : collection
+  records ||--o{ notifications : collection
+  records ||--o{ permissionOverrides : collection
+  records ||--o{ albums : collection
+  records ||--o{ albumItems : collection
+  records ||--o{ archive : collection
+  records ||--o{ meta : collection
+  albums ||--o{ albumItems : album_id
+  uploads }o--|| albumItems : item_id
+  assistant_jobs }o--|| records : household_id
 
-  User {
-    uuid id PK
-    string email UK
-    string display_name
+  users {
+    text id PK
+    text email UK "大文字小文字を区別しない"
+    text display_name
+    text avatar_tone
+    text password_hash "Argon2id の値"
+    text created_at
+    text deleted_at
+    text birthdate
+    text adult_declared_at
+    text avatar
+    integer idle_timeout_minutes
+    text totp_secret "暗号化して保存"
+    text totp_enabled_at
+    integer totp_last_step "再利用の防止"
   }
-  Household {
-    uuid id PK
-    string name
-    string iana_timezone
-    int authorization_revision
+  household_members {
+    text user_id PK,FK
+    text household_id
+    text membership_id UK
   }
-  HouseholdMembership {
-    uuid id PK
-    uuid user_id FK
-    uuid household_id FK
-    enum role
-    enum status
-    int version
+  records {
+    text household_id PK
+    text collection PK "下の JSON 文書の種類"
+    text id PK
+    integer seq "配列の順"
+    text body "JSON 文書"
   }
-  PermissionOverride {
-    uuid id PK
-    uuid membership_id FK
-    string capability
-    enum effect
+  sessions {
+    text id PK
+    text token_hash UK
+    text user_id FK
+    text label
+    text location
+    text created_at
+    text last_seen_at
+    text expires_at
+    text reauthenticated_at
+    text revoked_at
   }
-  Authenticator {
-    uuid id PK
-    uuid user_id FK
-    enum kind
-    bytes credential_public_key
+  passkeys {
+    text id PK
+    text user_id FK
+    text credential_id UK
+    blob public_key
+    integer counter
+    text transports
+    text label
+    text created_at
   }
-  Session {
-    uuid id PK
-    uuid user_id FK
-    timestamp expires_at
-    timestamp revoked_at
+  webauthn_challenges {
+    text id PK
+    text purpose
+    text user_id
+    text challenge
+    text expires_at
   }
-  HouseholdInvite {
-    uuid id PK
-    uuid household_id FK
-    enum role
-    timestamp expires_at
-    int max_uses
-    int use_count
-  }
-  Event {
-    uuid id PK
-    uuid household_id FK
-    timestamp starts_at_utc
-    timestamp ends_at_utc
-    string timezone
-    enum visibility_audience
-    json selected_membership_ids
-    int version
-    timestamp deleted_at
-  }
-  Todo {
-    uuid id PK
-    uuid household_id FK
-    uuid assignee_membership_id FK
-    uuid reviewer_membership_id FK
-    uuid creator_membership_id FK
-    enum status
-    enum visibility_audience
-    json selected_membership_ids
-    int version
-    timestamp deleted_at
-  }
-  Memo {
-    uuid id PK
-    uuid household_id FK
+  idempotency_records {
+    text scope PK
+    text key PK
+    text request_hash
+    integer status
     text body
-    enum visibility_audience
-    json selected_membership_ids
-    int version
-    timestamp deleted_at
+    text created_at
   }
-  Attachment {
-    uuid id PK
-    uuid memo_id FK
-    enum scan_status
-    int byte_size
+  rate_limits {
+    text bucket PK
+    integer count
+    integer window_started_at
   }
-  Expense {
-    uuid id PK
-    uuid household_id FK
-    uuid payer_membership_id FK
-    int amount_jpy
-    date incurred_on
-    enum category
-    text note
-    int version
-    timestamp deleted_at
+  audit_events {
+    text id PK
+    text household_id
+    text actor_user_id
+    text action
+    text target
+    text detail
+    text at
   }
-  Notification {
-    uuid id PK
-    uuid membership_id FK
-    enum kind
-    string destination
-    timestamp remind_at
-    enum status
-    bool read
+  recovery_codes {
+    text user_id PK,FK
+    text code_hash PK
+    text used_at
   }
-  ExpenseShare {
-    uuid id PK
-    uuid expense_id FK
-    uuid membership_id FK
-    int amount_jpy
+  password_resets {
+    text id PK
+    text user_id FK
+    text token_hash UK
+    text code_hash
+    integer attempts
+    text created_at
+    text expires_at
+    text used_at
   }
-  SettlementRecord {
-    uuid id PK
-    uuid expense_id FK
-    uuid from_membership_id FK
-    uuid to_membership_id FK
-    uuid reversal_of_id FK
-    int amount_jpy
-    timestamp recorded_at
+  entitlements {
+    text household_id PK
+    text status
+    text ends_at
+    text updated_at
   }
-  RecurrenceRule {
-    uuid id PK
-    string rfc5545_rrule
-    string timezone
+  uploads {
+    text id PK
+    text user_id FK
+    text household_id
+    text membership_id
+    text album_id
+    text item_id
+    integer upload_length
+    integer upload_offset
+    integer keep_location
+    text expires_at
+    text touched_at
   }
-  RecurrenceOverride {
-    uuid id PK
-    date occurrence_date
-    enum action
+  assistant_jobs {
+    text id PK
+    text household_id
+    text user_id
+    text kind
+    text status
+    text file_id
+    text result
+    text error_code
+    text created_at
+    text finished_at
   }
-  ResourceLink {
-    uuid id PK
-    uuid household_id FK
-    string validated_https_url
-    enum visibility_audience
-    json selected_membership_ids
+
+  memberships {
+    json body "役割、状態、版"
   }
-  PlaceSnapshot {
-    uuid id PK
-    uuid household_id FK
-    string name
-    string address
-    decimal poi_lat
-    decimal poi_lng
-    string category
-    enum captured_via
-    string provider_source
-    json licenses
-    json attributions
-    timestamp selected_at
+  events {
+    json body "予定と繰り返しの規則"
   }
-  PlaceLookupConsent {
-    uuid id PK
-    uuid membership_id FK
-    string notice_version
-    timestamp granted_at
-    timestamp revoked_at
+  todos {
+    json body "タスク"
   }
-  AuditEvent {
-    uuid id PK
-    uuid household_id FK
-    uuid actor_membership_id FK
-    string action
-    timestamp occurred_at
+  memos {
+    json body "メモと添付の情報"
   }
-  IdempotencyRecord {
-    uuid id PK
-    uuid household_id FK
-    string key_hash UK
-    string request_hash
-    int response_status
-    timestamp expires_at
+  expenses {
+    json body "支出と収入、負担、精算"
+  }
+  resources {
+    json body "関連リンク"
+  }
+  links {
+    json body "記録どうしのつながり"
+  }
+  colorLabels {
+    json body "色ラベル"
+  }
+  invites {
+    json body "招待（コードはハッシュ）"
+  }
+  notifications {
+    json body "人ごとの通知"
+  }
+  permissionOverrides {
+    json body "個別の権限"
+  }
+  albums {
+    json body "アルバム"
+  }
+  albumItems {
+    json body "写真と動画の情報"
+  }
+  archive {
+    json body "archive.events ほか、削除の前の状態"
+  }
+  meta {
+    json body "家族グループ、権限の版、個人の設定"
   }

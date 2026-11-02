@@ -3,9 +3,10 @@ import { readFile } from 'node:fs/promises';
 const catalog = JSON.parse(await readFile(new URL('../docs/verification/use-cases.json', import.meta.url), 'utf8'));
 const ranges = (prefix, count) => Array.from({ length: count }, (_, index) => `UC-${prefix}${String(index + 1).padStart(2, '0')}`);
 const expected = new Set([
-  ...ranges('A', 9), ...ranges('H', 9), ...ranges('D', 2), ...ranges('C', 6),
-  ...ranges('T', 4), ...ranges('M', 4), ...ranges('B', 7), ...ranges('R', 2),
-  ...ranges('S', 3), 'UC-N01', ...ranges('P', 4), ...ranges('F', 6), ...ranges('X', 2), ...ranges('L', 6),
+  ...ranges('A', 14), ...ranges('H', 12), ...ranges('D', 2), ...ranges('C', 7),
+  ...ranges('T', 5), ...ranges('M', 5), ...ranges('B', 9), ...ranges('R', 3),
+  ...ranges('S', 4), 'UC-N01', ...ranges('P', 4), ...ranges('F', 6), ...ranges('X', 2), ...ranges('L', 6),
+  ...ranges('G', 5), ...ranges('E', 4), ...ranges('Y', 4), ...ranges('O', 3),
 ]);
 const ids = catalog.cases.map((item) => item.id);
 const actual = new Set(ids);
@@ -15,4 +16,9 @@ const incomplete = catalog.cases.filter((item) => !item.title || !item.products?
 if (ids.length !== actual.size || missing.length || extra.length || incomplete.length) {
   throw new Error(`use-case catalog invalid: duplicates=${ids.length - actual.size}, missing=${missing}, extra=${extra}, incomplete=${incomplete.map((item) => item.id)}`);
 }
-console.log(`Use-case catalog: ${ids.length} entries, no duplicates or omissions.`);
+// capability は null（公開・本人の操作）か、実在する能力だけを許す。
+const types = await readFile(new URL('../src/domain/types.ts', import.meta.url), 'utf8');
+const known = new Set([...(types.match(/export type Capability =([^;]+);/)?.[1] ?? '').matchAll(/'([a-z.]+)'/g)].map((match) => match[1]));
+const unknownCapabilities = catalog.cases.filter((item) => item.capability !== null && !known.has(item.capability)).map((item) => `${item.id}: ${item.capability}`);
+if (known.size === 0 || unknownCapabilities.length) throw new Error(`use-case catalog names unknown capabilities: ${unknownCapabilities}`);
+console.log(`Use-case catalog: ${ids.length} entries, no duplicates or omissions, capabilities all exist.`);

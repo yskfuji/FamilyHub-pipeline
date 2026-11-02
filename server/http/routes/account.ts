@@ -23,7 +23,6 @@ const declare = (operationId: string, overrides: Partial<RouteDeclaration> = {})
 const anonymous = (operationId: string) => declare(operationId, { auth: 'public', capability: 'none' });
 
 interface AccountRow { id: string; email: string; display_name: string; password_hash: string | null; birthdate: string | null; adult_declared_at: string | null; avatar: string | null; idle_timeout_minutes: number; totp_secret: string | null; totp_enabled_at: string | null; totp_last_step: number | null }
-const accountColumns = 'id, email, display_name, password_hash, birthdate, adult_declared_at, avatar, idle_timeout_minutes, totp_secret, totp_enabled_at, totp_last_step';
 
 const today = (deps: AppDeps) => deps.clock.now().slice(0, 10);
 const audit = (deps: AppDeps, userId: string, action: string) => deps.db.run('INSERT INTO audit_events (id, actor_user_id, action, at) VALUES (?, ?, ?, ?)', deps.ids.next('audit'), userId, action, deps.clock.now());
@@ -32,7 +31,7 @@ const secretHash = (deps: AppDeps, value: string) => createHmac('sha256', deps.c
 
 function current(deps: AppDeps, request: FastifyRequest) {
   if (!request.session) throw unauthenticated();
-  const row = deps.db.get<AccountRow>(`SELECT ${accountColumns} FROM users WHERE id = ? AND deleted_at IS NULL`, request.session.user_id);
+  const row = deps.db.get<AccountRow>('SELECT id, email, display_name, password_hash, birthdate, adult_declared_at, avatar, idle_timeout_minutes, totp_secret, totp_enabled_at, totp_last_step FROM users WHERE id = ? AND deleted_at IS NULL', request.session.user_id);
   if (!row) throw unauthenticated();
   return row;
 }
@@ -64,8 +63,8 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AppDeps) {
     limit(deps, `sign-up:${clientKey(request)}`, 10, 3_600_000);
     const input = parse(signUpSchema, request.body);
     const age = ageOn(input.birthdate, today(deps));
-    if (age < 0 || age > 130) return sendError(reply, { code: 'INVALID_INPUT', message: '誕生日を確認してください。', retryable: false });
-    if (age < ADULT_AGE && !input.guardianConsent) return sendError(reply, { code: 'INVALID_INPUT', message: '18歳未満の方は、保護者の同意が必要です。', retryable: false });
+    if (age < 0 || age > 130) return sendError(reply, { code: 'INVALID_INPUT', message: serverMessages.birthdateInvalid, retryable: false });
+    if (age < ADULT_AGE && !input.guardianConsent) return sendError(reply, { code: 'INVALID_INPUT', message: serverMessages.guardianConsentRequired, retryable: false });
     const hash = await hashPassword(input.password);
     const taken = deps.db.get('SELECT id FROM users WHERE email = ?', input.email);
     if (taken) return sendError(reply, { code: 'CONFLICT', message: serverMessages.emailTaken, retryable: false });
@@ -99,12 +98,11 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AppDeps) {
     const parsed = passwordSchema.safeParse(body.newPassword);
     if (!parsed.success) return sendError(reply, { code: 'INVALID_INPUT', message: parsed.error.issues[0]?.message ?? serverMessages.invalidInput, retryable: false });
     interface ResetRow { id: string; user_id: string; code_hash: string; attempts: number; expires_at: string; used_at: string | null }
-    const columns = 'id, user_id, code_hash, attempts, expires_at, used_at';
     let row: ResetRow | undefined;
-    if (body.token) row = deps.db.get<ResetRow>(`SELECT ${columns} FROM password_resets WHERE token_hash = ?`, secretHash(deps, body.token));
+    if (body.token) row = deps.db.get<ResetRow>('SELECT id, user_id, code_hash, attempts, expires_at, used_at FROM password_resets WHERE token_hash = ?', secretHash(deps, body.token));
     else if (body.email && body.code) {
       const user = deps.db.get<{ id: string }>('SELECT id FROM users WHERE email = ?', body.email.trim());
-      row = user ? deps.db.get<ResetRow>(`SELECT ${columns} FROM password_resets WHERE user_id = ? ORDER BY created_at DESC LIMIT 1`, user.id) : undefined;
+      row = user ? deps.db.get<ResetRow>('SELECT id, user_id, code_hash, attempts, expires_at, used_at FROM password_resets WHERE user_id = ? ORDER BY created_at DESC LIMIT 1', user.id) : undefined;
       if (row && row.code_hash !== secretHash(deps, `${row.user_id}:${body.code}`)) {
         deps.db.run('UPDATE password_resets SET attempts = attempts + 1 WHERE id = ?', row.id);
         return sendError(reply, rejected);
@@ -136,7 +134,7 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AppDeps) {
   app.patch('/v1/account', { config: declare('updateAccount') }, (request, reply) => {
     const row = current(deps, request);
     const input = parse(accountUpdateSchema, request.body);
-    if (input.birthdate && row.birthdate) return sendError(reply, { code: 'CONFLICT', message: '誕生日は一度だけ申告できます。', retryable: false });
+    if (input.birthdate && row.birthdate) return sendError(reply, { code: 'CONFLICT', message: serverMessages.birthdateOnce, retryable: false });
     deps.db.transaction(() => {
       if (input.displayName) {
         deps.db.run('UPDATE users SET display_name = ? WHERE id = ?', input.displayName, row.id);
@@ -158,7 +156,7 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AppDeps) {
   });
   app.post('/v1/account/email', { config: declare('changeEmail', { recentAuth: true }) }, async (request, reply) => {
     const row = current(deps, request);
-    const { email } = parse(z.object({ email: z.email('メールアドレスを確認してください。').max(254) }), request.body);
+    const { email } = parse(z.object({ email: z.email(serverMessages.emailInvalid).max(254) }), request.body);
     if (deps.db.get('SELECT id FROM users WHERE email = ? AND id <> ?', email, row.id)) return sendError(reply, { code: 'CONFLICT', message: serverMessages.emailTaken, retryable: false });
     deps.db.run('UPDATE users SET email = ? WHERE id = ?', email, row.id);
     audit(deps, row.id, 'changeEmail');
@@ -176,11 +174,11 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AppDeps) {
         const self = memberships.find((item) => item.id === member.membership_id);
         const others = memberships.filter((item) => item.id !== member.membership_id && item.status === 'active');
         if (self?.role === 'owner' && others.length > 0) return { ok: false as const, error: { code: 'CONFLICT' as const, message: serverMessages.ownerHandover, retryable: false, reason: 'OWNER_REQUIRED' as const } };
-        if (self) { self.displayName = '退会したメンバー'; self.status = 'suspended'; self.version += 1; }
+        if (self) { self.displayName = serverMessages.deletedMember; self.status = 'suspended'; self.version += 1; }
         saveAggregate(deps.db, member.household_id, member.membership_id, loaded);
         deps.db.run('DELETE FROM household_members WHERE user_id = ?', row.id);
       }
-      deps.db.run("UPDATE users SET email = ?, display_name = '退会したメンバー', password_hash = NULL, totp_secret = NULL, totp_enabled_at = NULL, avatar = NULL, birthdate = NULL, deleted_at = ? WHERE id = ?", `deleted+${row.id}@invalid.invalid`, deps.clock.now(), row.id);
+      deps.db.run("UPDATE users SET email = ?, display_name = ?, password_hash = NULL, totp_secret = NULL, totp_enabled_at = NULL, avatar = NULL, birthdate = NULL, deleted_at = ? WHERE id = ?", `deleted+${row.id}@invalid.invalid`, serverMessages.deletedMember, deps.clock.now(), row.id);
       deps.db.run('DELETE FROM passkeys WHERE user_id = ?', row.id);
       deps.db.run('DELETE FROM recovery_codes WHERE user_id = ?', row.id);
       deps.db.run('DELETE FROM assistant_jobs WHERE user_id = ?', row.id);
@@ -194,7 +192,7 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AppDeps) {
 
   app.post('/v1/account/totp', { config: declare('beginTotpEnrollment', { recentAuth: true }) }, (request, reply) => {
     const row = current(deps, request);
-    if (row.totp_enabled_at) return sendError(reply, { code: 'CONFLICT', message: 'すでに設定されています。', retryable: false });
+    if (row.totp_enabled_at) return sendError(reply, { code: 'CONFLICT', message: serverMessages.alreadySet, retryable: false });
     const secret = randomBytes(20);
     deps.db.run('UPDATE users SET totp_secret = ?, totp_last_step = NULL WHERE id = ?', encryptSecret(deps.config.secret, secret), row.id);
     return { otpauthUri: totpUri(row.email, secret) };

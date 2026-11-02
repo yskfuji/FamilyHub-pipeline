@@ -21,16 +21,29 @@ function buildId() {
   }
 }
 
+/** 版の印を dist-server に残す。画面のビルドと同じ値であることを audit:security が確かめる。 */
+function buildIdFile() {
+  return {
+    name: 'family-hub-build-id',
+    apply: (_config: unknown, env: { isSsrBuild?: boolean }) => Boolean(env.isSsrBuild),
+    generateBundle(this: { emitFile(file: { type: 'asset'; fileName: string; source: string }): void }) {
+      this.emitFile({ type: 'asset', fileName: 'build-id.txt', source: `${buildId()}\n` });
+    },
+  };
+}
+
 const apiProxy = { '/v1': { target: process.env.FAMILY_HUB_API ?? 'http://127.0.0.1:8799', changeOrigin: false } };
 
-export default defineConfig(() => {
+export default defineConfig(({ isSsrBuild }) => {
   const auditSurface = process.env.VITE_INCLUDE_AUDIT_SURFACE === 'true';
   const realStack = process.env.VITE_GATEWAY === 'http';
   return {
   server: { proxy: apiProxy },
   preview: { proxy: apiProxy, ...(realStack ? { headers: deliveryHeaders() } : {}) },
-  plugins: [react()],
-  define: { 'import.meta.env.VITE_BUILD_ID': JSON.stringify(buildId()) },
+  // public/ は画面の配信物で、API の出力先には入れない。
+  ...(isSsrBuild ? { publicDir: false as const } : {}),
+  plugins: [react(), buildIdFile()],
+  define: { 'import.meta.env.VITE_BUILD_ID': JSON.stringify(buildId()), __FAMILY_HUB_BUILD__: JSON.stringify(buildId()) },
   resolve: {
     alias: {
       '@audit-surface': resolve(import.meta.dirname, auditSurface ? 'src/app/auditSurface.audit.tsx' : 'src/app/auditSurface.consumer.tsx'),
@@ -39,6 +52,8 @@ export default defineConfig(() => {
   build: {
     target: 'es2022',
     sourcemap: false,
+    // API と運営者の命令を同じ出力先へ作る。HTTP の経路を持たない命令も、開発用の依存なしで動かせるようにする。
+    ...(isSsrBuild ? { rollupOptions: { input: { main: 'server/main.ts', cli: 'server/cli.ts' } } } : {}),
   },
   test: {
     projects: [

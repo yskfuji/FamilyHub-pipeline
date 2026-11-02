@@ -10,10 +10,15 @@ release/SHA256SUMS
 *.log
 *.tsbuildinfo
 dist-server/
-data/
+/data/
+/uploads/
+/media/
 .env
 .env.*
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
+*.db
+*.db-wal
+*.db-shm
 dist-http/

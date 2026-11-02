@@ -1,4 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, createHmac, hkdfSync, randomBytes } from 'node:crypto';
+import { serverMessages } from '../../src/content/serverMessages';
 
 /** RFC 6238 の確認コード（SHA-1、30秒、6桁）。 */
 const STEP_SECONDS = 30;
@@ -56,4 +57,4 @@ export function newRecoveryCodes(count = 8) {
   return Array.from({ length: count }, () => { const raw = randomBytes(5).toString('hex').toUpperCase(); return `${raw.slice(0, 5)}-${raw.slice(5)}`; });
 }
 
-export const totpUri = (email: string, secret: Buffer) => `otpauth://totp/${encodeURIComponent(`よりどころ:${email}`)}?secret=${base32Encode(secret)}&issuer=${encodeURIComponent('よりどころ')}&period=${STEP_SECONDS}&digits=6`;
+export const totpUri = (email: string, secret: Buffer) => `otpauth://totp/${encodeURIComponent(`${serverMessages.brand}:${email}`)}?secret=${base32Encode(secret)}&issuer=${encodeURIComponent(serverMessages.brand)}&period=${STEP_SECONDS}&digits=6`;

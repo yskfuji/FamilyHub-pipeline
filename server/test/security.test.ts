@@ -83,6 +83,30 @@ describe('request boundary', () => {
   });
 });
 
+describe('operations', () => {
+  it('reports the build id the client build embeds', async () => {
+    const world = open();
+    const response = await call(world, '/v1/version');
+    expect(await response.json()).toEqual({ build: import.meta.env.VITE_BUILD_ID });
+  });
+
+  it('counts the address the proxy saw, not one the client wrote into the header', async () => {
+    const world = open();
+    const { url } = await world.ready;
+    const pre = await fetch(`${url}/v1/auth/csrf`);
+    const preCookie = pre.headers.getSetCookie()[0].split(';')[0];
+    const { token } = await pre.json() as { token: string };
+    const statuses: number[] = [];
+    for (let attempt = 0; attempt < 51; attempt += 1) {
+      // nginx は届いた値の後ろに、接続してきた相手を足す。信じるのは末尾だけ。
+      const headers = { Origin: ORIGIN, Cookie: preCookie, ...json(token), 'X-Forwarded-For': `203.0.113.${attempt}, 198.51.100.7` };
+      statuses.push((await fetch(`${url}/v1/auth/password`, { method: 'POST', headers, body: JSON.stringify({ email: `nobody${attempt}@example.test`, password: 'wrong-password-long-enough' }) })).status);
+    }
+    expect(statuses.slice(0, 50).every((status) => status === 401)).toBe(true);
+    expect(statuses[50]).toBe(429);
+  });
+});
+
 describe('secrets at rest', () => {
   it('stores invite codes and session tokens only as hashes', async () => {
     const world = open();

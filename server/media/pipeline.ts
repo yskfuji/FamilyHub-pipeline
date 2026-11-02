@@ -7,6 +7,7 @@ import { sniff } from './sniff';
 import type { SniffResult } from './sniff';
 import { stripVideoLocation } from './mp4Location';
 import type { Scanner } from '../adapters/scanner';
+import { serverMessages } from '../../src/content/serverMessages';
 
 export const quarantinePath = (root: string, id: string) => join(root, 'quarantine', id);
 export const originalPath = (root: string, householdId: string, id: string) => join(root, householdId, id, 'original');
@@ -66,12 +67,12 @@ export async function processMedia(request: ProcessRequest): Promise<ProcessOutc
   const { root, householdId, itemId, source, keepLocation, scanner } = request;
   const reject = async (message: string): Promise<ProcessOutcome> => { await rm(source, { force: true }); return { status: 'rejected', message }; };
   const type = await sniffFile(source);
-  if ('rejected' in type) return reject(type.rejected === 'heic' ? 'HEIC の写真は受け付けていません。JPEG で保存し直してください。' : 'この形式のファイルは受け付けていません。');
-  if (type.kind === 'document') return reject('アルバムには写真と動画だけを追加できます。');
+  if ('rejected' in type) return reject(type.rejected === 'heic' ? serverMessages.heicRejected : serverMessages.fileTypeRejected);
+  if (type.kind === 'document') return reject(serverMessages.albumMediaOnly);
   const sha256 = await sha256File(source);
   const duplicate = request.findDuplicate(sha256);
   if (duplicate) { await rm(source, { force: true }); return { status: 'duplicate', existingId: duplicate }; }
-  if (await scanner.scan(source) !== 'clean') return reject('安全を確認できなかったため、保存しませんでした。');
+  if (await scanner.scan(source) !== 'clean') return reject(serverMessages.mediaNotSafe);
   const destination = originalPath(root, householdId, itemId);
   await ensureParent(destination);
   try {
@@ -85,6 +86,6 @@ export async function processMedia(request: ProcessRequest): Promise<ProcessOutc
     return { status: 'ready', sha256, mimeType: type.mimeType, kind: 'video', media: { byteSize: (await stat(destination)).size, hasThumbnail: false } };
   } catch {
     await rm(destination, { force: true });
-    return reject(type.kind === 'video' ? 'この動画は位置情報を確認できなかったため、保存しませんでした。' : 'この画像を読み取れませんでした。');
+    return reject(type.kind === 'video' ? serverMessages.videoLocationUnknown : serverMessages.imageUnreadable);
   }
 }

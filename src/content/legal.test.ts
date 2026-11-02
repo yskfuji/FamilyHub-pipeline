@@ -16,6 +16,11 @@ describe('規約とポリシーの草案', () => {
     expect(documentText('privacy')).toContain('OpenPOI');
     expect(documentText('privacy')).toContain('Open-Meteo');
   });
+  it('読み取りの補助は、既定で使わないことと、有効なときに送るものを明記する', () => {
+    const text = documentText('privacy');
+    for (const phrase of ['読み取りの補助', '初期の設定では使いません', '運営者が有効にしたときだけ', '画像', '本文', '運営者が設定したサービスへ送ります']) expect(text).toContain(phrase);
+    expect(documentText('terms')).toContain('初期の設定では使いません');
+  });
   it('保存の期間（7日の復元、30日の削除）を明記する', () => {
     for (const id of ['terms', 'privacy']) {
       expect(documentText(id)).toContain('7日間');

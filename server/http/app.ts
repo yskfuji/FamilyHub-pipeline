@@ -80,7 +80,7 @@ export const routeTable: Array<{ method: string; url: string; declaration: Route
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   routeTable.length = 0;
-  const app = Fastify({ logger: false, bodyLimit: 2 * 1024 * 1024, trustProxy: true, exposeHeadRoutes: false });
+  const app = Fastify({ logger: false, bodyLimit: 2 * 1024 * 1024, trustProxy: 'loopback', exposeHeadRoutes: false });
   await app.register(cookie);
   await app.register(multipart);
   app.decorateRequest('session', null);

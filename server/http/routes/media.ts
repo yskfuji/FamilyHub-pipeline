@@ -63,11 +63,11 @@ async function finishUpload(deps: AppDeps, upload: UploadRow) {
   const outcome = await processMedia({
     root: deps.config.mediaPath, householdId: upload.household_id, itemId: upload.item_id, source, keepLocation: Boolean(upload.keep_location), scanner: deps.scanner,
     findDuplicate: (sha256) => deps.db.get<{ id: string }>("SELECT id FROM records WHERE household_id = ? AND collection = 'albumItems' AND json_extract(body, '$.albumId') = ? AND json_extract(body, '$.sha256') = ? AND json_extract(body, '$.status') = 'ready' AND json_extract(body, '$.deletedAt') IS NULL", upload.household_id, upload.album_id, sha256)?.id ?? null,
-  }).catch(async (): Promise<ProcessOutcome> => { await rm(source, { force: true }); return { status: 'rejected', message: '処理できなかったため、保存しませんでした。もう一度追加してください。' }; });
+  }).catch(async (): Promise<ProcessOutcome> => { await rm(source, { force: true }); return { status: 'rejected', message: serverMessages.mediaFailed }; });
   deps.db.transaction(() => {
     updateItem(deps, upload, (item) => {
       if (outcome.status === 'ready') Object.assign(item, { status: 'ready', sha256: outcome.sha256, mimeType: outcome.mimeType, kind: outcome.kind, ...outcome.media, hasThumbnail: Boolean(item.hasThumbnail) || outcome.media.hasThumbnail });
-      else if (outcome.status === 'duplicate') Object.assign(item, { status: 'rejected', statusMessage: '同じ写真がすでにあります。' });
+      else if (outcome.status === 'duplicate') Object.assign(item, { status: 'rejected', statusMessage: serverMessages.mediaDuplicate });
       else Object.assign(item, { status: 'rejected', statusMessage: outcome.message });
     });
     deps.db.run('DELETE FROM uploads WHERE id = ?', upload.id);
@@ -155,7 +155,7 @@ export function registerMediaRoutes(app: FastifyInstance, deps: AppDeps) {
     // 閉じたタブの送信が枠をふさがないよう、しばらく動きのないものは数えない（続きからは送れる）。
     const activeSince = new Date(Date.parse(deps.clock.now()) - UPLOAD_ACTIVE_MS).toISOString();
     const active = deps.db.get<{ count: number }>('SELECT count(*) AS count FROM uploads WHERE user_id = ? AND unixepoch(expires_at) > unixepoch(?) AND unixepoch(coalesce(touched_at, ?)) > unixepoch(?)', actor.userId, deps.clock.now(), deps.clock.now(), activeSince);
-    if ((active?.count ?? 0) >= MAX_ACTIVE_UPLOADS) throw new ApiError(429, { code: 'RATE_LIMITED', message: '同時に送れるのは3件までです。', retryable: true });
+    if ((active?.count ?? 0) >= MAX_ACTIVE_UPLOADS) throw new ApiError(429, { code: 'RATE_LIMITED', message: serverMessages.uploadLimit, retryable: true });
     return mutate(deps, request, reply, (rules) => {
       const reserved = rules.albums.reserveItem(body.albumId, { kind: body.mimeType.startsWith('video/') ? 'video' : 'photo', originalName: body.name, mimeType: body.mimeType, byteSize: body.byteSize, keepLocation: body.keepLocation });
       if (!reserved.ok) return reserved;

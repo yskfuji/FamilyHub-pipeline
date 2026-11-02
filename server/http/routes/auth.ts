@@ -22,7 +22,7 @@ interface UserRow { id: string; email: string; display_name: string; password_ha
 
 const deviceLabel = (request: FastifyRequest) => {
   const agent = request.headers['user-agent'] ?? '';
-  const browser = /Edg\//.test(agent) ? 'Edge' : /Chrome\//.test(agent) ? 'Chrome' : /Firefox\//.test(agent) ? 'Firefox' : /Safari\//.test(agent) ? 'Safari' : 'ブラウザ';
+  const browser = /Edg\//.test(agent) ? 'Edge' : /Chrome\//.test(agent) ? 'Chrome' : /Firefox\//.test(agent) ? 'Firefox' : /Safari\//.test(agent) ? 'Safari' : serverMessages.genericBrowser;
   const device = /iPhone/.test(agent) ? 'iPhone' : /iPad/.test(agent) ? 'iPad' : /Android/.test(agent) ? 'Android' : /Macintosh/.test(agent) ? 'Mac' : /Windows/.test(agent) ? 'Windows' : '';
   return [device, browser].filter(Boolean).join(' ');
 };

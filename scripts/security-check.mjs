@@ -1,5 +1,7 @@
+import { existsSync } from 'node:fs';
 import { readFile, readdir } from 'node:fs/promises';
-import { join, relative, resolve } from 'node:path';
+import { dirname, extname, join, relative, resolve } from 'node:path';
+import ts from 'typescript';
 
 async function filesUnder(dir) {
   const entries = await readdir(dir, { withFileTypes: true });
@@ -29,8 +31,18 @@ for (const name of ['Content-Security-Policy', 'Permissions-Policy', 'Strict-Tra
 }
 const connectSrc = fromHeaders('Content-Security-Policy')?.match(/connect-src ([^;]+)/)?.[1].trim();
 if (connectSrc !== "'self' https://api.openpoiapi.com") failures.push(`connect-src must be exactly 'self' https://api.openpoiapi.com (found: ${connectSrc})`);
+const mediaSrc = fromHeaders('Content-Security-Policy')?.match(/media-src ([^;]+)/)?.[1].trim();
+if (mediaSrc !== "'self' blob:") failures.push(`media-src must be exactly 'self' blob: (found: ${mediaSrc})`);
 const permissions = fromHeaders('Permissions-Policy') ?? '';
 for (const directive of ['geolocation=(self)', 'camera=()', 'microphone=()']) if (!permissions.includes(directive)) failures.push(`Permissions-Policy must include ${directive}`);
+
+// nginx: /v1 は同じオリジンのまま API へ渡す。この中で add_header を書くと上の見出しが消える。
+const apiLocation = nginx.match(/location \/v1\/ \{([\s\S]*?)\n {2}\}/)?.[1] ?? '';
+const defaultPort = (await readFile(resolve('server/main.ts'), 'utf8')).match(/process\.env\.PORT \?\? (\d+)/)?.[1];
+for (const required of [`proxy_pass http://127.0.0.1:${defaultPort};`, 'proxy_set_header Host $host;', 'proxy_set_header X-Forwarded-Proto $scheme;', 'proxy_set_header X-Forwarded-For', 'proxy_request_buffering off;']) {
+  if (!apiLocation.includes(required)) failures.push(`deploy/nginx.conf location /v1/ must keep ${required}`);
+}
+if (apiLocation.includes('add_header')) failures.push('deploy/nginx.conf location /v1/ must not use add_header');
 
 // 外部の場所検索: 出口は1ファイルだけにし、Cookie・リファラー・キャッシュを使わない。
 const egress = production.filter((file) => file.text.includes('api.openpoiapi.com'));
@@ -59,5 +71,60 @@ for (const required of ['pinnedLookup', 'isForbiddenAddress', 'agent: false', "'
 // 試験の緩めた設定を、本番の組み立てへ持ち込まない。
 for (const file of ['server/main.ts', 'server/dev.ts']) if (/testing:\s*\{|allowHttp|allowAnyPort/.test(await readFile(resolve(file), 'utf8'))) failures.push(`${file} must not relax the URL guard`);
 
+// 構文木で見る検査。server/ の本体（試験と代役を除く）だけが対象。
+const japanese = /[\u3040-\u30ff\u3400-\u9fff]/;
+const sqlStart = /^\s*(SELECT|INSERT\s+INTO|UPDATE|DELETE\s+FROM|DROP|ALTER|CREATE|PRAGMA)\b/i;
+/** Db の中のこれらだけは、利用者の入力を含まない。PRAGMA は値を束縛できない。 */
+const dbInternals = new Set(['sql', 'migrations[index]', "commitWhen(value) ? 'COMMIT' : 'ROLLBACK'", '`PRAGMA user_version = ${Number(index + 1)}`']);
+const allowedSource = /^src\/(domain|authz|content)\//;
+const isDatabase = (expression) => /(^|\.)(db|raw)$/.test(expression.getText());
+
+for (const path of serverFiles) {
+  const content = await readFile(resolve(path), 'utf8');
+  const ast = ts.createSourceFile(path, content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const checkImport = (specifier) => {
+    if (!specifier.startsWith('.')) return;
+    const target = relative(resolve('.'), resolve(dirname(path), specifier));
+    if (target.startsWith('src/') && !allowedSource.test(`${target}/`)) failures.push(`${path}: may import only src/domain, src/authz and src/content (found ${target})`);
+    if (target.startsWith('server/testing') && path !== 'server/dev.ts') failures.push(`${path}: must not import the test doubles (${target})`);
+  };
+  const visit = (node) => {
+    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) { if (node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) checkImport(node.moduleSpecifier.text); }
+    if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword && node.arguments[0] && ts.isStringLiteral(node.arguments[0])) checkImport(node.arguments[0].text);
+    if ((ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) && japanese.test(node.text)) {
+      failures.push(`${path}:${ast.getLineAndCharacterOfPosition(node.getStart(ast)).line + 1}: Japanese text belongs in src/content/serverMessages.ts`);
+    }
+    if (ts.isTemplateExpression(node) && sqlStart.test(node.head.text) && !(path === 'server/db/db.ts' && dbInternals.has(node.getText()))) failures.push(`${path}: SQL must not be built from a template (${node.head.text.trim().slice(0, 30)})`);
+    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken && ts.isStringLiteralLike(node.left) && sqlStart.test(node.left.text)) failures.push(`${path}: SQL must not be built by concatenation`);
+    if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && ['get', 'all', 'run', 'exec', 'prepare'].includes(node.expression.name.text) && isDatabase(node.expression.expression)) {
+      const [first] = node.arguments;
+      const literal = first && (ts.isStringLiteral(first) || ts.isNoSubstitutionTemplateLiteral(first));
+      if (!literal && !(path === 'server/db/db.ts' && first && dbInternals.has(first.getText()))) failures.push(`${path}: database calls take a literal statement (found ${first?.getText().slice(0, 40)})`);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(ast);
+  // Cookie を書くのはセッションの部品だけ。
+  if (path !== 'server/auth/sessions.ts' && /set-cookie|setCookie|clearCookie/i.test(content)) failures.push(`${path}: Set-Cookie belongs in server/auth/sessions.ts`);
+}
+
+// ビルドの中身。代役と確認用データが配信物へ混ざらないこと、画面と API の版の印がそろうこと。
+async function builtText(dir) {
+  const files = (await filesUnder(resolve(dir))).filter((file) => ['.js', '.html', '.css'].includes(extname(file)));
+  return (await Promise.all(files.map((file) => readFile(file, 'utf8')))).join('\n');
+}
+if (!existsSync(resolve('dist-server/main.js')) || !existsSync(resolve('dist-server/cli.js')) || !existsSync(resolve('dist-http'))) {
+  failures.push('dist-server (with main.js and cli.js) and dist-http are required: run npm run build:server and npm run build:http first');
+} else {
+  const server = await builtText('dist-server');
+  const http = await builtText('dist-http');
+  for (const marker of ['fakeClamd', 'fakeLlm', 'seedHousehold', 'SEED_PASSWORD', 'server/testing', 'test-double', '森さんち', 'member-aoi']) if (server.includes(marker)) failures.push(`dist-server contains a test double or fixture marker: ${marker}`);
+  for (const marker of ['森さんち', 'member-aoi', 'runtime.mock']) if (http.includes(marker)) failures.push(`dist-http contains a fixture marker: ${marker}`);
+  const buildId = (await readFile(resolve('dist-server/build-id.txt'), 'utf8')).trim();
+  if (!buildId) failures.push('dist-server/build-id.txt is empty');
+  if (!server.includes(buildId)) failures.push(`dist-server does not embed its build id ${buildId}`);
+  if (!http.includes(buildId)) failures.push(`dist-http and dist-server carry different build ids (server: ${buildId}): build them from the same commit`);
+}
+
 if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
-console.log(`Security static checks passed across ${sourceFiles.length} source files and ${serverFiles.length} server files (headers in sync; one place-lookup egress; outbound calls only in server/adapters).`);
+console.log(`Security static checks passed across ${sourceFiles.length} source files and ${serverFiles.length} server files (headers in sync; one place-lookup egress; outbound calls only in server/adapters; literal SQL; cookies in one module; server imports limited; no Japanese literals in server; builds free of test doubles and fixtures; matching build ids).`);

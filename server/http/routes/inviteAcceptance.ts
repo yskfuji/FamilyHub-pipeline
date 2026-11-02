@@ -6,6 +6,7 @@ import { ApiError, sendError, unauthenticated } from '../context';
 import type { AppDeps } from '../context';
 import { parse } from '../parse';
 import { hashInviteToken } from './household';
+import { serverMessages } from '../../../src/content/serverMessages';
 
 const unusable = 'UNAUTHENTICATED' as const;
 const memberColors = ['#315c80', '#a94f38', '#6f7552', '#8a6680', '#796a55', '#3f6f6a', '#8a7440', '#5b5f8a'];
@@ -18,7 +19,7 @@ export function registerInviteAcceptance(app: FastifyInstance, deps: AppDeps) {
     const code = parse(z.object({ code: z.string().max(200) }), request.body).code.trim();
     const token = hashInviteToken(code);
     const found = deps.db.get<{ household_id: string }>("SELECT household_id FROM records WHERE collection = 'invites' AND json_extract(body, '$.token') = ?", token);
-    const rejected = { code: unusable, message: '招待コードが正しくないか、有効期限が切れています。招待した人に新しいコードを依頼してください。', retryable: false };
+    const rejected = { code: unusable, message: serverMessages.inviteInvalid, retryable: false };
     if (!found) return sendError(reply, rejected);
     const result = deps.db.transaction(() => {
       const member = deps.db.get<{ household_id: string; membership_id: string }>('SELECT household_id, membership_id FROM household_members WHERE user_id = ?', session.user_id);
