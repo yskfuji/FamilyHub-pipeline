@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { readFile, readdir } from 'node:fs/promises';
 import { extname, join, resolve } from 'node:path';
 
@@ -20,6 +21,7 @@ const sourceFiles = (await filesUnder(resolve('src'))).filter((file) => (
   || file.endsWith('/content/help.ts')
   || file.endsWith('/content/legal.ts')
   || (/\/features\/place\/[^/]+\.ts$/.test(file) && !file.endsWith('.test.ts'))
+  || (/\/features\/showcase\/management\/[^/]+\.ts$/.test(file) && !file.endsWith('.test.ts'))
 ));
 sourceFiles.push(resolve('index.html'), resolve('scripts/build-gallery.mjs'));
 const forbidden = [
@@ -37,8 +39,11 @@ const forbidden = [
   ['implied model', /\bAI\b|人工知能|ニューラル|Neural Engine|機械学習/],
 ];
 const failures = [];
+// 管理コンソールの見本だけは、本物につながらないことを伝えるために「サーバー」と書く。ほかの語も、ほかの画面も例外にしない。
+const consoleSampleDir = `${resolve('src/features/showcase/management')}/`;
 for (const file of sourceFiles) {
-  const text = await readFile(file, 'utf8');
+  const raw = await readFile(file, 'utf8');
+  const text = file.startsWith(consoleSampleDir) ? raw.replaceAll('サーバー', '') : raw;
   for (const [label, pattern] of forbidden) if (pattern.test(text)) failures.push(`${file}: ${label}`);
 }
 
@@ -54,10 +59,29 @@ const catalogRequirements = [
 ];
 for (const [label, required] of catalogRequirements) if (!catalogText.includes(required)) failures.push(`content catalog is missing: ${label}`);
 
-const distFiles = (await filesUnder(resolve('dist'))).filter((file) => ['.js', '.html', '.map'].includes(extname(file)));
-if (distFiles.some((file) => extname(file) === '.map')) failures.push('consumer build contains source maps');
-const distText = (await Promise.all(distFiles.filter((file) => extname(file) !== '.map').map((file) => readFile(file, 'utf8')))).join('\n');
-for (const marker of ['/showcase', '内部監査', '表示状態', '検証状況']) if (distText.includes(marker)) failures.push(`consumer build contains audit marker: ${marker}`);
+// 通常のビルドと実サーバー向けのビルドには、内部監査の面も管理コンソールの見本も入れない。
+const auditMarkers = ['/showcase', '内部監査', '表示状態', '検証状況'];
+const consoleMarkers = ['/showcase/management', '管理コンソール', 'mgmt-', 'management-console', '見本の運営者', '見本の家族', '見本のバックアップ', '架空のデータ'];
+let builtFiles = 0;
+for (const [dir, label] of [['dist', 'consumer'], ['dist-http', 'http']]) {
+  if (!existsSync(resolve(dir))) { failures.push(`${dir} is missing: build it before this audit`); continue; }
+  const files = (await filesUnder(resolve(dir))).filter((file) => ['.js', '.css', '.html', '.map'].includes(extname(file)));
+  builtFiles += files.length;
+  if (files.some((file) => extname(file) === '.map')) failures.push(`${label} build contains source maps`);
+  const built = (await Promise.all(files.filter((file) => extname(file) !== '.map').map((file) => readFile(file, 'utf8')))).join('\n');
+  for (const marker of auditMarkers) if (built.includes(marker)) failures.push(`${label} build contains audit marker: ${marker}`);
+  for (const marker of consoleMarkers) if (built.includes(marker)) failures.push(`${label} build contains console marker: ${marker}`);
+}
+
+// 比較元のアプリの名前をリポジトリに書かない。この検査自身にも書かないよう、語を組み立てる。
+const unwantedName = new RegExp(['be', 'lives'].join(''), 'i');
+const namedRoots = ['src', 'server', 'docs', 'scripts', 'e2e', 'contracts'];
+const namedFiles = [...(await Promise.all(namedRoots.map((root) => filesUnder(resolve(root))))).flat(), resolve('README.md')];
+for (const file of namedFiles) {
+  if (unwantedName.test(file.slice(resolve('.').length))) failures.push(`${file}: file name must not carry the comparison app's name`);
+  if (['.png', '.webm', '.jpg', '.zip'].includes(extname(file))) continue;
+  if (unwantedName.test(await readFile(file, 'utf8'))) failures.push(`${file}: must not carry the comparison app's name`);
+}
 
 if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
-console.log(`UI copy, content-catalog, and consumer-boundary audit passed across ${sourceFiles.length} visible-copy source files and ${distFiles.length} build files.`);
+console.log(`UI copy, content-catalog, name, and build-boundary audit passed across ${sourceFiles.length} visible-copy source files, ${namedFiles.length} named-tree files and ${builtFiles} build files.`);

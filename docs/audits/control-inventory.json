@@ -1920,6 +1920,187 @@
       "undo": null,
       "alternative": "手で追加する",
       "entity": null
+    },
+    {
+      "idPattern": "^showcase\\.management\\.nav\\.",
+      "routes": [
+        "/showcase/management"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "navigation",
+      "onlineRequired": false,
+      "successObservation": "選んだ項目へ移る。見本の表示は残る",
+      "failureRecovery": "項目が見つからなければ概要へ戻るリンクを出す",
+      "undo": null,
+      "alternative": null,
+      "entity": "ManagementSample"
+    },
+    {
+      "idPattern": "^showcase\\.management\\.overview\\.",
+      "routes": [
+        "/showcase/management"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "navigation",
+      "onlineRequired": false,
+      "successObservation": "数字の元になる項目へ移る",
+      "failureRecovery": "一覧の見出しから移れる",
+      "undo": null,
+      "alternative": null,
+      "entity": "ManagementSample"
+    },
+    {
+      "idPattern": "^showcase\\.management\\.service\\.",
+      "routes": [
+        "/showcase/management/services"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "local-sample",
+      "onlineRequired": false,
+      "successObservation": "確認した時刻だけ画面の中で変わる",
+      "failureRecovery": "本物の接続先へは送らないので失敗しない。読み込み直すと戻る",
+      "undo": null,
+      "alternative": null,
+      "entity": "ManagementSample"
+    },
+    {
+      "idPattern": "^showcase\\.management\\.job\\.",
+      "routes": [
+        "/showcase/management/jobs"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "local-sample",
+      "onlineRequired": false,
+      "successObservation": "試算は履歴に足すだけ。実行は確認のあと画面の中の件数だけ変わる",
+      "failureRecovery": "読み込み直すと戻る",
+      "undo": null,
+      "alternative": "試算だけで確かめられる",
+      "entity": "ManagementSample"
+    },
+    {
+      "idPattern": "^showcase\\.management\\.backup\\.",
+      "routes": [
+        "/showcase/management/backups"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "local-sample",
+      "onlineRequired": false,
+      "successObservation": "一覧の見本が画面の中で変わる",
+      "failureRecovery": "読み込み直すと戻る",
+      "undo": null,
+      "alternative": null,
+      "entity": "ManagementSample"
+    },
+    {
+      "idPattern": "^showcase\\.management\\.audit\\.",
+      "routes": [
+        "/showcase/management/audit-log"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "filter",
+      "onlineRequired": false,
+      "successObservation": "条件に合う見本の記録だけを表示する",
+      "failureRecovery": "該当がなければその旨を表示する",
+      "undo": null,
+      "alternative": null,
+      "entity": "ManagementSample"
+    },
+    {
+      "idPattern": "^showcase\\.management\\.household\\.",
+      "routes": [
+        "/showcase/management/households"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "local-sample",
+      "onlineRequired": false,
+      "successObservation": "状態と期限が画面の中で変わる",
+      "failureRecovery": "読み込み直すと戻る",
+      "undo": null,
+      "alternative": "止めるときは確認を出す",
+      "entity": "ManagementSample"
+    },
+    {
+      "idPattern": "^showcase\\.management\\.record\\.",
+      "routes": [
+        "/showcase/management/records"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "filter",
+      "onlineRequired": false,
+      "successObservation": "条件に合う見本の記録だけを表示する。変更はできない",
+      "failureRecovery": "該当がなければその旨を表示する",
+      "undo": null,
+      "alternative": null,
+      "entity": "ManagementSample"
+    },
+    {
+      "idPattern": "^showcase\\.management\\.confirm\\.",
+      "routes": [
+        "/showcase/management/jobs",
+        "/showcase/management/households"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "dialog",
+      "onlineRequired": false,
+      "successObservation": "確定すると画面の中の状態だけ変わる",
+      "failureRecovery": "やめると何も変わらない",
+      "undo": "やめる",
+      "alternative": null,
+      "entity": "ManagementSample"
     }
   ]
 }

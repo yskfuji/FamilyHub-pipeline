@@ -68,7 +68,7 @@ export default function App() {
   else if (at('/insights')) page = <PermissionBoundary capability="insight.read"><InsightsPage/></PermissionBoundary>;
   else if (path === '/settings' || path === '/settings/') page = <SettingsIndex/>;
   else if (settingsTab) page = <PermissionBoundary capability={settingsTab.capability}><SettingsPage path={path}/></PermissionBoundary>;
-  else if (auditPath && at(auditPath)) page = <AuditPage/>;
+  else if (auditPath && at(auditPath)) page = <AuditPage path={path}/>;
   else page = <NotFound/>;
   return <><Shell path={path}>{page}</Shell><IdleGuard/></>;
 }
