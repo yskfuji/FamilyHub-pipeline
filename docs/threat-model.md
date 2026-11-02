@@ -1,38 +1,55 @@
 # 脅威モデル
 
-対象はフロントエンドと公開API契約。実バックエンド、端末OS、外部天気事業者、外部の場所検索（OpenPOI API）の安全性を、この成果物だけで保証しない。
+対象は画面（`src/`）、API サーバー（`server/`）、公開API契約（`contracts/family-hub.openapi.yaml`）、配信の設定（`deploy/`、`public/_headers`）。ここに書く「実装」は、コードと自動試験で確かめたという意味で、本番で安全と判定したという意味ではない。外部の侵入試験は行っていない。端末OS、外部の天気（Open-Meteo）、外部の場所検索（OpenPOI API）、運営者が設定する読み取りの補助の接続先の安全性は、この成果物だけでは保証しない。
 
 ## 資産・主体・境界
 
-- 資産: 家族構成、予定、タスク、学校書類/OCR、支出、記録した場所、招待、セッション、監査記録。端末の正確な現在地と写真の位置情報も、保存しない一時的な資産として扱う。
-- 主体: 管理者／大人のメンバー／子どもメンバー／ゲスト、未認証者、招待受領者、外部サービス。API内部値は `owner/adult/child/guest` を維持する。
-- 信頼境界: ブラウザ↔API、API↔DB、API↔ファイル隔離/AV、API↔天気/祝日、世帯A↔世帯B、ブラウザ↔端末の位置情報、ブラウザ↔OpenPOI API（同意後だけ、Cookieなし）。
+- 資産: 家族構成、予定、タスク、学校書類/OCR、支出、記録した場所、招待、セッション、監査記録、写真と動画、添付、パスワードの確認用の値、パスキーの公開鍵、確認コード（TOTP）の秘密、回復コード、`FAMILY_HUB_SECRET`、読み取りの補助の接続鍵。端末の正確な現在地と写真の位置情報も、既定では保存しない一時的な資産として扱う。
+- 主体: 管理者／大人のメンバー／子どもメンバー／ゲスト、未認証者、招待受領者、運営者（`server/cli.ts` を実行できる人）、外部サービス。API内部値は `owner/adult/child/guest` を維持する。
+- 信頼境界: ブラウザ↔API、API↔SQLite、API↔メディアの保存先、API↔clamd、API↔SMTP、API↔読み取りの補助（LLM）、API↔利用者が指定したURLのページ、API↔Open-Meteo、家族グループA↔家族グループB、運営者の手元↔データベース、ブラウザ↔端末の位置情報、ブラウザ↔OpenPOI API（同意後だけ、Cookieなし）。
 
 ## STRIDE要約
 
-| 脅威 | 例 | 必須対策 | この成果物の状態 |
+状態の見方: 「実装」はサーバーで強制し自動試験がある。「実装（代役）」は外部の相手を代役に置き換えて試した。実物との接続は未確認で `evidence-pending`。
+
+| 脅威 | 例 | 対策 | この成果物の状態 |
 |---|---|---|---|
-| Spoofing | セッション窃取、フィッシング | WebAuthn、再認証、`__Host-` Secure HttpOnly SameSite Cookie、ローテーション | UI/API契約のみ |
-| Tampering | 予定/タスク/権限の競合上書き、精算額改ざん | version/権限revision、冪等キー、整数円、サーバー再計算、監査ログ | モック競合＋契約 |
-| Repudiation | 招待や精算操作の否認 | append-only AuditEvent、主体/時刻/対象/結果 | ER/契約のみ |
-| Information disclosure | 別世帯の添付参照、通知漏えい | 全問い合わせでhousehold認可、署名URL、通知マスキング、最小化 | 表示UI＋契約 |
-| Denial of service | 大容量添付、招待試行 | サイズ/回数制限、レート制御、隔離キュー | UI制限＋契約 |
-| Elevation of privilege | ゲストが管理者操作、唯一の管理者を消す | Membership roleをサーバー強制、既定拒否、object-level認可、管理者数検証 | UI非表示＋モック拒否＋契約 |
+| Spoofing | セッション窃取、フィッシング | パスキー（`@simplewebauthn/server` で challenge・origin・RP ID・カウンターを検証）、確認コード、再認証、`__Host-` Secure HttpOnly SameSite=Lax Cookie、サインインごとの新しいトークン | 実装。パスキーは Chromium の仮想認証器で確認。実機は未確認 |
+| Spoofing（パスワード） | 総当たり、メールアドレスの列挙 | Argon2id（m=46080, t=2, p=1）、15文字以上、IP とメールアドレスごとの回数制限、未登録でも同じ計算と同じ応答 | 実装 |
+| Tampering | 予定/タスク/権限の競合上書き、精算額改ざん | 版（version）、権限リビジョン（`If-Permission-Revision`）、`Idempotency-Key`、整数円、共有の規則（`src/domain/commands`）での再計算 | 実装 |
+| Repudiation | 招待や精算操作の否認 | 変更の操作ごとに `audit_events` へ主体・時刻・対象を残す。運営者の命令も残す | 実装。ただし記録は同じ SQLite の中にあり、データベースへ書ける人からは守れない（追記専用の強制や外部への複製はない） |
+| Information disclosure | 別の家族の添付参照、通知漏えい | 全問い合わせを閲覧者の所属から開始、`projectSnapshotForViewer` の投影、不可視の対象は `NOT_FOUND`、署名付きの短いリンク、通知の内容を隠す設定 | 実装 |
+| Denial of service | 大容量添付、招待試行 | 大きさと容量の上限、同時アップロード3件、回数制限（`rate_limits`）、読み取りは家族で1件ずつ・1時間30回 | 実装。回数制限は1台の SQLite に閉じる。全体の負荷試験は未実施 |
+| Elevation of privilege | ゲストが管理者操作、唯一の管理者を消す | 役割の上限と個別権限をサーバーで判定、宣言のない経路は起動時に拒否、最後の管理者の保護 | 実装（`npm run audit:routes` が経路と契約を双方向で照合） |
 | Information disclosure（場所） | 記録した場所から生活圏・通学先を推測、外部検索の記録から行動を推測 | 外部へは小数第3位に丸めた位置と確定した検索語だけ送る、端末内で並べ直す、写真は送らない、`place.read` による項目単位の秘匿（子ども・ゲストには返さない） | 実装＋単体・E2E＋契約 |
 | Tampering（写真） | 細工した写真のメタデータで解析を暴走・誤作動させる | 先頭256KiBだけ読む、マーカー・項目・箱の数と参照先を制限、例外を外へ出さない、範囲外の値を捨てる | 実装＋変異ファズ500回 |
 | Denial of service（場所） | 巨大な写真、外部検索の連打 | 30MB上限、入力確定時だけ検索、自動再試行なし、8秒で打ち切り | 実装＋単体 |
 | Spoofing／Tampering（外部応答） | 外部の応答に不正な値やリンクを混ぜる | zodで緩く検証し長さを制限、Reactの出力エスケープ、応答からリンクを作らない、出典リンクは固定URL | 実装＋単体 |
-| Repudiation（同意） | 外部送信への同意の有無を争う | 同意の版と日時を受付側で記録し、AuditEventに残す。現在の説明と異なる版は拒否する | 日時の記録はモック、AuditEventと版の照合は契約のみ |
+| Repudiation（同意） | 外部送信への同意の有無を争う | 同意の版と日時をサーバーの時計で記録し、監査記録に残す | 実装（`savePrivacySettings`）。現在の説明の版との照合は画面で行い、サーバーは古い版を拒否しない。文言の法的な十分さは未確認 |
 
-一覧・検索・詳細取得も、能力と対象の公開範囲をサーバーで毎回判定する。閲覧不可の個別対象は `NOT_FOUND` とし、存在の有無を漏らさない。フロント側の非表示は誤操作防止であって認可境界ではない。権限、招待、金融操作は再認証と監査イベントを必須契約とする。
+一覧・検索・詳細取得も、能力と対象の公開範囲をサーバーで毎回判定する。閲覧不可の個別対象は `NOT_FOUND` とし、存在の有無を漏らさない。フロント側の非表示は誤操作防止であって認可境界ではない。権限、招待、金融操作は直近の本人確認（既定5分、`FAMILY_HUB_RECENT_AUTH_MS`）がないと `403 REAUTH_REQUIRED` で拒否し、監査記録を残す。
 
 ## セッションとCSRF
 
-本番APIはCookie名を `__Host-family_session` とし、`Path=/; Secure; HttpOnly; SameSite=Lax` を最低線にする。認証・権限変更時にIDをローテーションし、サーバー側失効を実装する。認証情報をlocalStorage/sessionStorageへ保存しない。
+Cookie は `server/auth/sessions.ts` だけが発行する（`npm run audit:security` で検査）。https の配信では `__Host-fh_session` と `__Host-fh_pre`、loopback の http 開発では `fh_session` と `fh_pre` を使い、どれも `Path=/; HttpOnly; SameSite=Lax`、https では `Secure`。セッションの値は32バイトの乱数で、データベースには SHA-256 だけを保存する。有効期間は30日、無操作の時間切れ（既定30分、本人が変更できる）はサーバーで判定する。画面の残り時間の表示は案内にすぎない。パスワードの変更で本人のほかの端末を終了する。認証情報は localStorage/sessionStorage へ保存しない。
 
-参照フロントのパスキー追加は明示的なデモ登録であり、秘密鍵を生成・保存しない。HTTP adapterではsecure contextとWebAuthn credential APIを要求し、challenge・origin・RP ID・attestation/credentialの検証はサーバー責務とする。パスワード変更の入力値と招待tokenはWeb Storageへ保存しない。
+`NODE_ENV=production` では、https のオリジン、32文字以上の `FAMILY_HUB_SECRET`、clamd の設定がないと起動しない。開発用の既定の秘密は `NODE_ENV=production` では使われないが、配信物の文字列としては残る。
 
-状態変更はCSRF tokenに加えて`Origin`/`Sec-Fetch-Site`を検証する。XSS対策の代替にはしない。出力エスケープ、依存管理、strict CSPを併用する。
+状態を変える要求は `Origin` と `Sec-Fetch-Site` を確かめ、セッション（サインイン前は `fh_pre`）に結んだ HMAC の `X-CSRF-Token` を要求する。トークンは画面のメモリだけに置く。XSS対策の代替にはしない。出力エスケープ、依存管理、strict CSPを併用する。
+
+パスワード変更の入力値と招待コードは Web Storage へ保存しない。招待コードはハッシュで保存し、作成時の応答でだけ返す。
+
+## 確認コード（TOTP）と回復コード
+
+- 検証はサーバーで行う（RFC 6238、SHA-1、30秒、6桁、前後1枠）。一度使った時間枠より前は受け付けず、同じコードを繰り返し使えない（`users.totp_last_step`）。
+- 秘密は検証に元の値が要るのでハッシュにできない。`FAMILY_HUB_SECRET` から HKDF で作った鍵の AES-256-GCM で暗号化して保存する。`FAMILY_HUB_SECRET` を失うと確認コードは使えなくなり、漏れるとデータベースと合わせて秘密が読める。鍵の入れ替えの手順はない。
+- 回復コードは8個で、SHA-256 だけを保存し、1回ずつ使える。
+- サインインの確認コードは1つの試行につき5回、設定の変更は15分に10回まで。
+- 設定と解除には直近の本人確認が要る。
+
+## 運営者の命令（`server/cli.ts`）
+
+利用期間の延長・利用の停止・メンバーの停止と再開は、データベースのある機械で実行する命令だけで行い、HTTP の経路を持たない。すべて `audit_events` に `operator` として残す。実行する人の本人確認は OS のアカウントに任せている。命令を実行できる人はデータベースも直接読み書きできるので、この層の悪用はこのアプリでは防げない。
 
 ## オフライン再送
 
@@ -40,16 +57,62 @@
 
 これは保存データの偶発的な読み出しへの多層防御であり、同一オリジンXSS、悪意ある実行コード、端末侵害から秘密を守る仕組みではない。再送前にはセッション、能力、権限リビジョン、対象版を再検証する。
 
-## 添付
+## アップロードとメディア
 
-1. 許可拡張子をPDF/JPEG/PNGに限定。
-2. MIMEとmagic bytesを照合し、ファイル名をランダム化。
-3. webroot外の隔離領域へ置き、AV/CDRを実行。
-4. `clean`になるまで内容配信しない。配信時も世帯/オブジェクト認可。
-5. サイズ、個数、解凍後サイズ、処理時間を制限。
-6. 拒否・検査結果をAuditEventへ記録。
+対象はメモの添付と、アルバムの写真・動画。実装は `server/http/routes/media.ts` と `server/media/`。
+
+1. 受け付ける形式はファイルの先頭から判定し、送られてきた名前や種類の申告は信じない（JPEG/PNG/PDF/MP4/MOV）。HEIC はこの配布の sharp で読めないので理由を示して拒否する。
+2. 大きさの上限: 添付は PDF・画像10MB、動画120MB（サーバーの受け入れは130MiB）。アルバムは写真100MiB、動画4GiB、家族で20GiB、添付は家族で1GiB。
+3. 受け取ったファイルは保存先の外の一時領域に置き、clamd の検査が `clean` のときだけ保存する。感染、接続不可、時間切れ、壊れた応答はすべて拒否する。本番は clamd の設定がないと起動しない。開発用の代役は検査をしないので、`NODE_ENV=production` では選ばれない。
+4. 写真は sharp で読み直して位置情報を除き、動画は MP4/MOV の位置情報の箱を直接消す。解析できない動画は黙って保存せず拒否する。利用者が残すことを選んだ場合だけ残す。
+5. SHA-256 はサーバーで計算し、同じ家族の重複を拒否する。
+6. アルバムの大きなファイルは tus 1.0 の手順で8MiBずつ送る（経路は自前の実装）。同時に3件まで、未完了は24時間で消す。
+
+配信:
+
+- すべて `/v1/` の下だけで配る。`public/sw.js` は `/v1/` をキャッシュしない。
+- 応答には `X-Content-Type-Options: nosniff` と `Content-Security-Policy: default-src 'none'; sandbox` を付ける。添付は `Content-Disposition: attachment` で返す。
+- 添付のリンクは5分で切れる署名付きで、さらにセッションが要る。署名は添付のIDと期限だけに掛かり、`mime` と `name` は問い合わせの値を使う。`mime` は許可した種類に限り、それ以外は `application/octet-stream` にする。名前は保存時と異なる値に書き換えられるが、影響は本人が受け取るファイル名だけである。
+- 発行済みのリンクは5分の間、権限が変わっても開ける。
 
 AVのclean判定は絶対安全を意味しない。未知脅威、パーサ脆弱性、誤検知に備え、最小権限と更新・監視を併用する。
+
+未確認: 実物の clamd（EICAR を含む）とは接続していない。代役で OK・感染・無応答・壊れた応答・接続拒否を確かめた。sharp の解析器の脆弱性はこのアプリでは防げない。動画は再エンコードしないので、再生時の解析はブラウザに任せる。H.264 の再生とピクチャーインピクチャーは自動試験で確かめていない。
+
+## 読み取りの補助（LLM）
+
+既定では無効。`FAMILY_HUB_LLM_URL` と `FAMILY_HUB_LLM_MODEL` を設定したときだけ、OpenAI 互換の `/chat/completions` を呼ぶ。接続先は https か loopback の http に限る。
+
+- 送るもの: 利用者が読み取りを選んだ画像（領収書・チラシ）を読み直して長辺1600pxの JPEG にしたものと、読み取りを選んだページのアドレスと本文（最大8000文字）。家族の記録は送らない。送る前に画面で説明する（`ReadingNotice`）。
+- 送られた先での保存期間や利用は、接続先のサービスに依存する。**家族ごとの同意の仕組みはない。** 運営者が有効にすると、`assistant.use` を持つ人（既定で管理者と大人のメンバー）が使える。扱いは [比較表の未決事項](parity-matrix.md) に残す。
+- 読み取る内容はデータとして渡し、ページの本文は JSON の値に入れる。指示の注入を完全に防ぐことはできないので、応答は信用しない。応答は1MiBまでとし、形を確かめ、提案として画面に出すだけで、自動では保存しない。
+- 画像は検査を通してから読み、終わったら消す。
+- 家族で同時に1件、1人1時間30回まで。既定の待ち時間は45秒（`FAMILY_HUB_LLM_TIMEOUT_MS`）。
+- 接続鍵（`FAMILY_HUB_LLM_KEY`）は環境変数で渡す。
+
+未確認: 実物の LLM には接続していない。代役だけで確かめた。
+
+## URLの取得とSSRF
+
+利用者が指定したURLのページをサーバーが取得するので、内部の宛先へ向けられる危険がある（`server/adapters/urlFetcher.ts`）。
+
+- https の 443 番だけを許す。内部の名前（`localhost`、`.local`、`.internal` など）は名前を引く前に拒む。
+- 名前を引いた結果のすべての宛先を確かめ、プライベート、ループバック、リンクローカル、メタデータ、文書用の範囲、IPv4 を埋め込んだ IPv6 を拒む。確かめた宛先に接続を固定し（`pinnedLookup`）、DNS の再束縛で差し替えられないようにする。
+- 転送は3回までで、そのたびに同じ確認をやり直す。本文は2MiB、10秒で打ち切る。Cookie は送らない。
+- 追跡用の引数を除いてから取得する。
+- 試験用の緩めた設定は `server/main.ts` と `server/dev.ts` に書けないよう `npm run audit:security` で検査する。
+
+未確認: 試験は http の代役で行っており、**実際の TLS ハンドシェイクを通る経路は確かめていない。** 取得先には運営者の機械の IP アドレスが見える。
+
+## 外への接続の出口
+
+サーバーからの外部接続は `server/adapters/` だけ（天気、SMTP、clamd、LLM、URLの取得）。`server/` が読み込めるのは `src/domain`、`src/authz`、`src/content` だけで、`npm run audit:security` と ESLint の `no-restricted-imports` で止める。`src/domain/commands` は `src/data/gateway.ts` の型を読むが、型だけで実行時の依存はない。データベースの SQL は文字列の連結を禁じ、`npm run audit:security` が構文木で確かめる。例外は `PRAGMA user_version` の1か所で、値は束縛できないが計算した整数だけが入る。
+
+## 実験的な部品
+
+- パスワードのハッシュは Node の `crypto.argon2` を使う。**これは実験的な API** で、変更に備えて `server/auth/password.ts` の1ファイルに閉じている。`node >=24.7.0` を要求する。
+- データベースは `node:sqlite` を使う。**Node 24 では安定版ではない。** 利用は `server/db/db.ts` の1ファイルに閉じ、差し替えられるようにしている。
+- どちらも Node の更新で動作が変わりうるので、更新のたびに全試験を流す必要がある。
 
 ## 位置情報と外部送信
 
@@ -59,7 +122,7 @@ AVのclean判定は絶対安全を意味しない。未知脅威、パーサ脆�
 - 保存するのは選んだ場所の名前・住所・場所の座標（小数第5位）・出典・取得方法だけ。`place.read` を持つ管理者と大人のメンバーだけに返し、子ども・ゲストには項目ごと除く。読めない人は書けない。
 - 残るリスク: OpenPOIにはIPアドレス、丸めた位置、時刻、ブラウザの種類、送信元のオリジンが届き、複数回の検索を結び付けられうる。送信先は取得した情報の保存期間を公表しておらず、SLAもない。サービスの変更や規約の変更時は `PLACE_LOOKUP_NOTICE_VERSION` を更新して同意を取り直す。本番では中継APIを置けばIPアドレスを隠せるが、送信先の変更として公表内容の改訂が必要になる。
 - 法令との対応（法的助言ではない）: アカウントに結び付いた位置情報は個人情報として扱う（個人情報保護委員会ガイドライン）。外部送信は電気通信事業法の外部送信規律の対象となりうるため、送信先・送る内容・目的を `/settings/location` で公表し、初回利用前に同意を求める。適用の可否と文言は専門家の確認を要する。
-- 支出には編集APIがないため、支出に記録した場所は後から外せない（追記のみの記録）。メモの場所は編集で外せる。
+- 支出の場所もメモの場所も、編集で外せる（`updateExpense`、`updateMemo`）。
 
 ## 認可の境界の点検（2026-10-03）
 
@@ -67,13 +130,15 @@ AVのclean判定は絶対安全を意味しない。未知脅威、パーサ脆�
 - ヒントは固定のデータを画面へ直接読み込んでおり、能力の確認がなかった。`insights.list()`（`GET /v1/insights`）を通し、`insight.read` を確認したうえで、閲覧者に見えている記録だけから導く。
 - 通知（`notification.manage`）と関連リンク（`resource.read`）は、画面でも能力で出し分ける。mock では通知設定にも能力の確認を加えた。
 - 招待コードは作成時の応答でだけ返し、一覧では返さない。招待の受け付けは、存在しない・期限切れ・使用済み・取り消しを区別しない。
-- パスキーのサインインは、開始・端末での本人確認・検証の3段階が終わってから先へ進む（以前は開始だけで進んでいた）。検証は API 側の責務。
+- パスキーのサインインは、開始・端末での本人確認・検証の3段階が終わってから先へ進む（以前は開始だけで進んでいた）。検証はサーバーで行う。
 - 繰り返しの「この予定だけ」が無視され、シリーズ全体が消える不具合を直した。範囲は例外日またはシリーズの分割で表し、削除・分割の前の状態を保存して7日以内に戻せる。
 
 ## 配備ヘッダー
 
-`public/_headers`と`deploy/nginx.conf`はstrict CSP、HSTS、`frame-ancestors 'none'`、`base-uri 'none'`、`form-action 'self'`、nosniff、COOP、CORPを同じ値で含み、`npm run audit:security` が一致を検査する。`connect-src` は `'self' https://api.openpoiapi.com` だけ、`Permissions-Policy` は `geolocation=(self)` で自サイト以外の位置情報利用を禁じる。`vite preview` はこれらのヘッダーを適用しないため、配備先での確認が必要。TLS証明書、HSTS preload、reporting endpointは配備先で検証する。
+`public/_headers`と`deploy/nginx.conf`はstrict CSP、HSTS、`frame-ancestors 'none'`、`base-uri 'none'`、`form-action 'self'`、nosniff、COOP、CORPを同じ値で含み、`npm run audit:security` が一致を検査する。`connect-src` は `'self' https://api.openpoiapi.com`、`media-src` は `'self' blob:` だけで、完全一致を検査する。`Permissions-Policy` は `geolocation=(self)` で自サイト以外の位置情報利用を禁じる。`location /v1/` の転送先も検査し、この中で `add_header` を書くと見出しが消えるので禁止している。実スタックの E2E は同じ見出しを `vite preview` で付けて流す（localhost の http で動かすため、HSTS と `upgrade-insecure-requests` だけ外す）。nginx そのものの動作、TLS証明書、HSTS preload、reporting endpointは配備先で検証する。
+
+API は `trustProxy: 'loopback'` で、同じ機械の nginx から届く `X-Forwarded-For` の末尾だけを信じる。別の機械の転送を挟む場合は、この設定を変えないと回数制限が転送元の1つの宛先に集まる。
 
 ## 依存関係
 
-Viteは既知問題の修正版8.3.1へ固定更新した。2026-10-01時点で `npm audit --omit=dev` と全依存の `npm audit` はともに0件。これは将来の脆弱性不存在を保証しないため、lockfileを含む継続監査とlocalhost限定の開発サーバー運用を維持する。
+依存はすべて固定の版で `package-lock.json` に記録する。これは将来の脆弱性不存在を保証しないため、lockfileを含む継続監査とlocalhost限定の開発サーバー運用を維持する。結果は `docs/audits/verification-report.md` に残す。
