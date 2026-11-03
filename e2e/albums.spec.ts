@@ -306,9 +306,14 @@ test.describe('viewer', () => {
     await page.getByRole('button', { name: '写真「item-sports-1.jpg」を開く' }).click();
     const viewer = page.getByRole('dialog', { name: '写真を表示' });
     const swipe = (fromX: number, toX: number, fromY: number, toY: number) => viewer.locator('.media-stage').evaluate((stage, points) => {
-      const touch = (x: number, y: number) => new Touch({ identifier: 1, target: stage, clientX: x, clientY: y });
-      stage.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, changedTouches: [touch(points[0], points[2])] }));
-      stage.dispatchEvent(new TouchEvent('touchend', { bubbles: true, changedTouches: [touch(points[1], points[3])] }));
+      // デスクトップの Safari には Touch がないので、同じ形のイベントを組み立てる。
+      const touch = (type: string, x: number, y: number) => {
+        const event = new Event(type, { bubbles: true });
+        Object.defineProperty(event, 'changedTouches', { value: [{ clientX: x, clientY: y }] });
+        stage.dispatchEvent(event);
+      };
+      touch('touchstart', points[0], points[2]);
+      touch('touchend', points[1], points[3]);
     }, [fromX, toX, fromY, toY]);
     await swipe(300, 100, 200, 210);
     await expect(count(viewer)).toContainText('2 / 3');

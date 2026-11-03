@@ -101,7 +101,7 @@
   - H.264 の動画の再生
   - ピクチャーインピクチャー
   - 実スタックの Firefox と WebKit（実スタックの E2E は Chromium だけ）
-  - モックの Firefox（段階16の環境では起動できず未実施）と WebKit（4件が失敗。`docs/audits/verification-report.md`）
+  - モックの Firefox（段階16の環境では起動できず未実施）と WebKit（環境由来の読み込みの時間切れ2件を除いて通過。`docs/audits/verification-report.md`）
   - 配備先での CSP・Permissions-Policy の適用、nginx そのものの動作、TLS 証明書
   - 実運用の Core Web Vitals
   - iOS Safari実機での現在地と写真の位置情報（「オプション」の既定値を含む）、Android実機での写真の位置情報

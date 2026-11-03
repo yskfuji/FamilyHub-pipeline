@@ -13,9 +13,9 @@
 | 日本語コンテンツ監査 | pass + evidence-pending | 122ファイルを走査。既知の未翻訳語・内部値・実装語0件。比較元の名前の検査は350ファイル。母語話者2名レビューは未実施 |
 | 操作ID・ユースケース | pass | 明示的な操作468件・108系統。ユースケース96件、能力名はすべて実在 |
 | Chromium モック E2E + axe | pass | `e2e/` の一覧と `e2e/accessibility.spec.ts` で305件 |
-| WebKit モック E2E | 未達（4件） | `npm run test:e2e` の WebKit で4件が再現して失敗する（`e2e/albums.spec.ts:304`、`:378`、`e2e/shell.spec.ts:173`、`:392`）。この4件は段階15のコミットでも同じように失敗し、この段階で増えたものではない。ほかに2件（`e2e/navigation.spec.ts:103`、`e2e/places.spec.ts:106`）は全体の実行で失敗し、単独の再実行では通った。4件の内容は、WebKit で `Touch` を作れない（試験の問題）、Escape のあとでボタンへフォーカスが戻らない、密度「コンパクト」で操作の高さが30pxになる、月の表のキーボード操作で移動のリンクへフォーカスが移らない。修正していない |
-| Firefox モック E2E | 未実施 | この環境では Firefox が起動の段階で止まり（macOS の sandbox の `Operation not permitted`）、試験へ進めない。245件が `browserType.launch` の時間切れで、アプリの結果ではない |
-| `npm run verify` の全体 | 未達 | 上の2件のため、この環境では終了コード0にならない。全体の命令としては実行していない。構成する命令は個別に実行した |
+| WebKit モック E2E | pass（環境由来の時間切れを除く） | `npm run test:e2e` の一覧を Chromium と WebKit で実行し、491件が通過、3件が skip、失敗は WebKit の2件。2件とも `page.goto` の読み込み待ちの時間切れで、単独の再実行では3回とも通った。WebKit で静的ファイル（`/favicon.svg`）だけを300回開いても2回同じように止まり、アプリの画面（`/today`）は300回で0回だったため、この環境の WebKit の問題と判断した。以前の4件は直した: 密度「コンパクト」で Safari がセレクトの `min-height` を無視して30pxになっていた（`.select` の標準の見た目を外して矢印を描く）、Safari ではクリックしたボタンに焦点が移らず、重ね表示を閉じたあと焦点が `main` に戻っていた（`focusReturnTarget`、単体試験あり）、デスクトップの WebKit に `Touch` がない（試験の書き方を変更）、Safari の既定の Tab はリンクを飛ばす（WebKit では Option+Tab で確かめる） |
+| Firefox モック E2E | 未実施 | この環境では Firefox が起動の段階で止まり（macOS の sandbox の `Operation not permitted`）、試験へ進めない。Firefox 自身の sandbox を切っても同じだった。アプリの結果ではない |
+| `npm run verify` の全体 | 未達 | Firefox が起動できないため、この環境では終了コード0にならない。全体の命令としては実行していない。構成する命令は個別に実行した |
 | 実スタック E2E | pass（Chromium だけ） | `playwright.real.config.ts`: 40件。実際の API と SQLite、配信と同じ CSP の下で動かす。パスキーは仮想認証器、LLM は代役 |
 | 管理コンソールの見本 | pass | 7項目すべてで見本の表示を確認。外への要求がないこと、通常のビルドでは見つからないページになることを `e2e/management.spec.ts` で確認。390px と 1440px の撮影を目視し、水平のはみ出しは0 |
 | API の起動 | pass | `dist-server/main.js` を一時的なデータベースで起動し、`/health` は200、`/ready` は200、`/v1/version` は `dist-server/build-id.txt` と同じ値。`NODE_ENV=production` で clamd に届かないときは `/health` が200、`/ready` が503。clamd の設定がなければ起動しない。`dist-server/cli.js` は動作を確認 |
@@ -23,7 +23,7 @@
 | 配布の一覧 | pass | `bash scripts/package.sh --dry-run`: 497件。データベース、アップロード、メディア、`.env`、ビルド、試験の結果を含まない。`src/data/` と `server/media/` は含む |
 | Lighthouse Today desktop | pass（ローカルの静的 preview） | Performance 99、Accessibility 100、Best Practices 100、LCP 767ms、CLS 0.00048、TBT 0ms |
 | 場所検索の実データ測定 | 前回の結果 | 2026-10-03 の測定のまま（`docs/audits/place-lookup-probe.md`）。今回は再測定していない |
-| npm runtime audit | residual risk | `npm audit --omit=dev`: high 1件（zod 4.1.11、GHSA-mrhx-c7xc-m3w5。大きな集まりの検証でメモリを使い切る）。修正版 4.6.7 があるが、この段階では更新していない。API の本文は2MiBに制限している |
+| npm runtime audit | pass | zod を 4.6.7 に上げ（GHSA-mrhx-c7xc-m3w5 の修正版）、`npm audit --omit=dev` は0件 |
 | npm full audit | residual risk | 全依存で32件（critical 1、high 12、moderate 14、low 5）。大半は開発用の推移依存。強制修正は行っていない |
 | 実機の VoiceOver + Safari | evidence-pending | 人手記録なし |
 | iOS Safari / Android実機の位置情報 | evidence-pending | 実機記録なし |

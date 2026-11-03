@@ -389,11 +389,12 @@ test.describe('month keyboard', () => {
     await expect(page).toHaveURL(/on=2026-10-17/);
   });
 
-  test('the grid is a single tab stop, and the skip link stays first', async ({ page }) => {
+  test('the grid is a single tab stop, and the skip link stays first', async ({ page, browserName }) => {
     await page.goto('/calendar?month=2026-10&on=2026-10-14');
     await expect(page.locator('button.day[tabindex="0"]')).toHaveCount(1);
     await expect(day(page, '2026-10-14')).toHaveAttribute('tabindex', '0');
-    await page.keyboard.press('Tab');
+    // Safari の既定では Tab はリンクを飛ばし、Option+Tab で止まる。
+    await page.keyboard.press(browserName === 'webkit' ? 'Alt+Tab' : 'Tab');
     await expect(page.getByRole('link', { name: '本文へ移動' })).toBeFocused();
   });
 });

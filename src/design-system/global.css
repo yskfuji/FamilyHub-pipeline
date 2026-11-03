@@ -106,6 +106,9 @@
   .field { display: grid; gap: .4rem; }
   .field label, .field > span { font-size: .82rem; font-weight: 750; color: var(--ink-soft); }
   .input, .select, .textarea { width: 100%; min-height: 2.9rem; padding: .68rem .8rem; border: 1px solid var(--line-strong); border-radius: .7rem; background: var(--sheet); color: var(--ink); }
+  /* Safari は標準の見た目のセレクトで min-height を無視するので、見た目を外して矢印を描く。 */
+  .select { -webkit-appearance: none; appearance: none; padding-right: 2rem; background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%); background-position: right 1.05rem center, right .75rem center; background-size: .3rem .3rem; background-repeat: no-repeat; }
+  @media (forced-colors: active) { .select { -webkit-appearance: auto; appearance: auto; } }
   .textarea { min-height: 7rem; resize: vertical; }
   .field-help { color: var(--ink-soft); font-size: .75rem; }
   .field-error { color: var(--danger); font-size: .78rem; font-weight: 700; }

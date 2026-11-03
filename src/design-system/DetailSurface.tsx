@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useId, useLayoutEffect, useRef, useSyncExternalStore, type PropsWithChildren } from 'react';
 import { ja } from '../content/ja';
-import { Drawer } from './components';
+import { Drawer, focusReturnTarget } from './components';
 import { CloseIcon } from './icons';
 
 /** 一覧と詳細を横に並べられる、本文の領域の幅（rem）。 */
@@ -27,7 +27,7 @@ function DetailPane({ title, eyebrow, onClose, children }: PropsWithChildren<{ t
   const titleId = useId();
   const pane = useRef<HTMLElement>(null);
   const close = useEffectEvent(onClose);
-  const trigger = useRef<HTMLElement | null>(document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null);
+  const trigger = useRef<HTMLElement | null>(focusReturnTarget());
   useLayoutEffect(() => {
     const returnTarget = trigger.current;
     pane.current?.querySelector<HTMLElement>('[data-autofocus]')?.focus({ preventScroll: true });

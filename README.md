@@ -101,7 +101,7 @@ npx tsx server/cli.ts resume <membership>       # メンバーの参加を戻す
 - 通常の `build` は `/showcase`、actor/scenario切替、監査用fixture、source mapを含みません。`build:http` のビルドは確認用データも含みません。どちらも `npm run audit:ui` と `npm run audit:security` が確かめます。
 - 実験的な Node の API は1ファイルに閉じています（`server/auth/password.ts`、`server/db/db.ts`）。
 - 実物の SMTP、clamd、LLM、URL 取得の TLS の経路、H.264 の再生、ピクチャーインピクチャーは未確認です。実スタックの E2E は Chromium だけです。
-- `npm run verify` は3ブラウザの E2E を含みます。最後の確認では WebKit の4件が失敗し、Firefox は起動できなかったので、全体は終了コード0になっていません（[検証結果](docs/audits/verification-report.md)）。
+- `npm run verify` は3ブラウザの E2E を含みます。最後の確認では Firefox がこの環境で起動できず、WebKit では環境由来の読み込みの時間切れが2件出たので、全体は終了コード0になっていません（[検証結果](docs/audits/verification-report.md)）。
 
 詳細は [証拠台帳](docs/evidence-register.md)、[脅威モデル](docs/threat-model.md)、[アクセス表](docs/access-control-matrix.md)、[IA](docs/information-architecture.md)、[比較表](docs/parity-matrix.md) を参照してください。
 

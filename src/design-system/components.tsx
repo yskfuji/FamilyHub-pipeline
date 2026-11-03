@@ -40,10 +40,19 @@ export function useModalTriggerTracking() {
   }, []);
 }
 
+/**
+ * 閉じたときに焦点を戻す先。Safari はボタンを押しても焦点を移さず、祖先の main（tabindex="-1"）へ移すことがあるので、
+ * 操作できる要素に焦点がなければ、直前に押された要素を使う。
+ */
+export function focusReturnTarget(): HTMLElement | null {
+  const active = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null;
+  if (active?.matches(focusable)) return active;
+  return lastModalTrigger?.isConnected ? lastModalTrigger : active;
+}
+
 export function useModalBehavior(onClose: () => void) {
   const root = useRef<HTMLElement>(null);
-  const active = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null;
-  const trigger = useRef<HTMLElement | null>(active ?? lastModalTrigger);
+  const trigger = useRef<HTMLElement | null>(focusReturnTarget());
   const close = useEffectEvent(() => closeGuarded(root.current, onClose));
   useLayoutEffect(() => {
     const returnTarget = trigger.current;
