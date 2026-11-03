@@ -77,9 +77,11 @@ describe('request boundary', () => {
   it('keeps every failed rule from being saved or audited', async () => {
     const world = open();
     await world.gateway.todos.createTodo({ title: '', assigneeMembershipId: 'member-aoi' });
-    expect(world.deps.db.get<{ count: number }>('SELECT count(*) AS count FROM audit_events')?.count).toBe(0);
-    await world.gateway.todos.createTodo({ title: '記録', assigneeMembershipId: 'member-aoi' });
-    expect(world.deps.db.get<{ action: string; target: string | null }>('SELECT action, target FROM audit_events')).toMatchObject({ action: 'createTodo' });
+    const audited = () => world.deps.audit.store.db.all<{ action: string; target: string | null }>('SELECT action, target FROM audit_events');
+    expect(audited()).toEqual([]);
+    const created = await world.gateway.todos.createTodo({ title: '記録', assigneeMembershipId: 'member-aoi' });
+    expect(audited()).toEqual([{ action: 'createTodo', target: created.ok ? created.value.id : 'missing' }]);
+    expect(world.deps.db.get<{ count: number }>('SELECT count(*) AS count FROM audit_outbox')?.count).toBe(0);
   });
 });
 

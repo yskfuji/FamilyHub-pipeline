@@ -1,3 +1,5 @@
+import { dirname, join } from 'node:path';
+import { AUDIT_RETENTION_MONTHS } from '../src/domain/auditLog';
 import { checkLlmUrl } from './adapters/llm';
 import { Keyring, keyringSourceFrom } from './auth/keyring';
 
@@ -6,6 +8,10 @@ export interface ServerConfig {
   /** 利用者が開くオリジン。Origin の検査、Cookie、パスキーの RP ID に使う。 */
   origin: string;
   databasePath: string;
+  /** 監査の記録のファイル（audit.db）。既定は本体の DB と同じ場所。権限 0600 で作る。 */
+  auditDatabasePath: string;
+  /** 監査の記録を残す月数。過ぎた分は毎日、checkpoint を残してから消す。0 なら消さない。 */
+  auditRetentionMonths: number;
   /** 鍵束。Cookie の値に結ぶ CSRF トークン、期限付きの署名、二段階認証の秘密の暗号化に使う（server/auth/keyring.ts）。 */
   keys: Keyring;
   secureCookies: boolean;
@@ -44,12 +50,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const secureCookies = url.protocol === 'https:';
   if (production && !secureCookies) throw new Error('production requires an https origin');
   if (!secureCookies && !loopback(url.hostname)) throw new Error('plain http is only allowed on loopback hosts');
+  const databasePath = env.FAMILY_HUB_DATABASE ?? 'data/family-hub.sqlite';
+  const auditRetentionMonths = Number(env.FAMILY_HUB_AUDIT_RETENTION_MONTHS ?? AUDIT_RETENTION_MONTHS);
+  if (!Number.isInteger(auditRetentionMonths) || auditRetentionMonths < 0) throw new Error('FAMILY_HUB_AUDIT_RETENTION_MONTHS must be a whole number of months');
   return {
     production,
     origin,
     keys,
     secureCookies,
-    databasePath: env.FAMILY_HUB_DATABASE ?? 'data/family-hub.sqlite',
+    databasePath,
+    auditDatabasePath: env.FAMILY_HUB_AUDIT_DB ?? (databasePath === ':memory:' ? ':memory:' : join(dirname(databasePath), 'audit.db')),
+    auditRetentionMonths,
     sessionDays: 30,
     mediaPath: env.FAMILY_HUB_MEDIA ?? 'data/media',
     clamd: env.FAMILY_HUB_CLAMD_HOST ? { host: env.FAMILY_HUB_CLAMD_HOST, port: Number(env.FAMILY_HUB_CLAMD_PORT ?? 3310), timeoutMs: Number(env.FAMILY_HUB_CLAMD_TIMEOUT_MS ?? 600_000) } : null,

@@ -11,7 +11,7 @@ import { sendError, unauthenticated } from '../context';
 import type { AppDeps, RouteDeclaration } from '../context';
 import { parse } from '../parse';
 import { limit } from '../rateLimit';
-import { passwordContextFor, totpUnavailable, verifySecondFactor } from './account';
+import { auditAccount, passwordContextFor, totpUnavailable, verifySecondFactor } from './account';
 import { entitlementActive } from '../app';
 
 const declare = (operationId: string, overrides: Partial<RouteDeclaration> = {}) => ({ route: { operationId, auth: 'session', csrf: true, capability: 'own', idempotent: false, ...overrides } as RouteDeclaration });
@@ -31,7 +31,8 @@ const deviceLabel = (request: FastifyRequest) => {
 function startSession(deps: AppDeps, request: FastifyRequest, reply: FastifyReply, userId: string) {
   // サインインのたびに新しい値にする（固定化を防ぐ）。CSRF トークンも結び直される。
   issueSessionCookie(reply, deps.config, createSession(deps.db, deps.config, userId, deps.clock.now(), deviceLabel(request), deps.ids.next('session')));
-  deps.db.run('INSERT INTO audit_events (id, actor_user_id, action, at) VALUES (?, ?, ?, ?)', deps.ids.next('audit'), userId, 'signIn', deps.clock.now());
+  // どの方法でサインインしたか（パスワード・確認コード・パスキー）を、経路の operationId で残す。
+  auditAccount(deps, userId, request.routeOptions.config.route?.operationId ?? 'signIn');
 }
 
 function sessionStage(deps: AppDeps, request: FastifyRequest) {
@@ -114,6 +115,7 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
     const body = parse(z.object({ challengeId: idSchema, credential: z.record(z.string(), z.unknown()) }), request.body);
     const created = await finishRegistration(deps, user.id, body.challengeId, body.credential as unknown as RegistrationResponseJSON);
     if (!created) return sendError(reply, { code: 'INVALID_INPUT', message: serverMessages.passkeyRegistrationFailed, retryable: true });
+    auditAccount(deps, user.id, 'finishPasskeyRegistration');
     return reply.code(201).send(created);
   });
   app.post('/v1/auth/password/change', { config: declare('changePassword') }, async (request, reply) => {
@@ -129,7 +131,7 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
       deps.db.run('UPDATE users SET password_hash = ? WHERE id = ?', hashed, user.id);
       // ほかの端末のサインインを終わらせる。
       deps.db.run('UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND id <> ? AND revoked_at IS NULL', deps.clock.now(), user.id, request.session?.id ?? '');
-      deps.db.run('INSERT INTO audit_events (id, actor_user_id, action, at) VALUES (?, ?, ?, ?)', deps.ids.next('audit'), user.id, 'changePassword', deps.clock.now());
+      auditAccount(deps, user.id, 'changePassword');
     });
     return reply.code(204).send();
   });
@@ -138,7 +140,10 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
     const sessionId = parse(idSchema, (request.params as Record<string, unknown>).sessionId);
     const target = deps.db.get<{ id: string }>('SELECT id FROM sessions WHERE id = ? AND user_id = ? AND revoked_at IS NULL', sessionId, user.id);
     if (!target || target.id === request.session?.id) return sendError(reply, { code: 'FORBIDDEN', message: serverMessages.sessionNotRevocable, retryable: false });
-    deps.db.run('UPDATE sessions SET revoked_at = ? WHERE id = ?', deps.clock.now(), target.id);
+    deps.db.transaction(() => {
+      deps.db.run('UPDATE sessions SET revoked_at = ? WHERE id = ?', deps.clock.now(), target.id);
+      auditAccount(deps, user.id, 'revokeSession');
+    });
     return reply.code(204).send();
   });
 }

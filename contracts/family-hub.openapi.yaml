@@ -1560,6 +1560,46 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/NotificationPreferences' }
         default: { $ref: '#/components/responses/Error' }
+  /v1/audit-events:
+    get:
+      operationId: listAuditEvents
+      description: >-
+        The household's change record, newest first. Requires audit.read (owners by default; not
+        grantable to adults). Items never carry request bodies, secrets, tokens or addresses; detail
+        holds only the names of changed fields. A target the viewer cannot see (including one that no
+        longer exists) is returned without its ID and with hidden true. chain reports the latest
+        tamper check of the append-only hash chain.
+      parameters:
+        - { name: cursor, in: query, schema: { type: string, pattern: '^[0-9]{1,15}$' } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - { name: membershipId, in: query, schema: { type: string, maxLength: 100 } }
+        - { name: group, in: query, schema: { $ref: '#/components/schemas/AuditGroupFilter' } }
+        - { name: action, in: query, schema: { type: string, pattern: '^[A-Za-z.]{1,60}$' } }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: One page of the change record
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuditPage' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/account/audit-events:
+    get:
+      operationId: listAccountAuditEvents
+      description: >-
+        The caller's own account record (sign-in, password, email and two-step changes, passkeys,
+        signing other devices out), newest first, and the operator removing the caller's two-step code.
+      parameters:
+        - { name: cursor, in: query, schema: { type: string, pattern: '^[0-9]{1,15}$' } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        '200':
+          description: One page of the account record
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountAuditPage' }
+        default: { $ref: '#/components/responses/Error' }
 components:
   securitySchemes:
     sessionCookie:
@@ -2074,3 +2114,85 @@ components:
         viewer: { $ref: '#/components/schemas/ViewerContext' }
         permissionOverrides: { type: array, items: { $ref: '#/components/schemas/PermissionOverride' } }
       additionalProperties: true
+    AuditGroupFilter:
+      enum: [account, household, members, events, tasks, memos, expenses, albums, links, notifications, assistant, operator]
+    AuditGroup:
+      enum: [account, household, members, events, tasks, memos, expenses, albums, links, notifications, assistant, operator, other]
+    AuditDetail:
+      type: [object, 'null']
+      description: Names of the changed fields only, never their values.
+      required: [fields]
+      additionalProperties: false
+      properties:
+        fields: { type: array, items: { type: string } }
+    AuditEvent:
+      type: object
+      additionalProperties: false
+      required: [id, at, actor, action, group, target, detail]
+      properties:
+        id: { type: string }
+        at: { type: string, format: date-time }
+        actor:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [kind, membershipId, displayName]
+              properties:
+                kind: { const: member }
+                membershipId: { type: string }
+                displayName: { type: string }
+            - type: object
+              additionalProperties: false
+              required: [kind]
+              properties: { kind: { enum: [operator, former] } }
+        action: { type: string, description: The operationId, or operator.* for operator commands }
+        group: { $ref: '#/components/schemas/AuditGroup' }
+        target:
+          oneOf:
+            - type: 'null'
+            - type: object
+              additionalProperties: false
+              required: [kind, id, hidden]
+              properties:
+                kind: { enum: [event, task, memo, expense, album, member, invite, colorLabel, link, notification] }
+                id: { type: [string, 'null'], description: null when hidden }
+                hidden: { type: boolean }
+        detail: { $ref: '#/components/schemas/AuditDetail' }
+    AuditPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor, chain]
+      properties:
+        items: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/AuditEvent' } }
+        nextCursor: { type: [string, 'null'] }
+        chain:
+          type: object
+          additionalProperties: false
+          required: [state, checkedAt]
+          properties:
+            state: { enum: [ok, problem, unchecked] }
+            checkedAt: { type: [string, 'null'], format: date-time }
+    AccountAuditPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, at, actor, action, group, detail]
+            properties:
+              id: { type: string }
+              at: { type: string, format: date-time }
+              actor:
+                type: object
+                additionalProperties: false
+                required: [kind]
+                properties: { kind: { enum: [self, operator] } }
+              action: { type: string }
+              group: { $ref: '#/components/schemas/AuditGroup' }
+              detail: { $ref: '#/components/schemas/AuditDetail' }
+        nextCursor: { type: [string, 'null'] }

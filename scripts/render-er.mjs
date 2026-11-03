@@ -5,7 +5,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 const diagrams = [
-  { source: 'docs/data-model.mmd', output: 'docs/er.svg', title: 'Family Hub データモデル', description: 'server/db/migrations.ts が作るSQLiteの表と、records 表にJSON文書として保存する記録の種類。', kind: 'er' },
+  { source: 'docs/data-model.mmd', output: 'docs/er.svg', title: 'Family Hub データモデル', description: 'server/db/migrations.ts が作る本体のSQLiteの表、server/audit/schema.ts が作る監査の記録のファイル（audit.db）の表、records 表にJSON文書として保存する記録の種類。', kind: 'er' },
   { source: 'docs/interaction-flow.mmd', output: 'docs/interaction-flow.svg', title: 'Family Hub 操作・認可フロー', description: '操作入口から認可、command、Gateway、対象エンティティ、監査記録までの責務境界。', kind: 'flow' },
 ];
 
@@ -31,7 +31,10 @@ for (const diagram of diagrams) {
     const entities = new Set([...source.matchAll(/^\s{2}([A-Za-z_]+)\s*\{/gm)].map((match) => match[1]));
     const migrations = await readFile(resolve('server/db/migrations.ts'), 'utf8');
     const store = await readFile(resolve('server/db/aggregateStore.ts'), 'utf8');
-    const tables = [...migrations.matchAll(/CREATE TABLE (\w+)/g)].map((match) => match[1]);
+    // 本体の DB の表（後の変更で消した表を除く）と、監査の記録のファイル（audit.db）の表。
+    const dropped = new Set([...migrations.matchAll(/DROP TABLE (\w+)/g)].map((match) => match[1]));
+    const auditSchema = await readFile(resolve('server/audit/schema.ts'), 'utf8');
+    const tables = [...new Set([...[...migrations.matchAll(/CREATE TABLE (\w+)/g)].map((match) => match[1]).filter((name) => !dropped.has(name)), ...[...auditSchema.matchAll(/CREATE TABLE (\w+)/g)].map((match) => match[1])])];
     const collections = [...store.matchAll(/^const (?:lists|mediaLists) = \[([^\]]+)\]/gm)].flatMap((match) => [...match[1].matchAll(/'(\w+)'/g)].map((name) => name[1]));
     const expected = [...tables, ...collections, 'archive', 'meta'];
     const missing = expected.filter((name) => !entities.has(name));

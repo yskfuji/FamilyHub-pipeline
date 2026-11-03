@@ -9,7 +9,10 @@ erDiagram
   key_fingerprints ||--o{ users : seals_totp_secret
   household_members }o--|| records : household_id
   records ||--o{ entitlements : household_id
-  records ||--o{ audit_events : household_id
+  records ||--o{ audit_outbox : household_id
+  audit_outbox ||--o| audit_events : moves_to_audit_db
+  audit_events ||--o{ audit_anchors : anchored_daily
+  audit_events ||--o{ audit_checkpoints : pruned_through
   records ||--o{ memberships : collection
   records ||--o{ events : collection
   records ||--o{ todos : collection
@@ -99,13 +102,40 @@ erDiagram
     integer count
     integer window_started_at
   }
+  audit_outbox {
+    integer seq PK "本体の DB。変更と同じトランザクションで書く"
+    text id UK "audit.db へ INSERT OR IGNORE で移してから消す"
+    text household_id
+    text actor_user_id
+    text action "operationId"
+    text target "経路の ID。本文は残さない"
+    text detail "変えた項目の名前だけ"
+    text at
+  }
+  audit_anchors {
+    text day PK "本体の DB。毎日の基準点の控え"
+    integer seq
+    text hash
+    text at
+  }
   audit_events {
-    text id PK
+    integer seq PK "audit.db（別のファイル、0600）"
+    text id UK
+    text at
     text household_id
     text actor_user_id
     text action
     text target
     text detail
+    text prev_hash
+    text hash "SHA-256(prev_hash と正規化した行)"
+  }
+  audit_checkpoints {
+    integer seq PK "audit.db。prune が消す前に残す"
+    integer through_seq
+    text hash "消した区間の末尾の hash"
+    text pruned_before
+    integer pruned_rows
     text at
   }
   recovery_codes {

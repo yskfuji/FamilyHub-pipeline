@@ -1,4 +1,5 @@
 import { createAlbumCommands } from './albums';
+import { createAuditCommands } from './audit';
 import { createFamilyCommands } from './family';
 import { createLinkCommands } from './links';
 import { createTrashCommands } from './trash';
@@ -33,5 +34,6 @@ export function createHouseholdRules(aggregate: HouseholdAggregate, env: Command
     insights: createInsightCommands(context),
     assistant: createAssistantCommands(context),
     notifications: createNotificationCommands(context),
+    audit: createAuditCommands(context),
   };
 }

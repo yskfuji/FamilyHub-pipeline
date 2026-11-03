@@ -15,7 +15,8 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-# データベースとメディアの置き場所だけ書けるようにする。
+# データベース・監査の記録（audit.db、既定は FAMILY_HUB_DATABASE と同じディレクトリ）・メディアの置き場所だけ書けるようにする。
+# FAMILY_HUB_AUDIT_DB を別のディレクトリに置くなら、ここに足す。
 ReadWritePaths=/var/lib/family-hub
 
 [Install]

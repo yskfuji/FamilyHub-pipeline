@@ -1,6 +1,7 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { ServerConfig } from '../config';
 import type { Db } from '../db/db';
+import type { AuditLog } from '../audit/log';
 import type { SessionRow } from '../auth/sessions';
 import { serverMessages } from '../../src/content/serverMessages';
 import type { GatewayError, Id, Rfc3339 } from '../../src/domain/types';
@@ -15,6 +16,8 @@ export interface IdSource { next(prefix: string): Id; inviteToken(): string; }
 
 export interface AppDeps {
   db: Db;
+  /** 監査の記録。本体の DB の送り出しの箱へ書き、確定した後に audit.db へ移す（server/audit/log.ts）。 */
+  audit: AuditLog;
   config: ServerConfig;
   clock: ServerClock;
   ids: IdSource;

@@ -16,7 +16,7 @@
 - `FAMILY_HUB_SECRET`（32文字以上の乱数）か、鍵束の `FAMILY_HUB_KEYS` と `FAMILY_HUB_ACTIVE_KID`。下の「鍵」を参照
 - `FAMILY_HUB_CLAMD_HOST`: clamd の接続先
 
-`FAMILY_HUB_DATABASE` と `FAMILY_HUB_MEDIA` は永続する領域を指定します。メールを使うなら `FAMILY_HUB_SMTP_*`、読み取りの補助を使うなら `FAMILY_HUB_LLM_*` を設定します。
+`FAMILY_HUB_DATABASE` と `FAMILY_HUB_MEDIA` は永続する領域を指定します。監査の記録は別のファイル `FAMILY_HUB_AUDIT_DB`（既定は `FAMILY_HUB_DATABASE` と同じディレクトリの `audit.db`）に置きます。下の「監査の記録」を参照してください。メールを使うなら `FAMILY_HUB_SMTP_*`、読み取りの補助を使うなら `FAMILY_HUB_LLM_*` を設定します。
 
 読み取りの補助の接続先は、同じ機械か家庭内の LLM だけです（loopback、10/8・172.16/12・192.168/16、fc00::/7）。外部の LLM のサービスは設定できません。
 
@@ -50,6 +50,16 @@
 - 回復コードもパスキーもないときは、本人であることを確かめたうえで `node dist-server/cli.js totp reset --user <利用者の ID>` を実行します（監査の記録に残ります）。
 - 鍵は API の機械とは別の場所にも保管してください。
 
+## 監査の記録
+
+- ファイル: `FAMILY_HUB_AUDIT_DB`（既定は本体の DB と同じディレクトリの `audit.db`）。API と命令が権限 0600 で作り、すでにあるファイルも 0600 にそろえます（`-wal` と `-shm` も同じ権限になります）。置き場所は `family-hub-api.service` の `ReadWritePaths` の中にしてください。別のディレクトリに置くなら `ReadWritePaths` に足します。
+- **別のファイルにしても、API と同じ OS の利用者や root からは守れません。** 両方のファイルを書き換えられ、trigger も外せます。改ざんに気づけるのは、別の場所に残した基準点の範囲だけです。
+- 基準点: API は毎日1回、運用ログ（journald）に `audit anchor day=… seq=… hash=…` の行を出します。運用ログを別の機械へ送るか、この行を別の場所に控えてください。**最後の基準点より後の切り捨ては検出できません。** 今の基準点は `node dist-server/cli.js audit anchor` でも表示できます。
+- 確かめる: `journalctl -u family-hub-api | grep 'audit anchor' > anchors.txt` で控えを作り、`node dist-server/cli.js audit verify --anchors anchors.txt`。改変・削除・並べ替え・挿入・基準点より前の切り捨てを、行の番号とともに標準エラーに出し、終了コード2で終わります。食い違いがなければ0です。API も起動のときと毎日、直近の5000行を確かめ、食い違いを運用ログ（`audit: the chain check failed at seq …`）と管理者の「変更の記録」に出します。`/ready` は落としません。
+- 保持: 既定で24か月（`FAMILY_HUB_AUDIT_RETENTION_MONTHS`、0 なら消さない）。API が毎日、過ぎた分を消します。手で消すなら `node dist-server/cli.js audit prune --before 2025-01-01`（省くと24か月より前）。消す前に、消す区間の末尾の hash を checkpoint として残し、そのことを鎖に1行足します。verify はそこから続きを確かめます。
+- 移行: 以前の版の本体の DB にあった `audit_events` の行は、最初の起動で送り出しの箱（`audit_outbox`）へ移し、`audit.db` の鎖の起点にします（表は消えます）。起動の前に本体の DB を別に写しておいてください。
+- バックアップ: `audit.db` も本体の DB と同じく、`-wal` を含めて写してください（段階4で仕組みを作るまでは手で）。
+
 ## nginx
 
 - `nginx.conf` には TLS 証明書の設定がありません。配備先で足してください。
@@ -59,10 +69,10 @@
 
 ## バックアップ
 
-バックアップの仕組みはありません。SQLite のファイル（`-wal` を含む）と `FAMILY_HUB_MEDIA` の両方を、運営者が別に保存してください。復元の手順は確かめていません。
+バックアップの仕組みはありません。SQLite のファイル（本体の DB と `audit.db`、どちらも `-wal` を含む）と `FAMILY_HUB_MEDIA` を、運営者が別に保存してください。復元の手順は確かめていません。
 
 ## 運営
 
-- 試用は14日で終わります。`node dist-server/cli.js list`、`grant`、`expire`、`suspend`、`resume` を API と同じ環境変数で実行します。鍵の命令（`keys status|rotate|retire`、`totp reset --user`）は上の「鍵」を参照してください。
+- 試用は14日で終わります。`node dist-server/cli.js list`、`grant`、`expire`、`suspend`、`resume` を API と同じ環境変数で実行します。鍵の命令（`keys status|rotate|retire`、`totp reset --user`）は上の「鍵」、監査の記録の命令（`audit verify|anchor|prune`）は上の「監査の記録」を参照してください。
 - `/health` は起動の確認、`/ready` はデータベースと clamd の確認です。nginx の設定では外へ出していません。
 - `node:sqlite` は安定版の API ではありません。Node を更新するときは全試験を流してください。パスワードのハッシュは Node の `crypto.argon2` ではなく `@node-rs/argon2` で計算します。

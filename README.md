@@ -44,6 +44,8 @@ API（`server/config.ts`、`server/main.ts`）の設定です。
 | `FAMILY_HUB_KEYS` | 未設定 | 鍵束。`kid=秘密` をカンマで並べる（秘密は32文字以上）。設定すると `FAMILY_HUB_SECRET` は kid `legacy` として読むためだけに使う |
 | `FAMILY_HUB_ACTIVE_KID` | `FAMILY_HUB_KEYS` が1つならその kid | 新しく署名・暗号化する鍵。`FAMILY_HUB_KEYS` に2つ以上あるときは必須 |
 | `FAMILY_HUB_DATABASE` | `data/family-hub.sqlite`（`dev:server` は `data/dev.sqlite`） | SQLite のファイル |
+| `FAMILY_HUB_AUDIT_DB` | `FAMILY_HUB_DATABASE` と同じディレクトリの `audit.db` | 監査の記録（変更の記録）のファイル。権限 0600 で作る。改ざんに気づく仕組みと限界は [配備の覚え書き](deploy/README.md#監査の記録) |
+| `FAMILY_HUB_AUDIT_RETENTION_MONTHS` | `24` | 監査の記録を残す月数。過ぎた分は毎日 checkpoint を残してから消す。0 なら消さない |
 | `FAMILY_HUB_MEDIA` | `data/media` | 写真、動画、添付の保存先 |
 | `FAMILY_HUB_RECENT_AUTH_MS` | `300000` | 金銭や権限の操作に必要な、直近の本人確認の有効時間 |
 | `FAMILY_HUB_SMTP_HOST`、`_PORT`、`_USER`、`_PASSWORD`、`_FROM` | 未設定（ポートは587） | メール送信。未設定の間は、メールを使う機能を画面に出しません |

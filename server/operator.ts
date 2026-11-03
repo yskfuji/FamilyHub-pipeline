@@ -1,7 +1,11 @@
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { Keyring, syncKeyring, totpReferences } from './auth/keyring';
 import { openTotpSecret, sealTotpSecret } from './auth/totp';
 import type { Db } from './db/db';
+import type { Anchor } from './audit/chain';
+import { writeOutbox } from './audit/log';
+import type { AuditLog } from './audit/log';
 
 /**
  * 運営者の手元の命令。支払いの仕組みがないので、利用期間の延長と停止はここで行う。
@@ -16,8 +20,14 @@ import type { Db } from './db/db';
  *   keys rotate                二段階認証の秘密を、有効な鍵で1つのトランザクションで暗号化し直す（何度実行してもよい）
  *   keys retire <kid>          参照が0件の鍵を引退させる。引退した鍵では署名を確かめない
  *   totp reset --user <id>     その人の二段階認証と回復コードを消す（鍵をなくしたときの手当て）
+ *   audit verify [--anchors <file>]
+ *                              監査の記録の鎖を全体で確かめる。基準点は本体の DB の控えと、運用ログから写したファイル（任意）
+ *   audit prune [--before <YYYY-MM-DD>]
+ *                              その日より前の監査の記録を、checkpoint を残してから消す（既定は保持の期間の24か月より前）
+ *   audit anchor               今の基準点（鎖の末尾の番号と hash）を表示し、運用ログ向けに残す
  *
- * 終了コード: 0 は成功、1 は使い方の誤りか、断った（理由を標準エラーに出す）。
+ * 終了コード: 0 は成功、1 は使い方の誤りか、断った（理由を標準エラーに出す）、2 は監査の記録の鎖に食い違いを見つけた。
+ * 監査の記録は本体の DB の送り出しの箱に書き、命令の後で audit.db へ移す（server/cli.ts）。
  */
 export interface OperatorEnv {
   db: Db;
@@ -25,14 +35,30 @@ export interface OperatorEnv {
   now: string;
   out(line: string): void;
   err(line: string): void;
+  /** 監査の記録の命令（audit verify|prune|anchor）に使う。 */
+  audit?: AuditLog;
+  /** 監査の記録を残す月数（FAMILY_HUB_AUDIT_RETENTION_MONTHS）。 */
+  auditRetentionMonths?: number;
 }
 
-const usage = 'usage: list | grant <household> [days] | expire <household> | suspend <membership> | resume <membership> | keys status | keys rotate | keys retire <kid> | totp reset --user <id>';
+/** 運用ログから写したファイルの基準点を読む。`audit anchor day=… seq=… hash=…` の行だけを使う。 */
+export function readAnchors(text: string): Anchor[] {
+  return [...text.matchAll(/audit anchor\b[^\n]*?\bseq=(\d+) hash=([0-9a-f]{64})/g)].map((match) => ({ seq: Number(match[1]), hash: match[2] }));
+}
+
+/** 保持の期間の境（この日より前を消す）。 */
+export function retentionCutoff(now: string, months: number) {
+  const date = new Date(Date.parse(`${now.slice(0, 10)}T00:00:00Z`));
+  date.setUTCMonth(date.getUTCMonth() - months);
+  return date.toISOString().slice(0, 10);
+}
+
+const usage = 'usage: list | grant <household> [days] | expire <household> | suspend <membership> | resume <membership> | keys status | keys rotate | keys retire <kid> | totp reset --user <id> | audit verify [--anchors <file>] | audit prune [--before <YYYY-MM-DD>] | audit anchor';
 
 export function runOperatorCommand(argv: readonly string[], env: OperatorEnv): number {
   const { db, keys, now, out, err } = env;
   const [command, target, argument, extra] = argv;
-  const audit = (householdId: string | null, action: string, auditTarget: string | null, detail: string) => db.run("INSERT INTO audit_events (id, household_id, actor_user_id, action, target, detail, at) VALUES (?, ?, 'operator', ?, ?, ?, ?)", `audit-${randomUUID()}`, householdId, action, auditTarget, detail, now);
+  const audit = (householdId: string | null, action: string, auditTarget: string | null, detail: string) => writeOutbox(db, { id: `audit-${randomUUID()}`, at: now, householdId, actorUserId: 'operator', action, target: auditTarget, detail: detail || null });
   const refuse = (reason: string) => { err(reason); return 1; };
 
   const setMembershipStatus = (status: 'active' | 'suspended') => {
@@ -118,6 +144,37 @@ export function runOperatorCommand(argv: readonly string[], env: OperatorEnv): n
     });
     out(`two-step code removed for ${user.id}`);
     return 0;
+  }
+
+  if (command === 'audit' && env.audit) {
+    const log = env.audit;
+    if (target === 'verify' && (argv.length === 2 || (argument === '--anchors' && extra && argv.length === 4))) {
+      const external = extra ? readAnchors(readFileSync(extra, 'utf8')) : [];
+      if (extra && external.length === 0) return refuse(`no anchors found in ${extra}`);
+      const result = log.verifyAll(now, external);
+      const checkpoint = log.store.latestCheckpoint();
+      if (result.ok) {
+        out(`ok ${result.checked} row(s) from seq ${(checkpoint?.through_seq ?? 0) + 1} to ${result.tailSeq}; tail hash ${result.tailHash}; ${log.anchors().length + external.length} anchor(s) checked`);
+        return 0;
+      }
+      for (const problem of result.problems.slice(0, 20)) err(`${problem.kind} at seq ${problem.seq}: ${problem.detail}`);
+      if (result.problems.length > 20) err(`${result.problems.length - 20} more problem(s)`);
+      return 2;
+    }
+    if (target === 'prune' && (argv.length === 2 || (argument === '--before' && extra && argv.length === 4))) {
+      if (extra && !/^\d{4}-\d{2}-\d{2}$/.test(extra)) return refuse('--before takes a date (YYYY-MM-DD)');
+      const before = extra ?? retentionCutoff(now, env.auditRetentionMonths ?? 24);
+      log.flush();
+      const { pruned, checkpoint } = log.store.prune(before, now, `audit-${randomUUID()}`);
+      out(checkpoint ? `pruned ${pruned} row(s) before ${before}; checkpoint seq ${checkpoint.through_seq} hash ${checkpoint.hash}` : `nothing to prune before ${before}`);
+      return 0;
+    }
+    if (target === 'anchor' && argv.length === 2) {
+      log.flush();
+      const anchor = log.currentAnchor();
+      out(`audit anchor day=${now.slice(0, 10)} seq=${anchor.seq} hash=${anchor.hash}`);
+      return 0;
+    }
   }
 
   err(usage);

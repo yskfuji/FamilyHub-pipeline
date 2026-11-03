@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { serverMessages } from '../../../src/content/serverMessages';
 import { accountUpdateSchema, ADULT_AGE, ageOn, signUpSchema } from '../../../src/domain/account';
+import { auditFieldsFor } from '../../../src/domain/auditLog';
 import { checkNewPassword } from '../../../src/domain/passwordPolicy';
 import type { PasswordContext } from '../../../src/domain/passwordPolicy';
 import { householdProfileSchema, passwordSchema } from '../../../src/domain/schemas';
@@ -28,7 +29,8 @@ const anonymous = (operationId: string) => declare(operationId, { auth: 'public'
 interface AccountRow { id: string; email: string; display_name: string; password_hash: string | null; birthdate: string | null; adult_declared_at: string | null; avatar: string | null; idle_timeout_minutes: number; totp_secret: string | null; totp_enabled_at: string | null; totp_last_step: number | null }
 
 const today = (deps: AppDeps) => deps.clock.now().slice(0, 10);
-const audit = (deps: AppDeps, userId: string, action: string) => deps.db.run('INSERT INTO audit_events (id, actor_user_id, action, at) VALUES (?, ?, ?, ?)', deps.ids.next('audit'), userId, action, deps.clock.now());
+/** 本人のアカウントの操作の記録。家族には属さない（本人の「アカウントの記録」にだけ出る）。 */
+export const auditAccount = (deps: AppDeps, userId: string, action: string, options: { householdId?: string; fields?: readonly string[] } = {}) => deps.audit.record({ id: deps.ids.next('audit'), at: deps.clock.now(), householdId: options.householdId ?? null, actorUserId: userId, action, detail: options.fields?.length ? JSON.stringify({ fields: [...options.fields].sort() }) : null });
 const clientKey = (request: FastifyRequest) => request.ip;
 
 /** 新しいパスワードと比べる、その人に関わる語（メールアドレス・表示名・家族グループの名前）。 */
@@ -103,7 +105,7 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AppDeps) {
     if (taken) return sendError(reply, { code: 'CONFLICT', message: serverMessages.emailTaken, retryable: false });
     const id = deps.ids.next('user');
     deps.db.run('INSERT INTO users (id, email, display_name, avatar_tone, password_hash, created_at, birthdate, adult_declared_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', id, input.email, input.displayName, 'indigo', hash, deps.clock.now(), input.birthdate, age >= ADULT_AGE ? deps.clock.now() : null);
-    audit(deps, id, 'signUp');
+    auditAccount(deps, id, 'signUp');
     return reply.code(201).send({ userId: id });
   });
 
@@ -155,7 +157,7 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AppDeps) {
       deps.db.run('UPDATE users SET password_hash = ? WHERE id = ?', hashed, userId);
       // 再設定の後は自動でサインインせず、すべての端末をサインアウトする。
       deps.db.run('UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL', deps.clock.now(), userId);
-      audit(deps, userId, 'confirmPasswordReset');
+      auditAccount(deps, userId, 'confirmPasswordReset');
     });
     return reply.code(204).send();
   });
@@ -189,7 +191,7 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AppDeps) {
         const adult = ageOn(input.birthdate, today(deps)) >= ADULT_AGE;
         deps.db.run('UPDATE users SET birthdate = ?, adult_declared_at = ? WHERE id = ?', input.birthdate, adult ? deps.clock.now() : null, row.id);
       }
-      audit(deps, row.id, 'updateAccount');
+      auditAccount(deps, row.id, 'updateAccount', { fields: auditFieldsFor('updateAccount', input) ?? [] });
     });
     return profileOf(deps, current(deps, request));
   });
@@ -198,7 +200,7 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AppDeps) {
     const { email } = parse(z.object({ email: z.email(serverMessages.emailInvalid).max(254) }), request.body);
     if (deps.db.get('SELECT id FROM users WHERE email = ? AND id <> ?', email, row.id)) return sendError(reply, { code: 'CONFLICT', message: serverMessages.emailTaken, retryable: false });
     deps.db.run('UPDATE users SET email = ? WHERE id = ?', email, row.id);
-    audit(deps, row.id, 'changeEmail');
+    auditAccount(deps, row.id, 'changeEmail');
     // 乗っ取りに気づけるよう、変更前のアドレスへ知らせる。
     await deps.mailer.send({ to: row.email, subject: serverMessages.emailChangedSubject, text: serverMessages.emailChangedBody });
     return profileOf(deps, current(deps, request));
@@ -222,7 +224,7 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AppDeps) {
       deps.db.run('DELETE FROM recovery_codes WHERE user_id = ?', row.id);
       deps.db.run('DELETE FROM assistant_jobs WHERE user_id = ?', row.id);
       deps.db.run('UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL', deps.clock.now(), row.id);
-      audit(deps, row.id, 'deleteAccount');
+      auditAccount(deps, row.id, 'deleteAccount');
       return ok(undefined);
     });
     if (result.ok) clearSessionCookie(reply, deps.config);
@@ -246,7 +248,7 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AppDeps) {
       deps.db.run('UPDATE users SET totp_enabled_at = ? WHERE id = ?', deps.clock.now(), row.id);
       deps.db.run('DELETE FROM recovery_codes WHERE user_id = ?', row.id);
       for (const value of codes) deps.db.run('INSERT INTO recovery_codes (user_id, code_hash) VALUES (?, ?)', row.id, hashRecoveryCode(value));
-      audit(deps, row.id, 'enableTotp');
+      auditAccount(deps, row.id, 'confirmTotpEnrollment');
     });
     return { recoveryCodes: codes };
   });
@@ -255,7 +257,7 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AppDeps) {
     deps.db.transaction(() => {
       deps.db.run('UPDATE users SET totp_secret = NULL, totp_enabled_at = NULL, totp_last_step = NULL WHERE id = ?', row.id);
       deps.db.run('DELETE FROM recovery_codes WHERE user_id = ?', row.id);
-      audit(deps, row.id, 'disableTotp');
+      auditAccount(deps, row.id, 'disableTotp');
     });
     return reply.code(204).send();
   });
@@ -277,7 +279,7 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AppDeps) {
       loaded.aggregate.state.context.asOf = now;
       loaded.aggregate.state.memberships.push(membership);
       saveAggregate(deps.db, householdId, membershipId, loaded);
-      audit(deps, row.id, 'createHousehold');
+      auditAccount(deps, row.id, 'createHousehold', { householdId });
     });
     return reply.code(201).send({ householdId });
   });

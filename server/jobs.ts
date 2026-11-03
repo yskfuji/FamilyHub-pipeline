@@ -7,6 +7,7 @@ import { loadAggregate, saveAggregate } from './db/aggregateStore';
 import { purgeReadings } from './assistant/jobs';
 import type { AppDeps } from './http/context';
 import { originalPath, quarantinePath } from './media/pipeline';
+import { retentionCutoff } from './operator';
 
 const defaults = { privacy: { defaultAudience: 'household' as const, hideNotificationContent: true, placeLookupConsent: null }, notificationPreferences: { todoDue: true, eventDeparture: true, quietHours: true } };
 const IDEMPOTENCY_KEEP_MS = 72 * 3_600_000;
@@ -55,8 +56,24 @@ export function generateNotifications(deps: AppDeps) {
   }
 }
 
+/**
+ * 監査の記録の毎日の手入れ。その日の基準点を運用ログと本体の DB に残し、直近の分の鎖を確かめ、
+ * 保持の期間（既定24か月）を過ぎた分を checkpoint を残してから消す。同じ日に何度呼んでもよい。
+ */
+export function runAuditDaily(deps: AppDeps) {
+  const now = deps.clock.now();
+  const months = deps.config.auditRetentionMonths;
+  if (months > 0) deps.audit.store.prune(retentionCutoff(now, months), now, deps.ids.next('audit'));
+  deps.audit.anchorDaily(now);
+  deps.audit.verifyRecent(now);
+}
+
 export function startJobs(deps: AppDeps) {
+  try { runAuditDaily(deps); } catch (error) { console.error(`audit: daily upkeep failed (${error instanceof Error ? error.message : 'unknown'})`); }
   const timers = [
+    // 確定の後に移しそこねた監査の記録を、短い間隔で audit.db へ移す。
+    setInterval(() => { deps.audit.flush(); }, 5_000),
+    setInterval(() => { try { runAuditDaily(deps); } catch { /* 次の回でやり直す */ } }, 3_600_000),
     setInterval(() => { void runRetention(deps).catch(() => undefined); }, 3_600_000),
     setInterval(() => { try { generateNotifications(deps); } catch { /* 次の回でやり直す */ } }, 5 * 60_000),
   ];

@@ -549,4 +549,77 @@ export function runGatewaySuite(world: (actorMembershipId?: string) => FamilyHub
       expect(await gateway.albums.restoreItem('album-sports', 'item-sports-3')).toMatchObject({ ok: true });
     });
   });
+
+  describe('change record (A5)', () => {
+    const itemKeys = ['action', 'actor', 'at', 'detail', 'group', 'id', 'target'];
+
+    it('records each successful change once by operation name, with field names but never the values', async () => {
+      const gateway = world();
+      const secret = '合言葉はひみつのりんご';
+      expect((await gateway.todos.createTodo({ title: '', assigneeMembershipId: 'member-aoi' })).ok).toBe(false);
+      const todo = await gateway.todos.createTodo({ title: secret, assigneeMembershipId: 'member-aoi' });
+      expect((await gateway.expenses.updateExpense('expense-books', { title: secret, note: secret }, 1)).ok).toBe(true);
+      const page = await gateway.audit.list();
+      expect(page.ok && todo.ok).toBe(true);
+      if (!page.ok || !todo.ok) return;
+      expect(page.value.items.map((item) => [item.action, item.group, item.target, item.detail])).toEqual([
+        ['updateExpense', 'expenses', { kind: 'expense', id: 'expense-books', hidden: false }, { fields: ['note', 'title'] }],
+        ['createTodo', 'tasks', { kind: 'task', id: todo.value.id, hidden: false }, null],
+      ]);
+      for (const item of page.value.items) {
+        expect(Object.keys(item).sort()).toEqual(itemKeys);
+        expect(item.actor).toEqual({ kind: 'member', membershipId: 'member-aoi', displayName: '碧' });
+      }
+      expect(JSON.stringify(page.value)).not.toContain(secret);
+      expect(page.value).toMatchObject({ nextCursor: null, chain: { state: 'ok' } });
+    });
+
+    it('lets only owners read the household record, and every member read their own account record', async () => {
+      expect(await world('member-ren').audit.list()).toMatchObject({ ok: false, error: { code: 'FORBIDDEN', reason: 'CAPABILITY_MISSING' } });
+      expect(await world('member-hana').audit.list()).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
+      expect(await world('member-ren').audit.listMine()).toEqual({ ok: true, value: { items: [], nextCursor: null } });
+      const owner = world();
+      expect((await owner.auth.updateAccount({ idleTimeoutMinutes: 5 })).ok).toBe(true);
+      const mine = await owner.audit.listMine();
+      expect(mine.ok && mine.value.items.map((item) => ({ ...item, id: 'id', at: 'at' }))).toEqual([{ id: 'id', at: 'at', actor: { kind: 'self' }, action: 'updateAccount', group: 'account', detail: { fields: ['idleTimeoutMinutes'] } }]);
+      const household = await owner.audit.list();
+      expect(household.ok && household.value.items).toEqual([]);
+    });
+
+    it('filters by person, kind and date, and pages with a cursor', async () => {
+      const gateway = world();
+      for (const title of ['一', '二', '三']) expect((await gateway.todos.createTodo({ title, assigneeMembershipId: 'member-aoi' })).ok).toBe(true);
+      expect((await gateway.events.createEvent({ title: '記録', startsAt: '2026-10-05T09:00:00+09:00', endsAt: '2026-10-05T10:00:00+09:00', timezone: 'Asia/Tokyo', participantMembershipIds: ['member-aoi'] })).ok).toBe(true);
+      const first = await gateway.audit.list({ group: 'tasks', limit: 2 });
+      expect(first.ok && first.value.items.map((item) => item.action)).toEqual(['createTodo', 'createTodo']);
+      if (!first.ok || !first.value.nextCursor) throw new Error('expected a second page');
+      const second = await gateway.audit.list({ group: 'tasks', limit: 2, cursor: first.value.nextCursor });
+      expect(second.ok && [second.value.items.map((item) => item.action), second.value.nextCursor]).toEqual([['createTodo'], null]);
+      const count = async (query: Parameters<FamilyHubGateway['audit']['list']>[0]) => { const page = await gateway.audit.list(query); return page.ok ? page.value.items.length : -1; };
+      expect(await count({ action: 'createEvent' })).toBe(1);
+      expect(await count({ group: 'tasks', action: 'createEvent' })).toBe(0);
+      expect(await count({ membershipId: 'member-aoi' })).toBe(4);
+      expect(await count({ membershipId: 'member-ren' })).toBe(0);
+      expect(await count({ from: '2026-09-30', to: '2026-09-30' })).toBe(4);
+      expect(await count({ from: '2026-10-01' })).toBe(0);
+      expect(await gateway.audit.list({ membershipId: 'member-other' })).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+      expect(await gateway.audit.list({ limit: 500 })).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+    });
+
+    it('hides the ID of a record the viewer can no longer see', async () => {
+      const gateway = world();
+      const link = await gateway.links.createLink({ kind: 'task', id: 'todo-form' }, { kind: 'expense', id: 'expense-books' });
+      expect(link.ok).toBe(true);
+      if (!link.ok) return;
+      const visible = await gateway.audit.list();
+      expect(visible.ok && visible.value.items[0].target).toEqual({ kind: 'link', id: link.value.id, hidden: false });
+      expect((await gateway.links.deleteLink(link.value.id)).ok).toBe(true);
+      const hidden = await gateway.audit.list();
+      expect(hidden.ok && hidden.value.items.map((item) => [item.action, item.target])).toEqual([
+        ['deleteItemLink', { kind: 'link', id: null, hidden: true }],
+        ['createItemLink', { kind: 'link', id: null, hidden: true }],
+      ]);
+      expect(JSON.stringify(hidden)).not.toContain(link.value.id);
+    });
+  });
 }

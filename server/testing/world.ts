@@ -15,13 +15,15 @@ import { createPageFetcher } from '../adapters/urlFetcher';
 import type { PageFetcher } from '../adapters/urlFetcher';
 import type { ServerConfig } from '../config';
 import { Db } from '../db/db';
+import { AuditLog } from '../audit/log';
+import { AuditStore } from '../audit/store';
 import { buildApp } from '../http/app';
 import type { AppDeps } from '../http/context';
 import { startFakeLlm } from './fakeLlm';
 import { SEED_PASSWORD, seedHousehold } from './seed';
 
 const ORIGIN = 'https://family.example.test';
-export const testConfig: ServerConfig = { production: false, origin: ORIGIN, databasePath: ':memory:', keys: new Keyring({ keys: [{ kid: LEGACY_KID, secret: 'test-secret-test-secret-test-secret-00' }], activeKid: LEGACY_KID }), secureCookies: true, sessionDays: 30, recentAuthMs: 300_000, smtp: null, mediaPath: '', clamd: null, llm: null };
+export const testConfig: ServerConfig = { production: false, origin: ORIGIN, databasePath: ':memory:', auditDatabasePath: ':memory:', auditRetentionMonths: 24, keys: new Keyring({ keys: [{ kid: LEGACY_KID, secret: 'test-secret-test-secret-test-secret-00' }], activeKid: LEGACY_KID }), secureCookies: true, sessionDays: 30, recentAuthMs: 300_000, smtp: null, mediaPath: '', clamd: null, llm: null };
 
 let cachedHash: Promise<string> | undefined;
 const passwordHash = () => (cachedHash ??= hashPassword(SEED_PASSWORD));
@@ -50,14 +52,15 @@ export interface World {
 
 /** 実際の Fastify を起動し、Cookie を保持する fetch で httpGateway をつなぐ。時計は1回の変更の操作ごとに1分進む。 */
 /** 鍵の試験のための差し替え。databasePath を渡すと、そのファイルを使い（起動し直しの試験）、見本の家族は空のときだけ入れる。 */
-export interface WorldOptions { keys?: ServerConfig['keys']; databasePath?: string }
+export interface WorldOptions { keys?: ServerConfig['keys']; databasePath?: string; auditDatabasePath?: string }
 
 export function createWorld(actorMembershipId = 'member-aoi', inspect?: (body: unknown, request: { method: string; url: string; status: number }) => void, scanner: Scanner = { scan: async () => 'clean', ready: async () => true }, reading: { llm?: LlmClient; pages?: PageFetcher } = {}, options: WorldOptions = {}): World {
   let tick = 0; let sequence = 0;
   const mail: World['mail'] = [];
   const db = new Db(options.databasePath ?? ':memory:');
+  const auditStore = new AuditStore(options.auditDatabasePath ?? (options.databasePath ? `${options.databasePath}.audit.db` : ':memory:'));
   const deps: AppDeps = {
-    db, config: { ...testConfig, keys: options.keys ?? testConfig.keys, mediaPath: mkdtempSync(join(tmpdir(), 'family-hub-media-')) }, scanner, jobs: new Set(), runningReads: new Set(), llm: reading.llm ?? defaultLlm, pages: reading.pages ?? defaultPages,
+    db, audit: new AuditLog(db, auditStore, { info: () => undefined, error: () => undefined }), config: { ...testConfig, keys: options.keys ?? testConfig.keys, mediaPath: mkdtempSync(join(tmpdir(), 'family-hub-media-')) }, scanner, jobs: new Set(), runningReads: new Set(), llm: reading.llm ?? defaultLlm, pages: reading.pages ?? defaultPages,
     clock: { now: () => toJstRfc3339(new Date(Date.parse('2026-09-30T07:45:00+09:00') + tick * 60_000)) },
     weather: { current: () => ({ location: '東京', condition: 'rain', temperatureC: 20, precipitationPercent: 70, alert: '見本の天気' }), refresh: async () => undefined },
     mailer: { available: true, send: async (message) => { mail.push(message); } },
@@ -97,5 +100,5 @@ export function createWorld(actorMembershipId = 'member-aoi', inspect?: (body: u
     return token;
   };
   const gateway = createHttpGateway(ORIGIN, csrf, () => undefined, cookieJar);
-  return { gateway, deps, mail, ready: boot.then(({ url }) => ({ url, cookies })), close: async () => { const { app } = await boot; await Promise.all([...deps.jobs]); app.server.closeAllConnections(); await app.close(); db.close(); } };
+  return { gateway, deps, mail, ready: boot.then(({ url }) => ({ url, cookies })), close: async () => { const { app } = await boot; await Promise.all([...deps.jobs]); app.server.closeAllConnections(); await app.close(); auditStore.close(); db.close(); } };
 }

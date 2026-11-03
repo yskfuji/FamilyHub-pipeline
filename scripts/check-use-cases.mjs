@@ -3,10 +3,10 @@ import { readFile } from 'node:fs/promises';
 const catalog = JSON.parse(await readFile(new URL('../docs/verification/use-cases.json', import.meta.url), 'utf8'));
 const ranges = (prefix, count) => Array.from({ length: count }, (_, index) => `UC-${prefix}${String(index + 1).padStart(2, '0')}`);
 const expected = new Set([
-  ...ranges('A', 14), ...ranges('H', 12), ...ranges('D', 2), ...ranges('C', 7),
+  ...ranges('A', 15), ...ranges('H', 13), ...ranges('D', 2), ...ranges('C', 7),
   ...ranges('T', 5), ...ranges('M', 5), ...ranges('B', 9), ...ranges('R', 3),
   ...ranges('S', 4), 'UC-N01', ...ranges('P', 4), ...ranges('F', 6), ...ranges('X', 2), ...ranges('L', 6),
-  ...ranges('G', 5), ...ranges('E', 4), ...ranges('Y', 4), ...ranges('O', 3),
+  ...ranges('G', 5), ...ranges('E', 4), ...ranges('Y', 4), ...ranges('O', 4),
 ]);
 const ids = catalog.cases.map((item) => item.id);
 const actual = new Set(ids);

@@ -74,6 +74,11 @@ const allowedBase = (value: string) => {
 };
 
 type FetchLike = typeof fetch;
+/** 省いた条件を送らない検索の文字列。 */
+const queryOf = (query: object) => {
+  const params = new URLSearchParams(Object.entries(query).filter(([, value]) => value !== undefined && value !== '').map(([key, value]) => [key, String(value)]));
+  return params.size ? `?${params}` : '';
+};
 const UPLOAD_CHUNK_BYTES = 8 * 1024 * 1024;
 const UPLOAD_RETRIES = 6;
 
@@ -307,6 +312,10 @@ export function createHttpGateway(baseUrl: string, getCsrfToken: CsrfProvider, g
       resume: (id) => request(`/v1/notifications/${encodeURIComponent(id)}/resume`, { method: 'POST', csrf: true }),
       getPreferences: () => request('/v1/notification-preferences'),
       updatePreferences: (input) => request('/v1/notification-preferences', { method: 'PATCH', body: JSON.stringify(input), csrf: true }),
+    },
+    audit: {
+      list: (query = {}) => request(`/v1/audit-events${queryOf(query)}`),
+      listMine: (query = {}) => request(`/v1/account/audit-events${queryOf(query)}`),
     },
     credentials: {
       async create(options) {

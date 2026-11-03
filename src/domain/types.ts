@@ -54,7 +54,8 @@ export type Capability =
   | 'album.read' | 'album.create' | 'album.update' | 'album.delete'
   | 'link.manage' | 'assistant.use'
   | 'place.read'
-  | 'insight.read' | 'resource.read' | 'settings.own' | 'notification.manage';
+  | 'insight.read' | 'resource.read' | 'settings.own' | 'notification.manage'
+  | 'audit.read';
 export interface PermissionOverride { membershipId: Id; capability: Capability; effect: 'allow' | 'deny'; }
 export interface ViewerContext {
   userId: Id;

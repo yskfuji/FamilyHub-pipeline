@@ -21,6 +21,7 @@ const sourceFiles = (await filesUnder(resolve('src'))).filter((file) => (
   || file.endsWith('/content/passwordMessages.ts')
   || file.endsWith('/content/help.ts')
   || file.endsWith('/content/legal.ts')
+  || file.endsWith('/content/auditLabels.ts')
   || (/\/features\/place\/[^/]+\.ts$/.test(file) && !file.endsWith('.test.ts'))
   || (/\/features\/showcase\/management\/[^/]+\.ts$/.test(file) && !file.endsWith('.test.ts'))
 ));

@@ -1,6 +1,7 @@
 import type { AlbumInput, AlbumUpdateInput, ColorLabelInput, EventInput, EventUpdateInput, ExpenseInput, ExpenseUpdateInput, HouseholdProfileInput, MemoInput, TodoInput, TodoUpdateInput } from '../domain/schemas';
 import type { AccountUpdateInput, SignUpInput } from '../domain/account';
 import type { AssistantJob, AssistantStatus } from '../domain/assistant';
+import type { AccountAuditPage, AccountAuditQuery, AuditPage, AuditQuery } from '../domain/auditLog';
 import type { AccountProfile, Album, AlbumItem, AlbumSummary, Authenticator, ColorLabel, ItemLink, LinkedItemRef, TrashItem, CalendarEvent, Expense, Household, HouseholdInvite, HouseholdNotification, HouseholdSnapshot, Id, Insight, IsoDate, Memo, MembershipRole, MutationContext, NotificationPreferences, PermissionOverride, PrivacySettings, RecurrenceScope, Result, Scenario, SecurityOverview, SessionInfo, Todo } from '../domain/types';
 
 export interface AuthPort {
@@ -171,6 +172,14 @@ export interface AssistantPort {
   getJob(id: Id): Promise<Result<AssistantJob>>;
 }
 
+/** 変更の記録。本文・秘密・トークンは返さない。見られない記録を指す行は ID を伏せる。 */
+export interface AuditPort {
+  /** 家族の変更の記録を新しい順に。audit.read が必要（既定では管理者だけ）。鎖の確認の結果も返す。 */
+  list(query?: AuditQuery): Promise<Result<AuditPage>>;
+  /** 本人のアカウントの記録（サインイン、パスワードや確認コードの変更など）。 */
+  listMine(query?: AccountAuditQuery): Promise<Result<AccountAuditPage>>;
+}
+
 export type SearchResultKind = 'event' | 'task' | 'memo' | 'expense' | 'place' | 'resource';
 export interface SearchResult { kind: SearchResultKind; id: Id; label: string; detail?: string; destination: string }
 
@@ -193,5 +202,6 @@ export interface FamilyHubGateway {
   insights: InsightPort;
   assistant: AssistantPort;
   notifications: NotificationPort;
+  audit: AuditPort;
   credentials: CredentialClient;
 }

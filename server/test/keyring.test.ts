@@ -59,7 +59,7 @@ function operator(databasePath: string, keys: Keyring, argv: string[]) {
   const out: string[] = []; const err: string[] = [];
   try {
     const code = runOperatorCommand(argv, { db, keys, now: '2026-10-01T09:00:00+09:00', out: (line) => out.push(line), err: (line) => err.push(line) });
-    return { code, out, err, audit: db.all<{ action: string; target: string | null; household_id: string | null }>("SELECT action, target, household_id FROM audit_events WHERE actor_user_id = 'operator' ORDER BY rowid") };
+    return { code, out, err, audit: db.all<{ action: string; target: string | null; household_id: string | null }>("SELECT action, target, household_id FROM audit_outbox WHERE actor_user_id = 'operator' ORDER BY seq") };
   } finally { db.close(); }
 }
 

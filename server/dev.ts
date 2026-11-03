@@ -3,6 +3,8 @@ import { toJstRfc3339 } from '../src/domain/calendarDate';
 import { hashPassword } from './auth/password';
 import { loadConfig } from './config';
 import { Db } from './db/db';
+import { AuditLog } from './audit/log';
+import { AuditStore } from './audit/store';
 import { prepareLlmClient } from './adapters/llm';
 import { createMailer } from './adapters/mail';
 import { createScanner } from './adapters/scanner';
@@ -17,7 +19,7 @@ const config = loadConfig({ ...process.env, FAMILY_HUB_DATABASE: process.env.FAM
 const db = new Db(config.databasePath);
 const now = () => toJstRfc3339(new Date());
 if (!db.get('SELECT id FROM users LIMIT 1')) seedHousehold(db, await hashPassword(SEED_PASSWORD), now());
-const deps = { db, config, mailer: createMailer(config), scanner: createScanner(config), weather: createWeatherSource(() => Date.now()), llm: await prepareLlmClient(config.llm), pages: createPageFetcher(), runningReads: new Set<string>(), jobs: new Set<Promise<void>>(), clock: { now }, ids: { next: (prefix: string) => `${prefix}-${randomUUID()}`, inviteToken: () => randomBytes(18).toString('base64url') } };
+const deps = { db, audit: new AuditLog(db, new AuditStore(config.auditDatabasePath)), config, mailer: createMailer(config), scanner: createScanner(config), weather: createWeatherSource(() => Date.now()), llm: await prepareLlmClient(config.llm), pages: createPageFetcher(), runningReads: new Set<string>(), jobs: new Set<Promise<void>>(), clock: { now }, ids: { next: (prefix: string) => `${prefix}-${randomUUID()}`, inviteToken: () => randomBytes(18).toString('base64url') } };
 const app = await buildApp(deps);
 startJobs(deps);
 const address = await app.listen({ port: Number(process.env.PORT ?? 8799), host: '127.0.0.1' });

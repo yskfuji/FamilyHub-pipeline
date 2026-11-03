@@ -1,4 +1,5 @@
 import type { FamilyHubGateway } from './gateway';
+import { auditedGatewayOperations } from './gatewayOperations';
 import { baseAlbumItems, baseAlbums, baseInvites, baseNotificationPreferences, baseNotifications, basePrivacySettings, baseSecurityOverview, adultDeclaredUsers, sampleEventCandidates, sampleReceipt, seededSnapshot } from './fixtures';
 import { serverMessages } from '../content/serverMessages';
 import { readingImageProblem, readingUrlProblem } from '../domain/assistant';
@@ -7,7 +8,10 @@ import { ADULT_AGE, accountUpdateSchema, ageOn, signUpSchema } from '../domain/a
 import { checkNewPassword } from '../domain/passwordPolicy';
 import { currentPasswordSchema, passwordSchema } from '../domain/schemas';
 import { toJstRfc3339 } from '../domain/calendarDate';
+import { auditFieldsFor, matchesAuditFilter } from '../domain/auditLog';
+import type { StoredAuditRow } from '../domain/auditLog';
 import { createHouseholdRules } from '../domain/commands';
+import { accountAuditRequest, presentAccountAudit } from '../domain/commands/audit';
 import type { HouseholdAggregate } from '../domain/commands';
 import { fail, missing, ok } from '../domain/commands/context';
 import type { AccountProfile, Authenticator, GatewayError, HouseholdSnapshot, Id, Result, Scenario, SecurityOverview } from '../domain/types';
@@ -71,7 +75,24 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
   const nextId = (prefix: string) => `${prefix}-mock-${++sequence}`;
   // 確認用データの時計。操作のたびに1分進め、記録の前後関係（履歴の並び）を再現できるようにする。
   let clockTick = 0;
-  const now = () => toJstRfc3339(new Date(Date.parse('2026-09-30T07:45:00+09:00') + (clockTick++) * 60_000));
+  const timeAt = (tick: number) => toJstRfc3339(new Date(Date.parse('2026-09-30T07:45:00+09:00') + tick * 60_000));
+  const now = () => timeAt(clockTick++);
+  /** 時計を進めずに今の時刻を読む（変更の記録に使い、ほかの記録の時刻をずらさない）。 */
+  const peek = () => timeAt(clockTick);
+  /** 変更の記録。API と同じく、成功した変更の操作ごとに1行を残す（src/data/gatewayOperations.ts の対応表で決める）。 */
+  const auditRows: StoredAuditRow[] = [];
+  const recordAudit = (key: string, args: readonly unknown[], value: unknown) => {
+    const operation = auditedGatewayOperations[key];
+    const actor = state.memberships.find((item) => item.id === actorMembershipId);
+    if (!operation) return;
+    const params = args.slice(0, operation.params).map(String);
+    const created = operation.created ? (value as { id?: unknown } | undefined)?.id : undefined;
+    const fields = operation.fieldsArg === undefined ? null : auditFieldsFor(operation.operationId, args[operation.fieldsArg]);
+    auditRows.push({
+      seq: auditRows.length + 1, id: `audit-mock-${auditRows.length + 1}`, at: peek(), household_id: operation.household ? state.household.id : null, actor_user_id: actor?.userId ?? null,
+      action: operation.operationId, target: params.length ? params.join('/') : typeof created === 'string' ? created : null, detail: fields?.length ? JSON.stringify({ fields }) : null,
+    });
+  };
   /** 利用者ごとの成人の申告。見本の家族では、実際の環境の見本と同じく碧さんと蓮さんだけが申告している。 */
   const adultDeclarations = new Set<Id>(adultDeclaredUsers);
   const rules = createHouseholdRules(aggregate, {
@@ -100,7 +121,7 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
   const actorMember = state.memberships.find((item) => item.id === actorMembershipId);
   const account: AccountProfile = { displayName: actorMember?.displayName ?? '', email: `${actorMember?.userId ?? ''}@example.test`, avatar: { kind: 'initial' }, idleTimeoutMinutes: 30, birthdateDeclared: true, adultDeclared: adultDeclarations.has(actorMember?.userId ?? ''), totpEnabled: false, totpUnavailable: false };
 
-  return {
+  const gateway: FamilyHubGateway = {
     auth: {
       async beginPasskey() { await delay(); passkeyChallenge = nextId('passkey-challenge'); return ok({ challengeId: passkeyChallenge, publicKey: null }); },
       async finishPasskey(challengeId, assertion) {
@@ -271,5 +292,37 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
       // 確認用データでは端末の本人確認を模擬する（署名は作らない）。
       async get() { await delay(); return ok({ id: nextId('mock-assertion'), demo: true }); },
     },
+    audit: {
+      async list(query = {}) {
+        await delay();
+        const request = rules.audit.request(query);
+        if (!request.ok) return request;
+        const { filter, cursor, limit } = request.value;
+        const rows = auditRows.filter((row) => row.household_id === state.household.id && (cursor === undefined || row.seq < cursor) && matchesAuditFilter(row, filter)).sort((a, b) => b.seq - a.seq).slice(0, limit + 1);
+        return rules.audit.present(rows, limit, { state: 'ok', checkedAt: peek() });
+      },
+      async listMine(query = {}) {
+        await delay();
+        const request = accountAuditRequest(query);
+        if (!request.ok) return request;
+        const userId = state.memberships.find((item) => item.id === actorMembershipId)?.userId;
+        const { cursor, limit } = request.value;
+        const rows = auditRows.filter((row) => row.household_id === null && row.actor_user_id === userId && (cursor === undefined || row.seq < cursor)).sort((a, b) => b.seq - a.seq).slice(0, limit + 1);
+        return ok(presentAccountAudit(rows, limit));
+      },
+    },
   };
+  // 対応表にある操作は、成功したときに変更の記録を残す。
+  for (const [portName, port] of Object.entries(gateway) as Array<[string, Record<string, unknown>]>) {
+    for (const [method, implementation] of Object.entries(port)) {
+      const key = `${portName}.${method}`;
+      if (!auditedGatewayOperations[key] || typeof implementation !== 'function') continue;
+      port[method] = async (...args: unknown[]) => {
+        const result = await (implementation as (...values: unknown[]) => Promise<Result<unknown>>)(...args);
+        if (result.ok) recordAudit(key, args, result.value);
+        return result;
+      };
+    }
+  }
+  return gateway;
 }

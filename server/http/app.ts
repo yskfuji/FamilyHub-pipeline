@@ -10,6 +10,7 @@ import { ApiError, sendError, unauthenticated } from './context';
 import type { AppDeps, RouteDeclaration } from './context';
 import { registerAccountRoutes } from './routes/account';
 import { registerAssistantRoutes } from './routes/assistant';
+import { registerAuditRoutes } from './routes/audit';
 import { registerAuthRoutes } from './routes/auth';
 import { registerContentRoutes } from './routes/content';
 import { registerHouseholdRoutes } from './routes/household';
@@ -84,6 +85,9 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   routeTable.length = 0;
   // 鍵の指紋を記録と照らし合わせる。鍵のない暗号文があっても起動し、その人の二段階認証を「使えない」として扱う。
   logKeyReport(syncKeyring(deps.db, deps.config.keys, deps.clock.now()));
+  // 監査の記録: 箱に残った行（前の版の audit_events から移したものを含む）を audit.db へ移し、直近の分の鎖を確かめる。
+  // 食い違いがあっても起動は止めず、/ready も落とさない。管理者の画面（変更の記録）と運用ログに出す。
+  deps.audit.verifyRecent(deps.clock.now());
   // 頻出のパスワードの一覧は、最初の要求を待たずに読み込んでおく。
   await loadCommonPasswords();
   const app = Fastify({ logger: false, bodyLimit: 2 * 1024 * 1024, trustProxy: 'loopback', exposeHeadRoutes: false });
@@ -113,5 +117,6 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerContentRoutes(app, deps);
   registerMediaRoutes(app, deps);
   registerAssistantRoutes(app, deps);
+  registerAuditRoutes(app, deps);
   return app;
 }

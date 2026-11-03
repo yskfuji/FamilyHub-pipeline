@@ -30,6 +30,14 @@ describe('規約とポリシーの草案', () => {
       expect(documentText(id)).toContain('30日');
     }
   });
+  it('管理者が変更の記録を見られることと、その保持の期間（24か月）を明記する（A5-9）', () => {
+    for (const id of ['terms', 'privacy']) {
+      expect(documentText(id)).toContain('管理者は');
+      expect(documentText(id)).toContain('24か月残し');
+    }
+    expect(documentText('privacy')).toContain('見られない記録');
+    expect(documentText('privacy')).toContain('IPアドレスは含みません');
+  });
   it('本文は構造化した文字列だけで、HTML を含まない', () => {
     expect(JSON.stringify(legalDocuments)).not.toMatch(/<[a-z/]/i);
   });

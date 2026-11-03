@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { serverMessages } from '../../src/content/serverMessages';
+import { auditFieldsFor } from '../../src/domain/auditLog';
 import { createHouseholdRules } from '../../src/domain/commands';
 import type { HouseholdAggregate } from '../../src/domain/commands';
 import type { GatewayError, Id, NotificationPreferences, PrivacySettings, Result, User } from '../../src/domain/types';
@@ -33,7 +34,15 @@ function rulesFor(deps: AppDeps, aggregate: HouseholdAggregate, membershipId: Id
   });
 }
 
-export interface WorkContext { rules: Rules; loaded: LoadedAggregate }
+export interface WorkContext {
+  rules: Rules;
+  loaded: LoadedAggregate;
+  /** 監査の記録の detail に、変えた項目の名前だけを残す（値は残さない）。例: ["kind"]。 */
+  auditFields(fields: readonly string[]): void;
+}
+
+/** 監査の detail。変えた項目の名前だけで、値は入れない。 */
+const auditDetail = (fields: readonly string[] | null) => fields && fields.length ? JSON.stringify({ fields }) : null;
 
 /** 読み取り。保存しない。 */
 export function read<T>(deps: AppDeps, request: FastifyRequest, reply: FastifyReply, work: (rules: Rules) => Result<T>, options?: LoadOptions) {
@@ -73,10 +82,15 @@ export function mutate<T>(deps: AppDeps, request: FastifyRequest, reply: Fastify
     }
     const loaded = loadAggregate(deps.db, actor.householdId, actor.membershipId, defaults, options);
     const rules = rulesFor(deps, loaded.aggregate, actor.membershipId, actor.userId);
-    const result = work(rules, { rules, loaded });
+    let fields: string[] | null = null;
+    const result = work(rules, { rules, loaded, auditFields: (names) => { fields = [...new Set(names)].sort(); } });
     if (!result.ok) return { result };
     saveAggregate(deps.db, actor.householdId, actor.membershipId, loaded, options);
-    deps.db.run('INSERT INTO audit_events (id, household_id, actor_user_id, action, target, at) VALUES (?, ?, ?, ?, ?, ?)', deps.ids.next('audit'), actor.householdId, actor.userId, declaration?.operationId ?? request.url, targetOf(request), deps.clock.now());
+    deps.audit.record({
+      id: deps.ids.next('audit'), at: deps.clock.now(), householdId: actor.householdId, actorUserId: actor.userId,
+      action: declaration?.operationId ?? request.url, target: targetOf(request, declaration?.successStatus === 201 ? result.value : undefined),
+      detail: auditDetail(fields ?? auditFieldsFor(declaration?.operationId ?? '', (request.body as { input?: unknown } | null)?.input)),
+    });
     if (idempotencyKey) deps.db.run('INSERT INTO idempotency_records (scope, key, request_hash, status, body, created_at) VALUES (?, ?, ?, ?, ?, ?)', scope, idempotencyKey, fingerprint, result.value === undefined ? 204 : declaration?.successStatus ?? 200, result.value === undefined ? null : JSON.stringify(result.value), deps.clock.now());
     return { result };
   }, (value) => Boolean(value.replay || value.result?.ok));
@@ -88,5 +102,13 @@ export function mutate<T>(deps: AppDeps, request: FastifyRequest, reply: Fastify
   return respond(reply, outcome.result as Result<T>, declaration?.successStatus);
 }
 
-/** 監査の記録には本文を残さず、どの記録に対する操作かだけを残す。 */
-const targetOf = (request: FastifyRequest) => Object.values((request.params ?? {}) as Record<string, string>).join('/') || null;
+/**
+ * 監査の記録には本文を残さず、どの記録に対する操作かだけを残す。経路の ID（例: 支出/精算）を並べ、
+ * 経路に ID のない作成の操作では、作った記録の ID を使う。
+ */
+const targetOf = (request: FastifyRequest, created?: unknown) => {
+  const fromPath = Object.values((request.params ?? {}) as Record<string, string>).join('/');
+  if (fromPath) return fromPath;
+  const id = (created as { id?: unknown } | undefined)?.id;
+  return typeof id === 'string' ? id : null;
+};

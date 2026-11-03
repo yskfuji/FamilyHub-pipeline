@@ -22,11 +22,18 @@ export const allCapabilities: Capability[] = [
   'link.manage', 'assistant.use',
   'place.read',
   'insight.read', 'resource.read', 'settings.own', 'notification.manage',
+  'audit.read',
 ];
+
+/**
+ * 管理者だけが持てる能力。大人の上限に入れないので、個別の許可でも大人には渡せない。
+ * audit.read（変更の記録を見る）は、家族全員の操作の履歴を見せるので、家族の管理と同じ扱いにする。
+ */
+const ownerOnly = (item: Capability) => (item.startsWith('household.') && item !== 'household.members.read') || item === 'audit.read';
 
 const roleCeilings: Record<HouseholdMembership['role'], readonly Capability[]> = {
   owner: allCapabilities,
-  adult: allCapabilities.filter((item) => !item.startsWith('household.') || item === 'household.members.read'),
+  adult: allCapabilities.filter((item) => !ownerOnly(item)),
   child: [
     'event.read', 'event.create', 'event.update', 'event.delete',
     'task.read', 'task.create', 'task.update', 'task.delete', 'task.transition',

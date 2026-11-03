@@ -1,10 +1,11 @@
 import { readFile } from 'node:fs/promises';
 
-const [contract, adapter, gateway, domain] = await Promise.all([
+const [contract, adapter, gateway, domain, audited] = await Promise.all([
   readFile('contracts/family-hub.openapi.yaml', 'utf8'),
   readFile('src/data/httpGateway.ts', 'utf8'),
   readFile('src/data/gateway.ts', 'utf8'),
   readFile('src/domain/types.ts', 'utf8'),
+  readFile('src/data/gatewayOperations.ts', 'utf8'),
 ]);
 
 const failures = [];
@@ -71,6 +72,7 @@ const operationFor = {
   'assistant.getStatus': 'getAssistantStatus', 'assistant.readReceipt': 'readReceipt', 'assistant.readEventImage': 'readEventImage', 'assistant.readEventUrl': 'readEventUrl', 'assistant.getJob': 'getAssistantJob',
   'notifications.list': 'listNotifications', 'notifications.markRead': 'markNotificationRead', 'notifications.snooze': 'snoozeNotification', 'notifications.stop': 'stopNotification',
   'notifications.resume': 'resumeNotification', 'notifications.getPreferences': 'getNotificationPreferences', 'notifications.updatePreferences': 'updateNotificationPreferences',
+  'audit.list': 'listAuditEvents', 'audit.listMine': 'listAccountAuditEvents',
   'credentials.create': null, 'credentials.get': null,
 };
 const portOf = Object.fromEntries([...gateway.matchAll(/^\s+(\w+): (\w+Port|CredentialClient);$/gm)].map((match) => [match[2], match[1]]));
@@ -82,6 +84,13 @@ for (const method of declared) {
   if (!new RegExp(`\\b${name}(:|\\s*\\()`).test(adapter)) failures.push(`HTTP adapter does not implement: ${method}`);
 }
 for (const method of Object.keys(operationFor)) if (!declared.includes(method)) failures.push(`mapping refers to a gateway method that no longer exists: ${method}`);
+// 確認用の実装が変更の記録に使う対応表（src/data/gatewayOperations.ts）は、ここの対応と同じ operationId を使う。
+const auditedEntries = [...audited.matchAll(/^\s+'(\w+\.\w+)': (?:household|account)\('(\w+)'/gm)].map((match) => [match[1], match[2]]);
+if (auditedEntries.length === 0) failures.push('src/data/gatewayOperations.ts: no audited operations found');
+for (const [method, operationId] of auditedEntries) {
+  if (!(method in operationFor)) failures.push(`gatewayOperations.ts maps an unknown gateway method: ${method}`);
+  else if (operationFor[method] !== operationId) failures.push(`gatewayOperations.ts disagrees with operationFor: ${method} -> ${operationId} (expected ${operationFor[method]})`);
+}
 const mapped = new Set(Object.values(operationFor).filter(Boolean));
 // 運用の確認や CSRF の取得など、画面の Gateway を通らない操作は契約に x-gateway: none と書く。
 const exempt = new Set([...contract.matchAll(/operationId:\s*([A-Za-z0-9]+)\n\s+x-gateway: none/g)].map((match) => match[1]));

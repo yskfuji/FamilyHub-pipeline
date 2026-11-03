@@ -14,6 +14,18 @@ describe('authorization policy', () => {
     expect(capabilitiesFor('adult', [{ membershipId: 'member-adult', capability: 'event.delete', effect: 'deny' }])).not.toContain('event.delete');
   });
 
+  it('gives the change record (audit.read) to owners only and never lets an override grant it to an adult (A5-1)', () => {
+    expect(capabilitiesFor('owner')).toContain('audit.read');
+    for (const role of ['adult', 'child', 'guest'] as const) {
+      expect(capabilityCeilingFor(role)).not.toContain('audit.read');
+      expect(capabilitiesFor(role, [{ membershipId: `member-${role}`, capability: 'audit.read', effect: 'allow' }])).not.toContain('audit.read');
+    }
+    // 個別の拒否は、ほかの能力と同じく管理者にも効く。
+    expect(capabilitiesFor('owner', [{ membershipId: 'member-owner', capability: 'audit.read', effect: 'deny' }])).not.toContain('audit.read');
+    // 大人の上限から外したのは家族の管理と audit.read だけ。
+    expect(capabilityCeilingFor('adult')).toEqual(capabilitiesFor('owner').filter((item) => item === 'household.members.read' || (!item.startsWith('household.') && item !== 'audit.read')));
+  });
+
   it('never lets a child override the role ceiling', () => {
     expect(capabilitiesFor('child')).not.toContain('expense.read');
     expect(capabilitiesFor('child', [{ membershipId: 'member-child', capability: 'expense.read', effect: 'allow' }])).not.toContain('expense.read');

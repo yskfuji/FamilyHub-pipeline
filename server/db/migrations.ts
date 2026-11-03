@@ -1,4 +1,9 @@
-/** スキーマの変更は末尾に足す。適用済みのものは書き換えない。 */
+/**
+ * スキーマの変更は末尾に足す。適用済みのものは書き換えない。
+ * 監査の記録は別のファイル（audit.db、server/audit/schema.ts）に置く。本体には、同じトランザクションで書く
+ * 送り出しの箱（audit_outbox）と、毎日の基準点の控え（audit_anchors）だけを置く。
+ * 7番目の変更で、それまで本体にあった audit_events の行を送り出しの箱へ移し、鎖の起点にする。
+ */
 export const migrations: readonly string[] = [
   `
   CREATE TABLE users (
@@ -151,6 +156,27 @@ export const migrations: readonly string[] = [
     fingerprint TEXT NOT NULL,
     created_at TEXT NOT NULL,
     retired_at TEXT
+  ) WITHOUT ROWID;
+  `,
+  `
+  CREATE TABLE audit_outbox (
+    seq INTEGER PRIMARY KEY,
+    id TEXT NOT NULL UNIQUE,
+    household_id TEXT,
+    actor_user_id TEXT,
+    action TEXT NOT NULL,
+    target TEXT,
+    detail TEXT,
+    at TEXT NOT NULL
+  );
+  INSERT INTO audit_outbox (id, household_id, actor_user_id, action, target, detail, at)
+    SELECT id, household_id, actor_user_id, action, target, detail, at FROM audit_events ORDER BY rowid;
+  DROP TABLE audit_events;
+  CREATE TABLE audit_anchors (
+    day TEXT PRIMARY KEY,
+    seq INTEGER NOT NULL,
+    hash TEXT NOT NULL,
+    at TEXT NOT NULL
   ) WITHOUT ROWID;
   `,
 ];

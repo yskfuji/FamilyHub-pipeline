@@ -38,7 +38,7 @@ export function registerInviteAcceptance(app: FastifyInstance, deps: AppDeps) {
         deps.db.run('INSERT INTO household_members (user_id, household_id, membership_id) VALUES (?, ?, ?)', session.user_id, found.household_id, id);
       }
       saveAggregate(deps.db, found.household_id, member?.membership_id ?? '', loaded);
-      deps.db.run('INSERT INTO audit_events (id, household_id, actor_user_id, action, target, at) VALUES (?, ?, ?, ?, ?, ?)', deps.ids.next('audit'), found.household_id, session.user_id, 'acceptInvite', invite.id, deps.clock.now());
+      deps.audit.record({ id: deps.ids.next('audit'), at: deps.clock.now(), householdId: found.household_id, actorUserId: session.user_id, action: 'acceptInvite', target: invite.id });
       return accepted;
     }, (value) => value.ok);
     if (!result.ok) return sendError(reply, result.error);

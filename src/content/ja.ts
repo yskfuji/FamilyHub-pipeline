@@ -211,6 +211,7 @@ export const ja = {
     'resource.read': '関連リンクを見る',
     'settings.own': '自分の設定を変更する',
     'notification.manage': '通知を管理する',
+    'audit.read': '変更の記録を見る',
   } satisfies Record<Capability, string>,
   actions: {
     add: '追加する',
