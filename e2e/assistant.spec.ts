@@ -211,7 +211,8 @@ test('the reading controls stay 44 pixels tall on a phone', async ({ page }) => 
   const box = await dialog.locator('.shift-check').first().boundingBox();
   expect(box?.width).toBeGreaterThanOrEqual(44);
   expect(box?.height).toBeGreaterThanOrEqual(44);
-  for (const button of await page.locator('.calendar-readers .button').all()) expect((await button.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+  // 位置が端数のとき、boundingBox の高さは 44 より 0.00002 ほど小さく返ることがある（CSS の高さは 44px ちょうど）。
+  for (const button of await page.locator('.calendar-readers .button').all()) expect(Math.round(((await button.boundingBox())?.height ?? 0) * 100) / 100).toBeGreaterThanOrEqual(44);
   const overflow = await dialog.evaluate((node) => node.scrollWidth - node.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });

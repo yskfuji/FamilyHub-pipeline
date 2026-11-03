@@ -25,7 +25,7 @@ export function InsightsPage() {
 
   return <div className="page">
     <PageHeader eyebrow="ヒント" title="確認しておきたいこと" description="予定・タスク・家計の記録から、確認しておきたいことをまとめています。"/>
-    <div className="callout info" style={{ marginBottom: '1.5rem' }}><EyeIcon/><div><strong>ヒントは記録から計算しています</strong><p className="small muted mb-0">ヒントをもとに予定や担当を自動で変更することはありません。操作しなくても、記録はそのままです。</p></div></div>
+    <div className="callout info mb-5"><EyeIcon/><div><strong>ヒントは記録から計算しています</strong><p className="small muted mb-0">ヒントをもとに予定や担当を自動で変更することはありません。操作しなくても、記録はそのままです。</p></div></div>
     {error ? <div className="notice error" role="alert"><strong>{error.message}</strong><p className="small mb-0">{errorGuidance(error)}</p><button data-control-id="insights.retry" className="button mt-1" type="button" onClick={() => setAttempt((value) => value + 1)}>{ja.actions.retry}</button></div>
       : insights === null ? <div className="grid three" role="status" aria-busy="true" aria-label="ヒントを読み込んでいます"><div className="skeleton"/><div className="skeleton"/><div className="skeleton"/></div>
         : insights.length === 0 ? <EmptyState title="いま確認が必要なことはありません">予定やタスク、家計の記録に変化があると、ここに表示します。</EmptyState>

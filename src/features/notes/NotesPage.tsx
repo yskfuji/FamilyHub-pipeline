@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Suspense, lazy, useMemo, useState } from 'react';
 import { memberName, useApp } from '../../app/AppContext';
 import { useMemberScope } from '../../app/useMemberScope';
 import { detailId, navigate, useSearch, withQueryParam } from '../../app/router';
@@ -14,9 +14,11 @@ import type { Attachment, Memo } from '../../domain/types';
 import { dayLabel } from '../calendar/calendarLabels';
 import { MemberScopeSelect, ScopeNote } from '../shared/MemberScopeSelect';
 import { audienceText } from '../shared/visibilityText';
-import { MemoDrawer } from './MemoDrawer';
-import { MemoForm } from './MemoForm';
 import { useAttachmentQueue } from './useAttachmentQueue';
+
+/** メモの詳細と作成のフォームは、開いたときに読む。 */
+const MemoDrawer = lazy(async () => ({ default: (await import('./MemoDrawer')).MemoDrawer }));
+const MemoForm = lazy(async () => ({ default: (await import('./MemoForm')).MemoForm }));
 
 const attachmentTone = (attachments: readonly Attachment[]) => (attachments.some((item) => item.status === 'rejected') ? 'danger' : attachments.some((item) => item.status !== 'clean') ? 'attention' : 'success');
 
@@ -93,10 +95,10 @@ export function NotesPage({ path }: { path: string }) {
         </div>
       </a>)}</div>}
     </div>
-    {active && <MemoDrawer key={active.id} memo={active} queue={queue} onClose={() => navigate(`/notes${search}`, false, true)} onDeleted={setDeleted}/>}
+    {active && <Suspense fallback={null}><MemoDrawer key={active.id} memo={active} queue={queue} onClose={() => navigate(`/notes${search}`, false, true)} onDeleted={setDeleted}/></Suspense>}
     </div>
-    {creating && <Dialog title="メモを作る" description="ファイルも一緒に追加できます。追加したファイルは、確認が終わるまで開けません。" onClose={() => { if (!submitting) setCreating(false); }}>
+    {creating && <Suspense fallback={null}><Dialog title="メモを作る" description="ファイルも一緒に追加できます。追加したファイルは、確認が終わるまで開けません。" onClose={() => { if (!submitting) setCreating(false); }}>
       <MemoForm formId="new" initial={newMemoDraft(dateKeyFromRfc3339(snapshot.context.asOf), defaultAudience(snapshot.viewer.role, 'memo', privacy?.defaultAudience) as MemoAudience)} submitLabel="作成する" busyLabel="作成中…" busy={submitting} error={formError} offerFiles onSubmit={(draft, files) => void create(draft, files)} onCancel={() => setCreating(false)}/>
-    </Dialog>}
+    </Dialog></Suspense>}
   </div>;
 }

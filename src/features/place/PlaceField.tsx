@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useApp } from '../../app/AppContext';
-import { externalLinkLabel, ja, placeCategoryLabel, placeDistanceLabel } from '../../content/ja';
+import { ja, placeCategoryLabel, placeDistanceLabel } from '../../content/ja';
 import { StatusBadge } from '../../design-system/components';
-import { ImageIcon, LinkIcon, LocateIcon, MapPinIcon, SearchIcon } from '../../design-system/icons';
+import { ImageIcon, LocateIcon, MapPinIcon, SearchIcon } from '../../design-system/icons';
 import { placeRefSchema } from '../../domain/schemas';
 import type { PlaceCaptureSource, PlaceRef, PrivacySettings, Result } from '../../domain/types';
 import { getDevicePosition, isGeolocationAvailable } from './deviceLocation';
+import { PlaceAttributionLink } from './PlaceAttribution';
 import { readPhotoGps } from './exif';
 import { APPROXIMATE_ACCURACY_METERS, COARSE_ACCURACY_METERS, toPlaceRef, toRfc3339, type ExactPosition, type PlaceCandidate } from './geo';
-import { OPENPOI_ATTRIBUTION_URL, PLACE_LOOKUP_NOTICE_VERSION, findNearbyPlaces, openPoiPlaceLookup, searchPlacesByName, type PlaceLookupPort } from './openPoi';
+import { PLACE_LOOKUP_NOTICE_VERSION, findNearbyPlaces, openPoiPlaceLookup, searchPlacesByName, type PlaceLookupPort } from './openPoi';
 
 export type PlaceFailure = keyof typeof ja.place.failures;
 type LookupOrigin = Exclude<PlaceCaptureSource, 'manual'>;
@@ -41,9 +42,7 @@ export function usePlaceLookupConsent() {
 
 /* ---------- 表示部品 ---------- */
 
-export function PlaceAttributionLink({ where }: { where: 'picker' | 'memo' | 'budget' | 'expense' | 'places' }) {
-  return <p className="place-attribution small muted">{ja.place.attributionPrefix}: <a data-control-id={`place.attribution.${where}`} href={OPENPOI_ATTRIBUTION_URL} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" aria-label={externalLinkLabel(`${ja.place.attributionPrefix} ${ja.place.attributionLabel}`)}>{ja.place.attributionLabel}<LinkIcon width="13"/></a></p>;
-}
+export { PlaceAttributionLink };
 
 export function PlaceSummary({ place }: { place: PlaceRef }) {
   const category = placeCategoryLabel(place.category);

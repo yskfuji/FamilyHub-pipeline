@@ -175,6 +175,8 @@ test.describe('theme and density', () => {
     await page.evaluate(() => localStorage.setItem('family-hub-density', 'compact'));
     await page.reload();
     await expect(page.getByRole('button', { name: 'すぐに追加' })).toBeVisible();
+    // 画面の本文は分けて読むので、枠の後に出る。本文のボタンが出るまで待つ。
+    await expect(page.locator('main .page-head h1')).toBeVisible();
     const heights = await page.locator('main button:visible, main a.button:visible, main select:visible').evaluateAll((items) => items.map((item) => item.getBoundingClientRect().height));
     expect(heights.length).toBeGreaterThan(0);
     expect(Math.min(...heights)).toBeGreaterThanOrEqual(44);

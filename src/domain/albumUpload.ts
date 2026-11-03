@@ -1,4 +1,4 @@
-import { MEDIA_LIMITS } from './commands/albums';
+import { MEDIA_LIMITS } from './mediaLimits';
 import type { Id } from './types';
 
 /** 同時に送れる数。受け取る側の上限と同じ。 */

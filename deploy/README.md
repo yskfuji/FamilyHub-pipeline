@@ -66,6 +66,8 @@
 - `location /v1/` の中で `add_header` を書くと、上の見出しがすべて消えます。書かないでください。
 - API は同じ機械の nginx から届く `X-Forwarded-For` の末尾だけを信じます（`trustProxy: 'loopback'`）。別の機械を挟むなら設定を変える必要があります。
 - 見出しは `public/_headers` と同じ値です。変えるときは両方を変えます。`npm run audit:security` が一致を確かめます。
+- 圧縮: `npm run build:http` は、1KB 以上の文字のファイル（JS・CSS・HTML・SVG など）の隣に、gzip -9 で圧縮した `.gz` を置きます。`location /` の `gzip_static on;` がそれをそのまま配り、配るたびに圧縮しません。`gzip_static` には `ngx_http_gzip_static_module` が要ります（Debian・Ubuntu と nginx.org の包みには入っています。自分でビルドするときは `--with-http_gzip_static_module`）。`.gz` は元のファイルと同じ中身であることを `npm run audit:security` が確かめます。
+- brotli（`.br`）は作っていません。`brotli_static` は別のモジュール `ngx_brotli` がないと設定の誤りになり、nginx が起動しないためです。使うときは、モジュールを入れたうえで、ビルドに `.br` の出力を足し、`brotli_static on;` を書いてください。
 
 ## バックアップ
 

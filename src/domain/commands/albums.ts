@@ -3,8 +3,9 @@ import { albumInputSchema, albumUpdateSchema } from '../schemas';
 import type { Album, AlbumItem, AlbumSummary, Id, Result, ViewerContext } from '../types';
 import { applyPatch, conflict, denied, fail, invalid, missing, ok } from './context';
 import type { CommandContext } from './context';
+import { MEDIA_LIMITS } from '../mediaLimits';
 
-export const MEDIA_LIMITS = { photoBytes: 100 * 1024 * 1024, videoBytes: 4 * 1024 * 1024 * 1024, albumQuotaBytes: 20 * 1024 * 1024 * 1024 } as const;
+export { MEDIA_LIMITS };
 
 /** アルバムが閲覧者に見えるか。一覧・1件・全体の検索が同じ規則を使う。 */
 export const canSeeAlbum = (viewer: ViewerContext, album: Album) => authorizeVisibleResource(viewer, 'album.read', album.visibility, [album.creatorMembershipId]).allowed;

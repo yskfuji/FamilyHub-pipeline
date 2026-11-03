@@ -1,10 +1,11 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { readableTextOn } from '../../domain/readableText';
 import { useApp } from '../../app/AppContext';
 import { setDevicePreferences, useDevicePreferences, type Density } from '../../app/devicePreferences';
 import { densityLabels } from '../../app/paletteCommands';
 import { capabilityCeilingFor, defaultCapabilitiesFor } from '../../authz/policy';
 import { externalLinkLabel, ja, membershipStatusLabels, roleLabels } from '../../content/ja';
-import { settingsRoutes } from '../../content/settingsRoutes';
+import { settingsTabFor, settingsTabs } from './settingsTabs';
 import { Dialog, PageHeader, StatusBadge, formatDate, formatRelative, formatTime } from '../../design-system/components';
 import { navigate } from '../../app/router';
 import { ArrowIcon, LinkIcon, LockIcon, PeopleIcon, ShieldIcon } from '../../design-system/icons';
@@ -25,21 +26,6 @@ import { RecentlyDeleted } from './RecentlyDeleted';
 const HelpSection = lazy(() => import('./HelpSection'));
 const LegalSection = lazy(() => import('./LegalSection'));
 
-/** 設定のタブと、その表示に必要な能力。経路の許可（App.tsx）とタブの表示はこの表だけを参照する。 */
-export const settingsTabs: ReadonlyArray<{ href: typeof settingsRoutes[number]; label: string; capability: Capability }> = [
-  { href: '/settings/household', label: '家族', capability: 'household.members.read' },
-  { href: '/settings/security', label: 'サインインとセキュリティ', capability: 'settings.own' },
-  { href: '/settings/account', label: 'アカウント', capability: 'settings.own' },
-  { href: '/settings/privacy', label: '共有とプライバシー', capability: 'settings.own' },
-  { href: '/settings/notifications', label: '通知', capability: 'notification.manage' },
-  { href: '/settings/location', label: ja.place.settings.tab, capability: 'place.read' },
-  { href: '/settings/accessibility', label: '表示・操作', capability: 'settings.own' },
-  { href: '/settings/resources', label: '関連リンク', capability: 'resource.read' },
-  { href: '/settings/recently-deleted', label: '最近削除', capability: 'settings.own' },
-  { href: '/settings/help', label: 'ヘルプ', capability: 'settings.own' },
-  { href: '/settings/legal', label: '規約（草案）', capability: 'settings.own' },
-];
-export const settingsTabFor = (path: string) => settingsTabs.find((tab) => path === tab.href || path.startsWith(`${tab.href}/`));
 const inviteRoles: Array<Exclude<MembershipRole, 'owner'>> = ['adult', 'child', 'guest'];
 
 export function SettingsPage({ path }: { path: string }) {
@@ -170,7 +156,7 @@ function Household() {
       <section className="card">
         <p className="eyebrow">家族</p><h2>{snapshot.household.name}</h2><p className="muted">利用中 {activeCount}人 / {MAX_HOUSEHOLD_MEMBERS}人まで · 日時の表示 · 日本時間</p>
         <ul className="list">{people.map((item) => <li className="list-row" key={item.id}>
-          <span className="avatar" style={{ background: item.color }} aria-hidden="true">{item.displayName.slice(0, 1)}</span>
+          <span className="avatar" style={{ background: item.color, color: readableTextOn(item.color) }} aria-hidden="true">{item.displayName.slice(0, 1)}</span>
           <div className="row-main"><strong>{item.displayName}</strong><span className="meta">{roleLabels[item.role]} · {membershipStatusLabels[item.status]}</span></div>
           {canManage ? <button data-control-id={`settings.member.permissions.${item.id}`} className="button" type="button" aria-label={`${item.displayName}さんの権限を設定`} onClick={() => void openPermissions(item)}>権限を設定</button> : <StatusBadge>{roleLabels[item.role]}</StatusBadge>}
         </li>)}</ul>

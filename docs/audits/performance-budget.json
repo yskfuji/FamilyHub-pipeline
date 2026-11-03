@@ -1,0 +1,186 @@
+{
+  "measuredAt": "2026-11-03T16:42:35.114Z",
+  "build": "dist-http (vite preview, uncompressed; JS counted as gzip -6 of each body)",
+  "budgets": {
+    "jsBeforeLcpGzip6": 150000,
+    "woff2Bytes": 400000
+  },
+  "screens": [
+    {
+      "screen": "today",
+      "path": "/today",
+      "lcpMs": 84,
+      "readyMs": 173,
+      "jsBeforeLcpGzip6": 106272,
+      "jsTotalGzip6": 106272,
+      "jsTotalRaw": 317594,
+      "woff2Bytes": 25040,
+      "chunksBeforeLcp": [
+        "taskList-DLN18584.js 367",
+        "preload-helper-BZ1Pz5am.js 688",
+        "AppContext-CFRu0s84.js 4970",
+        "calendarDate-ClkKhgyO.js 5947",
+        "components-CVQ9PwwD.js 14645",
+        "auditSurface.consumer-CRRosIsl.js 50",
+        "router-gLRH-7Zb.js 853",
+        "settingsTabs-DFMFV4TU.js 492",
+        "devicePreferences-BNeAR-nb.js 1410",
+        "index-CxJUoAVt.js 64340",
+        "runtime.http-D5QE8snG.js 4691",
+        "recurrence-BeFt0ocx.js 1503",
+        "TodayPage-Bp3xuI2B.js 2906",
+        "ledger-Yp2C-Uud.js 1203",
+        "MemberScopeSelect-D13CuncS.js 656",
+        "SeasonMark-CNP9iclW.js 826",
+        "SyncStatus-eGymBx_k.js 725"
+      ],
+      "chunksAfterLcp": [],
+      "fonts": [
+        "noto-sans-jp-latin-wght-normal-BZ68q7jy.woff2 25040"
+      ]
+    },
+    {
+      "screen": "calendar",
+      "path": "/calendar",
+      "lcpMs": 228,
+      "readyMs": 269,
+      "jsBeforeLcpGzip6": 114478,
+      "jsTotalGzip6": 114478,
+      "jsTotalRaw": 339545,
+      "woff2Bytes": 25040,
+      "chunksBeforeLcp": [
+        "taskList-DLN18584.js 367",
+        "calendarDate-ClkKhgyO.js 5947",
+        "AppContext-CFRu0s84.js 4970",
+        "preload-helper-BZ1Pz5am.js 688",
+        "components-CVQ9PwwD.js 14645",
+        "auditSurface.consumer-CRRosIsl.js 50",
+        "devicePreferences-BNeAR-nb.js 1410",
+        "router-gLRH-7Zb.js 853",
+        "settingsTabs-DFMFV4TU.js 492",
+        "index-CxJUoAVt.js 64340",
+        "runtime.http-D5QE8snG.js 4691",
+        "recurrence-BeFt0ocx.js 1503",
+        "useReadingStatus-D1FAolxo.js 247",
+        "calendarLayout-CnwOM6Yw.js 1455",
+        "calendarLabels-BffAWGtk.js 1459",
+        "CalendarPage-Dcj_ZpS5.js 8305",
+        "MemberScopeSelect-D13CuncS.js 656",
+        "SeasonMark-CNP9iclW.js 826",
+        "useTodoTransition-BGbk5vnJ.js 862",
+        "policy-BPSJT06Z.js 712"
+      ],
+      "chunksAfterLcp": [],
+      "fonts": [
+        "noto-sans-jp-latin-wght-normal-BZ68q7jy.woff2 25040"
+      ]
+    },
+    {
+      "screen": "budget",
+      "path": "/budget",
+      "lcpMs": 88,
+      "readyMs": 79,
+      "jsBeforeLcpGzip6": 111088,
+      "jsTotalGzip6": 111088,
+      "jsTotalRaw": 334331,
+      "woff2Bytes": 25040,
+      "chunksBeforeLcp": [
+        "taskList-DLN18584.js 367",
+        "preload-helper-BZ1Pz5am.js 688",
+        "AppContext-CFRu0s84.js 4970",
+        "calendarDate-ClkKhgyO.js 5947",
+        "components-CVQ9PwwD.js 14645",
+        "auditSurface.consumer-CRRosIsl.js 50",
+        "devicePreferences-BNeAR-nb.js 1410",
+        "router-gLRH-7Zb.js 853",
+        "settingsTabs-DFMFV4TU.js 492",
+        "index-CxJUoAVt.js 64340",
+        "runtime.http-D5QE8snG.js 4691",
+        "PlaceAttribution-CAawz-rt.js 377",
+        "useReadingStatus-D1FAolxo.js 247",
+        "ledger-Yp2C-Uud.js 1203",
+        "MemberScopeSelect-D13CuncS.js 656",
+        "DetailSurface-CucCri25.js 847",
+        "BudgetPage-BxaKiaKy.js 7846",
+        "SettlementHistory-DSLuvlm-.js 1459"
+      ],
+      "chunksAfterLcp": [],
+      "fonts": [
+        "noto-sans-jp-latin-wght-normal-BZ68q7jy.woff2 25040"
+      ]
+    },
+    {
+      "screen": "albums",
+      "path": "/albums",
+      "lcpMs": 84,
+      "readyMs": 72,
+      "jsBeforeLcpGzip6": 115579,
+      "jsTotalGzip6": 115579,
+      "jsTotalRaw": 350393,
+      "woff2Bytes": 25040,
+      "chunksBeforeLcp": [
+        "taskList-DLN18584.js 367",
+        "preload-helper-BZ1Pz5am.js 688",
+        "calendarDate-ClkKhgyO.js 5947",
+        "AppContext-CFRu0s84.js 4970",
+        "components-CVQ9PwwD.js 14645",
+        "auditSurface.consumer-CRRosIsl.js 50",
+        "router-gLRH-7Zb.js 853",
+        "settingsTabs-DFMFV4TU.js 492",
+        "devicePreferences-BNeAR-nb.js 1410",
+        "index-CxJUoAVt.js 64340",
+        "runtime.http-D5QE8snG.js 4691",
+        "visibilityForm-Crob6_hG.js 539",
+        "policy-BPSJT06Z.js 712",
+        "VisibilityFields-_pq0Az2w.js 743",
+        "visibilityText-tr_DQ0p8.js 172",
+        "memoAttachments-DJr5JayJ.js 531",
+        "AlbumsPage-BhOZUSKb.js 14429"
+      ],
+      "chunksAfterLcp": [],
+      "fonts": [
+        "noto-sans-jp-latin-wght-normal-BZ68q7jy.woff2 25040"
+      ]
+    },
+    {
+      "screen": "notes",
+      "path": "/notes",
+      "lcpMs": 108,
+      "readyMs": 76,
+      "jsBeforeLcpGzip6": 110799,
+      "jsTotalGzip6": 110799,
+      "jsTotalRaw": 323457,
+      "woff2Bytes": 25040,
+      "chunksBeforeLcp": [
+        "taskList-DLN18584.js 367",
+        "preload-helper-BZ1Pz5am.js 688",
+        "AppContext-CFRu0s84.js 4970",
+        "calendarDate-ClkKhgyO.js 5947",
+        "components-CVQ9PwwD.js 14645",
+        "auditSurface.consumer-CRRosIsl.js 50",
+        "router-gLRH-7Zb.js 853",
+        "devicePreferences-BNeAR-nb.js 1410",
+        "settingsTabs-DFMFV4TU.js 492",
+        "index-CxJUoAVt.js 64340",
+        "runtime.http-D5QE8snG.js 4691",
+        "visibilityForm-Crob6_hG.js 539",
+        "policy-BPSJT06Z.js 712",
+        "NotesPage-DwitPYuh.js 3701",
+        "calendarLabels-BffAWGtk.js 1459",
+        "calendarLayout-CnwOM6Yw.js 1455",
+        "visibilityText-tr_DQ0p8.js 172",
+        "recurrence-BeFt0ocx.js 1503",
+        "memoAttachments-DJr5JayJ.js 531",
+        "memoList-CeJvwU5y.js 233",
+        "MemberScopeSelect-D13CuncS.js 656",
+        "DetailSurface-CucCri25.js 847",
+        "memoForm-djLFJHLA.js 538"
+      ],
+      "chunksAfterLcp": [],
+      "fonts": [
+        "noto-sans-jp-latin-wght-normal-BZ68q7jy.woff2 25040"
+      ]
+    }
+  ],
+  "cumulativeWoff2Bytes": 25040
+}

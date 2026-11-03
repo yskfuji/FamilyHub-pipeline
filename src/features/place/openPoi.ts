@@ -8,8 +8,7 @@ import { NEARBY_RADIUS_METERS, candidateKey, coarsen, haversineMeters, rankCandi
  * 送るのは丸めた位置（CoarseCenter）と検索語だけ。Cookie・リファラーは送らず、応答もキャッシュしない。
  */
 const API_ORIGIN = 'https://api.openpoiapi.com';
-export const OPENPOI_ATTRIBUTION_URL = 'https://openpoiapi.com/attribution.html';
-export const OPENPOI_TERMS_URL = 'https://docs.openpoiapi.com/legal.html';
+export { OPENPOI_ATTRIBUTION_URL, OPENPOI_TERMS_URL } from './openPoiLinks';
 /** 外部送信の説明を変えたら更新し、全員に同意を取り直す。 */
 export const PLACE_LOOKUP_NOTICE_VERSION = '2026-10-03';
 

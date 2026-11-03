@@ -1,8 +1,9 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { extname, join, resolve } from 'node:path';
+import { constants, gzipSync } from 'node:zlib';
 
 /** 実スタックの確認では、配信と同じセキュリティのヘッダーを付ける。localhost の http で動かす分だけ外す。 */
 function deliveryHeaders() {
@@ -32,6 +33,32 @@ function buildIdFile() {
   };
 }
 
+/**
+ * 配信用に、文字のファイルを前もって gzip（-9）で圧縮して .gz を並べて置く。nginx の gzip_static がそのまま配る（deploy/nginx.conf）。
+ * 画面のビルドだけで行い、API の出力先（dist-server）には作らない。書体・画像・動画はすでに圧縮されているので対象にしない。
+ * brotli（.br）は作らない。配る側に ngx_brotli が要り、標準の nginx は brotli_static を知らずに起動しないため（deploy/README.md）。
+ */
+const PRECOMPRESS_EXTENSIONS = new Set(['.js', '.mjs', '.css', '.html', '.svg', '.json', '.webmanifest', '.txt', '.xml']);
+const PRECOMPRESS_MIN_BYTES = 1024;
+function precompress() {
+  let outDir = '';
+  return {
+    name: 'family-hub-precompress',
+    apply: (_config: unknown, env: { command: string; isSsrBuild?: boolean }) => env.command === 'build' && !env.isSsrBuild,
+    configResolved(config: { root: string; build: { outDir: string } }) { outDir = resolve(config.root, config.build.outDir); },
+    closeBundle() {
+      const walk = (dir: string): string[] => readdirSync(dir).flatMap((name) => { const path = join(dir, name); return statSync(path).isDirectory() ? walk(path) : [path]; });
+      for (const file of walk(outDir)) {
+        if (!PRECOMPRESS_EXTENSIONS.has(extname(file))) continue;
+        const body = readFileSync(file);
+        if (body.length < PRECOMPRESS_MIN_BYTES) continue;
+        const packed = gzipSync(body, { level: constants.Z_BEST_COMPRESSION });
+        if (packed.length < body.length) writeFileSync(`${file}.gz`, packed);
+      }
+    },
+  };
+}
+
 const apiProxy = { '/v1': { target: process.env.FAMILY_HUB_API ?? 'http://127.0.0.1:8799', changeOrigin: false } };
 
 export default defineConfig(({ isSsrBuild }) => {
@@ -42,7 +69,7 @@ export default defineConfig(({ isSsrBuild }) => {
   preview: { proxy: apiProxy, ...(realStack ? { headers: deliveryHeaders() } : {}) },
   // public/ は画面の配信物で、API の出力先には入れない。
   ...(isSsrBuild ? { publicDir: false as const } : {}),
-  plugins: [react(), buildIdFile()],
+  plugins: [react(), buildIdFile(), precompress()],
   define: { 'import.meta.env.VITE_BUILD_ID': JSON.stringify(buildId()), __FAMILY_HUB_BUILD__: JSON.stringify(buildId()) },
   resolve: {
     alias: {

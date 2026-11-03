@@ -1,9 +1,9 @@
 {
-  "performance": 99,
+  "performance": 100,
   "accessibility": 100,
   "bestPractices": 100,
-  "lcpMs": 766.9372000000001,
-  "cls": 0.0005763598642274981,
+  "lcpMs": 608.1288499999999,
+  "cls": 0.00009772174065318273,
   "tbtMs": 0,
   "note": "INP requires field interaction data; Lighthouse lab proxy reports TBT instead."
 }

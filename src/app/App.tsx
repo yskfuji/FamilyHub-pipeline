@@ -1,21 +1,7 @@
-import type { ReactNode } from 'react';
+import { Suspense, lazy, type ReactNode } from 'react';
 import { Shell } from './Shell';
 import { usePath } from './router';
-import { WelcomePage } from '../features/auth/WelcomePage';
-import { AuthPage } from '../features/auth/AuthPage';
-import { ResetPasswordPage } from '../features/auth/ResetPasswordPage';
-import { SignUpPage } from '../features/auth/SignUpPage';
-import { OnboardingPage } from '../features/auth/OnboardingPage';
-import { TodayPage } from '../features/today/TodayPage';
-import { CalendarPage } from '../features/calendar/CalendarPage';
-import { TasksPage } from '../features/tasks/TasksPage';
-import { NotesPage } from '../features/notes/NotesPage';
-import { BudgetPage } from '../features/budget/BudgetPage';
-import { AlbumsPage } from '../features/albums/AlbumsPage';
-import { InsightsPage } from '../features/insights/InsightsPage';
-import { SettingsPage, settingsTabFor, settingsTabs } from '../features/settings/SettingsPage';
-import { PlacesPage } from '../features/places/PlacesPage';
-import { PublicLegalPage } from '../features/settings/PublicLegalPage';
+import { settingsTabFor, settingsTabs } from '../features/settings/settingsTabs';
 import { navigate } from './router';
 import { useEffect } from 'react';
 import { EmptyState } from '../design-system/components';
@@ -24,6 +10,32 @@ import { IdleGuard } from './IdleGuard';
 import { StageScreen } from './StageScreens';
 import type { Capability } from '../domain/types';
 import { AuditPage, auditPath } from '@audit-surface';
+
+/**
+ * 画面ごとに分けて読む。最初の表示では、開いた画面の分だけを読む（docs/acceptance/criteria.md の B「性能」）。
+ * 名前つきの書き出しを default にそろえて React.lazy に渡す。
+ */
+const WelcomePage = lazy(async () => ({ default: (await import('../features/auth/WelcomePage')).WelcomePage }));
+const AuthPage = lazy(async () => ({ default: (await import('../features/auth/AuthPage')).AuthPage }));
+const ResetPasswordPage = lazy(async () => ({ default: (await import('../features/auth/ResetPasswordPage')).ResetPasswordPage }));
+const SignUpPage = lazy(async () => ({ default: (await import('../features/auth/SignUpPage')).SignUpPage }));
+const OnboardingPage = lazy(async () => ({ default: (await import('../features/auth/OnboardingPage')).OnboardingPage }));
+const TodayPage = lazy(async () => ({ default: (await import('../features/today/TodayPage')).TodayPage }));
+const CalendarPage = lazy(async () => ({ default: (await import('../features/calendar/CalendarPage')).CalendarPage }));
+const TasksPage = lazy(async () => ({ default: (await import('../features/tasks/TasksPage')).TasksPage }));
+const NotesPage = lazy(async () => ({ default: (await import('../features/notes/NotesPage')).NotesPage }));
+const BudgetPage = lazy(async () => ({ default: (await import('../features/budget/BudgetPage')).BudgetPage }));
+const AlbumsPage = lazy(async () => ({ default: (await import('../features/albums/AlbumsPage')).AlbumsPage }));
+const InsightsPage = lazy(async () => ({ default: (await import('../features/insights/InsightsPage')).InsightsPage }));
+const SettingsPage = lazy(async () => ({ default: (await import('../features/settings/SettingsPage')).SettingsPage }));
+const PlacesPage = lazy(async () => ({ default: (await import('../features/places/PlacesPage')).PlacesPage }));
+const PublicLegalPage = lazy(async () => ({ default: (await import('../features/settings/PublicLegalPage')).PublicLegalPage }));
+
+/** 画面の部品を読んでいる間の骨組み。枠（上部・ナビ）は先に出ているので、本文の場所だけを埋める。 */
+function PageLoading() {
+  return <div className="page" aria-busy="true"><div className="skeleton"/></div>;
+}
+const loading = (node: ReactNode) => <Suspense fallback={<PageLoading/>}>{node}</Suspense>;
 
 function PermissionBoundary({ capability, children }: { capability: Capability; children: ReactNode }) {
   const { can } = useApp();
@@ -49,26 +61,26 @@ export default function App() {
   // 接頭辞だけで一致させると /todayx なども通るため、区切りまで確認する。
   const at = (base: string) => path === base || path.startsWith(`${base}/`);
   const settingsTab = settingsTabFor(path);
-  if (path === '/' || path === '/welcome') return <WelcomePage/>;
-  if (path === '/auth') return <AuthPage/>;
-  if (path === '/sign-up') return <SignUpPage/>;
-  if (path === '/reset-password') return <ResetPasswordPage/>;
-  if (path === '/onboarding') return <OnboardingPage/>;
+  if (path === '/' || path === '/welcome') return loading(<WelcomePage/>);
+  if (path === '/auth') return loading(<AuthPage/>);
+  if (path === '/sign-up') return loading(<SignUpPage/>);
+  if (path === '/reset-password') return loading(<ResetPasswordPage/>);
+  if (path === '/onboarding') return loading(<OnboardingPage/>);
   // 規約は登録の前に読めるようにする。
-  if (path === '/settings/legal' && appStage !== 'ready') return <PublicLegalPage/>;
+  if (path === '/settings/legal' && appStage !== 'ready') return loading(<PublicLegalPage/>);
   if (appStage !== 'ready') return <StageScreen stage={appStage}/>;
-  let page;
-  if (at('/today')) page = <TodayPage/>;
-  else if (at('/calendar')) page = <PermissionBoundary capability="event.read"><CalendarPage path={path}/></PermissionBoundary>;
-  else if (at('/tasks')) page = <PermissionBoundary capability="task.read"><TasksPage path={path}/></PermissionBoundary>;
-  else if (at('/notes')) page = <PermissionBoundary capability="memo.read"><NotesPage path={path}/></PermissionBoundary>;
-  else if (at('/budget')) page = <PermissionBoundary capability="expense.read"><BudgetPage path={path}/></PermissionBoundary>;
-  else if (at('/albums')) page = <PermissionBoundary capability="album.read"><AlbumsPage path={path}/></PermissionBoundary>;
-  else if (at('/places')) page = <PermissionBoundary capability="place.read"><PlacesPage path={path}/></PermissionBoundary>;
-  else if (at('/insights')) page = <PermissionBoundary capability="insight.read"><InsightsPage/></PermissionBoundary>;
-  else if (path === '/settings' || path === '/settings/') page = <SettingsIndex/>;
-  else if (settingsTab) page = <PermissionBoundary capability={settingsTab.capability}><SettingsPage path={path}/></PermissionBoundary>;
-  else if (auditPath && at(auditPath)) page = <AuditPage path={path}/>;
-  else page = <NotFound/>;
-  return <><Shell path={path}>{page}</Shell><IdleGuard/></>;
+  let content;
+  if (at('/today')) content = <TodayPage/>;
+  else if (at('/calendar')) content = <PermissionBoundary capability="event.read"><CalendarPage path={path}/></PermissionBoundary>;
+  else if (at('/tasks')) content = <PermissionBoundary capability="task.read"><TasksPage path={path}/></PermissionBoundary>;
+  else if (at('/notes')) content = <PermissionBoundary capability="memo.read"><NotesPage path={path}/></PermissionBoundary>;
+  else if (at('/budget')) content = <PermissionBoundary capability="expense.read"><BudgetPage path={path}/></PermissionBoundary>;
+  else if (at('/albums')) content = <PermissionBoundary capability="album.read"><AlbumsPage path={path}/></PermissionBoundary>;
+  else if (at('/places')) content = <PermissionBoundary capability="place.read"><PlacesPage path={path}/></PermissionBoundary>;
+  else if (at('/insights')) content = <PermissionBoundary capability="insight.read"><InsightsPage/></PermissionBoundary>;
+  else if (path === '/settings' || path === '/settings/') content = <SettingsIndex/>;
+  else if (settingsTab) content = <PermissionBoundary capability={settingsTab.capability}><SettingsPage path={path}/></PermissionBoundary>;
+  else if (auditPath && at(auditPath)) content = <AuditPage path={path}/>;
+  else content = <NotFound/>;
+  return <><Shell path={path}>{loading(content)}</Shell><IdleGuard/></>;
 }

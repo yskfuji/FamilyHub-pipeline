@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
 import { useApp } from '../../app/AppContext';
 import { useMemberScope } from '../../app/useMemberScope';
 import { detailId, navigate } from '../../app/router';
@@ -13,12 +13,15 @@ import { MemberScopeSelect } from '../shared/MemberScopeSelect';
 import { AgendaView } from './AgendaView';
 import { CalendarToolbar } from './CalendarToolbar';
 import { DayEntries } from './DayPanel';
-import { EventDrawer, type DeletedEvent } from './EventDrawer';
+import type { DeletedEvent } from './EventDrawer';
 import { MonthFlow, MonthGrid } from './MonthView';
 import { ShiftReader } from './ShiftReader';
 import { TimelineView } from './TimelineView';
 import { useIsNarrow } from './calendarHooks';
 import { dayLabel, monthHeading, weekHeading, yearDayHeading } from './calendarLabels';
+
+/** 予定の詳細と編集は、開いたときに読む。 */
+const EventDrawer = lazy(async () => ({ default: (await import('./EventDrawer')).EventDrawer }));
 
 const VIEW_KEY = 'family-hub-calendar-view';
 const rememberedView = (): CalendarView => {
@@ -124,6 +127,6 @@ export function CalendarPage({ path }: { path: string }) {
       <button data-control-id="calendar.day.sheet-close" className="icon-button calendar-sheet-close" type="button" aria-label="日の一覧を閉じる" onClick={() => setSheetOpen(false)}><CloseIcon/></button>
       {dayEntries('sheet-day')}
     </section>}
-    {active && activeEvent && <EventDrawer key={`${active.id}-${active.occurrenceDate}`} active={active} series={activeEvent} onClose={close} onDeleted={setDeleted}/>}
+    {active && activeEvent && <Suspense fallback={null}><EventDrawer key={`${active.id}-${active.occurrenceDate}`} active={active} series={activeEvent} onClose={close} onDeleted={setDeleted}/></Suspense>}
   </div>;
 }

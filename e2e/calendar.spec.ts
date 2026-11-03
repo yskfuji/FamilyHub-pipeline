@@ -327,6 +327,8 @@ test.describe('narrow width', () => {
 
   test('the month buttons jump within the continuous months', async ({ page }) => {
     await page.goto('/calendar');
+    // 続く月の一覧が出てから押す（画面の本文は分けて読む）。
+    await expect(page.getByRole('heading', { name: '2026年9月', exact: true })).toBeVisible();
     await page.getByRole('button', { name: '前月' }).click();
     await expect(page.getByRole('heading', { name: '2026年8月', exact: true })).toBeInViewport();
     await page.getByRole('button', { name: '今月' }).click();

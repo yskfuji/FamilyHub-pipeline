@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { readFile, readdir } from 'node:fs/promises';
+import { gunzipSync } from 'node:zlib';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import ts from 'typescript';
 
@@ -204,6 +205,16 @@ if (!existsSync(resolve('dist-server/main.js')) || !existsSync(resolve('dist-ser
       if (joined.includes(sample.bytes.subarray(0, 48).toString('base64'))) failures.push(`${dir} embeds the mock sample ${sample.name}`);
     }
   }
+  // 前もって圧縮した .gz は、隣の元のファイルと同じ中身であること（上の確かめを .gz でかわせないように）。nginx は gzip_static で配る。
+  const httpFiles = await filesUnder(resolve('dist-http'));
+  const packed = httpFiles.filter((file) => file.endsWith('.gz'));
+  if (!packed.some((file) => file.endsWith('.js.gz')) || !httpFiles.includes(resolve('dist-http/index.html.gz'))) failures.push('dist-http must carry precompressed .gz files next to the scripts and index.html');
+  for (const file of packed) {
+    const original = file.slice(0, -'.gz'.length);
+    if (!existsSync(original)) { failures.push(`${relative(resolve('.'), file)} has no original next to it`); continue; }
+    if (!gunzipSync(await readFile(file)).equals(await readFile(original))) failures.push(`${relative(resolve('.'), file)} differs from ${relative(resolve('.'), original)}`);
+  }
+  if (!/location \/ \{[^}]*gzip_static on;/.test(nginx)) failures.push('deploy/nginx.conf location / must serve the precompressed files with gzip_static on');
   const buildId = (await readFile(resolve('dist-server/build-id.txt'), 'utf8')).trim();
   if (!buildId) failures.push('dist-server/build-id.txt is empty');
   if (!server.includes(buildId)) failures.push(`dist-server does not embed its build id ${buildId}`);
@@ -211,4 +222,4 @@ if (!existsSync(resolve('dist-server/main.js')) || !existsSync(resolve('dist-ser
 }
 
 if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
-console.log(`Security static checks passed across ${sourceFiles.length} source files and ${serverFiles.length} server files (headers in sync; one place-lookup egress; outbound calls only in server/adapters; the LLM connects only through the checked lookup; literal SQL; cookies in one module; server imports limited; no Japanese literals in server; builds free of test doubles, fixtures and mock sample files; matching build ids).`);
+console.log(`Security static checks passed across ${sourceFiles.length} source files and ${serverFiles.length} server files (headers in sync; one place-lookup egress; outbound calls only in server/adapters; the LLM connects only through the checked lookup; literal SQL; cookies in one module; server imports limited; no Japanese literals in server; builds free of test doubles, fixtures and mock sample files; precompressed files equal to their originals; matching build ids).`);

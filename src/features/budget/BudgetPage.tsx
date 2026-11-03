@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react';
 import { useApp } from '../../app/AppContext';
 import { useMemberScope } from '../../app/useMemberScope';
 import { detailId, navigate, useSearch } from '../../app/router';
@@ -8,15 +9,17 @@ import { ja } from '../../content/ja';
 import { budgetSearch, latestBudgetMonth, monthChange, readBudgetLocation, type BudgetLocation } from '../../domain/budgetView';
 import { monthKeyFromRfc3339 } from '../../domain/calendarDate';
 import { ReceiptReader } from '../assistant/ReceiptReader';
-import { PlaceAttributionLink } from '../place/PlaceField';
+import { PlaceAttributionLink } from '../place/PlaceAttribution';
 import { MemberScopeSelect, ScopeNote } from '../shared/MemberScopeSelect';
 import { BudgetList } from './BudgetList';
 import { BudgetMembers } from './BudgetMembers';
 import { BudgetMonthNav, BudgetTabs } from './BudgetNav';
 import { BudgetOverview } from './BudgetOverview';
 import { BudgetSettlements } from './BudgetSettlements';
-import { ExpenseDetail } from './ExpenseDetail';
 import { useBudgetActions } from './useBudgetActions';
+
+/** 記録の詳細と編集は、開いたときに読む。 */
+const ExpenseDetail = lazy(async () => ({ default: (await import('./ExpenseDetail')).ExpenseDetail }));
 
 export function BudgetPage({ path }: { path: string }) {
   const { snapshot, can, requestQuickCreate } = useApp();
@@ -58,7 +61,7 @@ export function BudgetPage({ path }: { path: string }) {
       </>}
     {hasProvenance && location.view !== 'members' && <div className="mt-1"><PlaceAttributionLink where="budget"/></div>}
     </div>
-    {active && <ExpenseDetail expense={active} onClose={close} actions={actions}/>}
+    {active && <Suspense fallback={null}><ExpenseDetail expense={active} onClose={close} actions={actions}/></Suspense>}
     </div>
   </div>;
 }

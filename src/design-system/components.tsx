@@ -5,14 +5,15 @@ import { AlertIcon, CloseIcon, FileIcon } from './icons';
 import { closeGuarded, finishLeaving, pendingLeave, stayHere, subscribeUnsaved } from './unsavedGuard';
 import { addDateKeyDays, dateKeyFromRfc3339 } from '../domain/calendarDate';
 import { ja } from '../content/ja';
+import { wordmark } from './wordmark';
 
 export function BrandMark() {
-  return <svg className="brand-mark" viewBox="0 0 48 48" role="img" aria-label={ja.brand.markLabel}><path d="M24 4c7 8 16 10 16 21 0 9-7 17-16 17S8 34 8 25C8 14 17 12 24 4Z" fill="var(--persimmon-soft)" stroke="var(--persimmon)" strokeWidth="2"/><path d="M16 27c4-7 12-7 16 0M24 18v17" fill="none" stroke="var(--indigo-strong)" strokeWidth="2" strokeLinecap="round"/></svg>;
+  return <svg className="brand-mark" viewBox="0 0 48 48" role="img" aria-label={ja.brand.markLabel}><path d="M24 4c7 8 16 10 16 21 0 9-7 17-16 17S8 34 8 25C8 14 17 12 24 4Z" fill="var(--brand-soft)" stroke="var(--brand)" strokeWidth="2"/><path d="M16 27c4-7 12-7 16 0M24 18v17" fill="none" stroke="var(--accent-strong)" strokeWidth="2" strokeLinecap="round"/></svg>;
 }
 
 export function Brand({ compact = false }: { compact?: boolean }) {
   // ロゴだけを表示するときも、リンク先が名前から分かるようにする。
-  return <a data-control-id="brand.home" href="/today" className="brand" data-link aria-label={compact ? `${ja.brand.name}（今日の画面へ）` : undefined}><BrandMark />{!compact && <span className="brand-copy"><span className="brand-name">{ja.brand.name}</span><span className="brand-kicker">{ja.brand.tagline}</span></span>}</a>;
+  return <a data-control-id="brand.home" href="/today" className="brand" data-link aria-label={compact ? `${ja.brand.name}（今日の画面へ）` : undefined}><BrandMark />{!compact && <span className="brand-copy"><svg className="brand-wordmark" viewBox={`0 0 ${wordmark.width} ${wordmark.height}`} role="img" aria-label={ja.brand.name}><path d={wordmark.path}/></svg><span className="brand-kicker">{ja.brand.tagline}</span></span>}</a>;
 }
 
 export function PageHeader({ eyebrow, title, description, action, mark }: { eyebrow: string; title: string; description: string; action?: ReactNode; mark?: ReactNode }) {
