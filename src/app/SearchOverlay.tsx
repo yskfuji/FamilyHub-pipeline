@@ -7,7 +7,7 @@ import { useModalBehavior } from '../design-system/components';
 import type { SearchResult, SearchResultKind } from '../data/gateway';
 import { matchesCommand, paletteCommands, type PaletteCommand } from './paletteCommands';
 
-const kindLabels: Record<SearchResultKind, string> = { event: '予定', task: 'タスク', memo: 'メモ', expense: '家計', place: '場所', resource: '関連リンク' };
+const kindLabels: Record<SearchResultKind, string> = { event: '予定', task: 'タスク', memo: 'メモ', expense: '家計', place: '場所', resource: '関連リンク', album: 'アルバム', albumItem: '写真・動画' };
 const ITEM = '[data-palette-item]';
 
 /** ⌘K の画面。入力すると家族の情報を探し、入力がなければできることの一覧を出す。 */

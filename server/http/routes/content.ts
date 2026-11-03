@@ -76,7 +76,7 @@ export function registerContentRoutes(app: FastifyInstance, deps: AppDeps) {
   app.post('/v1/settlement-batches', { config: declare('settleAll', { recentAuth: true, successStatus: 201 }) }, (request, reply) => mutate(deps, request, reply, (rules) => rules.expenses.settleAll(request.body as never)));
   app.post('/v1/settlement-batches/:batchId/reverse', { config: declare('reverseBatch', { recentAuth: true, successStatus: 201 }) }, (request, reply) => mutate(deps, request, reply, (rules) => rules.expenses.reverseBatch(param(request, 'batchId'))));
 
-  app.get('/v1/search', { config: reading('searchHousehold') }, (request, reply) => read(deps, request, reply, (rules) => rules.resources.search(parse(z.string().max(200), query(request).q))));
+  app.get('/v1/search', { config: reading('searchHousehold') }, (request, reply) => read(deps, request, reply, (rules) => rules.resources.search(parse(z.string().max(200), query(request).q)), { searchableMedia: true }));
   app.get('/v1/insights', { config: reading('listInsights') }, (request, reply) => read(deps, request, reply, (rules) => rules.insights.list()));
 
   app.get('/v1/notifications', { config: reading('listNotifications') }, (request, reply) => read(deps, request, reply, (rules) => rules.notifications.list()));

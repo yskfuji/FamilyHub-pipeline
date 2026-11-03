@@ -201,7 +201,7 @@ export function createHttpGateway(baseUrl: string, getCsrfToken: CsrfProvider, g
         const form = new FormData(); form.set('file', file);
         return request(`/v1/memos/${encodeURIComponent(memoId)}/attachments`, { method: 'POST', body: form, csrf: true, idempotencyKey });
       },
-      getAttachmentLink: (memoId, attachmentId) => request(`/v1/memos/${encodeURIComponent(memoId)}/attachments/${encodeURIComponent(attachmentId)}/link`),
+      getAttachmentLink: (memoId, attachmentId, disposition = 'attachment') => request(`/v1/memos/${encodeURIComponent(memoId)}/attachments/${encodeURIComponent(attachmentId)}/link${disposition === 'attachment' ? '?download=1' : ''}`),
       deleteAttachment: (memoId, attachmentId) => request(`/v1/memos/${encodeURIComponent(memoId)}/attachments/${encodeURIComponent(attachmentId)}`, { method: 'DELETE', csrf: true }),
       deleteMemo: (id) => request(`/v1/memos/${encodeURIComponent(id)}`, { method: 'DELETE', csrf: true }),
       restoreMemo: (id) => request(`/v1/memos/${encodeURIComponent(id)}/restore`, { method: 'POST', csrf: true }),

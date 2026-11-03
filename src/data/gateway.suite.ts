@@ -776,4 +776,34 @@ export function runGatewaySuite(world: (actorMembershipId?: string) => FamilyHub
       expect(await child.expenses.settleAll({ shares: [{ expenseId: 'expense-books', membershipId: 'member-ren', remainingJpy: 1430 }], transfers: [{ from: 'member-ren', to: 'member-aoi', amountJpy: 1430 }] })).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
     });
   });
+
+  describe('albums in the household search (A17)', () => {
+    const search = async (gateway: FamilyHubGateway, query: string) => { const result = await gateway.resources.search(query); if (!result.ok) throw new Error(result.error.message); return result.value; };
+    const of = (results: Awaited<ReturnType<typeof search>>, kind: string) => results.filter((item) => item.kind === kind);
+
+    it('finds an album by its place name only for someone with place.read, and by its title for everyone who sees it', async () => {
+      expect(of(await search(world(), '校庭'), 'album')).toEqual([{ kind: 'album', id: 'album-sports', label: '運動会', detail: '青葉小学校 校庭', destination: '/albums/album-sports' }]);
+      // 花さん（子ども）は place.read を持たない。場所は照合の前に取り除くので、場所の名前では見つからず、詳しい情報にも場所が出ない。
+      const child = world('member-hana');
+      expect(await search(child, '校庭')).toEqual([]);
+      expect(of(await search(child, '運動会'), 'album')).toEqual([{ kind: 'album', id: 'album-sports', label: '運動会', detail: '花の徒競走とお弁当', destination: '/albums/album-sports' }]);
+      // 見えないアルバム（大人だけ）は、題名でも写真でも出ない。
+      expect(of(await search(child, '週末の公園'), 'album')).toEqual([]);
+      expect(of(await search(child, 'item-park'), 'albumItem')).toEqual([]);
+      expect(of(await search(world(), '週末の公園'), 'album')).toMatchObject([{ id: 'album-park' }]);
+    });
+
+    it('finds photos and videos by file name and capture date, opening the viewer, and leaves out what is in the trash', async () => {
+      const gateway = world();
+      expect(of(await search(gateway, 'item-sports-2'), 'albumItem')).toEqual([{ kind: 'albumItem', id: 'item-sports-2', label: 'item-sports-2.jpg', detail: '運動会 · 2026年9月20日', destination: '/albums/album-sports?item=item-sports-2' }]);
+      for (const date of ['2026-09-13', '2026/9/13', '2026/09/13', '2026年9月13日']) expect(of(await search(gateway, date), 'albumItem').map((item) => item.id), date).toEqual(['item-park-1']);
+      expect(of(await search(gateway, '2026年9月20日'), 'albumItem').map((item) => item.id)).toEqual(['item-sports-1', 'item-sports-2', 'item-sports-3']);
+      expect((await gateway.albums.deleteItem('album-sports', 'item-sports-3')).ok).toBe(true);
+      expect(of(await search(gateway, 'item-sports-3'), 'albumItem')).toEqual([]);
+      const album = await gateway.albums.getAlbum('album-sports');
+      expect((await gateway.albums.deleteAlbum('album-sports', album.ok ? album.value.album.version : 0)).ok).toBe(true);
+      expect(await search(gateway, '運動会')).toEqual([]);
+      expect(of(await search(gateway, 'item-sports'), 'albumItem')).toEqual([]);
+    });
+  });
 }

@@ -2,6 +2,7 @@ import type { FamilyHubGateway } from './gateway';
 import { auditedGatewayOperations } from './gatewayOperations';
 import { baseAlbumItems, baseAlbums, baseInvites, baseNotificationPreferences, baseNotifications, basePrivacySettings, baseSecurityOverview, adultDeclaredUsers, sampleEventCandidates, sampleReceipt, seededSnapshot } from './fixtures';
 import { serverMessages } from '../content/serverMessages';
+import { sampleAttachmentUrls } from './sampleAttachments';
 import { readingImageProblem, readingUrlProblem } from '../domain/assistant';
 import type { AssistantJob, AssistantJobKind } from '../domain/assistant';
 import { ADULT_AGE, accountUpdateSchema, ageOn, signUpSchema } from '../domain/account';
@@ -242,7 +243,10 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
         await delay();
         const readable = rules.memos.readableAttachment(memoId, attachmentId);
         if (!readable.ok) return readable;
-        return fail({ code: 'NOT_FOUND', message: 'この確認用データには原本のファイルが含まれていないため開けません。実際の環境では、確認済みのファイルを期限付きのリンクで開きます。', retryable: false });
+        // 原本の代わりに、同じ種類の見本のファイルを開く。開くと保存は同じ URL になる（見本は保存の指定を持たない）。
+        const url = sampleAttachmentUrls[readable.value.mimeType];
+        if (!url) return fail({ code: 'NOT_FOUND', message: 'この確認用データには、この種類の見本のファイルがないため開けません。実際の環境では、確認済みのファイルを期限付きのリンクで開きます。', retryable: false });
+        return ok({ url, expiresAt: toJstRfc3339(new Date(Date.parse(peek()) + 5 * 60_000)) });
       },
     },
     expenses: delayed(rules.expenses),

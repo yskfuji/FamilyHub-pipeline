@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import sharp from 'sharp';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createClamdScanner } from '../adapters/scanner';
-import { stripVideoLocation } from '../media/mp4Location';
+import { scrubVideoMetadata } from '../media/mp4Metadata';
 import { originalPath } from '../media/pipeline';
 import { sniff } from '../media/sniff';
 import { startFakeClamd } from '../testing/fakeClamd';
@@ -47,14 +47,14 @@ describe('video location', () => {
     const path = join(dir, 'video.mp4');
     const original = sampleVideo();
     writeFileSync(path, original);
-    await stripVideoLocation(path);
+    await scrubVideoMetadata(path, { keepLocation: false });
     const result = readFileSync(path);
     expect(result.length).toBe(original.length);
     expect(result.includes(Buffer.from(LOCATION, 'latin1'))).toBe(false);
     expect(result.includes(Buffer.from('location', 'latin1'))).toBe(false);
     const broken = join(dir, 'broken.mp4');
     writeFileSync(broken, Buffer.concat([box('ftyp', Buffer.alloc(8)), Buffer.from([0, 0, 0xff, 0xff]), Buffer.from('moov', 'latin1')]));
-    await expect(stripVideoLocation(broken)).rejects.toThrow();
+    await expect(scrubVideoMetadata(broken, { keepLocation: false })).rejects.toThrow();
   });
 });
 
@@ -233,6 +233,7 @@ describe('memo attachments', () => {
     expect(opened.status).toBe(200);
     expect(opened.headers.get('content-security-policy')).toContain('sandbox');
     expect(opened.headers.get('content-disposition')).toContain('attachment');
+    expect(link.ok && new URL(link.value.url, url).searchParams.get('download')).toBe('1');
     const tampered = await fetch(`${url}${link.ok ? link.value.url.replace(/signature=[^&]+/, 'signature=wrong') : ''}`, { headers });
     expect(tampered.status).toBe(404);
   });
@@ -242,33 +243,73 @@ describe('memo attachments', () => {
     const uploaded = await world.gateway.memos.uploadAttachment('memo-school', asFile(pdf, 'お知らせ.pdf', 'application/pdf'));
     await settled(world);
     const attachment = uploaded.ok ? uploaded.value.attachments.at(-1)! : null;
-    const link = await world.gateway.memos.getAttachmentLink('memo-school', attachment!.id);
+    const link = await world.gateway.memos.getAttachmentLink('memo-school', attachment!.id, 'inline');
     const issued = new URL(link.ok ? link.value.url : '/', 'https://family.example.test');
-    expect([...issued.searchParams.keys()].sort()).toEqual(['disposition', 'expires', 'signature']);
-    expect(issued.searchParams.get('disposition')).toBe('attachment');
+    expect([...issued.searchParams.keys()].sort()).toEqual(['expires', 'signature']);
     const { url, cookies } = await world.ready;
     const headers = { Cookie: [...cookies].map(([name, value]) => `${name}=${value}`).join('; ') };
     const get = (query: URLSearchParams) => fetch(`${url}${issued.pathname}?${query}`, { headers });
-    const stored = { type: 'application/pdf', disposition: `attachment; filename*=UTF-8''${encodeURIComponent('お知らせ.pdf')}` };
+    const stored = { type: 'application/pdf', disposition: `inline; filename*=UTF-8''${encodeURIComponent('お知らせ.pdf')}` };
     const served = async (query: URLSearchParams) => { const response = await get(query); await response.arrayBuffer(); return { status: response.status, type: response.headers.get('content-type'), disposition: response.headers.get('content-disposition') }; };
     expect(await served(issued.searchParams)).toEqual({ status: 200, ...stored });
     // 余計な値を足しても、配信する種類と名前は記録のまま。
     const extra = new URLSearchParams(issued.searchParams);
-    extra.set('mime', 'text/html'); extra.set('name', 'evil.html'); extra.set('type', 'inline');
+    extra.set('mime', 'text/html'); extra.set('name', 'evil.html'); extra.set('disposition', 'attachment');
     expect(await served(extra)).toEqual({ status: 200, ...stored });
-    // 署名した値を重ねて渡すと、どちらを使うかがあいまいになるので開けない。
-    const doubled = new URLSearchParams(issued.searchParams);
-    doubled.append('disposition', 'inline');
-    expect((await get(doubled)).status).toBe(404);
-    // 署名に含まれる値を変えると開けない。
-    for (const [key, value] of [['disposition', 'inline'], ['expires', String(Number(issued.searchParams.get('expires')) + 60_000)], ['signature', 'x'.repeat(43)]] as const) {
+    // 署名に含まれる値を変えると開けない（開くリンクに download=1 を足して保存に変えることもできない）。
+    for (const [key, value] of [['download', '1'], ['download', 'yes'], ['expires', String(Number(issued.searchParams.get('expires')) + 60_000)], ['signature', 'x'.repeat(43)]] as const) {
       const tampered = new URLSearchParams(issued.searchParams);
       tampered.set(key, value);
-      expect((await get(tampered)).status, key).toBe(404);
+      expect((await get(tampered)).status, `${key}=${value}`).toBe(404);
     }
     const unsigned = new URLSearchParams(issued.searchParams);
-    unsigned.delete('disposition');
+    unsigned.delete('signature');
     expect((await get(unsigned)).status).toBe(404);
+  });
+
+  it('opens images, mp4 and PDF inline, saves with ?download=1, and never serves QuickTime or a tampered link inline (A14)', async () => {
+    const world = open();
+    const jpeg = await sharp({ create: { width: 8, height: 8, channels: 3, background: '#123456' } }).jpeg().toBuffer();
+    const png = await sharp({ create: { width: 8, height: 8, channels: 3, background: '#654321' } }).png().toBuffer();
+    const quicktime = Buffer.concat([box('ftyp', Buffer.from('qt  \0\0\0\0qt  ', 'latin1')), box('moov', Buffer.alloc(0)), box('mdat', Buffer.alloc(16, 1))]);
+    const files = [['a.jpg', 'image/jpeg', jpeg], ['a.png', 'image/png', png], ['a.mp4', 'video/mp4', sampleVideo()], ['a.pdf', 'application/pdf', pdf], ['a.mov', 'video/quicktime', quicktime]] as const;
+    const { url, cookies } = await world.ready;
+    const headers = { Cookie: [...cookies].map(([name, value]) => `${name}=${value}`).join('; ') };
+    const results: Record<string, { inline: string | null; download: string | null; type: string | null }> = {};
+    for (const [name, type, bytes] of files) {
+      const uploaded = await world.gateway.memos.uploadAttachment('memo-school', asFile(bytes, name, type));
+      await settled(world);
+      const attachment = uploaded.ok ? uploaded.value.attachments.at(-1)! : null;
+      const snapshot = await world.gateway.household.getSnapshot();
+      expect(snapshot.ok && snapshot.value.memos.find((memo) => memo.id === 'memo-school')?.attachments.find((item) => item.id === attachment!.id), name).toMatchObject({ status: 'clean', mimeType: type });
+      const inline = await world.gateway.memos.getAttachmentLink('memo-school', attachment!.id, 'inline');
+      const download = await world.gateway.memos.getAttachmentLink('memo-school', attachment!.id, 'attachment');
+      expect(download.ok && new URL(download.value.url, url).searchParams.get('download')).toBe('1');
+      const opened = await fetch(`${url}${inline.ok ? inline.value.url : ''}`, { headers });
+      const saved = await fetch(`${url}${download.ok ? download.value.url : ''}`, { headers });
+      for (const response of [opened, saved]) {
+        expect(response.status, name).toBe(200);
+        expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+        expect(response.headers.get('content-security-policy')).toBe("default-src 'none'; sandbox");
+        await response.arrayBuffer();
+      }
+      results[name] = { inline: opened.headers.get('content-disposition')?.split(';')[0] ?? null, download: saved.headers.get('content-disposition')?.split(';')[0] ?? null, type: opened.headers.get('content-type') };
+      // 保存のリンクから download=1 を外しても、開くリンクにはならない。
+      const stripped = new URL(download.ok ? download.value.url : '/', url);
+      stripped.searchParams.delete('download');
+      expect((await fetch(stripped, { headers })).status, name).toBe(404);
+    }
+    expect(results).toEqual({
+      'a.jpg': { inline: 'inline', download: 'attachment', type: 'image/jpeg' },
+      'a.png': { inline: 'inline', download: 'attachment', type: 'image/png' },
+      'a.mp4': { inline: 'inline', download: 'attachment', type: 'video/mp4' },
+      'a.pdf': { inline: 'inline', download: 'attachment', type: 'application/pdf' },
+      'a.mov': { inline: 'attachment', download: 'attachment', type: 'video/quicktime' },
+    });
+    // 既定（引数なし）は保存のリンク。
+    const plain = await world.gateway.memos.getAttachmentLink('memo-school', 'attachment-school');
+    expect(plain.ok && new URL(plain.value.url, url).searchParams.get('download')).toBe('1');
+    expect((await fetch(`${url}/v1/memos/memo-school/attachments/attachment-school/link?download=2`, { headers })).status).toBe(422);
   });
 
   it('removes the location from a video attachment, and refuses one it cannot read', async () => {

@@ -23,15 +23,24 @@ export interface LoadedAggregate {
   aggregate: HouseholdAggregate;
   /** 読み込んだ時点の本文。保存のときに変わった記録だけを書くために比べる。 */
   loaded: Map<string, RecordRow>;
+  /** 一部だけを読んだ（searchableMedia）。保存しない。 */
+  partial?: boolean;
 }
 
-export interface LoadOptions { media?: boolean }
+/**
+ * media: アルバムと写真・動画も読む。
+ * searchableMedia: 全体の検索のための読み取り。アルバムと、準備ができていてごみ箱にない写真・動画だけを読む（件数が多いので、
+ * 規則が捨てる項目は読まない）。一部だけを読むので、この読み込みは保存できない。
+ */
+export interface LoadOptions { media?: boolean; searchableMedia?: boolean }
 
 export function loadAggregate(db: Db, householdId: Id, actorMembershipId: Id, defaults: Pick<HouseholdAggregate, 'privacy' | 'notificationPreferences'>, options: LoadOptions = {}): LoadedAggregate {
   // アルバムの記録は件数が多くなるので、使わない操作では読み込まない。
   const rows = options.media
     ? db.all<RecordRow>('SELECT collection, id, seq, body FROM records WHERE household_id = ?', householdId)
-    : db.all<RecordRow>("SELECT collection, id, seq, body FROM records WHERE household_id = ? AND collection NOT IN ('albums', 'albumItems')", householdId);
+    : options.searchableMedia
+      ? db.all<RecordRow>("SELECT collection, id, seq, body FROM records WHERE household_id = ? AND (collection <> 'albumItems' OR (json_extract(body, '$.status') = 'ready' AND json_extract(body, '$.deletedAt') IS NULL))", householdId)
+      : db.all<RecordRow>("SELECT collection, id, seq, body FROM records WHERE household_id = ? AND collection NOT IN ('albums', 'albumItems')", householdId);
   const loaded = new Map(rows.map((row) => [`${row.collection}\u0000${row.id}`, row]));
   const single = <T,>(id: string, fallback: T): T => { const row = loaded.get(`meta\u0000${id}`); return row ? JSON.parse(row.body) as T : fallback; };
   const keys = personal(actorMembershipId);
@@ -64,10 +73,11 @@ export function loadAggregate(db: Db, householdId: Id, actorMembershipId: Id, de
     albumItems: read(rows, 'albumItems'),
     occurrenceDeletions: single('occurrenceDeletions', []),
   };
-  return { aggregate, loaded };
+  return { aggregate, loaded, ...(options.searchableMedia && !options.media ? { partial: true } : {}) };
 }
 
-export function saveAggregate(db: Db, householdId: Id, actorMembershipId: Id, { aggregate, loaded }: LoadedAggregate, options: LoadOptions = {}) {
+export function saveAggregate(db: Db, householdId: Id, actorMembershipId: Id, { aggregate, loaded, partial }: LoadedAggregate, options: LoadOptions = {}) {
+  if (partial) throw new Error('a partial load cannot be saved');
   const { state } = aggregate;
   const wanted = new Map<string, { collection: string; id: string; body: string; order?: number }>();
   const put = (collection: string, id: string, value: unknown, order?: number) => wanted.set(`${collection}\u0000${id}`, { collection, id, body: JSON.stringify(value), order });

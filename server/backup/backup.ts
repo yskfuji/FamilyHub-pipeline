@@ -25,12 +25,15 @@ import { maintenanceLock } from './lock';
  * 目録を一時ファイルに書き → その世代を読み戻して全部を確かめ（復号・hash・DB の検査・参照するメディアがそろうこと）→
  * 目録を rename で置いて確定する → 残す数を超えた世代を消し、どの世代も参照しない塊を消す。
  * 途中で止まっても、目録がなければ世代は見えない。
+ *
+ * 参照されているのに置き場所にないメディアは、1回は写し直し（写す間に消えた添付なら参照が消える）、それでもなければ世代を作って
+ * 目録の missing に記録し、運用ログに出す。1つの欠けで毎日のバックアップが止まり続けないようにするため。
  */
 export interface BackupSettings { dir: string; key: string; timeZone: string; chunkSize?: number }
 export interface BackupSources { db: Db; audit: AuditLog; mediaPath: string }
 export type BackupStage = 'snapshot' | 'chunks' | 'manifest' | 'verify' | 'commit' | 'prune';
 export interface CreateOptions { now?: Date; stage?: (stage: BackupStage) => void | Promise<void> }
-export interface CreateResult { id: string; files: number; bytes: number; writtenChunks: number; removedGenerations: string[]; removedChunks: number; collected: boolean }
+export interface CreateResult { id: string; files: number; bytes: number; writtenChunks: number; removedGenerations: string[]; removedChunks: number; collected: boolean; missing: string[] }
 
 /** ほかのバックアップか、期限切れのファイルを消す処理が動いている。 */
 export class BackupBusyError extends Error {}
@@ -38,6 +41,8 @@ export class BackupBusyError extends Error {}
 export class GenerationNotFoundError extends Error {}
 /** 写した DB が参照するファイルが、読む間に消えたか変わった。写し直す。 */
 class RetryableError extends Error {}
+/** 写した DB が参照するファイルが、置き場所にない。 */
+class MissingFileError extends RetryableError {}
 
 const MAIN_FILE = 'family-hub.sqlite';
 const AUDIT_FILE = 'audit.db';
@@ -137,7 +142,7 @@ async function storeFile(dir: string, keys: BackupKeys, chunkSize: number, sourc
   try {
     handle = await open(source, 'r');
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new RetryableError(`${path} is referenced but missing`);
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new MissingFileError(`${path} is referenced but missing`);
     throw error;
   }
   try {
@@ -260,9 +265,14 @@ async function extract(settings: BackupSettings, manifest: Manifest, target: str
   }
   const facts = readFacts(main, audit);
   const stored = new Set(manifest.files.filter((file) => file.role === 'media').map((file) => file.path));
-  const missing = facts.media.filter((path) => !stored.has(path));
-  if (missing.length) throw new BackupFormatError(`${missing.length} media file(s) referenced by the database are not in the generation, first ${missing[0]}`);
-  if (stored.size !== facts.media.length) throw new BackupFormatError('the generation holds media files the database does not reference');
+  // 作るときに欠けていたと記録したファイルだけは、ないことを許す（警告）。記録のない欠けは、書き換えか消去とみなす。
+  const listed = new Set(manifest.missing ?? []);
+  const referenced = new Set(facts.media);
+  const unlisted = facts.media.filter((path) => !stored.has(path) && !listed.has(path));
+  if (unlisted.length) throw new BackupFormatError(`${unlisted.length} media file(s) referenced by the database are not in the generation, first ${unlisted[0]}`);
+  const strayListed = [...listed].find((path) => !referenced.has(path));
+  if (strayListed) throw new BackupFormatError(`the manifest lists ${strayListed} as missing, but the database does not reference it`);
+  if (stored.size + listed.size !== facts.media.length) throw new BackupFormatError('the generation holds media files the database does not reference');
   if (facts.audit.seq !== manifest.audit.seq || facts.audit.hash !== manifest.audit.hash) throw new BackupFormatError(`the audit file ends at seq ${facts.audit.seq}, the manifest records seq ${manifest.audit.seq}`);
   if (JSON.stringify(facts.keys) !== JSON.stringify(manifest.keys)) throw new BackupFormatError('the key fingerprints differ from the manifest');
 }
@@ -301,7 +311,11 @@ export async function restoreGeneration(settings: BackupSettings, manifest: Mani
   return { database: join(resolve(target), MAIN_FILE), audit: join(resolve(target), AUDIT_FILE), media: join(resolve(target), 'media') };
 }
 
-async function attempt(settings: BackupSettings, sources: BackupSources, keys: BackupKeys, at: Date, stage: CreateOptions['stage']) {
+/**
+ * allowMissing: 参照されているのに置き場所にないメディアを、止めずに目録の missing に記録する。
+ * 最初の試みでは止めて写し直す（写す間に消された添付なら、写し直した DB はもう参照しない）。2回目からは記録して進める。
+ */
+async function attempt(settings: BackupSettings, sources: BackupSources, keys: BackupKeys, at: Date, stage: CreateOptions['stage'], allowMissing: boolean) {
   const chunkSize = settings.chunkSize ?? DEFAULT_CHUNK_SIZE;
   await mkdir(join(settings.dir, 'tmp'), { recursive: true, mode: 0o700 });
   const run = await mkdtemp(join(settings.dir, 'tmp', 'run-'));
@@ -318,6 +332,7 @@ async function attempt(settings: BackupSettings, sources: BackupSources, keys: B
 
     await stage?.('chunks');
     const files: ManifestFile[] = [];
+    const missing: string[] = [];
     let written = 0;
     const store = async (source: string, path: string, role: FileRole) => {
       const stored = await storeFile(settings.dir, keys, chunkSize, source, path, role);
@@ -326,11 +341,18 @@ async function attempt(settings: BackupSettings, sources: BackupSources, keys: B
     };
     await store(main, MAIN_FILE, 'database');
     await store(audit, AUDIT_FILE, 'audit');
-    for (const path of facts.media) await store(join(sources.mediaPath, path.slice('media/'.length)), path, 'media');
+    for (const path of facts.media) {
+      try {
+        await store(join(sources.mediaPath, path.slice('media/'.length)), path, 'media');
+      } catch (error) {
+        if (!(error instanceof MissingFileError) || !allowMissing) throw error;
+        missing.push(path);
+      }
+    }
 
     await stage?.('manifest');
     const id = newGenerationId(at, settings.timeZone);
-    const manifest: Manifest = { format: 1, id, createdAt: rfc3339(at, settings.timeZone), timeZone: settings.timeZone, chunkSize, audit: facts.audit, keys: facts.keys, files };
+    const manifest: Manifest = { format: 1, id, createdAt: rfc3339(at, settings.timeZone), timeZone: settings.timeZone, chunkSize, audit: facts.audit, keys: facts.keys, files, ...(missing.length ? { missing } : {}) };
     const pending = join(run, 'manifest.fhm');
     await writeAtomically(pending, keys.sealManifest(id, JSON.stringify(manifest)));
 
@@ -342,7 +364,7 @@ async function attempt(settings: BackupSettings, sources: BackupSources, keys: B
     await mkdir(join(settings.dir, 'generations'), { recursive: true, mode: 0o700 });
     await rename(pending, manifestPath(settings.dir, id));
     await syncDirectory(join(settings.dir, 'generations'));
-    return { id, files: files.length, bytes: files.reduce((sum, file) => sum + file.size, 0), writtenChunks: written };
+    return { id, files: files.length, bytes: files.reduce((sum, file) => sum + file.size, 0), writtenChunks: written, missing };
   } finally {
     await rm(run, { recursive: true, force: true });
   }
@@ -384,7 +406,7 @@ export async function createGeneration(settings: BackupSettings, sources: Backup
     let created: Awaited<ReturnType<typeof attempt>> | undefined;
     for (let count = 1; !created; count += 1) {
       try {
-        created = await attempt(settings, sources, keys, at, options.stage);
+        created = await attempt(settings, sources, keys, at, options.stage, count > 1);
       } catch (error) {
         // 写した後に消された・変わったメディアは、写し直せば合う。何度写しても合わなければ、検証の失敗として止める。
         if (!(error instanceof RetryableError)) throw error;
@@ -398,6 +420,9 @@ export async function createGeneration(settings: BackupSettings, sources: Backup
     lock.release();
   }
 }
+
+/** 作るときに欠けていたメディアの警告。最初の数件の位置を出す。 */
+export const missingWarning = (id: string, missing: readonly string[]) => `warning: ${id} was made without ${missing.length} referenced media file(s) that were missing from the media folder: ${missing.slice(0, 5).join(', ')}${missing.length > 5 ? ', ...' : ''}`;
 
 /** 世代ごとの、残る理由（日・週・月）。一覧の表示に使う。 */
 export async function generationTiers(settings: BackupSettings, at: Date): Promise<Map<string, Tier[]>> {

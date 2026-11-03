@@ -429,17 +429,21 @@ paths:
       x-gateway: none
       description: >-
         Requires the session and a short-lived signature from getAttachmentLink. The signature covers the
-        attachment id, the expiry and the disposition. The content type and the file name are read from the
-        stored attachment record, never from the query; other query values are ignored, and a signed value
-        given twice is refused. The attachment must still be readable by the viewer and checked clean.
+        attachment id, the expiry and the disposition (inline without download, attachment with download=1).
+        The content type and the file name are read from the stored attachment record, never from the query;
+        other query values are ignored, and a signed value given twice is refused. The attachment must still be
+        readable by the viewer and checked clean. Content-Disposition is inline only when the signed disposition
+        is inline and the stored type is image/jpeg, image/png, video/mp4 or application/pdf; every other type
+        (video/quicktime included) is always attachment. X-Content-Type-Options nosniff and
+        Content-Security-Policy "default-src 'none'; sandbox" are always sent.
       parameters:
         - { name: attachmentId, in: path, required: true, schema: { type: string } }
         - { name: expires, in: query, required: true, schema: { type: integer }, description: Expiry in epoch milliseconds (signed) }
-        - { name: disposition, in: query, required: true, schema: { enum: [attachment] }, description: How the file is served (signed) }
+        - { name: download, in: query, required: false, schema: { enum: ['1'] }, description: Present for the save link; serves attachment (signed) }
         - { name: signature, in: query, required: true, schema: { type: string } }
       responses:
         '200':
-          description: The file, with Content-Type and Content-Disposition taken from the stored record
+          description: The file, with Content-Type and the file name taken from the stored record
           content:
             application/octet-stream:
               schema: { type: string, format: binary }
@@ -1196,10 +1200,14 @@ paths:
   /v1/memos/{memoId}/attachments/{attachmentId}/link:
     get:
       operationId: getAttachmentLink
-      description: Issues a short-lived signed URL only for attachments whose scan status is clean and only to viewers allowed to read the memo.
+      description: >-
+        Issues a short-lived signed URL only for attachments whose scan status is clean and only to viewers allowed to read
+        the memo. Without download the link opens the file inline (for the allowed types, see getAttachmentFile); with
+        download=1 the link carries download=1 and always serves it as attachment.
       parameters:
         - { name: memoId, in: path, required: true, schema: { type: string } }
         - { name: attachmentId, in: path, required: true, schema: { type: string } }
+        - { name: download, in: query, required: false, schema: { enum: ['1'] } }
       responses:
         '200':
           description: Short-lived signed URL
@@ -1365,12 +1373,20 @@ paths:
             application/json:
               schema:
                 type: array
-                maxItems: 12
+                description: >-
+                  Grouped by kind in this order, at most the number given in x-limits-per-kind for each kind. Albums match
+                  on title, description and place name; the place is matched only for viewers with place.read (the same
+                  redaction as the album list). Album items match on file name and capture date (YYYY-MM-DD, YYYY/M/D or
+                  the Japanese form) and only ready items of visible, undeleted albums are searched. An album opens at
+                  /albums/{albumId}; an album item opens the viewer at /albums/{albumId}?item={itemId}.
+                maxItems: 45
+                x-limits-per-kind: { event: 5, task: 5, memo: 5, expense: 5, place: 5, resource: 5, album: 5, albumItem: 10 }
                 items:
                   type: object
                   required: [kind, id, label, destination]
+                  additionalProperties: false
                   properties:
-                    kind: { enum: [event, task, memo, expense, place, resource] }
+                    kind: { enum: [event, task, memo, expense, place, resource, album, albumItem] }
                     detail: { type: string }
                     id: { type: string }
                     label: { type: string }
@@ -1693,8 +1709,20 @@ components:
         id: { type: string }
         albumId: { type: string }
         kind: { enum: [photo, video] }
+        originalName: { type: string }
         status: { enum: [uploading, processing, ready, rejected] }
         locationKept: { type: boolean }
+        takenAt:
+          type: string
+          format: date-time
+          description: >-
+            Capture time read before the metadata is removed. Photos use DateTimeOriginal with OffsetTimeOriginal; without an
+            offset the household time zone is assumed. Videos prefer com.apple.quicktime.creationdate (with its offset), else the
+            mvhd creation time (seconds since 1904-01-01, taken as UTC). Zero, values before 1990 and values more than a day in
+            the future are discarded, and then takenAt is absent.
+        takenAtSource:
+          enum: [exif-offset, exif-local, quicktime-key, mvhd]
+          description: Where takenAt came from; exif-local means the photo had no offset and the household time zone was assumed.
     AccountProfile:
       type: object
       required: [displayName, email, avatar, idleTimeoutMinutes, birthdateDeclared, adultDeclared, totpEnabled, totpUnavailable]

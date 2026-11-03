@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import type { AuditLog } from '../audit/log';
 import type { ServerConfig } from '../config';
 import type { Db } from '../db/db';
-import { BackupBusyError, createGeneration, generationTiers, GenerationNotFoundError, keyProblems, listGenerations, readManifest, restoreGeneration, verifyGeneration } from './backup';
+import { BackupBusyError, createGeneration, generationTiers, GenerationNotFoundError, keyProblems, listGenerations, missingWarning, readManifest, restoreGeneration, verifyGeneration } from './backup';
 import type { BackupSettings } from './backup';
 import { BackupFormatError } from './format';
 import { lockHolder, maintenanceLock, serverLockPath } from './lock';
@@ -13,7 +13,8 @@ import { lockHolder, maintenanceLock, serverLockPath } from './lock';
  *
  *   backup now                       世代を1つ作り、読み戻して確かめてから確定する。古い世代を片付ける
  *   backup list                      世代の一覧（ID・作った日時・ファイルの数・大きさ・残る理由）
- *   backup verify <id>               世代を確かめる（復号・hash・DB の検査・参照するメディア・監査の基準点）
+ *   backup verify <id>               世代を確かめる（復号・hash・DB の検査・参照するメディア・監査の基準点）。
+ *                                    作るときに欠けていたと目録に記録したメディアは警告（終了コード0）にし、記録のない欠けは失敗にする
  *   restore <id> --to <dir> [--allow-missing-key <kid>]...
  *                                    空のディレクトリへ復元する。動いているファイルは上書きしない。
  *                                    ロックを持つ API が動いている間と、必要な鍵が鍵束にないときは断る
@@ -77,6 +78,7 @@ export async function runBackupCommand(argv: readonly string[], env: BackupComma
     try {
       const result = await createGeneration(settings, { db: sources.db, audit: sources.audit, mediaPath: config.mediaPath }, { now: now() });
       out(`created ${result.id}: ${result.files} file(s), ${result.bytes} byte(s), ${result.writtenChunks} new chunk(s); verified`);
+      if (result.missing.length) err(missingWarning(result.id, result.missing));
       out(`removed ${result.removedGenerations.length} generation(s) and ${result.removedChunks} unreferenced chunk(s)${result.collected ? '' : ' (chunks kept: a manifest could not be read)'}`);
       return 0;
     } catch (error) {
@@ -92,7 +94,7 @@ export async function runBackupCommand(argv: readonly string[], env: BackupComma
     for (const id of await listGenerations(settings.dir)) {
       try {
         const manifest = await readManifest(settings, id);
-        out(`${id} ${manifest.createdAt} files=${manifest.files.length} bytes=${manifest.files.reduce((sum, file) => sum + file.size, 0)} keep=${(tiers.get(id) ?? []).join(',') || '-'}`);
+        out(`${id} ${manifest.createdAt} files=${manifest.files.length} bytes=${manifest.files.reduce((sum, file) => sum + file.size, 0)} keep=${(tiers.get(id) ?? []).join(',') || '-'}${manifest.missing?.length ? ` missing=${manifest.missing.length}` : ''}`);
       } catch (error) {
         // 一覧を作る間に、ほかの実行が片付けた世代。
         if (error instanceof GenerationNotFoundError) continue;
@@ -106,7 +108,9 @@ export async function runBackupCommand(argv: readonly string[], env: BackupComma
   if (command === 'backup' && target === 'verify' && argument) {
     return withLock(async () => {
       const manifest = await verifyGeneration(settings, argument);
-      out(`ok ${manifest.id}: ${manifest.files.length} file(s) decrypted and matched their hashes; databases pass integrity_check and foreign_key_check; every referenced media file is present; audit anchor seq ${manifest.audit.seq}`);
+      const missing = manifest.missing ?? [];
+      out(`ok ${manifest.id}: ${manifest.files.length} file(s) decrypted and matched their hashes; databases pass integrity_check and foreign_key_check; ${missing.length ? `every referenced media file is present except ${missing.length} recorded as missing when the generation was made` : 'every referenced media file is present'}; audit anchor seq ${manifest.audit.seq}`);
+      if (missing.length) err(missingWarning(manifest.id, missing));
       return 0;
     });
   }
@@ -129,6 +133,7 @@ export async function runBackupCommand(argv: readonly string[], env: BackupComma
       await mkdir(destination, { recursive: true, mode: 0o700 });
       const restored = await restoreGeneration(settings, manifest, destination);
       out(`restored ${manifest.id} (created ${manifest.createdAt}) to ${destination}; verified`);
+      if (manifest.missing?.length) err(missingWarning(manifest.id, manifest.missing));
       out(`FAMILY_HUB_DATABASE=${restored.database}`);
       out(`FAMILY_HUB_AUDIT_DB=${restored.audit}`);
       out(`FAMILY_HUB_MEDIA=${restored.media}`);

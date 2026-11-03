@@ -55,7 +55,11 @@ function AlbumContent({ album, items, uploads, load, change, hold, release, onDe
   const filter = parseAlbumFilter(new URLSearchParams(search).get('filter'));
   const [panel, setPanel] = useState<'upload' | 'edit' | 'delete' | null>(null);
   const [organizing, setOrganizing] = useState(false);
-  const [viewing, setViewing] = useState<Id | null>(null);
+  // 全体の検索から写真や動画を選ぶと ?item=<id> で来る。準備ができた項目なら表示画面を開いておく。
+  const [viewing, setViewing] = useState<Id | null>(() => {
+    const requested = new URLSearchParams(search).get('item');
+    return requested && readyItems(gridItems(items, filter)).some((item) => item.id === requested) ? requested : null;
+  });
   const [showing, setShowing] = useState(false);
   const [deletedItem, setDeletedItem] = useState<AlbumItem | null>(null);
   const [busy, setBusy] = useState(false);

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { readFile, readdir } from 'node:fs/promises';
 import { dirname, extname, join, relative, resolve } from 'node:path';
@@ -190,6 +191,19 @@ if (!existsSync(resolve('dist-server/main.js')) || !existsSync(resolve('dist-ser
   const listMarker = 'manchesterunited';
   for (const asset of firstView) if ((await readFile(resolve('dist-http', asset), 'utf8')).includes(listMarker)) failures.push(`dist-http/${asset} is loaded with the first view but contains the common-password list`);
   if (!firstView.length || !http.includes(listMarker)) failures.push('dist-http must ship the common-password list as a separate file');
+  // 確認用データの添付の見本（src/data/samples）は、モックのビルドだけが読む。dist-http と dist-server には、ファイルとしても埋め込みとしても入れない。
+  const samples = await Promise.all((await filesUnder(resolve('src/data/samples'))).map(async (file) => ({ name: relative(resolve('.'), file), bytes: await readFile(file) })));
+  if (!samples.length) failures.push('src/data/samples must hold the sample attachments of the mock');
+  for (const dir of ['dist-http', 'dist-server']) {
+    const built = await Promise.all((await filesUnder(resolve(dir))).map(async (file) => ({ file, bytes: await readFile(file) })));
+    const joined = built.map((item) => item.bytes.toString('latin1')).join('\n');
+    for (const sample of samples) {
+      const digest = createHash('sha256').update(sample.bytes).digest('hex');
+      const copy = built.find((item) => createHash('sha256').update(item.bytes).digest('hex') === digest);
+      if (copy) failures.push(`${dir} contains the mock sample ${sample.name} as ${relative(resolve('.'), copy.file)}`);
+      if (joined.includes(sample.bytes.subarray(0, 48).toString('base64'))) failures.push(`${dir} embeds the mock sample ${sample.name}`);
+    }
+  }
   const buildId = (await readFile(resolve('dist-server/build-id.txt'), 'utf8')).trim();
   if (!buildId) failures.push('dist-server/build-id.txt is empty');
   if (!server.includes(buildId)) failures.push(`dist-server does not embed its build id ${buildId}`);
@@ -197,4 +211,4 @@ if (!existsSync(resolve('dist-server/main.js')) || !existsSync(resolve('dist-ser
 }
 
 if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
-console.log(`Security static checks passed across ${sourceFiles.length} source files and ${serverFiles.length} server files (headers in sync; one place-lookup egress; outbound calls only in server/adapters; the LLM connects only through the checked lookup; literal SQL; cookies in one module; server imports limited; no Japanese literals in server; builds free of test doubles and fixtures; matching build ids).`);
+console.log(`Security static checks passed across ${sourceFiles.length} source files and ${serverFiles.length} server files (headers in sync; one place-lookup egress; outbound calls only in server/adapters; the LLM connects only through the checked lookup; literal SQL; cookies in one module; server imports limited; no Japanese literals in server; builds free of test doubles, fixtures and mock sample files; matching build ids).`);

@@ -1,7 +1,7 @@
 import type { AuditLog } from '../audit/log';
 import type { BackupConfig } from '../config';
 import type { Db } from '../db/db';
-import { BackupBusyError, createGeneration, listGenerations } from './backup';
+import { BackupBusyError, createGeneration, listGenerations, missingWarning } from './backup';
 import { GENERATION_ID, localTime } from './calendar';
 
 export interface BackupLogger { info(line: string): void; error(line: string): void }
@@ -33,6 +33,8 @@ export function createBackupScheduler(settings: BackupConfig, sources: { db: Db;
     try {
       const result = await createGeneration(settings, sources, { now: at });
       logger.info(`backup: generation ${result.id} created and verified (${result.files} file(s), ${result.bytes} byte(s), ${result.writtenChunks} new chunk(s)); removed ${result.removedGenerations.length} generation(s) and ${result.removedChunks} chunk(s)${result.collected ? '' : '; chunks were not collected because a manifest could not be read'}`);
+      // 欠けたメディアがあっても世代は作る。運用者が気づけるよう、エラーの行に出す。
+      if (result.missing.length) logger.error(`backup: ${missingWarning(result.id, result.missing)}`);
       return 'created';
     } catch (error) {
       if (error instanceof BackupBusyError) {

@@ -5,9 +5,13 @@ import { dirname, join } from 'node:path';
 import sharp from 'sharp';
 import { sniff } from './sniff';
 import type { SniffResult } from './sniff';
-import { stripVideoLocation } from './mp4Location';
+import { readVideoCaptureTime, scrubVideoMetadata, UnsupportedVideoMetadata } from './mp4Metadata';
 import type { Scanner } from '../adapters/scanner';
 import { serverMessages } from '../../src/content/serverMessages';
+import { captureTimeFromExif } from '../../src/domain/captureTime';
+import type { CaptureTime, TakenAtSource } from '../../src/domain/captureTime';
+import { readPhotoFacts } from '../../src/domain/exifTiff';
+import type { PhotoFacts } from '../../src/domain/exifTiff';
 
 export const quarantinePath = (root: string, id: string) => join(root, 'quarantine', id);
 export const originalPath = (root: string, householdId: string, id: string) => join(root, householdId, id, 'original');
@@ -32,19 +36,63 @@ export async function sha256File(path: string) {
   return hash.digest('hex');
 }
 
-export interface ProcessedMedia { width?: number; height?: number; byteSize: number; takenAt?: string; hasThumbnail: boolean }
+export interface ProcessedMedia { width?: number; height?: number; byteSize: number; takenAt?: string; takenAtSource?: TakenAtSource; hasThumbnail: boolean }
 
-/** 画像を読み直して保存する。読み直すことで、埋め込まれた位置情報や不要な部分を取り除く。 */
-export async function sanitizeImage(source: string, destination: string, keepLocation: boolean) {
-  const image = sharp(source, { failOn: 'error' }).rotate();
-  const metadata = await sharp(source).metadata();
-  await ensureParent(destination);
-  if (keepLocation) await rename(source, destination);
-  else {
-    await (metadata.format === 'png' ? image.png() : image.jpeg({ quality: 92, mozjpeg: true })).toFile(destination);
-    await rm(source, { force: true });
+/** 角度・分・秒（秒は 1/1000 まで）の有理数の並び。sharp の withExif が読む形（"35/1 39/1 29340/1000"）。 */
+function dms(value: number) {
+  const total = Math.round(Math.abs(value) * 3_600_000);
+  const degrees = Math.floor(total / 3_600_000);
+  const minutes = Math.floor((total - degrees * 3_600_000) / 60_000);
+  return `${degrees}/1 ${minutes}/1 ${total - degrees * 3_600_000 - minutes * 60_000}/1000`;
+}
+
+/**
+ * 位置を残すときに書く、最小の EXIF（A16）。GPS（緯度・経度・高度）と撮影日時と時差だけを書く。
+ * 機種・ソフトウェア・シリアル・メーカーの独自の情報・縮小画像は書かない（sharp は入力の EXIF を使わず、これだけを書く）。
+ * libexif は形式に必要な項目（解像度・版・色空間・画素数）を足すが、人や機器を特定する値は含まない。
+ */
+export function minimalExif(facts: PhotoFacts): Record<string, Record<string, string>> | null {
+  const exif: Record<string, Record<string, string>> = {};
+  if (facts.gps) {
+    const { lat, lng, altitude } = facts.gps;
+    exif.IFD3 = {
+      GPSLatitudeRef: lat < 0 ? 'S' : 'N', GPSLatitude: dms(lat), GPSLongitudeRef: lng < 0 ? 'W' : 'E', GPSLongitude: dms(lng),
+      ...(altitude === undefined ? {} : { GPSAltitudeRef: altitude < 0 ? '1' : '0', GPSAltitude: `${Math.round(Math.abs(altitude) * 100)}/100` }),
+    };
   }
-  return { width: metadata.width, height: metadata.height };
+  if (facts.dateTimeOriginal) exif.IFD2 = { DateTimeOriginal: facts.dateTimeOriginal, ...(facts.offsetTimeOriginal ? { OffsetTimeOriginal: facts.offsetTimeOriginal } : {}) };
+  return Object.keys(exif).length ? exif : null;
+}
+
+export interface CaptureContext { timeZone: string; now: Date }
+
+/** 写真の EXIF から、撮影日時（A15）と位置。読めなければ空。 */
+export async function readImageFacts(source: string): Promise<PhotoFacts> {
+  const { exif } = await sharp(source).metadata();
+  return exif ? readPhotoFacts(exif) : {};
+}
+
+/**
+ * 画像を、回転を当ててから必ず再エンコードして保存する（A16）。元のファイルはそのまま保存しない。
+ * 撮影日時はメタデータを消す前に読む（A15）。位置を残すときだけ、最小の EXIF を書く。
+ */
+export async function sanitizeImage(source: string, destination: string, options: { keepLocation: boolean } & CaptureContext): Promise<{ width?: number; height?: number; capture: CaptureTime | null }> {
+  const facts = await readImageFacts(source);
+  const capture = captureTimeFromExif(facts.dateTimeOriginal, facts.offsetTimeOriginal, options.timeZone, options.now);
+  const { format } = await sharp(source).metadata();
+  await ensureParent(destination);
+  const exif = options.keepLocation ? minimalExif(facts) : null;
+  let image = sharp(source, { failOn: 'error' }).rotate();
+  if (exif) {
+    // withExif は入力の EXIF の塊（縮小画像など）を引き継ぐことがあるので、画素だけにしてから書く。
+    const { data, info } = await image.raw().toBuffer({ resolveWithObject: true });
+    image = sharp(data, { raw: { width: info.width, height: info.height, channels: info.channels } });
+  }
+  image = format === 'png' ? image.png() : image.jpeg({ quality: 92, mozjpeg: true });
+  if (exif) image = image.withExif(exif);
+  const written = await image.toFile(destination);
+  await rm(source, { force: true });
+  return { width: written.width, height: written.height, capture };
 }
 
 export async function writeThumbnail(source: string, destination: string) {
@@ -60,7 +108,7 @@ export async function acceptClientThumbnail(bytes: Buffer, destination: string) 
 
 export type ProcessOutcome = { status: 'ready'; media: ProcessedMedia; sha256: string; mimeType: string; kind: 'photo' | 'video' } | { status: 'duplicate'; existingId: string } | { status: 'rejected'; message: string };
 
-export interface ProcessRequest { root: string; householdId: string; itemId: string; source: string; keepLocation: boolean; scanner: Scanner; findDuplicate(sha256: string): string | null }
+export interface ProcessRequest extends CaptureContext { root: string; householdId: string; itemId: string; source: string; keepLocation: boolean; scanner: Scanner; findDuplicate(sha256: string): string | null }
 
 /** 受け取ったファイルの判定・検査・無害化。どの段階でも問題があれば保存しない。 */
 export async function processMedia(request: ProcessRequest): Promise<ProcessOutcome> {
@@ -75,17 +123,21 @@ export async function processMedia(request: ProcessRequest): Promise<ProcessOutc
   if (await scanner.scan(source) !== 'clean') return reject(serverMessages.mediaNotSafe);
   const destination = originalPath(root, householdId, itemId);
   await ensureParent(destination);
+  const captured = (capture: CaptureTime | null) => (capture ? { takenAt: capture.takenAt, takenAtSource: capture.takenAtSource } : {});
   try {
     if (type.kind === 'photo') {
-      const size = await sanitizeImage(source, destination, keepLocation);
+      const { capture, ...size } = await sanitizeImage(source, destination, { keepLocation, timeZone: request.timeZone, now: request.now });
       await writeThumbnail(destination, thumbnailPath(root, householdId, itemId));
-      return { status: 'ready', sha256, mimeType: type.mimeType, kind: 'photo', media: { ...size, byteSize: (await stat(destination)).size, hasThumbnail: true } };
+      return { status: 'ready', sha256, mimeType: type.mimeType, kind: 'photo', media: { ...size, ...captured(capture), byteSize: (await stat(destination)).size, hasThumbnail: true } };
     }
-    if (!keepLocation) await stripVideoLocation(source);
+    // 日時は消す前に読む。消せないメタデータがあれば保存しない。
+    const capture = await readVideoCaptureTime(source, request.timeZone, request.now);
+    await scrubVideoMetadata(source, { keepLocation });
     await rename(source, destination);
-    return { status: 'ready', sha256, mimeType: type.mimeType, kind: 'video', media: { byteSize: (await stat(destination)).size, hasThumbnail: false } };
-  } catch {
+    return { status: 'ready', sha256, mimeType: type.mimeType, kind: 'video', media: { ...captured(capture), byteSize: (await stat(destination)).size, hasThumbnail: false } };
+  } catch (error) {
     await rm(destination, { force: true });
+    if (error instanceof UnsupportedVideoMetadata) return reject(serverMessages.videoMetadataUnsupported);
     return reject(type.kind === 'video' ? serverMessages.videoLocationUnknown : serverMessages.imageUnreadable);
   }
 }

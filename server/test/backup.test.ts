@@ -122,13 +122,91 @@ describe('creating a generation (A8-1, A8-2, A8-3, A8-6)', () => {
     expect(second.writtenChunks).toBeLessThanOrEqual(2);
     expect(await chunksOf(h.settings, second.id, BIG)).toEqual(await chunksOf(h.settings, first.id, BIG));
   });
+});
 
-  it('stops without a generation when a referenced media file is missing', async () => {
+describe('a referenced media file is missing (A8, resilience)', () => {
+  const PARK = 'media/house-mori/item-park-1/original';
+  const reseal = (h: Household, id: string, change: (body: { files: Array<{ path: string }>; missing?: string[] }) => void) => {
+    const keys = new BackupKeys(KEY);
+    const body = JSON.parse(keys.openManifest(id, readFileSync(manifestPath(h.settings.dir, id)))) as { files: Array<{ path: string }>; missing?: string[] };
+    change(body);
+    writeFileSync(manifestPath(h.settings.dir, id), keys.sealManifest(id, JSON.stringify(body)));
+  };
+
+  it('still creates and verifies the generation, lists the file in the manifest, and warns on now, list, verify and restore', async () => {
     const h = await household();
     rmSync(join(h.media, 'house-mori', 'item-park-1', 'original'));
-    await expect(createGeneration(h.settings, h.sources)).rejects.toThrow('media/house-mori/item-park-1/original is referenced but missing');
-    expect(await h.cli(['backup', 'now'])).toMatchObject({ code: 2, err: expect.stringContaining('item-park-1/original') });
-    expect(await listGenerations(h.settings.dir)).toEqual([]);
+    const result = await createGeneration(h.settings, h.sources, { now: new Date('2026-11-02T03:00:00+09:00') });
+    expect(result.missing).toEqual([PARK]);
+    const manifest = await readManifest(h.settings, result.id);
+    expect(manifest.missing).toEqual([PARK]);
+    expect(manifest.files.map((file) => file.path)).not.toContain(PARK);
+    expect(manifest.files.filter((file) => file.role === 'media')).toHaveLength(h.files.size - 1);
+    const now = await h.cli(['backup', 'now']);
+    expect(now).toMatchObject({ code: 0, err: expect.stringContaining(`warning: `) });
+    expect(now.err).toContain(PARK);
+    expect(await h.cli(['backup', 'list'])).toMatchObject({ code: 0, out: expect.stringContaining('missing=1') });
+    const verified = await h.cli(['backup', 'verify', result.id]);
+    expect(verified).toMatchObject({ code: 0, out: expect.stringContaining('except 1 recorded as missing'), err: expect.stringContaining(PARK) });
+    const target = join(h.root, 'restored');
+    const restored = await h.cli(['restore', result.id, '--to', target]);
+    expect(restored).toMatchObject({ code: 0, err: expect.stringContaining(PARK) });
+    expect(existsSync(join(target, 'media/house-mori/item-sports-1/original'))).toBe(true);
+    expect(existsSync(join(target, PARK))).toBe(false);
+  });
+
+  it('copies again once before listing, so a file deleted while it is copied is not reported', async () => {
+    const h = await household();
+    const absent = join(h.media, 'house-mori', 'item-park-1', 'original');
+    rmSync(absent);
+    let snapshots = 0;
+    const result = await createGeneration(h.settings, h.sources, { stage: (stage) => {
+      if (stage !== 'snapshot') return;
+      snapshots += 1;
+      // 2回目の写しの前に、記録の側も消える（写す間に添付が消されたのと同じ）。
+      if (snapshots === 2) h.world.deps.db.run("DELETE FROM records WHERE collection = 'albumItems' AND id = 'item-park-1'");
+    } });
+    expect(snapshots).toBe(2);
+    expect(result.missing).toEqual([]);
+    expect((await readManifest(h.settings, result.id)).missing).toBeUndefined();
+  });
+
+  it('still fails verify on tampering, and on a missing file that was not listed when the generation was made', async () => {
+    const h = await household();
+    rmSync(join(h.media, 'house-mori', 'item-park-1', 'original'));
+    const { id } = await createGeneration(h.settings, h.sources);
+    const big = await chunksOf(h.settings, id, BIG);
+    const saved = readFileSync(big[1]);
+    const bytes = Buffer.from(saved); bytes[bytes.length - 40] ^= 1; writeFileSync(big[1], bytes);
+    expect(await h.cli(['backup', 'verify', id])).toMatchObject({ code: 2, err: expect.stringContaining('does not authenticate') });
+    writeFileSync(big[1], saved);
+    expect(await h.cli(['backup', 'verify', id])).toMatchObject({ code: 0 });
+    const original = readFileSync(manifestPath(h.settings.dir, id));
+    // 目録から、欠けとして記録していないファイルを外す。
+    reseal(h, id, (body) => { body.files = body.files.filter((file) => file.path !== BIG); });
+    expect(await h.cli(['backup', 'verify', id])).toMatchObject({ code: 2, err: expect.stringContaining(`not in the generation, first ${BIG}`) });
+    writeFileSync(manifestPath(h.settings.dir, id), original);
+    // 欠けの記録から外すと、記録のない欠けになる。
+    reseal(h, id, (body) => { delete body.missing; });
+    expect(await h.cli(['backup', 'verify', id])).toMatchObject({ code: 2, err: expect.stringContaining(`not in the generation, first ${PARK}`) });
+    writeFileSync(manifestPath(h.settings.dir, id), original);
+    // 参照されていないファイルを欠けとして書いても通さない。保存したファイルを欠けと書くことも通さない。
+    reseal(h, id, (body) => { body.missing = [PARK, 'media/house-mori/item-unknown/original']; });
+    expect(await h.cli(['backup', 'verify', id])).toMatchObject({ code: 2, err: expect.stringContaining('does not reference it') });
+    reseal(h, id, (body) => { body.missing = [PARK, BIG]; });
+    expect(await h.cli(['backup', 'verify', id])).toMatchObject({ code: 2, err: expect.stringContaining('manifest missing path') });
+    writeFileSync(manifestPath(h.settings.dir, id), original);
+    expect(await h.cli(['backup', 'verify', id])).toMatchObject({ code: 0 });
+  });
+
+  it('the daily run creates the generation and writes the missing files to the operator log as an error', async () => {
+    const h = await household();
+    rmSync(join(h.media, 'house-mori', 'item-park-1', 'original'));
+    const info: string[] = []; const errors: string[] = [];
+    const tick = createBackupScheduler(h.config.backup!, h.sources, { info: (line) => info.push(line), error: (line) => errors.push(line) }, () => new Date('2026-11-03T03:00:00+09:00'));
+    expect(await tick()).toBe('created');
+    expect(info.at(-1)).toMatch(/created and verified/);
+    expect(errors).toEqual([expect.stringMatching(new RegExp(`^backup: warning: .* 1 referenced media file\\(s\\) .*${PARK}`))]);
   });
 });
 

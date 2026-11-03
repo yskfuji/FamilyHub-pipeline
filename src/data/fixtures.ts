@@ -40,7 +40,7 @@ export const baseSnapshot: HouseholdSnapshot = {
   memos: [
     { id: 'memo-school', householdId: 'house-mori', title: '学校公開のお知らせ', body: '受付 9:15〜。来校証を着用。撮影は教室外のみ。', updatedAt: '2026-09-29T21:10:00+09:00', authorMembershipId: 'member-aoi', tags: ['学校', '今週'], attachments: [{ id: 'attachment-school', memoId: 'memo-school', originalName: '学校公開.pdf', mimeType: 'application/pdf', byteSize: 842310, status: 'clean', statusMessage: '確認が終わり、開ける状態です' }], ocrText: '令和8年度 学校公開のお知らせ…', place: { name: '青葉小学校 体育館', capturedVia: 'manual', selectedAt: '2026-09-29T21:10:00+09:00' }, visibility: visibleTo('member-aoi', 'selected', ['member-aoi','member-ren','member-hana']), version: 1 },
     { id: 'memo-clinic', householdId: 'house-mori', title: '小児科の控え', body: '次回は10月14日。保険証を持参。', updatedAt: '2026-09-28T18:40:00+09:00', authorMembershipId: 'member-ren', tags: ['控え'], attachments: [], visibility: visibleTo('member-ren', 'adults'), version: 1 },
-    { id: 'memo-receipt', householdId: 'house-mori', title: '教材費レシート', body: '家計への登録待ち。', updatedAt: '2026-09-30T06:50:00+09:00', authorMembershipId: 'member-aoi', tags: ['家計'], attachments: [{ id: 'attachment-receipt', memoId: 'memo-receipt', originalName: 'receipt.jpg', mimeType: 'image/jpeg', byteSize: 1284300, status: 'quarantined', statusMessage: 'ファイルを確認しています。完了するまで開けません' }], ocrText: '青葉書店　教材 2,860円', visibility: visibleTo('member-aoi', 'adults'), version: 1 },
+    { id: 'memo-receipt', householdId: 'house-mori', title: '教材費レシート', body: '家計への登録待ち。', updatedAt: '2026-09-30T06:50:00+09:00', authorMembershipId: 'member-aoi', tags: ['家計'], attachments: [{ id: 'attachment-receipt', memoId: 'memo-receipt', originalName: 'receipt.jpg', mimeType: 'image/jpeg', byteSize: 1284300, status: 'quarantined', statusMessage: 'ファイルを確認しています。完了するまで開けません' }, { id: 'attachment-receipt-photo', memoId: 'memo-receipt', originalName: '教材の写真.jpg', mimeType: 'image/jpeg', byteSize: 2259, status: 'clean', statusMessage: '確認が終わり、開ける状態です' }, { id: 'attachment-receipt-clip', memoId: 'memo-receipt', originalName: '教材の使い方.mp4', mimeType: 'video/mp4', byteSize: 2836, status: 'clean', statusMessage: '確認が終わり、開ける状態です' }], ocrText: '青葉書店　教材 2,860円', visibility: visibleTo('member-aoi', 'adults'), version: 1 },
   ],
   expenses: [
     { id: 'expense-books', householdId: 'house-mori', kind: 'expense', creatorMembershipId: 'member-aoi', visibility: visibleTo('member-aoi'), title: '学校教材', amountJpy: 2860, incurredOn: '2026-09-29', payerMembershipId: 'member-aoi', category: 'education', shares: [{ membershipId: 'member-aoi', amountJpy: 1430, settledJpy: 1430 }, { membershipId: 'member-ren', amountJpy: 1430, settledJpy: 0 }], settlements: [], note: '花の図工・理科教材', place: { name: '青葉書店', address: '東京都世田谷区', capturedVia: 'manual', selectedAt: '2026-09-29T18:20:00+09:00' }, version: 1 },
@@ -109,15 +109,16 @@ export const baseNotificationPreferences: NotificationPreferences = { todoDue: t
 export const basePrivacySettings: PrivacySettings = { defaultAudience: 'household', hideNotificationContent: true, placeLookupConsent: null };
 
 export const baseAlbums: Album[] = [
-  { id: 'album-sports', householdId: 'house-mori', title: '運動会', description: '花の徒競走とお弁当', coverItemId: 'item-sports-1', bgmPreset: 'bright', creatorMembershipId: 'member-aoi', visibility: visibleTo('member-aoi', 'selected', ['member-aoi', 'member-ren', 'member-hana', 'member-sora']), createdAt: '2026-09-20T17:00:00+09:00', version: 1 },
+  { id: 'album-sports', householdId: 'house-mori', title: '運動会', description: '花の徒競走とお弁当', coverItemId: 'item-sports-1', place: { name: '青葉小学校 校庭', capturedVia: 'manual', selectedAt: '2026-09-20T17:00:00+09:00' }, bgmPreset: 'bright', creatorMembershipId: 'member-aoi', visibility: visibleTo('member-aoi', 'selected', ['member-aoi', 'member-ren', 'member-hana', 'member-sora']), createdAt: '2026-09-20T17:00:00+09:00', version: 1 },
   { id: 'album-park', householdId: 'house-mori', title: '週末の公園', creatorMembershipId: 'member-ren', visibility: visibleTo('member-ren', 'adults'), createdAt: '2026-09-13T12:00:00+09:00', version: 1 },
 ];
 
-const fixtureItem = (id: string, albumId: string, position: number, uploaderMembershipId: string): AlbumItem => ({ id, albumId, householdId: 'house-mori', kind: 'photo', originalName: `${id}.jpg`, mimeType: 'image/jpeg', byteSize: 2_400_000 + position * 1000, width: 1600, height: 1200, takenAt: '2026-09-20T10:00:00+09:00', status: 'ready', locationKept: false, hasThumbnail: true, uploaderMembershipId, position, createdAt: '2026-09-20T17:00:00+09:00' });
+/** 撮影日時は、時差つきの EXIF（exif-offset）と、時差のない EXIF を家族の時間帯で読んだもの（exif-local）を混ぜる。 */
+const fixtureItem = (id: string, albumId: string, position: number, uploaderMembershipId: string, takenAt: string, takenAtSource: AlbumItem['takenAtSource']): AlbumItem => ({ id, albumId, householdId: 'house-mori', kind: 'photo', originalName: `${id}.jpg`, mimeType: 'image/jpeg', byteSize: 2_400_000 + position * 1000, width: 1600, height: 1200, takenAt, takenAtSource, status: 'ready', locationKept: false, hasThumbnail: true, uploaderMembershipId, position, createdAt: '2026-09-20T17:00:00+09:00' });
 
 export const baseAlbumItems: AlbumItem[] = [
-  fixtureItem('item-sports-1', 'album-sports', 0, 'member-aoi'),
-  fixtureItem('item-sports-2', 'album-sports', 1, 'member-aoi'),
-  fixtureItem('item-sports-3', 'album-sports', 2, 'member-ren'),
-  fixtureItem('item-park-1', 'album-park', 0, 'member-ren'),
+  fixtureItem('item-sports-1', 'album-sports', 0, 'member-aoi', '2026-09-20T09:12:30+09:00', 'exif-offset'),
+  fixtureItem('item-sports-2', 'album-sports', 1, 'member-aoi', '2026-09-20T10:05:00+09:00', 'exif-local'),
+  fixtureItem('item-sports-3', 'album-sports', 2, 'member-ren', '2026-09-20T11:40:12+09:00', 'exif-offset'),
+  fixtureItem('item-park-1', 'album-park', 0, 'member-ren', '2026-09-13T10:20:00+09:00', 'exif-offset'),
 ];

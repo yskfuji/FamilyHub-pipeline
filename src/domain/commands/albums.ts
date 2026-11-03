@@ -1,16 +1,19 @@
 import { authorize, authorizeVisibleResource, canDeleteResource, canMutateOwnedResource, redactPlace } from '../../authz/policy';
 import { albumInputSchema, albumUpdateSchema } from '../schemas';
-import type { Album, AlbumItem, AlbumSummary, Id, Result } from '../types';
+import type { Album, AlbumItem, AlbumSummary, Id, Result, ViewerContext } from '../types';
 import { applyPatch, conflict, denied, fail, invalid, missing, ok } from './context';
 import type { CommandContext } from './context';
 
 export const MEDIA_LIMITS = { photoBytes: 100 * 1024 * 1024, videoBytes: 4 * 1024 * 1024 * 1024, albumQuotaBytes: 20 * 1024 * 1024 * 1024 } as const;
 
+/** アルバムが閲覧者に見えるか。一覧・1件・全体の検索が同じ規則を使う。 */
+export const canSeeAlbum = (viewer: ViewerContext, album: Album) => authorizeVisibleResource(viewer, 'album.read', album.visibility, [album.creatorMembershipId]).allowed;
+
 export interface NewItem { kind: 'photo' | 'video'; originalName: string; mimeType: string; byteSize: number; keepLocation: boolean }
 
 export function createAlbumCommands(c: CommandContext) {
   const { a, state, nextId, now, viewer, offlineFailure, requireCapability, withinRestoreWindow, defaultVisibility, resolveVisibility, placeWriteGuard } = c;
-  const seen = (album: Album) => authorizeVisibleResource(viewer(), 'album.read', album.visibility, [album.creatorMembershipId]).allowed;
+  const seen = (album: Album) => canSeeAlbum(viewer(), album);
   const found = (id: Id) => a.albums.find((item) => item.id === id && !item.deletedAt);
   const clean = (album: Album) => redactPlace(structuredClone(album), viewer());
   const items = (albumId: Id) => a.albumItems.filter((item) => item.albumId === albumId && !item.deletedAt).sort((x, y) => x.position - y.position);

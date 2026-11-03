@@ -74,13 +74,19 @@ export interface TodoPort {
   restoreTodo(id: Id): Promise<Result<Todo>>;
 }
 
+export type AttachmentDisposition = 'inline' | 'attachment';
+
 export interface MemoPort {
   createMemo(input: MemoInput, context?: MutationContext): Promise<Result<Memo>>;
   updateMemo(id: Id, input: Partial<MemoInput>, expectedVersion: number, context?: MutationContext): Promise<Result<Memo>>;
   /** 同じファイルを送り直すときは同じ idempotencyKey を渡す。応答だけが届かなかったときに添付が2つにならない。 */
   uploadAttachment(memoId: Id, file: File, idempotencyKey?: string): Promise<Result<Memo>>;
-  /** 確認が終わった添付の、期限付きの閲覧URL。確認中・拒否の添付には発行しない。 */
-  getAttachmentLink(memoId: Id, attachmentId: Id): Promise<Result<{ url: string; expiresAt: string }>>;
+  /**
+   * 確認が終わった添付の、期限付きの URL。確認中・拒否の添付には発行しない。
+   * inline はアプリの中の表示画面で開くためのもの（画像・mp4・PDF だけが inline で届き、ほかの種類は保存になる）。
+   * attachment は保存のためのもの（?download=1）。既定は attachment。
+   */
+  getAttachmentLink(memoId: Id, attachmentId: Id, disposition?: AttachmentDisposition): Promise<Result<{ url: string; expiresAt: string }>>;
   deleteAttachment(memoId: Id, attachmentId: Id): Promise<Result<void>>;
   deleteMemo(id: Id): Promise<Result<void>>;
   restoreMemo(id: Id): Promise<Result<Memo>>;
@@ -187,7 +193,8 @@ export interface AuditPort {
   listMine(query?: AccountAuditQuery): Promise<Result<AccountAuditPage>>;
 }
 
-export type SearchResultKind = 'event' | 'task' | 'memo' | 'expense' | 'place' | 'resource';
+/** album は /albums/:id、albumItem は表示画面を開く /albums/:id?item=:itemId へ。 */
+export type SearchResultKind = 'event' | 'task' | 'memo' | 'expense' | 'place' | 'resource' | 'album' | 'albumItem';
 export interface SearchResult { kind: SearchResultKind; id: Id; label: string; detail?: string; destination: string }
 
 export interface ResourcePort {

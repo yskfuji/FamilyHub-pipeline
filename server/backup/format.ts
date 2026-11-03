@@ -112,6 +112,11 @@ export interface Manifest {
   /** 写した DB が使う鍵の指紋。required は、確認コードの秘密の暗号化に使っていて、復元に必要なもの。 */
   keys: ManifestKey[];
   files: ManifestFile[];
+  /**
+   * 写した DB が参照していたのに、置き場所になかったメディアのファイル（置き場所からの相対の位置、昇順）。
+   * 1つの欠けで毎日のバックアップが止まり続けないよう、世代は作り、欠けを記録する。verify はここにあるものだけを警告として扱う。
+   */
+  missing?: string[];
 }
 
 const SAFE_PATH = /^(?:family-hub\.sqlite|audit\.db|media\/[A-Za-z0-9._:-]+\/[A-Za-z0-9._:-]+\/(?:original|thumbnail\.jpg))$/;
@@ -134,5 +139,10 @@ export function parseManifest(id: string, body: string): Manifest {
     if (file.chunks !== Math.max(1, Math.ceil(file.size / value.chunkSize))) fail(`chunk count of ${file.path}`);
   }
   if (!value.files.some((file) => file.role === 'database') || !value.files.some((file) => file.role === 'audit')) fail('database files');
+  if (value.missing !== undefined) {
+    if (!Array.isArray(value.missing)) fail('missing list');
+    for (const path of value.missing ?? []) if (typeof path !== 'string' || !isSafePath(path) || !path.startsWith('media/') || paths.has(path)) fail(`missing path ${String(path).slice(0, 80)}`);
+    if (new Set(value.missing).size !== value.missing?.length) fail('missing list');
+  }
   return value;
 }

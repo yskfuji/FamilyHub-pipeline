@@ -61,6 +61,7 @@ export const serverMessages = {
   albumMediaOnly: 'アルバムには写真と動画だけを追加できます。',
   mediaNotSafe: '安全を確認できなかったため、保存しませんでした。',
   videoLocationUnknown: 'この動画は位置情報を確認できなかったため、保存しませんでした。',
+  videoMetadataUnsupported: 'この動画は撮影場所や機器の情報を取り除けない形式のため、保存しませんでした。別の形式で書き出してから追加してください。',
   imageUnreadable: 'この画像を読み取れませんでした。',
   kindChangeSettled: '取り消していない精算があるため、収入に変えられません。先に精算を取り消してください。',
   incomeCategoryRequired: '収入の費目を選んでください。',

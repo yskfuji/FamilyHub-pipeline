@@ -11,7 +11,7 @@ import { idSchema } from '../../../src/domain/schemas';
 import type { Memo } from '../../../src/domain/types';
 import { ok } from '../../../src/domain/commands/context';
 import { loadAggregate, saveAggregate } from '../../db/aggregateStore';
-import { stripVideoLocation } from '../../media/mp4Location';
+import { scrubVideoMetadata } from '../../media/mp4Metadata';
 import type { ProcessOutcome } from '../../media/pipeline';
 import { acceptClientThumbnail, originalPath, processMedia, quarantinePath, sanitizeImage, sniffFile, thumbnailPath } from '../../media/pipeline';
 import { ApiError, invalidInput, requireActor, sendError, unauthenticated } from '../context';
@@ -45,10 +45,13 @@ function sendFile(request: FastifyRequest, reply: FastifyReply, path: string, si
   return reply.code(206).header('Content-Range', `bytes ${start}-${end}/${size}`).header('Content-Length', end - start + 1).send(createReadStream(path, { start, end }));
 }
 
-/** 添付の表示方法。今は保存（attachment）だけ。署名に含めるので、リンクの値を書き換えても変えられない。 */
-const DISPOSITIONS = ['attachment'] as const;
-type Disposition = (typeof DISPOSITIONS)[number];
-const SERVABLE_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png', 'video/mp4', 'video/quicktime']);
+/**
+ * 添付の表示方法（A14）。開く（inline）は、アプリの中の表示画面が読む種類（画像・mp4・PDF）だけに使い、ほかの種類（QuickTime など）は
+ * いつも保存（attachment）にする。保存のリンクは ?download=1 を持つ。どちらにするかは署名に含めるので、リンクを書き換えても変えられない。
+ */
+type Disposition = 'inline' | 'attachment';
+const INLINE_TYPES = new Set(['image/jpeg', 'image/png', 'video/mp4', 'application/pdf']);
+const SERVABLE_TYPES = new Set([...INLINE_TYPES, 'video/quicktime']);
 
 /** 署名の対象は id・期限・表示方法。種類と名前は配信のときに記録から読むので、リンクには入れない。 */
 function signAttachment(deps: AppDeps, attachmentId: string, expires: number, disposition: Disposition) {
@@ -61,12 +64,19 @@ function track(deps: AppDeps, work: Promise<void>) {
   deps.jobs.add(job);
 }
 
+/** 家族の時間帯。時差のない撮影日時を読むときに使う。 */
+function householdTimeZone(deps: AppDeps, householdId: string) {
+  const row = deps.db.get<{ timezone: string | null }>("SELECT json_extract(body, '$.household.timezone') AS timezone FROM records WHERE household_id = ? AND collection = 'meta' AND id = 'household'", householdId);
+  return row?.timezone || 'Asia/Tokyo';
+}
+
 async function finishUpload(deps: AppDeps, upload: UploadRow) {
   const source = quarantinePath(deps.config.mediaPath, upload.id);
   deps.db.transaction(() => updateItem(deps, upload, (item) => { item.status = 'processing'; }));
   // 予期しない失敗でも「処理中」のまま残さず、拒否として記録する。
   const outcome = await processMedia({
     root: deps.config.mediaPath, householdId: upload.household_id, itemId: upload.item_id, source, keepLocation: Boolean(upload.keep_location), scanner: deps.scanner,
+    timeZone: householdTimeZone(deps, upload.household_id), now: new Date(Date.parse(deps.clock.now())),
     findDuplicate: (sha256) => deps.db.get<{ id: string }>("SELECT id FROM records WHERE household_id = ? AND collection = 'albumItems' AND json_extract(body, '$.albumId') = ? AND json_extract(body, '$.sha256') = ? AND json_extract(body, '$.status') = 'ready' AND json_extract(body, '$.deletedAt') IS NULL", upload.household_id, upload.album_id, sha256)?.id ?? null,
   }).catch(async (): Promise<ProcessOutcome> => { await rm(source, { force: true }); return { status: 'rejected', message: serverMessages.mediaFailed }; });
   deps.db.transaction(() => {
@@ -239,9 +249,10 @@ export function registerMediaRoutes(app: FastifyInstance, deps: AppDeps) {
       let clean = verdict === 'clean';
       if (clean) {
         try {
-          if (type.kind === 'photo') await sanitizeImage(path, destination, false);
+          // 添付は撮影場所を残さない。写真は再エンコードし、動画は許可した項目のほかのメタデータを空にする。
+          if (type.kind === 'photo') await sanitizeImage(path, destination, { keepLocation: false, timeZone: householdTimeZone(deps, actor.householdId), now: new Date(Date.parse(deps.clock.now())) });
           else {
-            if (type.kind === 'video') await stripVideoLocation(path);
+            if (type.kind === 'video') await scrubVideoMetadata(path, { keepLocation: false });
             await mkdir(dirname(destination), { recursive: true });
             await rename(path, destination);
           }
@@ -268,15 +279,19 @@ export function registerMediaRoutes(app: FastifyInstance, deps: AppDeps) {
       return payload;
     },
   }, (request, reply) => mutate(deps, request, reply, (rules) => rules.memos.deleteAttachment(param(request, 'memoId'), param(request, 'attachmentId'))));
-  app.get('/v1/memos/:memoId/attachments/:attachmentId/link', { config: reading('getAttachmentLink') }, (request, reply) => read(deps, request, reply, (rules) => {
-    const attachmentId = param(request, 'attachmentId');
-    const readable = rules.memos.readableAttachment(param(request, 'memoId'), attachmentId);
-    if (!readable.ok) return readable;
-    const expires = Date.parse(deps.clock.now()) + LINK_TTL_MS;
-    const disposition: Disposition = 'attachment';
-    const query = new URLSearchParams({ expires: String(expires), disposition, signature: signAttachment(deps, attachmentId, expires, disposition) });
-    return ok({ url: `/v1/attachment-files/${encodeURIComponent(attachmentId)}?${query}`, expiresAt: new Date(expires).toISOString() });
-  }));
+  app.get('/v1/memos/:memoId/attachments/:attachmentId/link', { config: reading('getAttachmentLink') }, (request, reply) => {
+    const download = (request.query as Record<string, unknown>).download;
+    if (download !== undefined && download !== '1') throw invalidInput();
+    return read(deps, request, reply, (rules) => {
+      const attachmentId = param(request, 'attachmentId');
+      const readable = rules.memos.readableAttachment(param(request, 'memoId'), attachmentId);
+      if (!readable.ok) return readable;
+      const expires = Date.parse(deps.clock.now()) + LINK_TTL_MS;
+      const disposition: Disposition = download === '1' ? 'attachment' : 'inline';
+      const query = new URLSearchParams({ ...(download === '1' ? { download: '1' } : {}), expires: String(expires), signature: signAttachment(deps, attachmentId, expires, disposition) });
+      return ok({ url: `/v1/attachment-files/${encodeURIComponent(attachmentId)}?${query}`, expiresAt: new Date(expires).toISOString() });
+    });
+  });
   app.get('/v1/attachment-files/:attachmentId', { config: reading('getAttachmentFile') }, async (request, reply) => {
     const actor = requireActor(request);
     if (!request.session) throw unauthenticated();
@@ -287,8 +302,9 @@ export function registerMediaRoutes(app: FastifyInstance, deps: AppDeps) {
     const single = (value: unknown) => (typeof value === 'string' ? value : undefined);
     const expires = Number(single(query.expires));
     const signature = single(query.signature);
-    const disposition = DISPOSITIONS.find((item) => item === single(query.disposition));
-    if (!Number.isSafeInteger(expires) || !signature || !disposition) return notFound();
+    if (query.download !== undefined && query.download !== '1') return notFound();
+    const disposition: Disposition = query.download === '1' ? 'attachment' : 'inline';
+    if (!Number.isSafeInteger(expires) || !signature) return notFound();
     // 有効な鍵で署名し、引退していないすべての鍵で確かめる。
     if (expires <= Date.parse(deps.clock.now()) || !deps.config.keys.verify('attachment', `${attachmentId}:${expires}:${disposition}`, signature)) return notFound();
     // 種類と名前は記録から取る。記録が消えたか、見られなくなったか、確認が終わっていなければ開けない。
@@ -299,7 +315,9 @@ export function registerMediaRoutes(app: FastifyInstance, deps: AppDeps) {
     const path = originalPath(deps.config.mediaPath, actor.householdId, attachmentId);
     const size = (await stat(path).catch(() => null))?.size;
     if (size === undefined) return notFound();
-    void reply.header('Content-Disposition', `${disposition}; filename*=UTF-8''${encodeURIComponent(readable.value.originalName)}`);
-    return sendFile(request, reply, path, size, SERVABLE_TYPES.has(readable.value.mimeType) ? readable.value.mimeType : 'application/octet-stream', 'private, no-store');
+    const mimeType = SERVABLE_TYPES.has(readable.value.mimeType) ? readable.value.mimeType : 'application/octet-stream';
+    const served: Disposition = disposition === 'inline' && INLINE_TYPES.has(mimeType) ? 'inline' : 'attachment';
+    void reply.header('Content-Disposition', `${served}; filename*=UTF-8''${encodeURIComponent(readable.value.originalName)}`);
+    return sendFile(request, reply, path, size, mimeType, 'private, no-store');
   });
 }

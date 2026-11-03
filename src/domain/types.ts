@@ -1,3 +1,4 @@
+import type { TakenAtSource } from './captureTime';
 export type Id = string;
 export type IsoDate = `${number}-${number}-${number}`;
 export type Rfc3339 = string;
@@ -214,7 +215,10 @@ export interface AlbumItem {
   byteSize: number;
   width?: number;
   height?: number;
+  /** 撮影日時（A15）。メタデータを消す前に読む。読めなければない。 */
   takenAt?: Rfc3339;
+  /** takenAt をどこから読んだか。exif-local は時差がなく、家族の時間帯とみなしたもの。 */
+  takenAtSource?: TakenAtSource;
   sha256?: string;
   status: AlbumItemStatus;
   statusMessage?: string;
