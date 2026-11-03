@@ -3,6 +3,7 @@ import { authorizeVisibleResource, canDeleteResource, canMutateOwnedResource } f
 import { addDateKeyDays, dateKeyFromRfc3339 } from '../calendarDate';
 import { isOccurrence, occurrenceStartsAt, remainderRule, withUntil } from '../recurrence';
 import { eventFieldsSchema, eventUpdateSchema, isEventTimeRangeValid } from '../schemas';
+import { daysBetweenKeys, seriesShiftRefusalMessage, shiftOccurrenceDeletions, shiftSeries } from '../seriesShift';
 import type { CalendarEvent, IsoDate } from '../types';
 import { applyPatch, archive, conflict, denied, fail, invalid, missing, ok } from './context';
 import type { CommandContext, SyncPort } from './context';
@@ -53,9 +54,18 @@ export function createEventCommands(c: CommandContext): SyncPort<EventPort> {
       if (recurring && (!occurrenceDate || !isOccurrence(seriesStart, target.recurrence!, occurrenceDate))) return invalid([{ message: '変更する回を確認してください。' }]);
       archive(a.archives.events, target.id, structuredClone(target));
       if (!recurring || (scope === 'future' && occurrenceDate === seriesStart)) {
+        // シリーズ全体の日付を変えるときは、規則・例外日・UNTIL・1回だけ削除した記録も同じ日数だけずらす（A13）。
+        // 繰り返しを同時に指定したときは、その規則をそのまま使う（例外日は画面が同じだけずらして送る）。
+        const deltaDays = target.recurrence && changes.startsAt ? daysBetweenKeys(seriesStart, dateKeyFromRfc3339(changes.startsAt)) : 0;
+        if (deltaDays !== 0 && changes.recurrence === undefined) {
+          const shifted = shiftSeries(target, deltaDays);
+          if (!shifted.ok) return invalid([{ message: seriesShiftRefusalMessage(shifted.reason) }]);
+          changes.recurrence = shifted.event.recurrence;
+        }
         const next = structuredClone(target); applyPatch(next, changes);
         if (!isEventTimeRangeValid(next.startsAt, next.endsAt)) return invalid([{ message: '終了日時は開始日時より後にしてください。' }]);
         applyPatch(target, changes); target.version += 1;
+        if (deltaDays !== 0) a.occurrenceDeletions = shiftOccurrenceDeletions(a.occurrenceDeletions, target.id, deltaDays);
         return ok(structuredClone(target));
       }
       const occurrence = occurrenceDate as IsoDate;

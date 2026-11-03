@@ -128,8 +128,12 @@ export const expenseInputSchema = z.object({
   if (value.shareAmounts && value.shareAmounts.reduce((sum, item) => sum + item.amountJpy, 0) !== value.amountJpy) context.addIssue({ code: 'custom', message: '負担の合計を金額と合わせてください。', path: ['shareAmounts'] });
 });
 
-/** 支出の変更。金額・支払った人・負担は、取り消していない精算がない間だけ変えられる（mock と API で検査する）。 */
+/**
+ * 支出の変更。金額・支払った人・負担は、取り消していない精算がない間だけ変えられる（mock と API で検査する）。
+ * kind を変えるときは、同じ要求の中で費目（と支出にするときは負担）を指定する（A3。規則は commands/expenses.ts）。
+ */
 export const expenseUpdateSchema = z.strictObject({
+  kind: z.enum(['expense', 'income']),
   title: z.string().trim().min(1, '支出名を入力してください。').max(120),
   amountJpy: jpySchema.positive('金額は1円以上にしてください。'),
   incurredOn: isoDateSchema,
@@ -141,6 +145,16 @@ export const expenseUpdateSchema = z.strictObject({
   place: placeRefSchema.nullable(),
   visibility: visibilityInputSchema,
 }).partial();
+
+/** まとめた精算（A4）。画面に示した負担と残りの額、送金の案。同じ負担を2回含めない。 */
+export const settleAllInputSchema = z.strictObject({
+  shares: z.array(z.strictObject({ expenseId: idSchema, membershipId: idSchema, remainingJpy: jpySchema.positive() })).min(1).max(1000),
+  transfers: z.array(z.strictObject({ from: idSchema, to: idSchema, amountJpy: jpySchema.positive() })).max(100),
+}).superRefine((value, context) => {
+  const keys = value.shares.map((item) => `${item.expenseId}\u0000${item.membershipId}`);
+  if (new Set(keys).size !== keys.length) context.addIssue({ code: 'custom', message: '同じ負担が2回含まれています。', path: ['shares'] });
+  if (value.transfers.some((item) => item.from === item.to)) context.addIssue({ code: 'custom', message: '送金の案を確認してください。', path: ['transfers'] });
+});
 
 export const householdProfileSchema = z.strictObject({
   name: z.string().trim().min(1, '家族グループの名前を入力してください。').max(40, '40文字以内で入力してください。'),
@@ -202,6 +216,7 @@ export type EventInput = z.input<typeof eventFieldsSchema>;
 export type EventUpdateInput = z.input<typeof eventUpdateSchema>;
 export type ExpenseInput = z.input<typeof expenseInputSchema>;
 export type ExpenseUpdateInput = z.input<typeof expenseUpdateSchema>;
+export type SettleAllRequest = z.input<typeof settleAllInputSchema>;
 export type HouseholdProfileInput = z.infer<typeof householdProfileSchema>;
 export type MemoInput = z.input<typeof memoInputSchema>;
 export type ColorLabelInput = z.infer<typeof colorLabelInputSchema>;

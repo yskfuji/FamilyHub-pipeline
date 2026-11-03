@@ -23,6 +23,7 @@ import type { MemoSort } from '../domain/memoList';
 import type { TaskFilter } from '../domain/taskList';
 import type { TodoAction } from '../domain/todoFlow';
 import type { SharedKind } from '../domain/visibilityForm';
+import type { SeriesShiftRefusal } from '../domain/seriesShift';
 
 const recurrence = {
   event: {
@@ -489,3 +490,16 @@ export function errorGuidance(error: GatewayError): string {
   if (error.retryable) return '入力した内容は残っています。しばらくしてから、もう一度お試しください。';
   return '表示された項目を確認して、入力内容を修正してください。';
 }
+
+/** 繰り返しの「すべて」の編集で日付を変えるときの文（A13）。理由は src/domain/seriesShift.ts が決める。 */
+export const seriesShiftCopy = {
+  confirm: (deltaDays: number, rule: string) => `すべての予定を${Math.abs(deltaDays)}日${deltaDays > 0 ? '後' : '前'}へ移します（${rule}）`,
+  refusal: {
+    'month-end': '月末に関わる繰り返しは、すべての回を同じ日数だけ移せません。',
+    'set-position': '「最初の日」「最後の日」のように選ぶ繰り返しは、すべての回を同じ日数だけ移せません。',
+    'crosses-week': '隔週などの曜日が週をまたぐため、すべての回を同じ日数だけ移せません。',
+    'out-of-range': '移した後の日が1〜28日に収まらないため、すべての回を同じ日数だけ移せません。',
+    unsupported: 'この繰り返しは、すべての回を同じ日数だけ移せません。',
+  } satisfies Record<SeriesShiftRefusal, string>,
+  pointer: '日付を変えるときは、対象を「これ以降の予定」にしてください。',
+} as const;

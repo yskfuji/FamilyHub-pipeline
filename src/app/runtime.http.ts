@@ -7,7 +7,7 @@ const empty: HouseholdSnapshot = {
   viewer: { userId: '', membershipId: '', role: 'guest', status: 'invited', capabilities: [], permissionRevision: 0 },
   permissionOverrides: [], user: { id: '', displayName: '', email: '', avatarTone: 'indigo' },
   household: { id: '', name: '', timezone: 'Asia/Tokyo' },
-  memberships: [], events: [], todos: [], memos: [], expenses: [], resources: [], links: [], colorLabels: [],
+  memberships: [], events: [], todos: [], memos: [], expenses: [], settlementBatches: [], resources: [], links: [], colorLabels: [],
   context: { asOf: new Date().toISOString(), timezone: 'Asia/Tokyo', weather: { location: '', condition: 'sunny', temperatureC: 0, precipitationPercent: 0 }, holidays: [], sync: { state: 'syncing', lastSyncedAt: new Date().toISOString() } },
 };
 

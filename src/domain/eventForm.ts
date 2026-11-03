@@ -1,6 +1,7 @@
 import { addDateKeyDays, dateKeyFromRfc3339, toJstRfc3339 } from './calendarDate';
 import { LAST_DAY_OF_MONTH_RULE, occurrenceDates, occurrenceStartsAt, parseRRule, withUntil } from './recurrence';
 import type { EventInput, EventUpdateInput } from './schemas';
+import { daysBetweenKeys, describeSeriesShift, seriesShiftRefusalMessage, shiftSeries } from './seriesShift';
 import type { CalendarEvent, Id, RecurrenceRule, VisibilityAudience } from './types';
 import { visibilityChange, visibilityInput, visibilityProblem } from './visibilityForm';
 
@@ -131,26 +132,48 @@ export function draftToCreateInput(draft: EventDraft): EventInput {
 /**
  * 変更の入力。空にした項目は null で外す。公開範囲と繰り返しは、変えたときだけ送る
  * （子どもが選べない公開範囲の予定を、題名だけ直せるようにするため）。
- * seriesStart を渡すと、開いた回の日付ではなくシリーズの開始日に時刻を当てはめる。
+ * seriesStart を渡すと、シリーズの開始日に時刻を当てはめる。occurrenceDate（開いた回の日付）も渡すと、
+ * 下書きの日付と開いた回の日付の差だけシリーズの開始日をずらす（A13。規則・例外日・UNTIL は受け取る側がずらす）。
  */
-export function draftToUpdateInput(draft: EventDraft, original: CalendarEvent, options: { recurrenceEditable: boolean; seriesStart?: string }): EventUpdateInput {
+export function draftToUpdateInput(draft: EventDraft, original: CalendarEvent, options: { recurrenceEditable: boolean; seriesStart?: string; occurrenceDate?: string }): EventUpdateInput {
   const times = eventTimes(draft);
+  const deltaDays = options.seriesStart ? seriesDeltaDays(draft, options.occurrenceDate) : 0;
   if (options.seriesStart) {
-    const span = Math.round((Date.parse(`${dateKeyFromRfc3339(times.endsAt)}T00:00:00Z`) - Date.parse(`${dateKeyFromRfc3339(times.startsAt)}T00:00:00Z`)) / 86_400_000);
-    times.endsAt = occurrenceStartsAt(times.endsAt, addDateKeyDays(options.seriesStart, span));
-    times.startsAt = occurrenceStartsAt(times.startsAt, options.seriesStart);
+    const span = daysBetweenKeys(dateKeyFromRfc3339(times.startsAt), dateKeyFromRfc3339(times.endsAt));
+    const start = addDateKeyDays(options.seriesStart, deltaDays);
+    times.endsAt = occurrenceStartsAt(times.endsAt, addDateKeyDays(start, span));
+    times.startsAt = occurrenceStartsAt(times.startsAt, start);
   }
   const before = recurrenceChoiceOf(original.recurrence, dateKeyFromRfc3339(original.startsAt));
   const rule = { recurrence: draft.recurrence, intervalDays: draft.intervalDays, until: draft.until };
   const recurrenceChanged = options.recurrenceEditable && draft.recurrence !== 'keep' && rruleOf(rule) !== rruleOf(before);
   const rrule = rruleOf(rule);
+  // 規則を同時に変えるときは、受け取る側は規則をそのまま使うので、例外日はここで同じだけずらす。
+  const exceptions = (original.recurrence?.exceptions ?? []).map((date) => addDateKeyDays(date, deltaDays));
   return {
     title: draft.title.trim(), ...times, allDay: draft.allDay, participantMembershipIds: draft.participantIds,
     location: draft.location.trim() || null, note: draft.note.trim() || null, weatherSensitive: draft.weatherSensitive,
     colorLabelId: draft.colorLabelId || null, reminderMinutesBefore: draft.reminderMinutes,
     ...visibilityChange(draft.audience, draft.selectedIds, original.visibility),
-    ...(recurrenceChanged ? { recurrence: rrule ? { rrule, timezone: TIMEZONE, exceptions: original.recurrence?.exceptions ?? [] } : null } : {}),
+    ...(recurrenceChanged ? { recurrence: rrule ? { rrule, timezone: TIMEZONE, exceptions } : null } : {}),
   };
+}
+
+/** 「すべて」の編集で、下書きの日付が開いた回の日付から何日動いたか。開いた回がわからなければ 0。 */
+export const seriesDeltaDays = (draft: Pick<EventDraft, 'start'>, occurrenceDate?: string) => occurrenceDate ? daysBetweenKeys(occurrenceDate, draft.start.slice(0, 10)) : 0;
+
+/**
+ * 「すべて」の編集で日付を動かしたときの見通し。保存の前に示す文か、ずらせない理由（「これ以降の予定」への案内つき）を返す。
+ * 日付が動いていないとき、または規則も同時に変えるとき（その規則をそのまま使う）は null。
+ */
+export function seriesEditPreview(draft: EventDraft, series: CalendarEvent, occurrenceDate: string, recurrenceEditable = true): { kind: 'shift' | 'refused'; deltaDays: number; text: string } | null {
+  const deltaDays = seriesDeltaDays(draft, occurrenceDate);
+  if (deltaDays === 0 || !series.recurrence) return null;
+  const before = recurrenceChoiceOf(series.recurrence, dateKeyFromRfc3339(series.startsAt));
+  if (recurrenceEditable && draft.recurrence !== 'keep' && rruleOf(draft) !== rruleOf(before)) return null;
+  const shifted = shiftSeries(series, deltaDays);
+  if (!shifted.ok) return { kind: 'refused', deltaDays, text: seriesShiftRefusalMessage(shifted.reason) };
+  return { kind: 'shift', deltaDays, text: describeSeriesShift(series, deltaDays) ?? '' };
 }
 
 /** 過去の予定から作るときの候補。新しい順に、同じ名前は1つにまとめる。 */

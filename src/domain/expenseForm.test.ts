@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { baseSnapshot } from '../data/fixtures';
-import { activeAdults, customSplitGap, expenseDraftProblem, expenseDraftToCreateInput, expenseDraftToUpdateInput, expenseToDraft, newExpenseDraft, parseYen, payerChoices, peopleOutsideExpense, plannedShares, seedCustomAmounts, type ExpenseDraft } from './expenseForm';
+import { activeAdults, customSplitGap, expenseDraftProblem, expenseDraftToCreateInput, expenseDraftToUpdateInput, expenseToDraft, kindChangeEffects, newExpenseDraft, parseYen, payerChoices, peopleOutsideExpense, plannedShares, seedCustomAmounts, withKind, type ExpenseDraft } from './expenseForm';
 import { expenseInputSchema, expenseUpdateSchema } from './schemas';
 import type { Expense } from './types';
 
@@ -167,6 +167,31 @@ describe('editing', () => {
     expect(expenseDraftToUpdateInput(draft, books, adults, false)).not.toHaveProperty('place');
     expect(expenseDraftToUpdateInput({ ...draft, place: null }, books, adults, false)).toMatchObject({ place: null });
     expect(expenseDraftToUpdateInput({ ...draft, audience: 'adults' }, books, adults, false)).toMatchObject({ visibility: { audience: 'adults', selectedMembershipIds: [] } });
+  });
+});
+
+describe('changing the kind of a record (A3)', () => {
+  it('switches the category and the split with the kind, and sends the kind only when it changes', () => {
+    const toIncome = withKind(expenseToDraft(books, adults), 'income');
+    expect(toIncome).toMatchObject({ kind: 'income', category: 'income_other' });
+    const input = expenseDraftToUpdateInput(toIncome, books, adults, false);
+    expect(input).toMatchObject({ kind: 'income', category: 'income_other' });
+    expect(input).not.toHaveProperty('shareMembershipIds');
+    expect(expenseUpdateSchema.safeParse(input).success).toBe(true);
+    const toExpense = withKind(expenseToDraft(salary, adults), 'expense');
+    expect(toExpense).toMatchObject({ kind: 'expense', category: 'other', splitMode: 'equal' });
+    expect(expenseDraftToUpdateInput(toExpense, salary, adults, false)).toMatchObject({ kind: 'expense', category: 'other', amountJpy: 320000, payerMembershipId: 'member-aoi', shareMembershipIds: adults });
+    expect(expenseDraftToUpdateInput(expenseToDraft(books, adults), books, adults, false)).not.toHaveProperty('kind');
+    expect(withKind(toIncome, 'income')).toBe(toIncome);
+  });
+
+  it('tells what the change clears and needs before saving', () => {
+    expect(kindChangeEffects(books, 'income')).toEqual({ changes: true, clearsShares: true, requiresShares: false, category: 'income', blockedBySettlement: false });
+    const settled = { ...books, settlements: [{ id: 's', amountJpy: 1430, fromMembershipId: 'member-ren', toMembershipId: 'member-aoi', recordedAt: '2026-09-30T00:00:00+09:00' }] };
+    expect(kindChangeEffects(settled, 'income').blockedBySettlement).toBe(true);
+    expect(kindChangeEffects({ ...settled, settlements: [{ ...settled.settlements[0], reversedAt: '2026-09-30T01:00:00+09:00' }] }, 'income').blockedBySettlement).toBe(false);
+    expect(kindChangeEffects(salary, 'expense')).toEqual({ changes: true, clearsShares: false, requiresShares: true, category: 'expense', blockedBySettlement: false });
+    expect(kindChangeEffects(salary, 'income').changes).toBe(false);
   });
 });
 

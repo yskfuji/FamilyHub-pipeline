@@ -215,7 +215,7 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
         if (error) return fail(error);
         const snapshot = project();
         if (scenario === 'empty') {
-          snapshot.events = []; snapshot.todos = []; snapshot.memos = []; snapshot.expenses = [];
+          snapshot.events = []; snapshot.todos = []; snapshot.memos = []; snapshot.expenses = []; snapshot.settlementBatches = [];
         }
         if (scenario === 'quarantined') {
           snapshot.memos[0].attachments[0].status = 'quarantined';
@@ -324,5 +324,22 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
       };
     }
   }
+  // 冪等キーを受け取る操作は、API と同じく、同じキーと同じ内容なら前の結果を返し（記録は増やさない）、内容が違えば断る。
+  const replays = new Map<string, { fingerprint: string; result: Result<unknown> }>();
+  const idempotent = <A extends unknown[], R>(name: string, method: (...args: A) => Promise<Result<R>>, keyOf: (...args: A) => string | undefined) => async (...args: A): Promise<Result<R>> => {
+    const key = keyOf(...args);
+    if (!key) return method(...args);
+    const fingerprint = JSON.stringify([name, ...args]);
+    const stored = replays.get(key);
+    if (stored) {
+      await delay();
+      return stored.fingerprint === fingerprint ? structuredClone(stored.result) as Result<R> : fail({ code: 'CONFLICT', message: serverMessages.idempotencyReused, retryable: false, reason: 'IDEMPOTENCY' });
+    }
+    const result = await method(...args);
+    if (result.ok) replays.set(key, { fingerprint, result: structuredClone(result) });
+    return result;
+  };
+  gateway.expenses.settleAll = idempotent('settleAll', gateway.expenses.settleAll, (_input, key) => key);
+  gateway.expenses.reverseBatch = idempotent('reverseBatch', gateway.expenses.reverseBatch, (_batchId, key) => key);
   return gateway;
 }

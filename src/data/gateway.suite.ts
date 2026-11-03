@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { FamilyHubGateway } from './gateway';
+import { serverMessages } from '../content/serverMessages';
+import { openShares, settleAllRequest } from '../domain/ledger';
 
 /** 確認用の実装と API の実装の両方に流す試験。world は呼ぶたびに、見本の家族を持つ新しい環境を返す。 */
 export function runGatewaySuite(world: (actorMembershipId?: string) => FamilyHubGateway) {
@@ -312,6 +314,32 @@ export function runGatewaySuite(world: (actorMembershipId?: string) => FamilyHub
       expect(original?.title).toBe('資源回収');
     });
 
+    it('moves the whole series with its rule, exceptions, UNTIL and deleted occurrences when its date changes (A13)', async () => {
+      const gateway = world();
+      expect(await gateway.events.deleteEvent('event-clean', 'this', 1, '2026-10-08')).toEqual({ ok: true, value: undefined });
+      const moved = await gateway.events.updateEvent('event-clean', 'series', { startsAt: '2026-10-02T08:00:00+09:00', endsAt: '2026-10-02T08:30:00+09:00' }, 2);
+      expect(moved).toMatchObject({ ok: true, value: { startsAt: '2026-10-02T08:00:00+09:00', version: 3, recurrence: { rrule: 'FREQ=WEEKLY;BYDAY=FR', exceptions: ['2026-10-09'] } } });
+      const trash = await gateway.trash.list();
+      expect(trash.ok && trash.value.filter((item) => item.id === 'event-clean').map((item) => (item as { occurrenceDate?: string }).occurrenceDate)).toEqual(['2026-10-09']);
+      // 削除した回は、ずらした日付で元に戻せる。
+      expect(await gateway.events.restoreEvent('event-clean', '2026-10-09')).toMatchObject({ ok: true, value: { recurrence: { exceptions: [] } } });
+      // 版が古ければ受け付けない。
+      expect(await gateway.events.updateEvent('event-clean', 'series', { startsAt: '2026-10-03T08:00:00+09:00', endsAt: '2026-10-03T08:30:00+09:00' }, 3)).toMatchObject({ ok: false, error: { code: 'CONFLICT' } });
+    });
+
+    it('refuses to move a whole series whose occurrences would not all move by the same days, and points to "this and following" (A13)', async () => {
+      const gateway = world();
+      const monthly = await gateway.events.createEvent({ title: '月の集金', startsAt: '2026-10-28T19:00:00+09:00', endsAt: '2026-10-28T19:30:00+09:00', timezone: 'Asia/Tokyo', participantMembershipIds: ['member-aoi'], recurrence: { rrule: 'FREQ=MONTHLY;BYMONTHDAY=28', timezone: 'Asia/Tokyo', exceptions: [] } });
+      expect(monthly.ok).toBe(true);
+      if (!monthly.ok) return;
+      const refused = await gateway.events.updateEvent(monthly.value.id, 'series', { startsAt: '2026-10-29T19:00:00+09:00', endsAt: '2026-10-29T19:30:00+09:00' }, 1);
+      expect(refused).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT', message: expect.stringContaining('「これ以降の予定」') } });
+      const weekend = await gateway.events.createEvent({ title: '隔週の週末', startsAt: '2026-11-07T10:00:00+09:00', endsAt: '2026-11-07T11:00:00+09:00', timezone: 'Asia/Tokyo', participantMembershipIds: ['member-aoi'], recurrence: { rrule: 'FREQ=WEEKLY;INTERVAL=2;BYDAY=SA,SU', timezone: 'Asia/Tokyo', exceptions: [] } });
+      expect(weekend.ok && (await gateway.events.updateEvent(weekend.value.id, 'series', { startsAt: '2026-11-08T10:00:00+09:00', endsAt: '2026-11-08T11:00:00+09:00' }, 1))).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+      const snapshot = await gateway.household.getSnapshot();
+      expect(snapshot.ok && snapshot.value.events.find((event) => event.id === monthly.value.id)).toMatchObject({ startsAt: '2026-10-28T19:00:00+09:00', version: 1 });
+    });
+
     it('detaches a single occurrence for "this event only" edits', async () => {
       const gateway = world();
       const result = await gateway.events.updateEvent('event-clean', 'this', { title: '資源回収（祝日のため変更）' }, 1, undefined, '2026-10-08');
@@ -620,6 +648,132 @@ export function runGatewaySuite(world: (actorMembershipId?: string) => FamilyHub
         ['createItemLink', { kind: 'link', id: null, hidden: true }],
       ]);
       expect(JSON.stringify(hidden)).not.toContain(link.value.id);
+    });
+  });
+  describe('changing the kind of a record (A3)', () => {
+    const find = async (gateway: FamilyHubGateway, id: string) => { const snapshot = await gateway.household.getSnapshot(); return snapshot.ok ? snapshot.value.expenses.find((item) => item.id === id) : undefined; };
+
+    it('turns an expense into income, clearing the shares, and records only the changed field names', async () => {
+      const gateway = world();
+      const changed = await gateway.expenses.updateExpense('expense-train', { kind: 'income', category: 'income_side' }, 1);
+      expect(changed).toMatchObject({ ok: true, value: { kind: 'income', category: 'income_side', shares: [], version: 2 } });
+      expect(await find(gateway, 'expense-train')).toMatchObject({ kind: 'income', shares: [] });
+      const page = await gateway.audit.list({ action: 'updateExpense' });
+      expect(page.ok && page.value.items.map((item) => item.detail)).toEqual([{ fields: ['category', 'kind'] }]);
+      expect(JSON.stringify(page)).not.toContain('income_side');
+    });
+
+    it('turns income into an expense with the spending category and the shares given in the same request', async () => {
+      const gateway = world();
+      expect(await gateway.expenses.updateExpense('income-salary', { kind: 'expense', category: 'food' }, 1)).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT', message: serverMessages.sharesRequired } });
+      expect(await gateway.expenses.updateExpense('income-salary', { kind: 'expense', shareMembershipIds: ['member-aoi', 'member-ren'] }, 1)).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT', message: serverMessages.spendingCategoryRequired } });
+      const changed = await gateway.expenses.updateExpense('income-salary', { kind: 'expense', category: 'food', shareMembershipIds: ['member-aoi', 'member-ren'] }, 1);
+      expect(changed).toMatchObject({ ok: true, value: { kind: 'expense', category: 'food', shares: [{ membershipId: 'member-aoi', amountJpy: 160000, settledJpy: 160000 }, { membershipId: 'member-ren', amountJpy: 160000, settledJpy: 0 }] } });
+    });
+
+    it('refuses to turn an expense with a live settlement into income, with the reason, and changes nothing', async () => {
+      const gateway = world();
+      expect(await gateway.expenses.updateExpense('expense-groceries', { kind: 'income', category: 'income_other' }, 1)).toMatchObject({ ok: false, error: { code: 'CONFLICT', message: serverMessages.kindChangeSettled } });
+      expect(await find(gateway, 'expense-groceries')).toMatchObject({ kind: 'expense', category: 'food', version: 1 });
+      expect(await gateway.expenses.updateExpense('expense-groceries', { kind: 'income' }, 1)).toMatchObject({ ok: false, error: { code: 'CONFLICT' } });
+    });
+
+    it('refuses a category of the other kind, and a category missing from the change', async () => {
+      const gateway = world();
+      expect(await gateway.expenses.updateExpense('expense-train', { kind: 'income', category: 'transport' }, 1)).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+      expect(await gateway.expenses.updateExpense('expense-train', { kind: 'income' }, 1)).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT', message: serverMessages.incomeCategoryRequired } });
+      expect(await gateway.expenses.updateExpense('income-salary', { kind: 'expense', category: 'income_bonus', shareMembershipIds: ['member-aoi'] }, 1)).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+      expect(await gateway.expenses.updateExpense('expense-train', { kind: 'income', category: 'income_other', shareMembershipIds: ['member-aoi'] }, 1)).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+      expect(await find(gateway, 'expense-train')).toMatchObject({ kind: 'expense', version: 1 });
+    });
+  });
+
+  describe('settling everything at once (A4)', () => {
+    /** 蓮さんにはすべての支出が見える（碧さんには、蓮さんだけの支出が見えない）。 */
+    const asRen = async () => {
+      const gateway = world('member-ren');
+      const snapshot = await gateway.household.getSnapshot();
+      if (!snapshot.ok) throw new Error('snapshot');
+      return { gateway, expenses: snapshot.value.expenses, request: settleAllRequest(snapshot.value.expenses, { memberFilterActive: false })! };
+    };
+    const openOf = async (gateway: FamilyHubGateway) => { const snapshot = await gateway.household.getSnapshot(); return snapshot.ok ? { open: openShares(snapshot.value.expenses), batches: snapshot.value.settlementBatches } : null; };
+
+    it('settles exactly the shown shares in one record with the transfers, and a second send with the same key replays it', async () => {
+      const { gateway, request } = await asRen();
+      expect(request).toEqual({
+        shares: [{ expenseId: 'expense-books', membershipId: 'member-ren', remainingJpy: 1430 }, { expenseId: 'expense-train', membershipId: 'member-aoi', remainingJpy: 1680 }, { expenseId: 'expense-ren-private', membershipId: 'member-aoi', remainingJpy: 1000 }],
+        transfers: [{ from: 'member-aoi', to: 'member-ren', amountJpy: 1250 }],
+      });
+      const settled = await gateway.expenses.settleAll(request, 'settle-all-screen-1');
+      expect(settled).toMatchObject({ ok: true, value: { transfers: request.transfers, recordedByMembershipId: 'member-ren' } });
+      if (!settled.ok) return;
+      expect(settled.value.items.map((item) => [item.expenseId, item.membershipId, item.amountJpy])).toEqual(request.shares.map((item) => [item.expenseId, item.membershipId, item.remainingJpy]));
+      const after = await openOf(gateway);
+      expect(after?.open).toEqual([]);
+      expect(after?.batches.map((batch) => batch.id)).toEqual([settled.value.id]);
+      const snapshot = await gateway.household.getSnapshot();
+      const records = snapshot.ok ? snapshot.value.expenses.flatMap((expense) => expense.settlements.filter((record) => record.batchId === settled.value.id)) : [];
+      expect(records.map((record) => record.id).sort()).toEqual(settled.value.items.map((item) => item.settlementId).sort());
+      // 二重に押しても、同じキーなら前の結果を返し、記録は増えない。
+      expect(await gateway.expenses.settleAll(request, 'settle-all-screen-1')).toEqual(settled);
+      expect((await openOf(gateway))?.batches).toHaveLength(1);
+      // 同じキーで別の操作を送ると断る。
+      expect(await gateway.expenses.reverseBatch(settled.value.id, 'settle-all-screen-1')).toMatchObject({ ok: false, error: { code: 'CONFLICT', reason: 'IDEMPOTENCY' } });
+    });
+
+    it('refuses when a shown remaining amount no longer matches, or a share is not visible, and changes nothing', async () => {
+      const { gateway, request } = await asRen();
+      const before = await openOf(gateway);
+      const stale = { ...request, shares: request.shares.map((item, index) => index === 0 ? { ...item, remainingJpy: item.remainingJpy + 1 } : item) };
+      expect(await gateway.expenses.settleAll(stale)).toMatchObject({ ok: false, error: { code: 'CONFLICT', message: serverMessages.settleAllChanged } });
+      const unknown = { ...request, shares: [...request.shares, { expenseId: 'expense-unknown', membershipId: 'member-aoi', remainingJpy: 10 }] };
+      expect(await gateway.expenses.settleAll(unknown)).toMatchObject({ ok: false, error: { code: 'CONFLICT', message: serverMessages.settleAllChanged } });
+      expect(await gateway.expenses.settleAll({ ...request, transfers: [{ from: 'member-aoi', to: 'member-ren', amountJpy: 1249 }] })).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+      expect(await gateway.expenses.settleAll({ ...request, shares: [...request.shares, request.shares[0]] })).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+      // 一部の支払いを記録した後は、画面の残りと合わない。
+      expect((await gateway.expenses.recordSettlement('expense-train', 'member-aoi', 100)).ok).toBe(true);
+      expect(await gateway.expenses.settleAll(request)).toMatchObject({ ok: false, error: { code: 'CONFLICT' } });
+      const after = await openOf(gateway);
+      expect(after?.batches).toEqual([]);
+      expect(after?.open).toEqual(before?.open.map((item) => item.expenseId === 'expense-train' ? { ...item, remainingJpy: item.remainingJpy - 100 } : item));
+    });
+
+    it('refuses with a message that reveals nothing when a hidden expense between the same people is still open', async () => {
+      const gateway = world();
+      const snapshot = await gateway.household.getSnapshot();
+      if (!snapshot.ok) return;
+      const request = settleAllRequest(snapshot.value.expenses, { memberFilterActive: false })!;
+      expect(request.shares.map((item) => item.expenseId)).toEqual(['expense-books', 'expense-train']);
+      const refused = await gateway.expenses.settleAll(request);
+      expect(refused).toEqual({ ok: false, error: { code: 'CONFLICT', message: serverMessages.settleAllRefused, retryable: false } });
+      expect(JSON.stringify(refused)).not.toMatch(/expense-ren|贈り物|1000|1500/);
+      // 見えない支出の負担を名指ししても、ほかの見えない記録と同じ答えになる。
+      expect(await gateway.expenses.settleAll({ shares: [{ expenseId: 'expense-ren-private', membershipId: 'member-aoi', remainingJpy: 1000 }], transfers: [{ from: 'member-aoi', to: 'member-ren', amountJpy: 1000 }] })).toMatchObject({ ok: false, error: { code: 'CONFLICT', message: serverMessages.settleAllChanged } });
+      expect((await openOf(gateway))?.open).toHaveLength(2);
+    });
+
+    it('reverses a batch as a whole so every remaining amount returns, and refuses once any part was reversed on its own', async () => {
+      const { gateway, request } = await asRen();
+      const before = await openOf(gateway);
+      const settled = await gateway.expenses.settleAll(request, 'settle-all-screen-2');
+      if (!settled.ok) throw new Error('settle');
+      const reversed = await gateway.expenses.reverseBatch(settled.value.id, 'reverse-screen-2');
+      expect(reversed).toMatchObject({ ok: true, value: { id: settled.value.id } });
+      expect(reversed.ok && reversed.value.reversedAt).toBeTruthy();
+      expect((await openOf(gateway))?.open).toEqual(before?.open);
+      expect(await gateway.expenses.reverseBatch(settled.value.id)).toMatchObject({ ok: false, error: { code: 'CONFLICT', message: serverMessages.batchReversed } });
+      // 改めてまとめて精算し、1件だけを個別に取り消すと、まとめの取り消しは断る。
+      const again = await gateway.expenses.settleAll(settleAllRequest((await gateway.household.getSnapshot() as { ok: true; value: { expenses: Parameters<typeof settleAllRequest>[0] } }).value.expenses, { memberFilterActive: false })!);
+      if (!again.ok) throw new Error('settle again');
+      const [first] = again.value.items;
+      expect((await gateway.expenses.reverseSettlement(first.expenseId, first.settlementId)).ok).toBe(true);
+      expect(await gateway.expenses.reverseBatch(again.value.id)).toMatchObject({ ok: false, error: { code: 'CONFLICT', message: serverMessages.batchPartlyReversed } });
+      expect(await gateway.expenses.reverseBatch('settlement-batch-unknown')).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } });
+    });
+
+    it('lets only members who may settle use it', async () => {
+      const child = world('member-hana');
+      expect(await child.expenses.settleAll({ shares: [{ expenseId: 'expense-books', membershipId: 'member-ren', remainingJpy: 1430 }], transfers: [{ from: 'member-ren', to: 'member-aoi', amountJpy: 1430 }] })).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
     });
   });
 }

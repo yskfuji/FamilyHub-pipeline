@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyTemplate, draftProblem, draftToCreateInput, draftToUpdateInput, eventTimes, eventToDraft, newEventDraft, pastEventTemplates, recurrenceChoiceOf, reminderLabel, rruleOf, withStart, type EventDraft } from './eventForm';
+import { applyTemplate, draftProblem, draftToCreateInput, draftToUpdateInput, eventTimes, eventToDraft, newEventDraft, pastEventTemplates, recurrenceChoiceOf, reminderLabel, rruleOf, seriesEditPreview, withStart, type EventDraft } from './eventForm';
 import { eventInputSchema, eventUpdateSchema } from './schemas';
 import { LAST_DAY_OF_MONTH_RULE, describeRule, occurrenceDates } from './recurrence';
 import type { CalendarEvent } from './types';
@@ -157,6 +157,21 @@ describe('draftToUpdateInput', () => {
   it('applies the times to the first date of the series for a series edit', () => {
     const occurrence = stored({ startsAt: '2026-10-12T15:00:00+09:00', endsAt: '2026-10-13T16:00:00+09:00' });
     expect(edit(occurrence, {}, { recurrenceEditable: true, seriesStart: '2026-10-05' })).toMatchObject({ startsAt: '2026-10-05T15:00:00+09:00', endsAt: '2026-10-06T16:00:00+09:00' });
+    expect(edit(occurrence, {}, { recurrenceEditable: true, seriesStart: '2026-10-05', occurrenceDate: '2026-10-12' })).toMatchObject({ startsAt: '2026-10-05T15:00:00+09:00', endsAt: '2026-10-06T16:00:00+09:00' });
+  });
+
+  it('moves the start of the series by the days the opened occurrence moved (A13)', () => {
+    const series = stored({ startsAt: '2026-10-05T15:00:00+09:00', endsAt: '2026-10-05T16:00:00+09:00', recurrence: { rrule: 'FREQ=WEEKLY', timezone: 'Asia/Tokyo', exceptions: ['2026-10-19'] } });
+    const draft = { ...eventToDraft(series), start: '2026-10-13T15:00', end: '2026-10-13T16:00' };
+    const input = draftToUpdateInput(draft, series, { recurrenceEditable: true, seriesStart: '2026-10-05', occurrenceDate: '2026-10-12' });
+    expect(input).toMatchObject({ startsAt: '2026-10-06T15:00:00+09:00', endsAt: '2026-10-06T16:00:00+09:00' });
+    // 規則は送らない（受け取る側が曜日・例外日・UNTIL をずらす）。規則も変えるときは、例外日をここでずらして送る。
+    expect(input).not.toHaveProperty('recurrence');
+    expect(draftToUpdateInput({ ...draft, recurrence: 'daily' }, series, { recurrenceEditable: true, seriesStart: '2026-10-05', occurrenceDate: '2026-10-12' }).recurrence).toEqual({ rrule: 'FREQ=DAILY', timezone: 'Asia/Tokyo', exceptions: ['2026-10-20'] });
+    expect(seriesEditPreview(draft, series, '2026-10-12')).toEqual({ kind: 'shift', deltaDays: 1, text: 'すべての予定を1日後へ移します（毎週火曜）' });
+    expect(seriesEditPreview({ ...draft, start: '2026-10-12T15:00' }, series, '2026-10-12')).toBeNull();
+    const monthly = stored({ startsAt: '2026-10-28T15:00:00+09:00', endsAt: '2026-10-28T16:00:00+09:00', recurrence: { rrule: 'FREQ=MONTHLY', timezone: 'Asia/Tokyo', exceptions: [] } });
+    expect(seriesEditPreview({ ...eventToDraft(monthly), start: '2026-11-29T15:00', end: '2026-11-29T16:00' }, monthly, '2026-11-28')).toMatchObject({ kind: 'refused', deltaDays: 1, text: expect.stringContaining('「これ以降の予定」') });
   });
 });
 

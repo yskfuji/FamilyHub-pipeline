@@ -38,6 +38,21 @@ test('"this and following" edits split the series without touching earlier occur
   await expect(listRows(page, '資源回収').filter({ hasNotText: '新しい集積所' })).toHaveCount(2);
 });
 
+test('changing the date for "all events" moves the whole series by the same days (A13)', async ({ page }) => {
+  await page.goto('/calendar/event-clean?month=2026-10&on=2026-10-15');
+  const drawer = page.getByRole('dialog', { name: '資源回収' });
+  await drawer.getByLabel('対象とする予定').selectOption('series');
+  await drawer.getByRole('button', { name: '編集する' }).click();
+  await page.getByLabel('開始', { exact: true }).fill('2026-10-16T08:00');
+  await page.getByRole('button', { name: '変更を保存' }).click();
+  await expect(page.locator('.toast-visible')).toContainText('更新しました');
+  await page.getByRole('button', { name: '閉じる' }).click();
+  await page.getByRole('button', { name: '一覧', exact: true }).click();
+  await expect(listRows(page, '資源回収')).toHaveCount(5);
+  for (const date of ['2026-10-01', '2026-10-08', '2026-10-15']) await expect(page.locator(`.agenda-day[data-date="${date}"] .list-row`).filter({ hasText: '資源回収' })).toHaveCount(0);
+  for (const date of ['2026-10-02', '2026-10-09', '2026-10-16', '2026-10-23', '2026-10-30']) await expect(page.locator(`.agenda-day[data-date="${date}"] .list-row`).filter({ hasText: '資源回収' })).toHaveCount(1);
+});
+
 test('recurring tasks show their rule and move to the next occurrence when completed', async ({ page }) => {
   await page.goto('/tasks/todo-garbage?actor=member-ren');
   const drawer = page.getByRole('dialog', { name: '資源ごみをまとめる' });

@@ -72,6 +72,9 @@ export function registerContentRoutes(app: FastifyInstance, deps: AppDeps) {
     return mutate(deps, request, reply, (rules) => rules.expenses.recordSettlement(param(request, 'expenseId'), body.fromMembershipId, body.amountJpy));
   });
   app.post('/v1/expenses/:expenseId/settlements/:settlementId/reverse', { config: declare('reverseSettlement', { recentAuth: true, successStatus: 201 }) }, (request, reply) => mutate(deps, request, reply, (rules) => rules.expenses.reverseSettlement(param(request, 'expenseId'), param(request, 'settlementId'))));
+  // まとめた精算（A4）。検査と記録は規則（src/domain/commands/expenses.ts）が1つのトランザクションの中で行う。
+  app.post('/v1/settlement-batches', { config: declare('settleAll', { recentAuth: true, successStatus: 201 }) }, (request, reply) => mutate(deps, request, reply, (rules) => rules.expenses.settleAll(request.body as never)));
+  app.post('/v1/settlement-batches/:batchId/reverse', { config: declare('reverseBatch', { recentAuth: true, successStatus: 201 }) }, (request, reply) => mutate(deps, request, reply, (rules) => rules.expenses.reverseBatch(param(request, 'batchId'))));
 
   app.get('/v1/search', { config: reading('searchHousehold') }, (request, reply) => read(deps, request, reply, (rules) => rules.resources.search(parse(z.string().max(200), query(request).q))));
   app.get('/v1/insights', { config: reading('listInsights') }, (request, reply) => read(deps, request, reply, (rules) => rules.insights.list()));

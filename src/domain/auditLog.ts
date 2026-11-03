@@ -21,7 +21,7 @@ export const auditGroupActions: Record<typeof auditGroups[number], readonly stri
   events: ['createEvent', 'updateRecurringEvent', 'deleteEvent', 'restoreEvent'],
   tasks: ['createTodo', 'updateTodoStatus', 'updateTodo', 'deleteTodo', 'restoreTodo'],
   memos: ['createMemo', 'updateMemo', 'deleteMemo', 'restoreMemo', 'uploadAttachment', 'deleteAttachment'],
-  expenses: ['createExpense', 'updateExpense', 'deleteExpense', 'restoreExpense', 'recordSettlement', 'reverseSettlement'],
+  expenses: ['createExpense', 'updateExpense', 'deleteExpense', 'restoreExpense', 'recordSettlement', 'reverseSettlement', 'settleAll', 'reverseBatch'],
   albums: ['createAlbum', 'updateAlbum', 'deleteAlbum', 'restoreAlbum', 'reorderAlbumItems', 'deleteAlbumItem', 'restoreAlbumItem', 'createUpload'],
   links: ['createItemLink', 'deleteItemLink'],
   notifications: ['markNotificationRead', 'snoozeNotification', 'stopNotification', 'resumeNotification', 'updateNotificationPreferences'],
@@ -33,12 +33,13 @@ const groupByAction = new Map(Object.entries(auditGroupActions).flatMap(([group,
 export const auditGroupOf = (action: string): AuditGroup => groupByAction.get(action) ?? 'other';
 
 /** 記録が指す対象の種類。操作の名前から決まる。 */
-export type AuditTargetKind = 'event' | 'task' | 'memo' | 'expense' | 'album' | 'member' | 'invite' | 'colorLabel' | 'link' | 'notification';
+export type AuditTargetKind = 'event' | 'task' | 'memo' | 'expense' | 'settlementBatch' | 'album' | 'member' | 'invite' | 'colorLabel' | 'link' | 'notification';
 const targetKinds: Record<string, AuditTargetKind> = Object.fromEntries([
   ...(['createEvent', 'updateRecurringEvent', 'deleteEvent', 'restoreEvent'] as const).map((action) => [action, 'event']),
   ...(['createTodo', 'updateTodoStatus', 'updateTodo', 'deleteTodo', 'restoreTodo'] as const).map((action) => [action, 'task']),
   ...(['createMemo', 'updateMemo', 'deleteMemo', 'restoreMemo', 'uploadAttachment', 'deleteAttachment'] as const).map((action) => [action, 'memo']),
   ...(['createExpense', 'updateExpense', 'deleteExpense', 'restoreExpense', 'recordSettlement', 'reverseSettlement'] as const).map((action) => [action, 'expense']),
+  ...(['settleAll', 'reverseBatch'] as const).map((action) => [action, 'settlementBatch']),
   ...(['createAlbum', 'updateAlbum', 'deleteAlbum', 'restoreAlbum', 'reorderAlbumItems', 'deleteAlbumItem', 'restoreAlbumItem'] as const).map((action) => [action, 'album']),
   ...(['updateMembershipRole', 'updatePermissionOverrides', 'resetPermissionOverrides', 'setMemberStatus', 'removeMember', 'operator.suspended', 'operator.active'] as const).map((action) => [action, 'member']),
   ...(['acceptInvite', 'createHouseholdInvite', 'revokeHouseholdInvite'] as const).map((action) => [action, 'invite']),

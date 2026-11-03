@@ -117,6 +117,8 @@ export class EncryptedOfflineQueue {
   }
 
   async enqueue(command: QueueableCommand, context: { actorUserId: Id; householdId: Id; permissionRevision: number }) {
+    // 家計の変更・種類の変更・精算は、接続できるときだけ行う（待ち行列に入れない）。型の外から渡されても断る。
+    if (!queueableOperations.has(command.operation)) throw new Error('この変更は接続してから行ってください。');
     const records = await this.currentRecords();
     if (records.length >= MAX_ITEMS) throw new Error('未送信の変更は50件まで保存できます。不要な項目を削除してください。');
     const createdAt = this.now();

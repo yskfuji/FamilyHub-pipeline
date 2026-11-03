@@ -213,6 +213,8 @@ export function createHttpGateway(baseUrl: string, getCsrfToken: CsrfProvider, g
       restoreExpense: (id) => request(`/v1/expenses/${encodeURIComponent(id)}/restore`, { method: 'POST', csrf: true }),
       recordSettlement: (expenseId, fromMembershipId, amountJpy) => request(`/v1/expenses/${encodeURIComponent(expenseId)}/settlements`, { method: 'POST', body: JSON.stringify({ fromMembershipId, amountJpy }), csrf: true }),
       reverseSettlement: (expenseId, settlementId) => request(`/v1/expenses/${encodeURIComponent(expenseId)}/settlements/${encodeURIComponent(settlementId)}/reverse`, { method: 'POST', csrf: true }),
+      settleAll: (input, idempotencyKey) => request('/v1/settlement-batches', { method: 'POST', body: JSON.stringify(input), csrf: true, idempotencyKey }),
+      reverseBatch: (batchId, idempotencyKey) => request(`/v1/settlement-batches/${encodeURIComponent(batchId)}/reverse`, { method: 'POST', csrf: true, idempotencyKey }),
     },
     albums: {
       listAlbums: () => request('/v1/albums'),

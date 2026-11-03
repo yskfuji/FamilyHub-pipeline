@@ -2,7 +2,7 @@ import type { AlbumInput, AlbumUpdateInput, ColorLabelInput, EventInput, EventUp
 import type { AccountUpdateInput, SignUpInput } from '../domain/account';
 import type { AssistantJob, AssistantStatus } from '../domain/assistant';
 import type { AccountAuditPage, AccountAuditQuery, AuditPage, AuditQuery } from '../domain/auditLog';
-import type { AccountProfile, Album, AlbumItem, AlbumSummary, Authenticator, ColorLabel, ItemLink, LinkedItemRef, TrashItem, CalendarEvent, Expense, Household, HouseholdInvite, HouseholdNotification, HouseholdSnapshot, Id, Insight, IsoDate, Memo, MembershipRole, MutationContext, NotificationPreferences, PermissionOverride, PrivacySettings, RecurrenceScope, Result, Scenario, SecurityOverview, SessionInfo, Todo } from '../domain/types';
+import type { AccountProfile, Album, AlbumItem, AlbumSummary, Authenticator, ColorLabel, ItemLink, LinkedItemRef, TrashItem, CalendarEvent, Expense, Household, HouseholdInvite, HouseholdNotification, HouseholdSnapshot, Id, Insight, IsoDate, Memo, MembershipRole, MutationContext, NotificationPreferences, PermissionOverride, PrivacySettings, RecurrenceScope, Result, Scenario, SecurityOverview, SessionInfo, SettleAllInput, SettlementBatch, Todo } from '../domain/types';
 
 export interface AuthPort {
   beginPasskey(): Promise<Result<{ challengeId: Id; publicKey: PublicKeyCredentialRequestOptions | null }>>;
@@ -154,6 +154,13 @@ export interface ExpensePort {
   restoreExpense(id: Id): Promise<Result<Expense>>;
   recordSettlement(expenseId: Id, fromMembershipId: Id, amountJpy: number): Promise<Result<Expense>>;
   reverseSettlement(expenseId: Id, settlementId: Id): Promise<Result<Expense>>;
+  /**
+   * 画面に示した負担をまとめて精算する（A4）。負担がすべて見えて残りの額が一致するときだけ、1回で精算済みにし、
+   * 実際に渡す送金の一覧を残す。本人の再確認が要る。冪等キーは画面ごとに1つ。オフラインの待ち行列には入れない。
+   */
+  settleAll(input: SettleAllInput, idempotencyKey?: string): Promise<Result<SettlementBatch>>;
+  /** まとめた精算を、まとめの単位で取り消す。一部をすでに個別に取り消していれば CONFLICT。 */
+  reverseBatch(batchId: Id, idempotencyKey?: string): Promise<Result<SettlementBatch>>;
 }
 
 export interface InsightPort {

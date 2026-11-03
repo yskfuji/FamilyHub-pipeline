@@ -1314,6 +1314,42 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Expense' }
         default: { $ref: '#/components/responses/Error' }
+  /v1/settlement-batches:
+    post:
+      operationId: settleAll
+      description: Settles in one transaction exactly the shares shown on screen. Every share must be visible to the viewer and its remaining amount must match, otherwise 409 and nothing changes. Refused with a generic 409 when a live expense hidden from the viewer still has a remaining share between the parties. Requires recent reauthentication; never queued offline.
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SettleAllInput' }
+      responses:
+        '201':
+          description: One settlement per listed share, all carrying the batch id; the batch keeps the transfers actually made
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SettlementBatch' }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/settlement-batches/{batchId}/reverse:
+    post:
+      operationId: reverseBatch
+      description: Appends a reversal for every settlement of the batch, restoring each remaining amount. 409 when the batch or any of its settlements was already reversed. NOT_FOUND when any expense of the batch is hidden from the viewer.
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+        - { name: batchId, in: path, required: true, schema: { type: string } }
+      responses:
+        '201':
+          description: Reversed batch
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SettlementBatch' }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
   /v1/search:
     get:
       operationId: searchHousehold
@@ -1846,7 +1882,9 @@ components:
     ExpensePatch:
       type: object
       additionalProperties: false
+      description: Changing kind needs the new kind's category in the same request, and shares when it becomes an expense; an expense with a live settlement cannot become income (409). Income has no shares.
       properties:
+        kind: { enum: [expense, income] }
         title: { type: string, minLength: 1, maxLength: 120 }
         amountJpy: { type: integer, minimum: 1 }
         incurredOn: { type: string, format: date }
@@ -1876,6 +1914,55 @@ components:
         recordedAt: { type: string, format: date-time }
         reversedAt: { type: string, format: date-time }
         reversalOfSettlementId: { type: string }
+        batchId: { type: string, description: Set when the settlement or its reversal belongs to a settle-all batch }
+    SettlementTransfer:
+      type: object
+      additionalProperties: false
+      required: [from, to, amountJpy]
+      properties:
+        from: { type: string }
+        to: { type: string }
+        amountJpy: { type: integer, minimum: 1 }
+    SettleAllInput:
+      type: object
+      additionalProperties: false
+      required: [shares, transfers]
+      properties:
+        shares:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items:
+            type: object
+            additionalProperties: false
+            required: [expenseId, membershipId, remainingJpy]
+            properties:
+              expenseId: { type: string }
+              membershipId: { type: string }
+              remainingJpy: { type: integer, minimum: 1 }
+        transfers: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/SettlementTransfer' } }
+    SettlementBatch:
+      type: object
+      additionalProperties: false
+      required: [id, householdId, recordedAt, recordedByMembershipId, transfers, items]
+      properties:
+        id: { type: string }
+        householdId: { type: string }
+        recordedAt: { type: string, format: date-time }
+        recordedByMembershipId: { type: string }
+        transfers: { type: array, items: { $ref: '#/components/schemas/SettlementTransfer' } }
+        items:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [expenseId, membershipId, amountJpy, settlementId]
+            properties:
+              expenseId: { type: string }
+              membershipId: { type: string }
+              amountJpy: { type: integer, minimum: 1 }
+              settlementId: { type: string }
+        reversedAt: { type: string, format: date-time }
     Expense:
       type: object
       required: [id, householdId, kind, title, amountJpy, incurredOn, payerMembershipId, creatorMembershipId, category, shares, settlements, visibility, version]
@@ -2113,6 +2200,7 @@ components:
       properties:
         viewer: { $ref: '#/components/schemas/ViewerContext' }
         permissionOverrides: { type: array, items: { $ref: '#/components/schemas/PermissionOverride' } }
+        settlementBatches: { type: array, description: Only batches whose expenses are all visible to the viewer, items: { $ref: '#/components/schemas/SettlementBatch' } }
       additionalProperties: true
     AuditGroupFilter:
       enum: [account, household, members, events, tasks, memos, expenses, albums, links, notifications, assistant, operator]
@@ -2154,7 +2242,7 @@ components:
               additionalProperties: false
               required: [kind, id, hidden]
               properties:
-                kind: { enum: [event, task, memo, expense, album, member, invite, colorLabel, link, notification] }
+                kind: { enum: [event, task, memo, expense, settlementBatch, album, member, invite, colorLabel, link, notification] }
                 id: { type: [string, 'null'], description: null when hidden }
                 hidden: { type: boolean }
         detail: { $ref: '#/components/schemas/AuditDetail' }

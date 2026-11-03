@@ -22,6 +22,7 @@ export function createAuditCommands(context: CommandContext) {
       case 'task': { const item = state.todos.find((entry) => entry.id === id); return Boolean(item && authorizeVisibleResource(current, 'task.read', item.visibility, [item.creatorMembershipId, item.assigneeMembershipId, ...(item.reviewerMembershipId ? [item.reviewerMembershipId] : [])]).allowed); }
       case 'memo': { const item = state.memos.find((entry) => entry.id === id); return Boolean(item && authorizeVisibleResource(current, 'memo.read', item.visibility, [item.authorMembershipId]).allowed); }
       case 'expense': { const item = state.expenses.find((entry) => entry.id === id); return Boolean(item && canSeeExpense(current, item)); }
+      case 'settlementBatch': { const item = state.settlementBatches.find((entry) => entry.id === id); return Boolean(item?.items.every((part) => { const expense = state.expenses.find((entry) => entry.id === part.expenseId); return expense && canSeeExpense(current, expense); })); }
       case 'album': { const item = a.albums.find((entry) => entry.id === id); return Boolean(item && authorizeVisibleResource(current, 'album.read', item.visibility, [item.creatorMembershipId]).allowed); }
       case 'member': return state.memberships.some((entry) => entry.id === id) && (id === current.membershipId || authorize(current, 'household.members.read').allowed);
       case 'invite': return a.invites.some((entry) => entry.id === id) && authorize(current, 'household.invites.manage').allowed;

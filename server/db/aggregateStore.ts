@@ -3,7 +3,7 @@ import type { HouseholdSnapshot, Id } from '../../src/domain/types';
 import type { Db } from './db';
 
 /** 配列で持つ記録と、1つだけ持つ記録の保存先。 */
-const lists = ['memberships', 'events', 'todos', 'memos', 'expenses', 'resources', 'links', 'colorLabels', 'invites', 'notifications', 'permissionOverrides'] as const;
+const lists = ['memberships', 'events', 'todos', 'memos', 'expenses', 'settlementBatches', 'resources', 'links', 'colorLabels', 'invites', 'notifications', 'permissionOverrides'] as const;
 const mediaLists = ['albums', 'albumItems'] as const;
 const archives = ['events', 'todos', 'memos', 'expenses'] as const;
 type ListName = typeof lists[number] | typeof mediaLists[number];
@@ -45,6 +45,7 @@ export function loadAggregate(db: Db, householdId: Id, actorMembershipId: Id, de
     todos: read(rows, 'todos'),
     memos: read(rows, 'memos'),
     expenses: read(rows, 'expenses'),
+    settlementBatches: read(rows, 'settlementBatches'),
     resources: read(rows, 'resources'),
     links: read(rows, 'links'),
     colorLabels: read(rows, 'colorLabels'),
@@ -71,7 +72,7 @@ export function saveAggregate(db: Db, householdId: Id, actorMembershipId: Id, { 
   const wanted = new Map<string, { collection: string; id: string; body: string; order?: number }>();
   const put = (collection: string, id: string, value: unknown, order?: number) => wanted.set(`${collection}\u0000${id}`, { collection, id, body: JSON.stringify(value), order });
   const sources: Record<typeof lists[number], ReadonlyArray<object>> = {
-    memberships: state.memberships, events: state.events, todos: state.todos, memos: state.memos, expenses: state.expenses, resources: state.resources,
+    memberships: state.memberships, events: state.events, todos: state.todos, memos: state.memos, expenses: state.expenses, settlementBatches: state.settlementBatches, resources: state.resources,
     links: state.links, colorLabels: state.colorLabels, invites: aggregate.invites,
     notifications: aggregate.notifications.map((item) => ({ recipientMembershipId: actorMembershipId, ...item })), permissionOverrides: aggregate.permissionOverrides,
   };

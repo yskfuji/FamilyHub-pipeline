@@ -51,6 +51,8 @@ export const auditedGatewayOperations: Readonly<Record<string, AuditedOperation>
   'expenses.restoreExpense': household('restoreExpense', 1),
   'expenses.recordSettlement': household('recordSettlement', 1),
   'expenses.reverseSettlement': household('reverseSettlement', 2),
+  'expenses.settleAll': household('settleAll', 0, { created: true }),
+  'expenses.reverseBatch': household('reverseBatch', 1),
   'albums.createAlbum': household('createAlbum', 0, { created: true }),
   'albums.updateAlbum': household('updateAlbum', 1, { fieldsArg: 1 }),
   'albums.deleteAlbum': household('deleteAlbum', 1),

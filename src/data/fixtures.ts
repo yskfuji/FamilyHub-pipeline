@@ -49,6 +49,7 @@ export const baseSnapshot: HouseholdSnapshot = {
     { id: 'income-salary', householdId: 'house-mori', kind: 'income', creatorMembershipId: 'member-aoi', visibility: visibleTo('member-aoi'), title: '9月の給与', amountJpy: 320000, incurredOn: '2026-09-25', payerMembershipId: 'member-aoi', category: 'income_salary', shares: [], settlements: [], version: 1 },
     { id: 'expense-august-utilities', householdId: 'house-mori', kind: 'expense', creatorMembershipId: 'member-ren', visibility: visibleTo('member-ren'), title: '8月の電気代', amountJpy: 9800, incurredOn: '2026-08-20', payerMembershipId: 'member-ren', category: 'utilities', shares: [{ membershipId: 'member-ren', amountJpy: 9800, settledJpy: 9800 }], settlements: [], version: 1 },
   ],
+  settlementBatches: [],
   resources: [
     { id: 'resource-school', householdId: 'house-mori', label: '青葉小学校の保護者向けページ', url: 'https://example.com/family-hub/school', kind: 'school', relatedEntityId: 'event-school', visibility: visibleTo('member-aoi', 'selected', ['member-aoi','member-ren','member-hana','member-yui']) },
     { id: 'resource-city', householdId: 'house-mori', label: '世田谷区の子育て手続き', url: 'https://example.com/family-hub/city', kind: 'municipality', visibility: visibleTo('member-aoi') },

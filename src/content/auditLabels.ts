@@ -37,7 +37,7 @@ export const auditActionLabels: Readonly<Record<string, string>> = {
   uploadAttachment: 'メモにファイルを添付した', deleteAttachment: 'メモの添付を削除した',
   // 家計
   createExpense: '家計の記録を追加した', updateExpense: '家計の記録を変えた', deleteExpense: '家計の記録を削除した', restoreExpense: '家計の記録を元に戻した',
-  recordSettlement: '精算を記録した', reverseSettlement: '精算を取り消した',
+  recordSettlement: '精算を記録した', reverseSettlement: '精算を取り消した', settleAll: 'まとめて精算した', reverseBatch: 'まとめた精算を取り消した',
   // アルバム
   createAlbum: 'アルバムを作った', updateAlbum: 'アルバムを変えた', deleteAlbum: 'アルバムを削除した', restoreAlbum: 'アルバムを元に戻した',
   reorderAlbumItems: 'アルバムの並びを変えた', deleteAlbumItem: '写真・動画を削除した', restoreAlbumItem: '写真・動画を元に戻した',
@@ -63,7 +63,7 @@ export const auditGroupLabels: Readonly<Record<AuditGroup, string>> = {
 };
 
 export const auditTargetLabels: Readonly<Record<AuditTargetKind, string>> = {
-  event: '予定', task: 'タスク', memo: 'メモ', expense: '家計の記録', album: 'アルバム', member: 'メンバー', invite: '招待', colorLabel: '色のリスト', link: '関連づけ', notification: '通知',
+  event: '予定', task: 'タスク', memo: 'メモ', expense: '家計の記録', settlementBatch: 'まとめた精算', album: 'アルバム', member: 'メンバー', invite: '招待', colorLabel: '色のリスト', link: '関連づけ', notification: '通知',
 };
 
 export const auditCopy = {

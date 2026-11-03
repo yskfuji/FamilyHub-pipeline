@@ -18,6 +18,8 @@ erDiagram
   records ||--o{ todos : collection
   records ||--o{ memos : collection
   records ||--o{ expenses : collection
+  records ||--o{ settlementBatches : collection
+  settlementBatches ||--o{ expenses : settles_shares_of
   records ||--o{ resources : collection
   records ||--o{ links : collection
   records ||--o{ colorLabels : collection
@@ -204,7 +206,10 @@ erDiagram
     json body "メモと添付の情報"
   }
   expenses {
-    json body "支出と収入、負担、精算"
+    json body "支出と収入、負担、精算（まとめた精算の記録は batchId を持つ）"
+  }
+  settlementBatches {
+    json body "まとめた精算。含めた負担と精算の記録、実際に渡した送金の一覧、取り消した時刻"
   }
   resources {
     json body "関連リンク"

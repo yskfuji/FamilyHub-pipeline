@@ -16,7 +16,7 @@ if (duplicates.length) failures.push(`duplicate OpenAPI operationId: ${[...new S
 const requiredOperations = [
   'updateMembershipRole', 'listHouseholdInvites', 'revokeHouseholdInvite',
   'getPermissionOverrides', 'updatePermissionOverrides', 'resetPermissionOverrides',
-  'restoreEvent', 'restoreTodo', 'restoreMemo', 'reverseSettlement',
+  'restoreEvent', 'restoreTodo', 'restoreMemo', 'reverseSettlement', 'settleAll', 'reverseBatch',
   'resumeNotification', 'updateNotificationPreferences', 'getPrivacySettings',
 ];
 for (const operation of requiredOperations) {
@@ -34,7 +34,7 @@ for (const marker of requiredContractMarkers) {
 
 const adapterMarkers = [
   "credentials: 'include'", "'X-CSRF-Token'", "'Idempotency-Key'", "'If-Permission-Revision'",
-  'response.status === 204', '/permission-overrides', '/restore', '/reverse', '/resume',
+  'response.status === 204', '/permission-overrides', '/restore', '/reverse', '/resume', '/settlement-batches',
 ];
 for (const marker of adapterMarkers) {
   if (!adapter.includes(marker)) failures.push(`missing HTTP adapter boundary: ${marker}`);
@@ -42,7 +42,7 @@ for (const marker of adapterMarkers) {
 
 const gatewayMethods = [
   'updatePermissionOverrides', 'resetPermissionOverrides', 'revokeInvite',
-  'restoreEvent', 'restoreTodo', 'restoreMemo', 'reverseSettlement', 'resume', 'getPrivacySettings',
+  'restoreEvent', 'restoreTodo', 'restoreMemo', 'reverseSettlement', 'settleAll', 'reverseBatch', 'resume', 'getPrivacySettings',
 ];
 for (const method of gatewayMethods) {
   if (!gateway.includes(`${method}(`)) failures.push(`missing gateway method: ${method}`);
@@ -67,7 +67,7 @@ const operationFor = {
   'memos.createMemo': 'createMemo', 'memos.updateMemo': 'updateMemo', 'memos.uploadAttachment': 'uploadAttachment', 'memos.getAttachmentLink': 'getAttachmentLink',
   'memos.deleteMemo': 'deleteMemo', 'memos.restoreMemo': 'restoreMemo',
   'expenses.createExpense': 'createExpense', 'expenses.updateExpense': 'updateExpense', 'expenses.deleteExpense': 'deleteExpense', 'expenses.restoreExpense': 'restoreExpense',
-  'expenses.recordSettlement': 'recordSettlement', 'expenses.reverseSettlement': 'reverseSettlement',
+  'expenses.recordSettlement': 'recordSettlement', 'expenses.reverseSettlement': 'reverseSettlement', 'expenses.settleAll': 'settleAll', 'expenses.reverseBatch': 'reverseBatch',
   'resources.search': 'searchHousehold', 'insights.list': 'listInsights',
   'assistant.getStatus': 'getAssistantStatus', 'assistant.readReceipt': 'readReceipt', 'assistant.readEventImage': 'readEventImage', 'assistant.readEventUrl': 'readEventUrl', 'assistant.getJob': 'getAssistantJob',
   'notifications.list': 'listNotifications', 'notifications.markRead': 'markNotificationRead', 'notifications.snooze': 'snoozeNotification', 'notifications.stop': 'stopNotification',

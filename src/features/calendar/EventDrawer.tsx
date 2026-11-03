@@ -5,7 +5,7 @@ import { Dialog, Drawer, StatusBadge } from '../../design-system/components';
 import { CalendarIcon, LinkIcon, PeopleIcon, RainIcon } from '../../design-system/icons';
 import { dateKeyFromRfc3339 } from '../../domain/calendarDate';
 import type { Occurrence } from '../../domain/calendarLayout';
-import { draftToUpdateInput, eventToDraft, reminderLabel, type EventDraft } from '../../domain/eventForm';
+import { draftToUpdateInput, eventToDraft, reminderLabel, seriesEditPreview, type EventDraft } from '../../domain/eventForm';
 import { describeRule } from '../../domain/recurrence';
 import { eventUpdateSchema } from '../../domain/schemas';
 import type { CalendarEvent, IsoDate, RecurrenceScope } from '../../domain/types';
@@ -52,7 +52,11 @@ export function EventDrawer({ active, series, onClose, onDeleted }: Props) {
   const update = async (draft: EventDraft) => {
     if (submitting) return;
     setFormError(''); setSubmitting(true);
-    const input = draftToUpdateInput(draft, series, { recurrenceEditable, seriesStart: recurring && scope === 'series' ? seriesStart : undefined });
+    const wholeSeries = recurring && scope === 'series';
+    // 日付を動かすときは、シリーズ全体を同じ日数だけずらす。ずらせない規則は理由を示して送らない（確かめの文の表示は後の段階）。
+    const preview = wholeSeries ? seriesEditPreview(draft, series, active.occurrenceDate, recurrenceEditable) : null;
+    if (preview?.kind === 'refused') { setFormError(preview.text); setSubmitting(false); return; }
+    const input = draftToUpdateInput(draft, series, { recurrenceEditable, seriesStart: wholeSeries ? seriesStart : undefined, occurrenceDate: wholeSeries ? active.occurrenceDate : undefined });
     const parsed = eventUpdateSchema.safeParse(input);
     if (!parsed.success) { setFormError(parsed.error.issues[0]?.message ?? '入力内容を確認してください。'); setSubmitting(false); return; }
     const occurrenceDate = recurring && scope !== 'series' ? active.occurrenceDate : undefined;

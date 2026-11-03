@@ -144,6 +144,8 @@ const snapshotProjection: Record<keyof HouseholdSnapshot, Projector> = {
   memos: (snapshot, viewer) => { snapshot.memos = snapshot.memos.filter((item) => !item.deletedAt && authorizeVisibleResource(viewer, 'memo.read', item.visibility, [item.authorMembershipId]).allowed).map((item) => redactPlace(item, viewer)); },
   resources: (snapshot, viewer) => { snapshot.resources = snapshot.resources.filter((item) => authorizeVisibleResource(viewer, 'resource.read', item.visibility).allowed); },
   expenses: (snapshot, viewer) => { snapshot.expenses = snapshot.expenses.filter((item) => !item.deletedAt).flatMap((item) => projectExpense(item, viewer) ?? []); },
+  // 含めた支出がすべて見えるまとめだけを返す。送金の額は、見えない支出の額を含みうるため。
+  settlementBatches: (snapshot) => { const seen = new Set(snapshot.expenses.map((item) => item.id)); snapshot.settlementBatches = snapshot.settlementBatches.filter((batch) => batch.items.every((item) => seen.has(item.expenseId))); },
   links: (snapshot, viewer) => { snapshot.links = snapshot.links.filter((link) => canSeeItem(snapshot, viewer, link.from) && canSeeItem(snapshot, viewer, link.to)); },
   memberships: (snapshot, viewer) => {
     if (authorize(viewer, 'household.members.read').allowed) return;

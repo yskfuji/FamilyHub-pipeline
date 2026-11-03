@@ -1,4 +1,4 @@
-import type { Expense, Id, IncomeCategory, SettlementRecord, SpendingCategory } from './types';
+import type { Expense, Id, IncomeCategory, SettleAllInput, SettlementRecord, SettlementTransfer, SpendingCategory } from './types';
 
 /**
  * 家計の集計。画面・ヒント・今日の画面が同じ計算を使い、表示が食い違わないようにする。
@@ -66,23 +66,33 @@ export function categoryBreakdown(expenses: Expense[], monthKey: string) {
   return totals.map((item, index) => ({ ...item, percent: shares[index] }));
 }
 
-/**
- * 残りのある記録をすべて相殺したうえで、誰が誰にいくら渡せば済むか。金額の大きい順。
- * 3人以上では、記録にない組み合わせの受け渡しになることがある。精算の記録は支出ごとに残す。
- */
-export function simplifiedTransfers(expenses: Expense[]) {
+/** 支払った人以外の負担のうち、まだ残りがあるもの。まとめた精算（A4）はこの単位で記録する。 */
+export interface OpenShare { expenseId: Id; membershipId: Id; payerMembershipId: Id; remainingJpy: number }
+
+export function openShares(expenses: Expense[]): OpenShare[] {
+  return live(expenses).flatMap((expense) => remainingOf(expense).map((share) => ({ expenseId: expense.id, membershipId: share.membershipId, payerMembershipId: expense.payerMembershipId, remainingJpy: share.amountJpy })));
+}
+
+/** 人ごとの正味。正は受け取る額、負は渡す額。合計は必ず0になる。 */
+export function netBalances(shares: ReadonlyArray<Pick<OpenShare, 'membershipId' | 'payerMembershipId' | 'remainingJpy'>>): Map<Id, number> {
   const net = new Map<Id, number>();
-  for (const expense of live(expenses)) {
-    for (const share of remainingOf(expense)) {
-      net.set(share.membershipId, (net.get(share.membershipId) ?? 0) - share.amountJpy);
-      net.set(expense.payerMembershipId, (net.get(expense.payerMembershipId) ?? 0) + share.amountJpy);
-    }
+  for (const share of shares) {
+    net.set(share.membershipId, (net.get(share.membershipId) ?? 0) - share.remainingJpy);
+    net.set(share.payerMembershipId, (net.get(share.payerMembershipId) ?? 0) + share.remainingJpy);
   }
+  return net;
+}
+
+/**
+ * 正味を、最大の貸し手と最大の借り手を組んで受け渡しにする（貪欲法）。1回ごとに少なくとも1人の正味が0になるので、
+ * 受け渡しの数は、正味が0でない人の数から1を引いた数以下になる。最小の数にする問題は強 NP 困難（evidence.md §15）。
+ */
+export function transfersFor(balances: ReadonlyMap<Id, number>): SettlementTransfer[] {
   const largestFirst = (a: { amountJpy: number; id: Id }, b: { amountJpy: number; id: Id }) => b.amountJpy - a.amountJpy || a.id.localeCompare(b.id);
-  const balances = [...net].map(([id, amountJpy]) => ({ id, amountJpy }));
-  const debtors = balances.filter((item) => item.amountJpy < 0).map((item) => ({ id: item.id, amountJpy: -item.amountJpy })).sort(largestFirst);
-  const creditors = balances.filter((item) => item.amountJpy > 0).sort(largestFirst);
-  const transfers: Array<{ from: Id; to: Id; amountJpy: number }> = [];
+  const entries = [...balances].map(([id, amountJpy]) => ({ id, amountJpy }));
+  const debtors = entries.filter((item) => item.amountJpy < 0).map((item) => ({ id: item.id, amountJpy: -item.amountJpy })).sort(largestFirst);
+  const creditors = entries.filter((item) => item.amountJpy > 0).sort(largestFirst);
+  const transfers: SettlementTransfer[] = [];
   let debtor = 0;
   let creditor = 0;
   while (debtor < debtors.length && creditor < creditors.length) {
@@ -94,6 +104,36 @@ export function simplifiedTransfers(expenses: Expense[]) {
     if (creditors[creditor].amountJpy === 0) creditor += 1;
   }
   return transfers;
+}
+
+/** 受け渡しが、正味をちょうど0にするか。人ごとに、受け取る額から渡す額を引いたものが正味と一致すること。 */
+export function transfersSettle(balances: ReadonlyMap<Id, number>, transfers: readonly SettlementTransfer[]): boolean {
+  const left = new Map(balances);
+  for (const transfer of transfers) {
+    left.set(transfer.from, (left.get(transfer.from) ?? 0) + transfer.amountJpy);
+    left.set(transfer.to, (left.get(transfer.to) ?? 0) - transfer.amountJpy);
+  }
+  return [...left.values()].every((value) => value === 0);
+}
+
+/**
+ * 残りのある記録をすべて相殺したうえで、誰が誰にいくら渡せば済むか。金額の大きい順。
+ * 3人以上では、記録にない組み合わせの受け渡しになることがある。まとめて記録するときは settleAllRequest を使う。
+ */
+export function simplifiedTransfers(expenses: Expense[]) {
+  return transfersFor(netBalances(openShares(expenses)));
+}
+
+/**
+ * 画面に示した内容から、まとめた精算（settleAll）の要求を作る。expenses は閲覧者に見えている支出。
+ * 人で絞って表示しているとき（「すべて」以外）は、示した一覧が家計の全体ではないので null（ボタンを出さない）。
+ * 精算するものがなければ null。
+ */
+export function settleAllRequest(expenses: Expense[], options: { memberFilterActive: boolean }): SettleAllInput | null {
+  if (options.memberFilterActive) return null;
+  const shares = openShares(expenses);
+  if (!shares.length) return null;
+  return { shares: shares.map(({ expenseId, membershipId, remainingJpy }) => ({ expenseId, membershipId, remainingJpy })), transfers: transfersFor(netBalances(shares)) };
 }
 
 export interface SettlementHistoryEntry {

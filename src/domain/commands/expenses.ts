@@ -1,8 +1,9 @@
 import type { ExpensePort } from '../../data/gateway';
 import { canDeleteResource, canSeeExpense, projectExpense } from '../../authz/policy';
-import { hasActiveSettlement, splitShares } from '../ledger';
-import { expenseInputSchema, expenseUpdateSchema, incomeCategorySchema } from '../schemas';
-import type { Expense, ExpenseShare, Id, Result } from '../types';
+import { serverMessages } from '../../content/serverMessages';
+import { hasActiveSettlement, netBalances, splitShares, transfersSettle } from '../ledger';
+import { expenseInputSchema, expenseUpdateSchema, incomeCategorySchema, settleAllInputSchema } from '../schemas';
+import type { Expense, ExpenseShare, Id, Result, SettlementBatch } from '../types';
 import { applyPatch, archive, conflict, denied, invalid, missing, ok, fail } from './context';
 import type { CommandContext, SyncPort } from './context';
 
@@ -46,12 +47,18 @@ export function createExpenseCommands(c: CommandContext): SyncPort<ExpensePort> 
       if (target.version !== expectedVersion) return conflict('支出');
       const parsed = expenseUpdateSchema.safeParse(input);
       if (!parsed.success) return invalid(parsed.error.issues);
-      const { place, note, amountJpy, payerMembershipId, shareMembershipIds, shareAmounts, category, visibility: requested, ...rest } = parsed.data;
-      const income = target.kind === 'income';
+      const { place, note, amountJpy, payerMembershipId, shareMembershipIds, shareAmounts, category, visibility: requested, kind, ...rest } = parsed.data;
+      // 種類を変えるとき（A3）。収入には負担と精算がないので、支出から収入へは取り消していない精算がない間だけ変えられ、負担は空にする。
+      // どちらへ変えるときも、新しい種類の費目（支出にするときは負担も）を同じ要求の中で指定する。
+      const changesKind = kind !== undefined && kind !== target.kind;
+      const income = (kind ?? target.kind) === 'income';
       const outsider = foreignMember<Expense>([payerMembershipId, ...(shareMembershipIds ?? []), ...(shareAmounts ?? []).map((item) => item.membershipId)]); if (outsider) return outsider;
+      if (changesKind && income && hasActiveSettlement(target)) return fail({ code: 'CONFLICT', message: serverMessages.kindChangeSettled, retryable: false });
+      if (changesKind && !category) return invalid([{ message: income ? serverMessages.incomeCategoryRequired : serverMessages.spendingCategoryRequired }]);
+      if (changesKind && !income && !shareMembershipIds && !shareAmounts) return invalid([{ message: serverMessages.sharesRequired }]);
       if (income && (shareMembershipIds || shareAmounts)) return invalid([{ message: '収入には負担を指定できません。' }]);
       if (category && incomeCategorySchema.safeParse(category).success !== income) return invalid([{ message: '費目を確認してください。' }]);
-      const changesSplit = amountJpy !== undefined || payerMembershipId !== undefined || shareMembershipIds !== undefined || shareAmounts !== undefined;
+      const changesSplit = changesKind || amountJpy !== undefined || payerMembershipId !== undefined || shareMembershipIds !== undefined || shareAmounts !== undefined;
       if (changesSplit && hasActiveSettlement(target)) return fail({ code: 'CONFLICT', message: '精算の記録があるため、金額・支払った人・負担する人は変更できません。先に精算を取り消してください。', retryable: false });
       if (shareAmounts && shareAmounts.reduce((sum, item) => sum + item.amountJpy, 0) !== (amountJpy ?? target.amountJpy)) return invalid([{ message: '負担の合計を金額と合わせてください。' }]);
       const visibility = requested ? resolveVisibility(requested, target.creatorMembershipId) : null;
@@ -59,6 +66,7 @@ export function createExpenseCommands(c: CommandContext): SyncPort<ExpensePort> 
       // 変えた後も自分に見える範囲だけを選べる。見えなくなる変更は、結果を返せないので受け付けない。
       if (visibility?.ok && !canSeeExpense(viewer(), { ...target, visibility: visibility.value })) return invalid([{ message: 'この公開範囲にすると、あなたが見られなくなります。' }]);
       Object.assign(target, rest);
+      if (changesKind) target.kind = kind;
       if (category) target.category = category;
       if (visibility?.ok) target.visibility = visibility.value;
       if (changesSplit) {
@@ -116,6 +124,64 @@ export function createExpenseCommands(c: CommandContext): SyncPort<ExpensePort> 
       target.settlements.push({ id: nextId('settlement-reversal'), amountJpy: -settlement.amountJpy, fromMembershipId: settlement.toMembershipId, toMembershipId: settlement.fromMembershipId, recordedAt: at, reversalOfSettlementId: settlement.id });
       target.version += 1;
       return shown(target);
+    },
+    settleAll(input) {
+      const guard = requireCapability<SettlementBatch>('expense.settle'); if (guard) return guard;
+      const network = offlineFailure<SettlementBatch>(); if (network) return network;
+      const parsed = settleAllInputSchema.safeParse(input);
+      if (!parsed.success) return invalid(parsed.error.issues);
+      const { shares: listed, transfers } = parsed.data;
+      const changed = fail<SettlementBatch>({ code: 'CONFLICT', message: serverMessages.settleAllChanged, retryable: false });
+      // 画面に示した負担が、今も閲覧者に見えて、残りの額がちょうど同じであること。1つでも違えば何もしない。
+      const targets: Array<{ expense: Expense; share: ExpenseShare; remainingJpy: number }> = [];
+      for (const item of listed) {
+        const expense = state.expenses.find((entry) => entry.id === item.expenseId && !entry.deletedAt);
+        if (!seen(expense) || expense.kind !== 'expense') return changed;
+        const share = expense.shares.find((entry) => entry.membershipId === item.membershipId && entry.membershipId !== expense.payerMembershipId);
+        if (!share || share.amountJpy - share.settledJpy !== item.remainingJpy) return changed;
+        targets.push({ expense, share, remainingJpy: item.remainingJpy });
+      }
+      const outsider = foreignMember<SettlementBatch>(transfers.flatMap((transfer) => [transfer.from, transfer.to])); if (outsider) return outsider;
+      if (!transfersSettle(netBalances(targets.map(({ expense, share, remainingJpy }) => ({ membershipId: share.membershipId, payerMembershipId: expense.payerMembershipId, remainingJpy }))), transfers)) return invalid([{ message: serverMessages.settleAllPlanMismatch }]);
+      // 関わる人の間に、閲覧者には見えない支出の残りがあれば、まとめると見えない記録を動かすことになるので断る。
+      // 理由は、その記録があることを明かさない一般的な文にする。
+      const parties = new Set([...transfers.flatMap((transfer) => [transfer.from, transfer.to]), ...targets.flatMap(({ expense, share }) => [share.membershipId, expense.payerMembershipId])]);
+      const hidden = state.expenses.some((expense) => !expense.deletedAt && !canSeeExpense(viewer(), expense)
+        && expense.shares.some((share) => share.membershipId !== expense.payerMembershipId && share.amountJpy > share.settledJpy && (parties.has(share.membershipId) || parties.has(expense.payerMembershipId))));
+      if (hidden) return fail({ code: 'CONFLICT', message: serverMessages.settleAllRefused, retryable: false });
+      const at = now();
+      const batch: SettlementBatch = { id: nextId('settlement-batch'), householdId: state.household.id, recordedAt: at, recordedByMembershipId: viewer().membershipId, transfers, items: [] };
+      for (const { expense, share, remainingJpy } of targets) {
+        const record = { id: nextId('settlement'), amountJpy: remainingJpy, fromMembershipId: share.membershipId, toMembershipId: expense.payerMembershipId, recordedAt: at, batchId: batch.id };
+        share.settledJpy += remainingJpy;
+        expense.settlements.push(record);
+        batch.items.push({ expenseId: expense.id, membershipId: share.membershipId, amountJpy: remainingJpy, settlementId: record.id });
+      }
+      for (const expense of new Set(targets.map((item) => item.expense))) expense.version += 1;
+      state.settlementBatches = [...state.settlementBatches, batch];
+      return ok(structuredClone(batch));
+    },
+    reverseBatch(batchId) {
+      const guard = requireCapability<SettlementBatch>('expense.settle'); if (guard) return guard;
+      const network = offlineFailure<SettlementBatch>(); if (network) return network;
+      const batch = state.settlementBatches.find((item) => item.id === batchId);
+      // 含めた支出が1つでも見えなければ、まとめごと無いものと同じに扱う。
+      const expenses = batch?.items.map((item) => state.expenses.find((entry) => entry.id === item.expenseId && !entry.deletedAt));
+      if (!batch || !expenses || !expenses.every(seen)) return missing('まとめた精算');
+      if (batch.reversedAt) return fail({ code: 'CONFLICT', message: serverMessages.batchReversed, retryable: false });
+      const records = batch.items.map((item, index) => expenses[index]!.settlements.find((record) => record.id === item.settlementId));
+      if (records.some((record) => !record || record.reversedAt)) return fail({ code: 'CONFLICT', message: serverMessages.batchPartlyReversed, retryable: false });
+      const at = now();
+      batch.items.forEach((item, index) => {
+        const expense = expenses[index]!; const record = records[index]!;
+        const share = expense.shares.find((entry) => entry.membershipId === record.fromMembershipId);
+        record.reversedAt = at;
+        if (share) share.settledJpy = Math.max(0, share.settledJpy - record.amountJpy);
+        expense.settlements.push({ id: nextId('settlement-reversal'), amountJpy: -record.amountJpy, fromMembershipId: record.toMembershipId, toMembershipId: record.fromMembershipId, recordedAt: at, reversalOfSettlementId: record.id, batchId: batch.id });
+      });
+      for (const expense of new Set(expenses)) expense!.version += 1;
+      batch.reversedAt = at;
+      return ok(structuredClone(batch));
     },
   };
 }

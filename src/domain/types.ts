@@ -246,6 +246,30 @@ export interface SettlementRecord {
   recordedAt: Rfc3339;
   reversedAt?: Rfc3339;
   reversalOfSettlementId?: Id;
+  /** まとめた精算（settleAll）で記録したとき、そのまとめの ID。取り消しの記録にも付ける。 */
+  batchId?: Id;
+}
+
+/** 実際に渡した送金。from が to へ amountJpy 円を渡す。 */
+export interface SettlementTransfer { from: Id; to: Id; amountJpy: number }
+/** まとめた精算に含めた負担。settlementId はその負担に付けた精算の記録。 */
+export interface SettlementBatchItem { expenseId: Id; membershipId: Id; amountJpy: number; settlementId: Id }
+
+/** まとめた精算（A4）。画面に示した負担をすべて精算済みにし、実際に渡した送金の一覧を残す。取り消しはまとめの単位で行う。 */
+export interface SettlementBatch {
+  id: Id;
+  householdId: Id;
+  recordedAt: Rfc3339;
+  recordedByMembershipId: Id;
+  transfers: SettlementTransfer[];
+  items: SettlementBatchItem[];
+  reversedAt?: Rfc3339;
+}
+
+/** まとめた精算の要求。shares は画面に示した負担と残りの額、transfers は画面に示した送金の案。 */
+export interface SettleAllInput {
+  shares: Array<{ expenseId: Id; membershipId: Id; remainingJpy: number }>;
+  transfers: SettlementTransfer[];
 }
 
 export type SpendingCategory = 'food' | 'dining' | 'transport' | 'utilities' | 'home' | 'education' | 'health' | 'entertainment' | 'shopping' | 'savings' | 'other';
@@ -328,6 +352,8 @@ export interface HouseholdSnapshot {
   todos: Todo[];
   memos: Memo[];
   expenses: Expense[];
+  /** まとめた精算。含めた支出がすべて閲覧者に見えるものだけを返す。 */
+  settlementBatches: SettlementBatch[];
   resources: ResourceLink[];
   links: ItemLink[];
   colorLabels: ColorLabel[];

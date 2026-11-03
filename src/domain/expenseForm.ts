@@ -1,5 +1,5 @@
 import { isDateKey } from './calendarDate';
-import { splitShares } from './ledger';
+import { hasActiveSettlement, splitShares } from './ledger';
 import type { ExpenseInput, ExpenseUpdateInput } from './schemas';
 import type { Expense, HouseholdMembership, Id, PlaceRef, VisibilityAudience } from './types';
 import { peopleOutsideAudience, visibilityChange, visibilityInput, visibilityProblem } from './visibilityForm';
@@ -137,13 +137,42 @@ function splitChange(draft: ExpenseDraft, original: Expense, adultIds: readonly 
   return { amountJpy, payerMembershipId: draft.payerId, ...shareInput(draft, adultIds) };
 }
 
-/** 変更の入力。空にした項目は null で外す。公開範囲と場所は、変えたときだけ送る。 */
+/** 変更の入力。空にした項目は null で外す。公開範囲と場所は、変えたときだけ送る。種類は変えたときだけ送る（費目はいつも送る）。 */
 export function expenseDraftToUpdateInput(draft: ExpenseDraft, original: Expense, adultIds: readonly Id[], splitLocked: boolean): ExpenseUpdateInput {
   return {
+    ...(draft.kind !== original.kind ? { kind: draft.kind } : {}),
     title: draft.title.trim(), incurredOn: draft.date, category: draft.category, note: draft.note.trim() || null,
     ...visibilityChange(draft.audience, draft.selectedIds, original.visibility),
     ...(draft.place !== (original.place ?? null) ? { place: draft.place } : {}),
     ...(splitLocked ? {} : splitChange(draft, original, adultIds)),
+  };
+}
+
+const isIncomeCategory = (category: Expense['category']) => category.startsWith('income_');
+
+/** 編集の画面で種類を切り替えたときの下書き（A3）。費目が新しい種類に合わなければ既定に戻し、支出にするときは負担を等分から始める。 */
+export function withKind(draft: ExpenseDraft, kind: Expense['kind']): ExpenseDraft {
+  if (draft.kind === kind) return draft;
+  const category = isIncomeCategory(draft.category) === (kind === 'income') ? draft.category : defaultCategory(kind);
+  return { ...draft, kind, category, ...(kind === 'expense' ? { splitMode: 'equal' as const, customAmounts: {} } : {}) };
+}
+
+/**
+ * 記録済みの種類を変えるときに起きること（A3）。画面はこれで欄を出し分け、保存の前に知らせる。
+ * - clearsShares: 収入にすると負担が消える（保存の前に知らせる）。
+ * - requiresShares: 支出にすると負担を選ぶ必要がある。
+ * - category: 新しい種類の費目を選ぶ必要がある。
+ * - blockedBySettlement: 取り消していない精算があるので収入にできない（先に精算を取り消す）。
+ */
+export function kindChangeEffects(original: Expense, kind: Expense['kind']) {
+  const changes = original.kind !== kind;
+  const toIncome = changes && kind === 'income';
+  return {
+    changes,
+    clearsShares: toIncome && original.shares.length > 0,
+    requiresShares: changes && kind === 'expense',
+    category: kind,
+    blockedBySettlement: toIncome && hasActiveSettlement(original),
   };
 }
 
