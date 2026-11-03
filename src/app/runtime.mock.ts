@@ -1,5 +1,5 @@
 import { capabilitiesFor, projectSnapshotForViewer } from '../authz/policy';
-import { baseSnapshot } from '../data/fixtures';
+import { baseSnapshot, seededSnapshot } from '../data/fixtures';
 import { createMockGateway } from '../data/mockGateway';
 import type { HouseholdSnapshot } from '../domain/types';
 import type { AppRuntime } from './runtime';
@@ -11,7 +11,7 @@ function queryActor() {
 }
 
 function initialSnapshot(actorId: string): HouseholdSnapshot {
-  let snapshot = structuredClone(baseSnapshot);
+  let snapshot = seededSnapshot();
   const member = snapshot.memberships.find((item) => item.id === actorId) ?? snapshot.memberships[0];
   const viewer = { userId: member.userId, membershipId: member.id, role: member.role, status: member.status, capabilities: capabilitiesFor(member.role), permissionRevision: 1 } as HouseholdSnapshot['viewer'];
   snapshot = projectSnapshotForViewer(snapshot, viewer);

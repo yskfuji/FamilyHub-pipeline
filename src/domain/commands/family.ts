@@ -7,7 +7,7 @@ import type { CommandContext, SyncPort } from './context';
 type Membership = HouseholdMembership;
 
 export function createFamilyCommands(c: CommandContext): SyncPort<FamilyPort> {
-  const { a, state, nextId, viewer, requireCapability } = c;
+  const { a, state, nextId, viewer, requireCapability, ownerCandidateProblem } = c;
   const member = (id: Id) => state.memberships.find((item) => item.id === id && item.status !== 'left');
   const changed = () => { a.permissionRevision += 1; };
   const owners = () => state.memberships.filter((item) => item.role === 'owner' && item.status === 'active');
@@ -22,7 +22,7 @@ export function createFamilyCommands(c: CommandContext): SyncPort<FamilyPort> {
       const target = member(toMembershipId);
       const self = state.memberships.find((item) => item.id === viewer().membershipId);
       if (!target || !self) return missing('メンバー');
-      if (target.status !== 'active' || target.role !== 'adult') return invalid([{ message: '管理者は、利用中の大人のメンバーにだけ渡せます。' }]);
+      const problem = ownerCandidateProblem<Membership>(target); if (problem) return problem;
       if (target.version !== expectedVersion) return conflict('メンバー');
       target.role = 'owner'; target.version += 1;
       self.role = 'adult'; self.version += 1;

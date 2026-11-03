@@ -10,7 +10,6 @@ import type { AppDeps, RouteDeclaration } from '../context';
 import { parse } from '../parse';
 import { mutate, read } from '../rules';
 import { registerInviteAcceptance } from './inviteAcceptance';
-import { serverMessages } from '../../../src/content/serverMessages';
 
 const declare = (operationId: string, overrides: Partial<RouteDeclaration> = {}) => ({ route: { operationId, auth: 'session', csrf: true, capability: 'rule', idempotent: true, ...overrides } as RouteDeclaration });
 const reading = (operationId: string) => declare(operationId, { csrf: false, idempotent: false });
@@ -64,12 +63,8 @@ export function registerHouseholdRoutes(app: FastifyInstance, deps: AppDeps) {
   registerInviteAcceptance(app, deps);
   app.post('/v1/households/current/ownership', { config: declare('transferOwnership', { recentAuth: true }) }, (request, reply) => {
     const body = parse(z.object({ toMembershipId: idSchema, expectedVersion: z.number().int() }), request.body);
-    return mutate(deps, request, reply, (rules) => {
-      const target = rules.context.state.memberships.find((item) => item.id === body.toMembershipId);
-      const adult = target && deps.db.get<{ adult_declared_at: string | null }>('SELECT adult_declared_at FROM users WHERE id = ?', target.userId);
-      if (target && !adult?.adult_declared_at) return { ok: false, error: { code: 'INVALID_INPUT', message: serverMessages.ownerMustBeAdult, retryable: false } };
-      return rules.family.transferOwnership(body.toMembershipId, body.expectedVersion);
-    });
+    // 成人の申告の確認は、役割の変更と同じ共有の規則（CommandEnv.isAdultDeclared）で行う。
+    return mutate(deps, request, reply, (rules) => rules.family.transferOwnership(body.toMembershipId, body.expectedVersion));
   });
   app.post('/v1/households/current/leave', { config: declare('leaveHousehold', { recentAuth: true }) }, (request, reply) => mutate(deps, request, reply, (rules) => {
     const result = rules.family.leaveHousehold();

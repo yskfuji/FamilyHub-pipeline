@@ -1,14 +1,18 @@
 import type { ExpensePort } from '../../data/gateway';
-import { canDeleteResource } from '../../authz/policy';
+import { canDeleteResource, canSeeExpense, projectExpense } from '../../authz/policy';
 import { hasActiveSettlement, splitShares } from '../ledger';
 import { expenseInputSchema, expenseUpdateSchema, incomeCategorySchema } from '../schemas';
-import type { Expense, ExpenseShare, Id } from '../types';
+import type { Expense, ExpenseShare, Id, Result } from '../types';
 import { applyPatch, archive, conflict, denied, invalid, missing, ok, fail } from './context';
 import type { CommandContext, SyncPort } from './context';
 
 export function createExpenseCommands(c: CommandContext): SyncPort<ExpensePort> {
-  const { a, state, nextId, now, viewer, requireCapability, offlineFailure, visible, placeWriteGuard, withinRestoreWindow, foreignMember, resolveVisibility } = c;
+  const { a, state, nextId, now, viewer, requireCapability, offlineFailure, placeWriteGuard, withinRestoreWindow, foreignMember, resolveVisibility } = c;
   const stakeholders = (item: Expense) => [item.creatorMembershipId, item.payerMembershipId];
+  /** 一覧と同じ規則で、閲覧者に見える支出だけを探す。見えないものは、無いものと同じに扱う。 */
+  const seen = (item: Expense | undefined): item is Expense => Boolean(item) && canSeeExpense(viewer(), item!);
+  /** 応答は一覧と同じ投影を通す。見えない項目（場所など）は返さない。 */
+  const shown = (item: Expense): Result<Expense> => { const projected = projectExpense(item, viewer()); return projected ? ok(projected) : missing('支出'); };
   /** 金額を指定した負担。支払った人の分は最初から精算済みとして扱う。 */
   const exactShares = (payer: Id, amounts: ReadonlyArray<{ membershipId: Id; amountJpy: number }>): ExpenseShare[] => amounts.map((item) => ({ membershipId: item.membershipId, amountJpy: item.amountJpy, settledJpy: item.membershipId === payer ? item.amountJpy : 0 }));
   return {
@@ -32,11 +36,11 @@ export function createExpenseCommands(c: CommandContext): SyncPort<ExpensePort> 
         ...(data.note ? { note: data.note } : {}), ...(data.place ? { place: data.place } : {}),
       };
       state.expenses = [expense, ...state.expenses];
-      return ok(visible(expense));
+      return shown(expense);
     },
     updateExpense(id, input, expectedVersion) {
       const guard = requireCapability<Expense>('expense.update'); if (guard) return guard;
-      const target = state.expenses.find((item) => item.id === id && !item.deletedAt); if (!target) return missing('支出');
+      const target = state.expenses.find((item) => item.id === id && !item.deletedAt); if (!seen(target)) return missing('支出');
       const placeGuard = placeWriteGuard<Expense>(input.place); if (placeGuard) return placeGuard;
       const network = offlineFailure<Expense>(); if (network) return network;
       if (target.version !== expectedVersion) return conflict('支出');
@@ -52,6 +56,8 @@ export function createExpenseCommands(c: CommandContext): SyncPort<ExpensePort> 
       if (shareAmounts && shareAmounts.reduce((sum, item) => sum + item.amountJpy, 0) !== (amountJpy ?? target.amountJpy)) return invalid([{ message: '負担の合計を金額と合わせてください。' }]);
       const visibility = requested ? resolveVisibility(requested, target.creatorMembershipId) : null;
       if (visibility && !visibility.ok) return visibility;
+      // 変えた後も自分に見える範囲だけを選べる。見えなくなる変更は、結果を返せないので受け付けない。
+      if (visibility?.ok && !canSeeExpense(viewer(), { ...target, visibility: visibility.value })) return invalid([{ message: 'この公開範囲にすると、あなたが見られなくなります。' }]);
       Object.assign(target, rest);
       if (category) target.category = category;
       if (visibility?.ok) target.visibility = visibility.value;
@@ -64,11 +70,11 @@ export function createExpenseCommands(c: CommandContext): SyncPort<ExpensePort> 
       }
       applyPatch(target, { note, place });
       target.version += 1;
-      return ok(visible(target));
+      return shown(target);
     },
     deleteExpense(id, expectedVersion) {
       const guard = requireCapability<void>('expense.delete'); if (guard) return guard;
-      const target = state.expenses.find((item) => item.id === id && !item.deletedAt); if (!target) return missing('支出');
+      const target = state.expenses.find((item) => item.id === id && !item.deletedAt); if (!seen(target)) return missing('支出');
       const decision = canDeleteResource(viewer(), 'expense.delete', stakeholders(target)); if (!decision.allowed) return denied(decision);
       const network = offlineFailure<void>(); if (network) return network;
       if (target.version !== expectedVersion) return conflict('支出');
@@ -78,17 +84,17 @@ export function createExpenseCommands(c: CommandContext): SyncPort<ExpensePort> 
     },
     restoreExpense(id) {
       const guard = requireCapability<Expense>('expense.delete'); if (guard) return guard;
-      const target = state.expenses.find((item) => item.id === id) ?? a.archives.expenses[id]; if (!target?.deletedAt) return missing('支出');
+      const target = state.expenses.find((item) => item.id === id) ?? a.archives.expenses[id]; if (!seen(target) || !target.deletedAt) return missing('支出');
       const decision = canDeleteResource(viewer(), 'expense.delete', stakeholders(target)); if (!decision.allowed) return denied(decision);
       if (!withinRestoreWindow(target.deletedAt)) return fail({ code: 'CONFLICT', message: '削除から7日を過ぎたため、元に戻せません。', retryable: false });
       delete target.deletedAt; target.version += 1; delete a.archives.expenses[id];
-      return ok(visible(target));
+      return shown(target);
     },
     recordSettlement(expenseId, fromMembershipId, amountJpy) {
       const guard = requireCapability<Expense>('expense.settle'); if (guard) return guard;
       const network = offlineFailure<Expense>(); if (network) return network;
       const target = state.expenses.find((expense) => expense.id === expenseId && !expense.deletedAt);
-      if (!target) return missing('支出');
+      if (!seen(target)) return missing('支出');
       if (!Number.isInteger(amountJpy) || amountJpy <= 0) return invalid([{ message: '精算額は1円以上の整数にしてください。' }]);
       const share = target.shares.find((item) => item.membershipId === fromMembershipId && item.membershipId !== target.payerMembershipId);
       if (!share) return invalid([{ message: '精算する人を確認してください。' }]);
@@ -97,19 +103,19 @@ export function createExpenseCommands(c: CommandContext): SyncPort<ExpensePort> 
       share.settledJpy += applied;
       target.settlements.push({ id: nextId('settlement'), amountJpy: applied, fromMembershipId: share.membershipId, toMembershipId: target.payerMembershipId, recordedAt: now() });
       target.version += 1;
-      return ok(visible(target));
+      return shown(target);
     },
     reverseSettlement(expenseId, settlementId) {
       const guard = requireCapability<Expense>('expense.settle'); if (guard) return guard;
       const network = offlineFailure<Expense>(); if (network) return network;
-      const target = state.expenses.find((item) => item.id === expenseId && !item.deletedAt); if (!target) return missing('支出');
+      const target = state.expenses.find((item) => item.id === expenseId && !item.deletedAt); if (!seen(target)) return missing('支出');
       const settlement = target.settlements.find((item) => item.id === settlementId && item.amountJpy > 0 && !item.reversedAt); if (!settlement) return missing('精算記録');
       const share = target.shares.find((item) => item.membershipId === settlement.fromMembershipId); if (!share) return missing('負担記録');
       const at = now();
       settlement.reversedAt = at; share.settledJpy = Math.max(0, share.settledJpy - settlement.amountJpy);
       target.settlements.push({ id: nextId('settlement-reversal'), amountJpy: -settlement.amountJpy, fromMembershipId: settlement.toMembershipId, toMembershipId: settlement.fromMembershipId, recordedAt: at, reversalOfSettlementId: settlement.id });
       target.version += 1;
-      return ok(visible(target));
+      return shown(target);
     },
   };
 }

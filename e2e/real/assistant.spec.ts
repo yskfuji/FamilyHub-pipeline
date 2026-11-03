@@ -27,7 +27,7 @@ test('reading helpers work against the LLM double, and nothing saves until the u
 
   await test.step('a receipt fills the form and saves only on request', async () => {
     const dialog = await receiptDialog(page);
-    await expect(dialog).toContainText('読み取りの処理先へ送ります');
+    await expect(dialog).toContainText('家庭内で読み取ります');
     await dialog.getByLabel('領収書の画像').setInputFiles(image('receipt.png'));
     await dialog.getByRole('button', { name: '読み取る', exact: true }).click();
     const form = page.getByRole('dialog', { name: 'すぐに追加' });

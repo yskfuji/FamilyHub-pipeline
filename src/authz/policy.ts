@@ -1,6 +1,7 @@
 import type {
   AuthorizationDecision,
   Capability,
+  Expense,
   HouseholdMembership,
   HouseholdSnapshot,
   LinkedItemRef,
@@ -99,6 +100,17 @@ export function redactPlace<T extends { place?: PlaceRef }>(item: T, viewer: Vie
   return redacted;
 }
 
+/** 支出に関わる人。作った人、支払った人、負担する人。 */
+export const expenseRelated = (item: Expense) => [item.creatorMembershipId, item.payerMembershipId, ...item.shares.map((share) => share.membershipId)];
+
+/** 支出が閲覧者に見えるか。一覧（スナップショット）と、1件を変える操作の両方がこの規則を使う。 */
+export const canSeeExpense = (viewer: ViewerContext, item: Expense) => authorizeVisibleResource(viewer, 'expense.read', item.visibility, expenseRelated(item)).allowed;
+
+/** 1件の支出を閲覧者に返す形にする。見えなければ null。見えても、場所は place.read がなければ除く。 */
+export function projectExpense(item: Expense, viewer: ViewerContext): Expense | null {
+  return canSeeExpense(viewer, item) ? redactPlace(structuredClone(item), viewer) : null;
+}
+
 const canSeeItem = (snapshot: HouseholdSnapshot, viewer: ViewerContext, item: LinkedItemRef) => {
   if (item.kind === 'event') return snapshot.events.some((entry) => entry.id === item.id);
   if (item.kind === 'task') return snapshot.todos.some((entry) => entry.id === item.id);
@@ -124,7 +136,7 @@ const snapshotProjection: Record<keyof HouseholdSnapshot, Projector> = {
   todos: (snapshot, viewer) => { snapshot.todos = snapshot.todos.filter((item) => !item.deletedAt && authorizeVisibleResource(viewer, 'task.read', item.visibility, [item.creatorMembershipId, item.assigneeMembershipId, ...(item.reviewerMembershipId ? [item.reviewerMembershipId] : [])]).allowed); },
   memos: (snapshot, viewer) => { snapshot.memos = snapshot.memos.filter((item) => !item.deletedAt && authorizeVisibleResource(viewer, 'memo.read', item.visibility, [item.authorMembershipId]).allowed).map((item) => redactPlace(item, viewer)); },
   resources: (snapshot, viewer) => { snapshot.resources = snapshot.resources.filter((item) => authorizeVisibleResource(viewer, 'resource.read', item.visibility).allowed); },
-  expenses: (snapshot, viewer) => { snapshot.expenses = snapshot.expenses.filter((item) => !item.deletedAt && authorizeVisibleResource(viewer, 'expense.read', item.visibility, [item.creatorMembershipId, item.payerMembershipId, ...item.shares.map((share) => share.membershipId)]).allowed).map((item) => redactPlace(item, viewer)); },
+  expenses: (snapshot, viewer) => { snapshot.expenses = snapshot.expenses.filter((item) => !item.deletedAt).flatMap((item) => projectExpense(item, viewer) ?? []); },
   links: (snapshot, viewer) => { snapshot.links = snapshot.links.filter((link) => canSeeItem(snapshot, viewer, link.from) && canSeeItem(snapshot, viewer, link.to)); },
   memberships: (snapshot, viewer) => {
     if (authorize(viewer, 'household.members.read').allowed) return;

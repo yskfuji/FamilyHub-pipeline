@@ -1,4 +1,4 @@
-import { baseAlbumItems, baseAlbums, baseInvites, baseNotificationPreferences, baseNotifications, basePrivacySettings, baseSnapshot } from '../../src/data/fixtures';
+import { adultDeclaredUsers, baseAlbumItems, baseAlbums, baseInvites, baseNotificationPreferences, baseNotifications, basePrivacySettings, baseSnapshot, seededSnapshot } from '../../src/data/fixtures';
 import type { HouseholdAggregate } from '../../src/domain/commands';
 import { loadAggregate, saveAggregate } from '../db/aggregateStore';
 import type { Db } from '../db/db';
@@ -16,11 +16,11 @@ export function seedHousehold(db: Db, passwordHash: string, createdAt: string) {
       db.run('INSERT INTO household_members (user_id, household_id, membership_id) VALUES (?, ?, ?)', member.userId, household.id, member.id);
     }
     db.run("INSERT INTO entitlements (household_id, status, updated_at) VALUES (?, 'active', ?)", household.id, createdAt);
-    db.run('UPDATE users SET adult_declared_at = ? WHERE id IN (?, ?)', createdAt, 'user-aoi', 'user-ren');
+    for (const userId of adultDeclaredUsers) db.run('UPDATE users SET adult_declared_at = ? WHERE id = ?', createdAt, userId);
     const defaults = { privacy: basePrivacySettings, notificationPreferences: baseNotificationPreferences };
     const loaded = loadAggregate(db, household.id, 'member-aoi', defaults);
     const seeded: HouseholdAggregate = {
-      state: { ...structuredClone(baseSnapshot) },
+      state: seededSnapshot(),
       permissionOverrides: [], permissionRevision: 1,
       invites: structuredClone(baseInvites).map((invite) => ({ ...invite, token: invite.token ? hashInviteToken(invite.token) : undefined })),
       notifications: structuredClone(baseNotifications), notificationPreferences: structuredClone(baseNotificationPreferences), privacy: structuredClone(basePrivacySettings),

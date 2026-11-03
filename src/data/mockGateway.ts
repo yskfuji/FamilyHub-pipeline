@@ -1,9 +1,9 @@
 import type { FamilyHubGateway } from './gateway';
-import { baseAlbumItems, baseAlbums, baseInvites, baseNotificationPreferences, baseNotifications, basePrivacySettings, baseSecurityOverview, baseSnapshot, sampleEventCandidates, sampleReceipt } from './fixtures';
+import { baseAlbumItems, baseAlbums, baseInvites, baseNotificationPreferences, baseNotifications, basePrivacySettings, baseSecurityOverview, adultDeclaredUsers, sampleEventCandidates, sampleReceipt, seededSnapshot } from './fixtures';
 import { serverMessages } from '../content/serverMessages';
 import { readingImageProblem, readingUrlProblem } from '../domain/assistant';
 import type { AssistantJob, AssistantJobKind } from '../domain/assistant';
-import { accountUpdateSchema, signUpSchema } from '../domain/account';
+import { ADULT_AGE, accountUpdateSchema, ageOn, signUpSchema } from '../domain/account';
 import { passwordSchema } from '../domain/schemas';
 import { toJstRfc3339 } from '../domain/calendarDate';
 import { createHouseholdRules } from '../domain/commands';
@@ -27,7 +27,7 @@ const scenarioError = (scenario?: Scenario): GatewayError | null => {
 
 export function initialAggregate(): HouseholdAggregate {
   return {
-    state: structuredClone(baseSnapshot),
+    state: seededSnapshot(),
     permissionOverrides: [],
     permissionRevision: 1,
     invites: structuredClone(baseInvites),
@@ -71,8 +71,11 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
   // 確認用データの時計。操作のたびに1分進め、記録の前後関係（履歴の並び）を再現できるようにする。
   let clockTick = 0;
   const now = () => toJstRfc3339(new Date(Date.parse('2026-09-30T07:45:00+09:00') + (clockTick++) * 60_000));
+  /** 利用者ごとの成人の申告。見本の家族では、実際の環境の見本と同じく碧さんと蓮さんだけが申告している。 */
+  const adultDeclarations = new Set<Id>(adultDeclaredUsers);
   const rules = createHouseholdRules(aggregate, {
     actorMembershipId, now, nextId,
+    isAdultDeclared: (userId) => adultDeclarations.has(userId),
     newInviteToken: () => `FAMILY-2026-${String(sequence).padStart(4, '0')}-ONE-TIME`,
     connectionLost: () => offline,
     describeUser: (member, base) => ({ ...base, email: `${member.userId}@example.test` }),
@@ -94,7 +97,7 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
   };
   const thumbnailUrls = new Map<Id, string>();
   const actorMember = state.memberships.find((item) => item.id === actorMembershipId);
-  const account: AccountProfile = { displayName: actorMember?.displayName ?? '', email: `${actorMember?.userId ?? ''}@example.test`, avatar: { kind: 'initial' }, idleTimeoutMinutes: 30, birthdateDeclared: true, adultDeclared: actorMember?.role === 'owner' || actorMember?.role === 'adult', totpEnabled: false };
+  const account: AccountProfile = { displayName: actorMember?.displayName ?? '', email: `${actorMember?.userId ?? ''}@example.test`, avatar: { kind: 'initial' }, idleTimeoutMinutes: 30, birthdateDeclared: true, adultDeclared: adultDeclarations.has(actorMember?.userId ?? ''), totpEnabled: false };
 
   return {
     auth: {
@@ -124,8 +127,12 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
         const parsed = accountUpdateSchema.safeParse(input);
         if (!parsed.success) return fail({ code: 'INVALID_INPUT', message: parsed.error.issues[0]?.message ?? '入力を確認してください。', retryable: false });
         const { birthdate, ...fields } = parsed.data;
-        Object.assign(account, fields, birthdate ? { birthdateDeclared: true } : {});
         const member = state.memberships.find((item) => item.id === actorMembershipId);
+        // 実際の環境と同じく、誕生日を申告したときに成人かどうかを記録し直す。
+        if (birthdate && member) {
+          if (ageOn(birthdate, now().slice(0, 10)) >= ADULT_AGE) adultDeclarations.add(member.userId); else adultDeclarations.delete(member.userId);
+        }
+        Object.assign(account, fields, birthdate ? { birthdateDeclared: true, adultDeclared: adultDeclarations.has(member?.userId ?? '') } : {});
         if (member && fields.displayName) member.displayName = fields.displayName;
         return ok(structuredClone(account));
       },

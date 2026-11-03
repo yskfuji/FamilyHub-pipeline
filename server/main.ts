@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { toJstRfc3339 } from '../src/domain/calendarDate';
 import { loadConfig } from './config';
 import { Db } from './db/db';
-import { createLlmClient } from './adapters/llm';
+import { prepareLlmClient } from './adapters/llm';
 import { createMailer } from './adapters/mail';
 import { createScanner } from './adapters/scanner';
 import { createPageFetcher } from './adapters/urlFetcher';
@@ -14,7 +14,7 @@ const config = loadConfig();
 const db = new Db(config.databasePath);
 const jobs = new Set<Promise<void>>();
 const deps = {
-  db, config, mailer: createMailer(config), scanner: createScanner(config), weather: createWeatherSource(() => Date.now()), llm: createLlmClient(config.llm), pages: createPageFetcher(), runningReads: new Set<string>(), jobs,
+  db, config, mailer: createMailer(config), scanner: createScanner(config), weather: createWeatherSource(() => Date.now()), llm: await prepareLlmClient(config.llm), pages: createPageFetcher(), runningReads: new Set<string>(), jobs,
   clock: { now: () => toJstRfc3339(new Date()) },
   ids: { next: (prefix: string) => `${prefix}-${randomUUID()}`, inviteToken: () => randomBytes(18).toString('base64url') },
 };

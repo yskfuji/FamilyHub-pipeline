@@ -64,6 +64,43 @@ export function runGatewaySuite(world: (actorMembershipId?: string) => FamilyHub
       expect(await world('member-hana').memos.deleteMemo('memo-clinic')).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } });
     });
 
+    it('answers NOT_FOUND for every change to an expense the viewer cannot see, even when the viewer pays or shares it', async () => {
+      const owner = world();
+      const same = async (hidden: Promise<{ ok: boolean }>, absent: Promise<{ ok: boolean }>) => {
+        const [a, b] = await Promise.all([hidden, absent]);
+        expect(a).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } });
+        expect(a).toEqual(b);
+      };
+      await same(owner.expenses.recordSettlement('expense-ren-private', 'member-aoi', 100), owner.expenses.recordSettlement('expense-unknown', 'member-aoi', 100));
+      await same(owner.expenses.reverseSettlement('expense-ren-private', 'settlement-private'), owner.expenses.reverseSettlement('expense-unknown', 'settlement-private'));
+      await same(owner.expenses.updateExpense('expense-ren-private', { title: '書き換え' }, 1), owner.expenses.updateExpense('expense-unknown', { title: '書き換え' }, 1));
+      await same(owner.expenses.deleteExpense('expense-ren-private', 1), owner.expenses.deleteExpense('expense-unknown', 1));
+      await same(owner.expenses.restoreExpense('expense-ren-deleted'), owner.expenses.restoreExpense('expense-unknown'));
+      const trash = await owner.trash.list();
+      expect(trash.ok && trash.value.map((item) => item.id)).not.toContain('expense-ren-deleted');
+      // 見える人には、同じ操作が通る。
+      const adult = world('member-ren');
+      expect(await adult.expenses.recordSettlement('expense-ren-private', 'member-aoi', 100)).toMatchObject({ ok: true, value: { id: 'expense-ren-private', shares: [{ membershipId: 'member-aoi', settledJpy: 600 }, { membershipId: 'member-ren' }] } });
+      expect(await adult.expenses.restoreExpense('expense-ren-deleted')).toMatchObject({ ok: true, value: { id: 'expense-ren-deleted' } });
+    });
+
+    it('refuses an expense audience that would hide the record from the person changing it', async () => {
+      const owner = world();
+      expect(await owner.expenses.updateExpense('expense-august-utilities', { visibility: { audience: 'creator' } }, 1)).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+      const snapshot = await owner.household.getSnapshot();
+      expect(snapshot.ok && snapshot.value.expenses.find((item) => item.id === 'expense-august-utilities')?.visibility.audience).toBe('household');
+    });
+
+    it('lets an owner promote only a declared adult, and lets one of two owners leave', async () => {
+      const owner = world();
+      const guest = await owner.household.updateMembershipRole('member-yui', 'adult', 1);
+      expect(guest).toMatchObject({ ok: true, value: { role: 'adult' } });
+      expect(await owner.household.updateMembershipRole('member-yui', 'owner', 2)).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+      expect(await owner.family.transferOwnership('member-yui', 2)).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+      expect(await owner.household.updateMembershipRole('member-ren', 'owner', 1)).toMatchObject({ ok: true, value: { role: 'owner' } });
+      expect(await owner.family.leaveHousehold()).toEqual({ ok: true, value: undefined });
+    });
+
     it('refuses people from outside the household in every written reference', async () => {
       const gateway = world();
       expect(await gateway.todos.createTodo({ title: '外の人', assigneeMembershipId: 'member-other' })).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });

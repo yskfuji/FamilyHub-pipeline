@@ -1,6 +1,6 @@
 import type { EventCandidate, ReceiptProposal } from '../domain/assistant';
 import { capabilitiesFor } from '../authz/policy';
-import type { Album, AlbumItem, HouseholdInvite, HouseholdNotification, HouseholdSnapshot, NotificationPreferences, PrivacySettings, SecurityOverview, VisibilityPolicy } from '../domain/types';
+import type { Album, AlbumItem, Expense, HouseholdInvite, HouseholdNotification, HouseholdSnapshot, NotificationPreferences, PrivacySettings, SecurityOverview, VisibilityPolicy } from '../domain/types';
 
 export const fixedNow = '2026-09-30T07:30:00+09:00';
 const visibleTo = (creatorMembershipId: string, audience: VisibilityPolicy['audience'] = 'household', selectedMembershipIds: string[] = []): VisibilityPolicy => ({ audience, creatorMembershipId, selectedMembershipIds });
@@ -70,6 +70,21 @@ export const baseSnapshot: HouseholdSnapshot = {
     sync: { state: 'synced', lastSyncedAt: '2026-09-30T07:29:00+09:00' },
   },
 };
+
+/**
+ * 蓮さんだけが見られる支出。碧さんは負担する人や支払った人に入っていても、見ることも変えることもできない。
+ * 確認用データと試験の家族にだけ入れる。集計の試験は baseSnapshot の支出だけを使う。
+ */
+export const restrictedExpenses: Expense[] = [
+  { id: 'expense-ren-private', householdId: 'house-mori', kind: 'expense', creatorMembershipId: 'member-ren', visibility: visibleTo('member-ren', 'creator'), title: '贈り物の下見', amountJpy: 3000, incurredOn: '2026-09-28', payerMembershipId: 'member-ren', category: 'other', shares: [{ membershipId: 'member-aoi', amountJpy: 1500, settledJpy: 500 }, { membershipId: 'member-ren', amountJpy: 1500, settledJpy: 1500 }], settlements: [{ id: 'settlement-private', amountJpy: 500, fromMembershipId: 'member-aoi', toMembershipId: 'member-ren', recordedAt: '2026-09-29T08:00:00+09:00' }], version: 1 },
+  { id: 'expense-ren-deleted', householdId: 'house-mori', kind: 'expense', creatorMembershipId: 'member-ren', visibility: visibleTo('member-ren', 'creator'), title: '取り消した下見', amountJpy: 800, incurredOn: '2026-09-28', payerMembershipId: 'member-aoi', category: 'other', shares: [{ membershipId: 'member-aoi', amountJpy: 800, settledJpy: 800 }], settlements: [], deletedAt: '2026-09-29T20:00:00+09:00', version: 2 },
+];
+
+/** 成人を申告した利用者。管理者にできるのはこの人たちだけ。試験の家族（server/testing/seed.ts）も同じ一覧を使う。 */
+export const adultDeclaredUsers: readonly string[] = ['user-aoi', 'user-ren'];
+
+/** 確認用データと試験の家族に入れる記録の全体。 */
+export const seededSnapshot = (): HouseholdSnapshot => ({ ...structuredClone(baseSnapshot), expenses: structuredClone([...baseSnapshot.expenses, ...restrictedExpenses]) });
 
 export const baseSecurityOverview: SecurityOverview = {
   authenticators: [{ id: 'authenticator-macbook', label: 'MacBook', createdAt: '2026-09-28T18:00:00+09:00', kind: 'passkey', demo: true }],

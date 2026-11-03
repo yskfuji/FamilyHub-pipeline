@@ -1,3 +1,5 @@
+import { checkLlmUrl } from './adapters/llm';
+
 export interface ServerConfig {
   production: boolean;
   /** 利用者が開くオリジン。Origin の検査、Cookie、パスキーの RP ID に使う。 */
@@ -12,19 +14,25 @@ export interface ServerConfig {
   mediaPath: string;
   clamd: { host: string; port: number; timeoutMs: number } | null;
   smtp: { host: string; port: number; user?: string; password?: string; from: string } | null;
-  /** 読み取りの補助の接続先（OpenAI 互換）。既定では使わない。 */
-  llm: { url: string; key?: string; model: string; timeoutMs: number } | null;
+  /**
+   * 読み取りの補助の接続先（OpenAI 互換）。既定では使わない。同じ機械か家庭内だけに接続する。
+   * allowLanHttp は、loopback 以外へ平文の http で送ることを運営者が明示したとき（FAMILY_HUB_LLM_ALLOW_LAN_HTTP=1）だけ true。
+   */
+  llm: { url: string; key?: string; model: string; timeoutMs: number; allowLanHttp?: boolean } | null;
 }
 
 const loopback = (host: string) => host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
 
-/** 接続先の鍵と家族の画像を送るので、loopback のほかは https に限る。 */
+/**
+ * 家族の画像と本文を送るので、接続先は同じ機械か家庭内に限る（外部へは送らない）。
+ * URL の形と、IP をそのまま書いた宛先はここで確かめる。名前の宛先は起動のときに引いて確かめる（prepareLlmClient）。
+ */
 function loadLlm(env: NodeJS.ProcessEnv): ServerConfig['llm'] {
   if (!env.FAMILY_HUB_LLM_URL) return null;
-  const url = new URL(env.FAMILY_HUB_LLM_URL);
-  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && loopback(url.hostname))) throw new Error('FAMILY_HUB_LLM_URL must use https, or http on a loopback host');
+  const allowLanHttp = env.FAMILY_HUB_LLM_ALLOW_LAN_HTTP === '1';
+  const url = checkLlmUrl(env.FAMILY_HUB_LLM_URL, allowLanHttp);
   if (!env.FAMILY_HUB_LLM_MODEL) throw new Error('FAMILY_HUB_LLM_MODEL is required with FAMILY_HUB_LLM_URL');
-  return { url: url.href, key: env.FAMILY_HUB_LLM_KEY, model: env.FAMILY_HUB_LLM_MODEL, timeoutMs: Number(env.FAMILY_HUB_LLM_TIMEOUT_MS ?? 45_000) };
+  return { url: url.href, key: env.FAMILY_HUB_LLM_KEY, model: env.FAMILY_HUB_LLM_MODEL, timeoutMs: Number(env.FAMILY_HUB_LLM_TIMEOUT_MS ?? 45_000), allowLanHttp };
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {

@@ -24,6 +24,7 @@ function rulesFor(deps: AppDeps, aggregate: HouseholdAggregate, membershipId: Id
     now: deps.clock.now,
     nextId: deps.ids.next,
     newInviteToken: deps.ids.inviteToken,
+    isAdultDeclared: (id) => Boolean(deps.db.get<{ adult_declared_at: string | null }>('SELECT adult_declared_at FROM users WHERE id = ? AND deleted_at IS NULL', id)?.adult_declared_at),
     describeUser: () => {
       const row = deps.db.get<UserRow>('SELECT id, email, display_name, avatar_tone FROM users WHERE id = ?', userId);
       if (!row) throw new Error('user not found');

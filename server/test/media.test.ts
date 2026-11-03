@@ -237,6 +237,40 @@ describe('memo attachments', () => {
     expect(tampered.status).toBe(404);
   });
 
+  it('serves the type and name stored with the attachment, whatever the link query says', async () => {
+    const world = open();
+    const uploaded = await world.gateway.memos.uploadAttachment('memo-school', asFile(pdf, 'お知らせ.pdf', 'application/pdf'));
+    await settled(world);
+    const attachment = uploaded.ok ? uploaded.value.attachments.at(-1)! : null;
+    const link = await world.gateway.memos.getAttachmentLink('memo-school', attachment!.id);
+    const issued = new URL(link.ok ? link.value.url : '/', 'https://family.example.test');
+    expect([...issued.searchParams.keys()].sort()).toEqual(['disposition', 'expires', 'signature']);
+    expect(issued.searchParams.get('disposition')).toBe('attachment');
+    const { url, cookies } = await world.ready;
+    const headers = { Cookie: [...cookies].map(([name, value]) => `${name}=${value}`).join('; ') };
+    const get = (query: URLSearchParams) => fetch(`${url}${issued.pathname}?${query}`, { headers });
+    const stored = { type: 'application/pdf', disposition: `attachment; filename*=UTF-8''${encodeURIComponent('お知らせ.pdf')}` };
+    const served = async (query: URLSearchParams) => { const response = await get(query); await response.arrayBuffer(); return { status: response.status, type: response.headers.get('content-type'), disposition: response.headers.get('content-disposition') }; };
+    expect(await served(issued.searchParams)).toEqual({ status: 200, ...stored });
+    // 余計な値を足しても、配信する種類と名前は記録のまま。
+    const extra = new URLSearchParams(issued.searchParams);
+    extra.set('mime', 'text/html'); extra.set('name', 'evil.html'); extra.set('type', 'inline');
+    expect(await served(extra)).toEqual({ status: 200, ...stored });
+    // 署名した値を重ねて渡すと、どちらを使うかがあいまいになるので開けない。
+    const doubled = new URLSearchParams(issued.searchParams);
+    doubled.append('disposition', 'inline');
+    expect((await get(doubled)).status).toBe(404);
+    // 署名に含まれる値を変えると開けない。
+    for (const [key, value] of [['disposition', 'inline'], ['expires', String(Number(issued.searchParams.get('expires')) + 60_000)], ['signature', 'x'.repeat(43)]] as const) {
+      const tampered = new URLSearchParams(issued.searchParams);
+      tampered.set(key, value);
+      expect((await get(tampered)).status, key).toBe(404);
+    }
+    const unsigned = new URLSearchParams(issued.searchParams);
+    unsigned.delete('disposition');
+    expect((await get(unsigned)).status).toBe(404);
+  });
+
   it('removes the location from a video attachment, and refuses one it cannot read', async () => {
     const world = open();
     const uploaded = await world.gateway.memos.uploadAttachment('memo-school', asFile(sampleVideo(), 'clip.mp4', 'video/mp4'));

@@ -68,6 +68,46 @@ for (const file of serverFiles.filter((path) => !path.startsWith('server/adapter
 // 利用者が指定した URL の取得は、確認を通す1か所だけ。
 const pageFetcherSource = await readFile(resolve('server/adapters/urlFetcher.ts'), 'utf8');
 for (const required of ['pinnedLookup', 'isForbiddenAddress', 'agent: false', "'Accept-Encoding': 'identity'"]) if (!pageFetcherSource.includes(required)) failures.push(`server/adapters/urlFetcher.ts must keep ${required}`);
+// 読み取りの補助（LLM）は、確かめた宛先にだけ接続する。宛先は同じ機械か家庭内だけ（外部へは送らない）。
+// 接続は http(s).request の1か所で、名前を引き直さない lookup（pinnedLookup）と、使い回しをしない agent: false を必ず渡す。
+const llmPath = 'server/adapters/llm.ts';
+const llmSource = await readFile(resolve(llmPath), 'utf8');
+{
+  const ast = ts.createSourceFile(llmPath, llmSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const propertyOf = (literal, name) => literal.properties.find((item) => ts.isPropertyAssignment(item) && item.name.getText() === name);
+  let requests = 0;
+  const visit = (node) => {
+    if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier) && /^(node:)?(tls|net|http2|dgram|dns|dns\/promises)$|^(undici|axios|got|node-fetch)$/.test(node.moduleSpecifier.text)) {
+      const named = node.importClause?.namedBindings;
+      const onlyIsIp = node.moduleSpecifier.text === 'node:net' && !node.importClause?.name && named && ts.isNamedImports(named) && named.elements.every((item) => item.name.text === 'isIP');
+      if (!onlyIsIp) failures.push(`${llmPath}: must not import ${node.moduleSpecifier.text}; connect through http(s).request with the checked lookup`);
+    }
+    if (ts.isCallExpression(node)) {
+      const callee = node.expression;
+      if (ts.isIdentifier(callee) && ['fetch', 'connect', 'createConnection'].includes(callee.text)) failures.push(`${llmPath}: ${callee.text}() bypasses the checked lookup`);
+      if (ts.isPropertyAccessExpression(callee) && ['fetch', 'connect', 'createConnection'].includes(callee.name.text)) failures.push(`${llmPath}: ${callee.getText()}() bypasses the checked lookup`);
+      if (ts.isPropertyAccessExpression(callee) && ['request', 'get'].includes(callee.name.text)) {
+        requests += 1;
+        const [options] = node.arguments;
+        const literal = options && ts.isObjectLiteralExpression(options) ? options : null;
+        const lookup = literal && propertyOf(literal, 'lookup');
+        const agent = literal && propertyOf(literal, 'agent');
+        if (callee.name.text === 'get') failures.push(`${llmPath}: ${callee.getText()}() is not allowed; use request() with the checked lookup`);
+        else if (!lookup || !ts.isCallExpression(lookup.initializer) || lookup.initializer.expression.getText() !== 'pinnedLookup') failures.push(`${llmPath}: ${callee.getText()}() must pass lookup: pinnedLookup(...)`);
+        else if (!agent || agent.initializer.kind !== ts.SyntaxKind.FalseKeyword) failures.push(`${llmPath}: ${callee.getText()}() must pass agent: false`);
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(ast);
+  if (requests !== 1) failures.push(`${llmPath}: must open connections in exactly one http(s).request call (found ${requests})`);
+  for (const required of ['resolveChecked(', 'isLocalAddress', 'isLoopbackAddress']) if (!llmSource.includes(required)) failures.push(`${llmPath} must keep ${required}`);
+}
+// 起動のときに LLM の宛先を確かめる。名前が外へ解決するなら起動しない。
+for (const file of ['server/main.ts', 'server/dev.ts']) {
+  const content = await readFile(resolve(file), 'utf8');
+  if (!content.includes('prepareLlmClient(config.llm)') || content.includes('createLlmClient')) failures.push(`${file} must build the reading helper with prepareLlmClient(config.llm)`);
+}
 // 試験の緩めた設定を、本番の組み立てへ持ち込まない。
 for (const file of ['server/main.ts', 'server/dev.ts']) if (/testing:\s*\{|allowHttp|allowAnyPort/.test(await readFile(resolve(file), 'utf8'))) failures.push(`${file} must not relax the URL guard`);
 
@@ -127,4 +167,4 @@ if (!existsSync(resolve('dist-server/main.js')) || !existsSync(resolve('dist-ser
 }
 
 if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
-console.log(`Security static checks passed across ${sourceFiles.length} source files and ${serverFiles.length} server files (headers in sync; one place-lookup egress; outbound calls only in server/adapters; literal SQL; cookies in one module; server imports limited; no Japanese literals in server; builds free of test doubles and fixtures; matching build ids).`);
+console.log(`Security static checks passed across ${sourceFiles.length} source files and ${serverFiles.length} server files (headers in sync; one place-lookup egress; outbound calls only in server/adapters; the LLM connects only through the checked lookup; literal SQL; cookies in one module; server imports limited; no Japanese literals in server; builds free of test doubles and fixtures; matching build ids).`);

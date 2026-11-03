@@ -52,6 +52,7 @@ export const serverMessages = {
   emailInvalid: 'メールアドレスを確認してください。',
   alreadySet: 'すでに設定されています。',
   ownerMustBeAdult: '管理者は、18歳以上と確認できた人にだけ渡せます。',
+  ownerMustBeActiveAdult: '管理者は、利用中の大人のメンバーにだけ渡せます。',
   inviteInvalid: '招待コードが正しくないか、有効期限が切れています。招待した人に新しいコードを依頼してください。',
   mediaFailed: '処理できなかったため、保存しませんでした。もう一度追加してください。',
   mediaDuplicate: '同じ写真がすでにあります。',

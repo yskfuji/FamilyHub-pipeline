@@ -2,13 +2,15 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
-export type FakeLlmMode = 'valid' | 'malformed' | 'invalid' | 'timeout' | 'error';
+export type FakeLlmMode = 'valid' | 'malformed' | 'invalid' | 'timeout' | 'error' | 'redirect' | 'huge';
 
 export interface FakeLlmRequest { authorization?: string; body: { model: string; messages: Array<{ role: string; content: unknown }> } }
 
 export interface FakeLlm {
   url: string;
   requests: FakeLlmRequest[];
+  /** 受け付けた TCP の接続の数。 */
+  connections(): number;
   setMode(mode: FakeLlmMode): void;
   /** timeout の応答を待たせている接続を返させる。 */
   release(): void;
@@ -49,15 +51,20 @@ export async function startFakeLlm(port = 0): Promise<FakeLlm> {
       if (mode === 'malformed') return reply(response, 200, completion('これは JSON ではありません'));
       if (mode === 'invalid') return reply(response, 200, completion(JSON.stringify({ total: -5, date_text: 7, merchant: { a: 1 }, category: 'nothing', candidates: 'none' })));
       if (mode === 'timeout') { waiting.push(response); return undefined; }
+      if (mode === 'redirect') { response.writeHead(307, { Location: 'http://127.0.0.1:9/v1/chat/completions' }); response.end(); return undefined; }
+      if (mode === 'huge') return reply(response, 200, completion('x'.repeat(1024 * 1024 + 16)));
       return reply(response, 200, completion(JSON.stringify(valid)));
     })();
   });
+  let connections = 0;
+  server.on('connection', () => { connections += 1; });
   await new Promise<void>((resolve) => { server.listen(port, '127.0.0.1', resolve); });
   server.unref();
   const release = () => { for (const response of waiting) response.destroy(); waiting = []; };
   return {
     url: `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`,
     requests,
+    connections: () => connections,
     setMode: (next) => { mode = next; },
     release,
     close: () => new Promise((resolve) => { release(); server.closeAllConnections(); server.close(() => resolve()); }),

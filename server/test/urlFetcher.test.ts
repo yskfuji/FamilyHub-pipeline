@@ -1,8 +1,12 @@
-import { createServer } from 'node:http';
-import type { Server, ServerResponse } from 'node:http';
+import { EventEmitter } from 'node:events';
+import http, { createServer } from 'node:http';
+import type { IncomingMessage, Server, ServerResponse } from 'node:http';
+import https from 'node:https';
+import type { RequestOptions } from 'node:https';
 import { createServer as createTcpServer } from 'node:net';
 import type { AddressInfo } from 'node:net';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { Readable } from 'node:stream';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PAGE_MAX_BYTES, createPageFetcher, htmlToText, isForbiddenAddress, isForbiddenName, pinnedLookup, stripTracking } from '../adapters/urlFetcher';
 import type { PageFailure, PageFetcherOptions } from '../adapters/urlFetcher';
 
@@ -259,5 +263,49 @@ describe('what is sent and read', () => {
     htmlToText('<a '.repeat(700_000));
     expect(performance.now() - started).toBeLessThan(1500);
     expect(htmlToText('あ'.repeat(20_000))).toHaveLength(8000);
+  });
+});
+
+describe('port 443 only, with the production settings (A2)', () => {
+  // 本番と同じ設定（試験の緩めた設定なし）。名前は公開の宛先に解決し、https の要求は代役の応答で返す。
+  const production = () => createPageFetcher({ resolve: async () => [{ address: '93.184.216.34' }] });
+  const scripted = (responses: Array<{ status: number; headers: Record<string, string>; body?: string }>) => {
+    const calls: Array<{ host?: string | null; port?: string | number | null; protocol?: string | null }> = [];
+    vi.spyOn(http, 'request').mockImplementation(() => { throw new Error('plain http must not be used'); });
+    vi.spyOn(https, 'request').mockImplementation(((options: RequestOptions, callback: (response: IncomingMessage) => void) => {
+      calls.push({ host: options.host, port: options.port, protocol: options.protocol });
+      const next = responses.shift() ?? { status: 500, headers: {} };
+      const request = Object.assign(new EventEmitter(), {
+        end: () => { setImmediate(() => callback(Object.assign(Readable.from([Buffer.from(next.body ?? '')]), { statusCode: next.status, headers: next.headers }) as unknown as IncomingMessage)); },
+      });
+      return request;
+    }) as never);
+    return calls;
+  };
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('refuses a redirect to port 8443 without connecting to it', async () => {
+    const calls = scripted([{ status: 302, headers: { location: 'https://example.com:8443/next' } }]);
+    expect(await failure(production().read('https://example.com/start'))).toBe('blocked');
+    expect(calls).toEqual([{ host: 'example.com', port: 443, protocol: 'https:' }]);
+  });
+
+  it('refuses a redirect to plain http without connecting to it', async () => {
+    const calls = scripted([{ status: 301, headers: { location: 'http://example.com/next' } }]);
+    expect(await failure(production().read('https://example.com/start'))).toBe('invalid');
+    expect(calls).toHaveLength(1);
+  });
+
+  it('refuses plain http and another port before any connection', async () => {
+    const calls = scripted([]);
+    expect(await failure(production().read('http://example.com/'))).toBe('invalid');
+    expect(await failure(production().read('https://example.com:8443/'))).toBe('blocked');
+    expect(calls).toEqual([]);
+  });
+
+  it('still follows a redirect that stays on port 443', async () => {
+    const calls = scripted([{ status: 302, headers: { location: 'https://example.com:443/next' } }, { status: 200, headers: { 'content-type': 'text/plain' }, body: '届きました' }]);
+    expect((await production().read('https://example.com/start')).text).toBe('届きました');
+    expect(calls.map((call) => call.port)).toEqual([443, 443]);
   });
 });

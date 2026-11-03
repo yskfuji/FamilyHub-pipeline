@@ -46,10 +46,11 @@ API（`server/config.ts`、`server/main.ts`）の設定です。
 | `FAMILY_HUB_RECENT_AUTH_MS` | `300000` | 金銭や権限の操作に必要な、直近の本人確認の有効時間 |
 | `FAMILY_HUB_SMTP_HOST`、`_PORT`、`_USER`、`_PASSWORD`、`_FROM` | 未設定（ポートは587） | メール送信。未設定の間は、メールを使う機能を画面に出しません |
 | `FAMILY_HUB_CLAMD_HOST`、`_PORT`、`_TIMEOUT_MS` | 未設定（3310、600000） | ウイルス検査。`NODE_ENV=production` では `FAMILY_HUB_CLAMD_HOST` が必須 |
-| `FAMILY_HUB_LLM_URL` | 未設定 | 読み取りの補助の接続先（OpenAI 互換）。https か loopback の http。未設定なら機能は無効 |
+| `FAMILY_HUB_LLM_URL` | 未設定 | 読み取りの補助の接続先（OpenAI 互換）。同じ機械か家庭内だけ（loopback、10/8・172.16/12・192.168/16、fc00::/7）。外への宛先なら起動しない。未設定なら機能は無効 |
 | `FAMILY_HUB_LLM_MODEL` | なし | `FAMILY_HUB_LLM_URL` を設定するときは必須 |
 | `FAMILY_HUB_LLM_KEY` | 未設定 | 接続先の鍵 |
 | `FAMILY_HUB_LLM_TIMEOUT_MS` | `45000` | 読み取りの待ち時間 |
+| `FAMILY_HUB_LLM_ALLOW_LAN_HTTP` | 未設定 | `1` のときだけ、loopback 以外の家庭内の機械へ平文の http で送る。画像と本文と鍵が平文で流れる |
 | `PORT` | `8799` | API のポート |
 | `HOST` | `127.0.0.1` | API の待ち受けアドレス（`server/main.ts` だけ。`dev:server` は常に `127.0.0.1`） |
 

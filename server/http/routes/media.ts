@@ -46,8 +46,14 @@ function sendFile(request: FastifyRequest, reply: FastifyReply, path: string, si
   return reply.code(206).header('Content-Range', `bytes ${start}-${end}/${size}`).header('Content-Length', end - start + 1).send(createReadStream(path, { start, end }));
 }
 
-function signAttachment(deps: AppDeps, attachmentId: string, expires: number) {
-  return createHmac('sha256', deps.config.secret).update(`attachment:${attachmentId}:${expires}`).digest('base64url');
+/** 添付の表示方法。今は保存（attachment）だけ。署名に含めるので、リンクの値を書き換えても変えられない。 */
+const DISPOSITIONS = ['attachment'] as const;
+type Disposition = (typeof DISPOSITIONS)[number];
+const SERVABLE_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png', 'video/mp4', 'video/quicktime']);
+
+/** 署名の対象は id・期限・表示方法。種類と名前は配信のときに記録から読むので、リンクには入れない。 */
+function signAttachment(deps: AppDeps, attachmentId: string, expires: number, disposition: Disposition) {
+  return createHmac('sha256', deps.config.secret).update(`attachment:${attachmentId}:${expires}:${disposition}`).digest('base64url');
 }
 
 /** 検査が終わったら記録を更新する。結果の保存に失敗しても、確認待ちのまま開けない状態を保つ。 */
@@ -268,21 +274,34 @@ export function registerMediaRoutes(app: FastifyInstance, deps: AppDeps) {
     const readable = rules.memos.readableAttachment(param(request, 'memoId'), attachmentId);
     if (!readable.ok) return readable;
     const expires = Date.parse(deps.clock.now()) + LINK_TTL_MS;
-    const query = new URLSearchParams({ mime: readable.value.mimeType, name: readable.value.originalName, expires: String(expires), signature: signAttachment(deps, attachmentId, expires) });
+    const disposition: Disposition = 'attachment';
+    const query = new URLSearchParams({ expires: String(expires), disposition, signature: signAttachment(deps, attachmentId, expires, disposition) });
     return ok({ url: `/v1/attachment-files/${encodeURIComponent(attachmentId)}?${query}`, expiresAt: new Date(expires).toISOString() });
   }));
   app.get('/v1/attachment-files/:attachmentId', { config: reading('getAttachmentFile') }, async (request, reply) => {
     const actor = requireActor(request);
     if (!request.session) throw unauthenticated();
     const attachmentId = param(request, 'attachmentId');
-    const { expires, signature, mime, name } = parse(z.object({ expires: z.coerce.number(), signature: z.string(), mime: z.string(), name: z.string() }), request.query);
-    const expected = Buffer.from(signAttachment(deps, attachmentId, expires));
+    const notFound = () => sendError(reply, { code: 'NOT_FOUND', message: serverMessages.notFound, retryable: false });
+    // 署名した値だけを読む。同じ名前の値が重なれば、書き換えとみなして断る。ほかの値は使わない。
+    const query = request.query as Record<string, unknown>;
+    const single = (value: unknown) => (typeof value === 'string' ? value : undefined);
+    const expires = Number(single(query.expires));
+    const signature = single(query.signature);
+    const disposition = DISPOSITIONS.find((item) => item === single(query.disposition));
+    if (!Number.isSafeInteger(expires) || !signature || !disposition) return notFound();
+    const expected = Buffer.from(signAttachment(deps, attachmentId, expires, disposition));
     const presented = Buffer.from(signature);
-    if (expires <= Date.parse(deps.clock.now()) || expected.length !== presented.length || !timingSafeEqual(expected, presented)) return sendError(reply, { code: 'NOT_FOUND', message: serverMessages.notFound, retryable: false });
+    if (expires <= Date.parse(deps.clock.now()) || expected.length !== presented.length || !timingSafeEqual(expected, presented)) return notFound();
+    // 種類と名前は記録から取る。記録が消えたか、見られなくなったか、確認が終わっていなければ開けない。
+    const { aggregate } = loadAggregate(deps.db, actor.householdId, actor.membershipId, defaults);
+    const memo = aggregate.state.memos.find((item) => item.attachments.some((entry) => entry.id === attachmentId));
+    const readable = memo && createHouseholdRules(aggregate, { actorMembershipId: actor.membershipId, now: deps.clock.now, nextId: deps.ids.next, newInviteToken: deps.ids.inviteToken }).memos.readableAttachment(memo.id, attachmentId);
+    if (!readable?.ok) return notFound();
     const path = originalPath(deps.config.mediaPath, actor.householdId, attachmentId);
-    void reply.header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(name)}`);
     const size = (await stat(path).catch(() => null))?.size;
-    if (size === undefined) return sendError(reply, { code: 'NOT_FOUND', message: serverMessages.notFound, retryable: false });
-    return sendFile(request, reply, path, size, ['application/pdf', 'image/jpeg', 'image/png', 'video/mp4', 'video/quicktime'].includes(mime) ? mime : 'application/octet-stream', 'private, no-store');
+    if (size === undefined) return notFound();
+    void reply.header('Content-Disposition', `${disposition}; filename*=UTF-8''${encodeURIComponent(readable.value.originalName)}`);
+    return sendFile(request, reply, path, size, SERVABLE_TYPES.has(readable.value.mimeType) ? readable.value.mimeType : 'application/octet-stream', 'private, no-store');
   });
 }

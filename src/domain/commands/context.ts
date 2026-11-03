@@ -1,5 +1,6 @@
 import { allowedAudiencesFor, authorize, capabilitiesFor, projectSnapshotForViewer, redactPlace } from '../../authz/policy';
 import { ja } from '../../content/ja';
+import { serverMessages } from '../../content/serverMessages';
 import type { Album, AlbumItem, AuthorizationDecision, OccurrenceDeletion, CalendarEvent, Capability, Expense, GatewayError, HouseholdInvite, HouseholdMembership, HouseholdNotification, HouseholdSnapshot, Id, Memo, MutationContext, NotificationPreferences, PermissionOverride, PlaceRef, PrivacySettings, Result, Rfc3339, Todo, User, ViewerContext, VisibilityAudience, VisibilityPolicy } from '../types';
 import { RESTORE_WINDOW_DAYS } from '../restoreWindow';
 
@@ -38,6 +39,11 @@ export interface CommandEnv {
   /** 確認用の表示状態でだけ使う。接続できない状態を再現する。 */
   connectionLost?(): boolean;
   describeUser?(member: HouseholdMembership, base: User): User;
+  /**
+   * 利用者が18歳以上と申告しているか。管理者にする操作（移譲と役割の変更）が確かめる。
+   * 渡さない組み立て（定期の処理など）では、だれも管理者にできない。
+   */
+  isAdultDeclared?(userId: Id): boolean;
 }
 
 const RESTORE_WINDOW_MS = RESTORE_WINDOW_DAYS * 24 * 60 * 60 * 1000;
@@ -87,6 +93,12 @@ export function createCommandContext(a: HouseholdAggregate, env: CommandEnv) {
     const decision = authorize(viewer(), 'place.read');
     return decision.allowed ? null : denied<T>(decision);
   };
+  /** 管理者にできる人か。利用中の大人で、成人の申告があること。移譲と役割の変更の両方がこの規則を使う。 */
+  const ownerCandidateProblem = <T,>(target: HouseholdMembership): Result<T> | null => {
+    if (target.status !== 'active' || target.role !== 'adult') return invalid<T>([{ message: serverMessages.ownerMustBeActiveAdult }]);
+    if (!env.isAdultDeclared?.(target.userId)) return invalid<T>([{ message: serverMessages.ownerMustBeAdult }]);
+    return null;
+  };
   const withinRestoreWindow = (deletedAt?: string) => !deletedAt || Date.parse(now()) - Date.parse(deletedAt) <= RESTORE_WINDOW_MS;
   const defaultVisibility = () => ({ audience: a.privacy.defaultAudience, creatorMembershipId: viewer().membershipId, selectedMembershipIds: [] as Id[] });
   /** 入力に含まれる人が、この家族のメンバーであることを確かめる。他の家族の ID は受け付けない。 */
@@ -111,5 +123,5 @@ export function createCommandContext(a: HouseholdAggregate, env: CommandEnv) {
     snapshot.user = env.describeUser?.(actor(), base) ?? base;
     return snapshot;
   };
-  return { a, state, env, now, nextId, actor, viewer, requireCapability, offlineFailure, permissionConflict, visible, placeWriteGuard, withinRestoreWindow, defaultVisibility, foreignMember, foreignLabel, resolveVisibility, project };
+  return { a, state, env, now, nextId, actor, viewer, requireCapability, offlineFailure, permissionConflict, visible, placeWriteGuard, ownerCandidateProblem, withinRestoreWindow, defaultVisibility, foreignMember, foreignLabel, resolveVisibility, project };
 }

@@ -16,10 +16,13 @@ describe('規約とポリシーの草案', () => {
     expect(documentText('privacy')).toContain('OpenPOI');
     expect(documentText('privacy')).toContain('Open-Meteo');
   });
-  it('読み取りの補助は、既定で使わないことと、有効なときに送るものを明記する', () => {
+  it('読み取りの補助は、既定で使わないことと、家庭内で読み取り外部へ送らないことを明記する', () => {
     const text = documentText('privacy');
-    for (const phrase of ['読み取りの補助', '初期の設定では使いません', '運営者が有効にしたときだけ', '画像', '本文', '運営者が設定したサービスへ送ります']) expect(text).toContain(phrase);
-    expect(documentText('terms')).toContain('初期の設定では使いません');
+    for (const phrase of ['読み取りの補助', '初期の設定では使いません', '運営者が有効にしたときだけ', '画像', '本文', '同じ機械か家庭内のネットワーク', '外部へは送りません']) expect(text).toContain(phrase);
+    expect(text).not.toContain('運営者が設定したサービスへ送ります');
+    const external = legalDocuments.find((item) => item.id === 'privacy')?.sections.find((section) => section.heading === '外部のサービス');
+    expect(JSON.stringify(external)).not.toContain('読み取り');
+    for (const phrase of ['初期の設定では使いません', '外部のサービスへは送りません']) expect(documentText('terms')).toContain(phrase);
   });
   it('保存の期間（7日の復元、30日の削除）を明記する', () => {
     for (const id of ['terms', 'privacy']) {

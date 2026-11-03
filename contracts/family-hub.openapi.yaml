@@ -427,14 +427,29 @@ paths:
     get:
       operationId: getAttachmentFile
       x-gateway: none
-      description: Requires the session and a short-lived signature from getAttachmentLink.
+      description: >-
+        Requires the session and a short-lived signature from getAttachmentLink. The signature covers the
+        attachment id, the expiry and the disposition. The content type and the file name are read from the
+        stored attachment record, never from the query; other query values are ignored, and a signed value
+        given twice is refused. The attachment must still be readable by the viewer and checked clean.
+      parameters:
+        - { name: attachmentId, in: path, required: true, schema: { type: string } }
+        - { name: expires, in: query, required: true, schema: { type: integer }, description: Expiry in epoch milliseconds (signed) }
+        - { name: disposition, in: query, required: true, schema: { enum: [attachment] }, description: How the file is served (signed) }
+        - { name: signature, in: query, required: true, schema: { type: string } }
       responses:
-        '200': { description: OK }
+        '200':
+          description: The file, with Content-Type and Content-Disposition taken from the stored record
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '206': { description: Partial content for a Range request }
+        '404': { $ref: '#/components/responses/Error' }
         default: { $ref: '#/components/responses/Error' }
   /v1/households/current/ownership:
     post:
       operationId: transferOwnership
-      description: Hands the owner role to an active declared adult.
+      description: Hands the owner role to an active adult whose user has declared being 18 or older (shared rule with updateMembershipRole).
       parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
       requestBody:
         required: true
@@ -773,6 +788,9 @@ paths:
         default: { $ref: '#/components/responses/Error' }
     patch:
       operationId: updateMembershipRole
+      description: >-
+        Making someone owner follows the same shared rule as transferOwnership: the member must be an active adult
+        whose user has declared being 18 or older, otherwise INVALID_INPUT.
       parameters:
         - { $ref: '#/components/parameters/CsrfToken' }
         - { name: membershipId, in: path, required: true, schema: { type: string } }

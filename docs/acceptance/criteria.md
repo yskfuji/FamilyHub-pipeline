@@ -15,18 +15,18 @@
 
 | 項目 | 試験の ID | 結果 |
 |---|---|---|
-| A1 | （未記入） | 未実施 |
-| A2 | （未記入） | 未実施 |
+| A1 | 段階1。`server/test/llm.test.ts`: 「allowed addresses (A1-2)」の allows／refuses の全件（2）、「configuration and startup」の refuses to start with the URL…／refuses to start with an address outside the home…（`http://8.8.8.8`・`http://169.254.169.254` ほか）／accepts…（`https://192.168.1.10` ほか）／allows plain http to another machine on the home network only when it is stated（4）／refuses to start when the name resolves outside the home（`https://api.example.com`）／starts with the helper unavailable when the name does not resolve（1）、「each request」の resolves again for every request and connects to the checked address／never connects to a name that changes to a public address after startup／never connects when any later answer is outside…／opens the socket only to the pinned address…（3・5）、「createLlmClient」の does not use the global fetch／refuses a redirect without following it, and a body over 1 MiB／reports a connection failure without the URL or the key。`scripts/security-check.mjs` の LLM の規則（6。lookup を外す・`fetch` を足す・`agent: false` を外す注入で失敗することを確かめて戻した）。`src/content/legal.test.ts` の「読み取りの補助は、既定で使わないことと、家庭内で読み取り外部へ送らないことを明記する」、`e2e/real/assistant.spec.ts` の案内文（7） | 合格（段階1）。実物の LLM と、家庭内の別の機械への https は未確認 |
+| A2 | 段階1。新しく作ったのではなく、守られていることを示す試験を足した。`server/test/urlFetcher.test.ts` の「port 443 only, with the production settings (A2)」: refuses a redirect to port 8443 without connecting to it／refuses a redirect to plain http without connecting to it／refuses plain http and another port before any connection／still follows a redirect that stays on port 443。既存の「checks before any connection › refuses another port」 | 合格。443番の確認を外すと前の3つのうち2つが失敗することを確かめた。urlFetcher の動作は変えていない（宛先の判定を共有の部品 `server/adapters/destination.ts` へ移しただけ） |
 | A3 | （未記入） | 未実施 |
-| A4 | （未記入） | 未実施 |
+| A4 | 段階1（1の「閲覧者に見えること」の部分だけ）: `src/data/gateway.suite.ts` の「answers NOT_FOUND for every change to an expense the viewer cannot see, even when the viewer pays or shares it」（モックと実サーバー）。精算・精算の取り消し・更新・削除・復元が、一覧と同じ規則（`canSeeExpense`／`projectExpense`）で確かめ、応答も同じ投影を通す。最近削除からも見えない支出を外した | 一部（段階1）。`settleAll` は段階5 |
 | A5 | （未記入） | 未実施 |
 | A6 | （未記入） | 未実施 |
-| A7 | （未記入） | 未実施 |
+| A7 | 段階1（7だけ）: `server/test/media.test.ts` の「serves the type and name stored with the attachment, whatever the link query says」。種類と名前は記録から取り、署名は id・期限・表示方法（今は `attachment` だけ）を含む。余計な値は使わず、署名した値の書き換えと重複は 404 | 一部（段階1）。鍵束は段階2、inline は段階6 |
 | A8 | （未記入） | 未実施 |
 | A9 | （未記入） | 未実施 |
 | A10 | （未記入） | 未実施 |
 | A11 | （未記入） | 未実施 |
-| A12 | （未記入） | 未実施 |
+| A12 | 段階1（2と3）: `src/data/gateway.suite.ts` の「lets an owner promote only a declared adult, and lets one of two owners leave」（モックと実サーバー）。成人の申告は `CommandEnv.isAdultDeclared` で、移譲と役割の変更の両方が同じ規則（`ownerCandidateProblem`）で確かめる。モックは利用者ごとの申告を持つ | 一部（段階1）。画面（1）は段階9 |
 | A13 | （未記入） | 未実施 |
 | A14 | （未記入） | 未実施 |
 | A15 | （未記入） | 未実施 |

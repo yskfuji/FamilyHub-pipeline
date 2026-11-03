@@ -1,9 +1,13 @@
-import { lookup as dnsLookup } from 'node:dns/promises';
 import http from 'node:http';
 import type { IncomingMessage } from 'node:http';
 import https from 'node:https';
 import { isIP } from 'node:net';
 import type { LookupFunction } from 'node:net';
+import { DestinationError, defaultResolve, isForbiddenAddress, pinnedLookup as pinnedTo, resolveChecked } from './destination';
+import type { ResolveHost } from './destination';
+
+export { isForbiddenAddress } from './destination';
+export type { ResolveHost } from './destination';
 
 export const PAGE_MAX_BYTES = 2 * 1024 * 1024;
 export const PAGE_TIMEOUT_MS = 10_000;
@@ -15,61 +19,6 @@ export type PageFailure = 'invalid' | 'blocked' | 'unreachable' | 'redirects' | 
 export class PageRefused extends Error {
   readonly code: PageFailure;
   constructor(code: PageFailure) { super(code); this.code = code; }
-}
-
-const IPV4_BLOCKED: ReadonlyArray<readonly [string, number]> = [
-  ['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16], ['172.16.0.0', 12],
-  ['192.0.0.0', 24], ['192.0.2.0', 24], ['192.31.196.0', 24], ['192.52.193.0', 24], ['192.88.99.0', 24], ['192.168.0.0', 16], ['192.175.48.0', 24],
-  ['198.18.0.0', 15], ['198.51.100.0', 24], ['203.0.113.0', 24], ['224.0.0.0', 4], ['240.0.0.0', 4],
-  // 公開の範囲にある、クラウドのメタデータ。
-  ['168.63.129.16', 32],
-];
-
-const IPV6_UNICAST_BLOCKED: ReadonlyArray<readonly [string, number]> = [
-  ['2001::', 32], ['2001:2::', 48], ['2001:10::', 28], ['2001:20::', 28], ['2001:db8::', 32], ['3fff::', 20],
-];
-
-const bytesOfV4 = (address: string) => address.split('.').map(Number);
-
-function bytesOfV6(address: string): number[] {
-  const bare = address.split('%')[0].toLowerCase();
-  const tail = /^(.*:)(\d+\.\d+\.\d+\.\d+)$/.exec(bare);
-  const hex = tail ? `${tail[1]}${((Number(tail[2].split('.')[0]) << 8) + Number(tail[2].split('.')[1])).toString(16)}:${((Number(tail[2].split('.')[2]) << 8) + Number(tail[2].split('.')[3])).toString(16)}` : bare;
-  const [head, rest] = hex.split('::');
-  const left = head ? head.split(':') : [];
-  const right = rest ? rest.split(':') : [];
-  const groups = hex.includes('::') ? [...left, ...Array.from({ length: 8 - left.length - right.length }, () => '0'), ...right] : left;
-  return groups.flatMap((group) => { const value = parseInt(group, 16); return [value >> 8, value & 255]; });
-}
-
-function within(bytes: readonly number[], network: readonly number[], bits: number) {
-  for (let index = 0; index * 8 < bits; index += 1) {
-    const mask = bits - index * 8 >= 8 ? 255 : (255 << (8 - (bits - index * 8))) & 255;
-    if ((bytes[index] & mask) !== (network[index] & mask)) return false;
-  }
-  return true;
-}
-
-const forbiddenV4 = (bytes: readonly number[]) => IPV4_BLOCKED.some(([network, bits]) => within(bytes, bytesOfV4(network), bits));
-
-function forbiddenV6(bytes: readonly number[]) {
-  const zeros = (from: number, to: number) => bytes.slice(from, to).every((value) => value === 0);
-  // 中に IPv4 を埋め込む形は、埋め込まれた先で判定する。
-  if (zeros(0, 10) && bytes[10] === 255 && bytes[11] === 255) return forbiddenV4(bytes.slice(12));
-  if (within(bytes, bytesOfV6('64:ff9b::'), 96)) return forbiddenV4(bytes.slice(12));
-  if (within(bytes, bytesOfV6('2002::'), 16)) return forbiddenV4(bytes.slice(2, 6));
-  // それ以外は、グローバルユニキャスト（2000::/3）のほかをすべて拒む。
-  if (!within(bytes, bytesOfV6('2000::'), 3)) return true;
-  return IPV6_UNICAST_BLOCKED.some(([network, bits]) => within(bytes, bytesOfV6(network), bits));
-}
-
-/** 接続してはいけない宛先か。読めないものも拒む。 */
-export function isForbiddenAddress(address: string): boolean {
-  const bare = address.replace(/^\[|\]$/g, '').split('%')[0];
-  const family = isIP(bare);
-  if (family === 4) return forbiddenV4(bytesOfV4(bare));
-  if (family === 6) return forbiddenV6(bytesOfV6(bare));
-  return true;
 }
 
 const TRACKING_PREFIXES = ['utm_', 'hsa_', 'pk_', 'mtm_', 'oly_', 'vero_', 'mc_'];
@@ -95,8 +44,6 @@ export function isForbiddenName(host: string) {
   return host === 'localhost' || !host.includes('.') || INTERNAL_SUFFIXES.some((suffix) => host.endsWith(suffix));
 }
 
-export type ResolveHost = (host: string) => Promise<ReadonlyArray<{ address: string }>>;
-
 export interface PageFetcherOptions {
   /** 試験の代役にだけ渡す。本番の組み立てでは渡さない。 */
   testing?: { allowHttp?: boolean; allowAnyPort?: boolean; isForbidden?: (address: string) => boolean };
@@ -113,20 +60,10 @@ export interface PageFetcher {
   read(address: string): Promise<FetchedPage>;
 }
 
-/** 確かめた宛先だけを返す lookup。名前を引き直さないので、途中で宛先を差し替えられない。 */
+/** 確かめた宛先だけを返す lookup。共有の部品（destination.ts）を、内側を拒む判定で使う。 */
 export function pinnedLookup(host: string, address: string, isForbidden: (address: string) => boolean = isForbiddenAddress): LookupFunction {
-  const family = isIP(address);
-  return (name, options, callback) => {
-    if (name.replace(/\.$/, '').toLowerCase() !== host || isForbidden(address)) {
-      callback(new PageRefused('blocked'), '', 0);
-      return;
-    }
-    if (options.all) (callback as unknown as (error: null, addresses: Array<{ address: string; family: number }>) => void)(null, [{ address, family }]);
-    else callback(null, address, family);
-  };
+  return pinnedTo(host, address, (candidate) => !isForbidden(candidate), () => new PageRefused('blocked'));
 }
-
-const defaultResolve: ResolveHost = (host) => dnsLookup(host, { all: true, verbatim: true });
 
 const isRedirect = (status: number) => [301, 302, 303, 307, 308].includes(status);
 
@@ -203,13 +140,11 @@ export function createPageFetcher(options: PageFetcherOptions = {}): PageFetcher
 
   async function checkedAddress(url: URL) {
     const host = hostOf(url);
+    // IP をそのまま書いた宛先は target() で確かめ済み。1つでも内側の宛先が混ざる名前は使わない。
     if (isIP(host)) return host;
-    let answers: ReadonlyArray<{ address: string }>;
-    try { answers = await resolve(host); } catch { throw new PageRefused('unreachable'); }
-    if (!answers.length) throw new PageRefused('unreachable');
-    // 1つでも内側の宛先が混ざる名前は使わない。
-    if (answers.some((answer) => isForbidden(answer.address))) throw new PageRefused('blocked');
-    return answers[0].address;
+    try { return await resolveChecked(host, (address) => !isForbidden(address), resolve); } catch (error) {
+      throw new PageRefused(error instanceof DestinationError && error.reason === 'refused' ? 'blocked' : 'unreachable');
+    }
   }
 
   const open = (url: URL, address: string, signal: AbortSignal) => new Promise<IncomingMessage>((done, reject) => {

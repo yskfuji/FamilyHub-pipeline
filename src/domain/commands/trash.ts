@@ -1,5 +1,5 @@
 import type { TrashPort } from '../../data/gateway';
-import { authorize, authorizeVisibleResource, canDeleteResource } from '../../authz/policy';
+import { authorizeVisibleResource, canDeleteResource, canSeeExpense } from '../../authz/policy';
 import { RETENTION_DAYS } from '../restoreWindow';
 import type { TrashItem } from '../types';
 import { ok } from './context';
@@ -19,7 +19,7 @@ export function createTrashCommands(c: CommandContext): SyncPort<TrashPort> {
         ...a.occurrenceDeletions.filter((item) => fresh(item.deletedAt)).filter((item) => { const series = state.events.find((event) => event.id === item.eventId && !event.deletedAt); return series && can('event.delete', [series.ownerMembershipId, ...series.participantMembershipIds]); }).map((item) => ({ kind: 'occurrence' as const, id: item.eventId, occurrenceDate: item.occurrenceDate, title: item.title, deletedAt: item.deletedAt })),
         ...state.todos.filter((item) => fresh(item.deletedAt) && can('task.delete', [item.creatorMembershipId, item.assigneeMembershipId])).map((item) => ({ kind: 'task' as const, id: item.id, title: item.title, deletedAt: item.deletedAt! })),
         ...state.memos.filter((item) => fresh(item.deletedAt) && can('memo.delete', [item.authorMembershipId])).map((item) => ({ kind: 'memo' as const, id: item.id, title: item.title, deletedAt: item.deletedAt! })),
-        ...(authorize(me, 'expense.read').allowed ? state.expenses.filter((item) => fresh(item.deletedAt) && can('expense.delete', [item.creatorMembershipId, item.payerMembershipId])).map((item) => ({ kind: 'expense' as const, id: item.id, title: item.title, deletedAt: item.deletedAt! })) : []),
+        ...state.expenses.filter((item) => fresh(item.deletedAt) && can('expense.delete', [item.creatorMembershipId, item.payerMembershipId]) && canSeeExpense(me, item)).map((item) => ({ kind: 'expense' as const, id: item.id, title: item.title, deletedAt: item.deletedAt! })),
         ...a.albums.filter((item) => fresh(item.deletedAt) && can('album.delete', [item.creatorMembershipId]) && authorizeVisibleResource(me, 'album.read', item.visibility, [item.creatorMembershipId]).allowed).map((item) => ({ kind: 'album' as const, id: item.id, title: item.title, deletedAt: item.deletedAt! })),
         ...a.albumItems.filter((item) => fresh(item.deletedAt) && can('album.delete', [item.uploaderMembershipId])).map((item) => ({ kind: 'photo' as const, id: item.id, parentId: item.albumId, title: item.originalName, deletedAt: item.deletedAt! })),
       ];

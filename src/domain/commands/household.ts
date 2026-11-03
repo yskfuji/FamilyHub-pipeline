@@ -8,7 +8,7 @@ import { fail, invalid, missing, ok } from './context';
 import type { CommandContext, SyncPort } from './context';
 
 export function createHouseholdCommands(c: CommandContext): SyncPort<Omit<HouseholdPort, 'getSnapshot' | 'createHousehold'>> {
-  const { a, state, env, nextId, now, requireCapability, offlineFailure, project } = c;
+  const { a, state, env, nextId, now, requireCapability, offlineFailure, ownerCandidateProblem, project } = c;
   return {
     acceptInvite(code) {
       // 期限切れ・使用済み・取り消し・存在しないコードを区別しない（推測を防ぐ）。
@@ -38,6 +38,7 @@ export function createHouseholdCommands(c: CommandContext): SyncPort<Omit<Househ
       if (target.version !== expectedVersion) return fail({ code: 'CONFLICT', message: '別の端末で権限が更新されています。', retryable: true, reason: 'VERSION' });
       const activeOwners = state.memberships.filter((member) => member.status === 'active' && member.role === 'owner');
       if (target.role === 'owner' && role !== 'owner' && activeOwners.length === 1) return fail({ code: 'FORBIDDEN', message: '管理者は1人以上必要です。先に別のメンバーを管理者に変更してください。', retryable: false, reason: 'OWNER_REQUIRED' });
+      if (role === 'owner' && target.role !== 'owner') { const problem = ownerCandidateProblem<HouseholdSnapshot['memberships'][number]>(target); if (problem) return problem; }
       target.role = role; target.version += 1; a.permissionRevision += 1;
       return ok(structuredClone(target));
     },
