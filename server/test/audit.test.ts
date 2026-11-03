@@ -304,6 +304,17 @@ describe('retention and prune (A6-7)', () => {
     expect(() => loadConfig({ FAMILY_HUB_AUDIT_RETENTION_MONTHS: '-1' })).toThrow();
   });
 
+  it('counts back whole months and clamps to the last day of a shorter month', () => {
+    // setUTCMonth は 3月31日の1か月前を 3月3日にしていた（2月31日が繰り上がる）。
+    expect(retentionCutoff('2026-03-31T03:00:00+09:00', 1)).toBe('2026-02-28');
+    expect(retentionCutoff('2024-03-31T03:00:00+09:00', 1)).toBe('2024-02-29');
+    expect(retentionCutoff('2026-05-31T03:00:00+09:00', 1)).toBe('2026-04-30');
+    expect(retentionCutoff('2026-01-31T03:00:00+09:00', 2)).toBe('2025-11-30');
+    expect(retentionCutoff('2028-02-29T03:00:00+09:00', 24)).toBe('2026-02-28');
+    expect(retentionCutoff('2026-12-31T03:00:00+09:00', 12)).toBe('2025-12-31');
+    expect(retentionCutoff('2026-03-15T03:00:00+09:00', 0)).toBe('2026-03-15');
+  });
+
   it('leaves a checkpoint with the tail hash of the pruned range, then deletes it, and verify continues from the checkpoint', () => {
     const { log, store, db } = setup();
     addRows(log, 10);

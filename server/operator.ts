@@ -26,6 +26,8 @@ import type { AuditLog } from './audit/log';
  *                              その日より前の監査の記録を、checkpoint を残してから消す（既定は保持の期間の24か月より前）
  *   audit anchor               今の基準点（鎖の末尾の番号と hash）を表示し、運用ログ向けに残す
  *
+ * バックアップの命令（backup now|list|verify、restore）は server/backup/command.ts。
+ *
  * 終了コード: 0 は成功、1 は使い方の誤りか、断った（理由を標準エラーに出す）、2 は監査の記録の鎖に食い違いを見つけた。
  * 監査の記録は本体の DB の送り出しの箱に書き、命令の後で audit.db へ移す（server/cli.ts）。
  */
@@ -46,14 +48,21 @@ export function readAnchors(text: string): Anchor[] {
   return [...text.matchAll(/audit anchor\b[^\n]*?\bseq=(\d+) hash=([0-9a-f]{64})/g)].map((match) => ({ seq: Number(match[1]), hash: match[2] }));
 }
 
-/** 保持の期間の境（この日より前を消す）。 */
+/**
+ * 保持の期間の境（この日より前を消す）。months か月前の同じ日。その月にその日がなければ、その月の末日にそろえる
+ * （3月31日の1か月前は2月28日か29日。setUTCMonth のように3月へ繰り上がらない）。
+ */
 export function retentionCutoff(now: string, months: number) {
-  const date = new Date(Date.parse(`${now.slice(0, 10)}T00:00:00Z`));
-  date.setUTCMonth(date.getUTCMonth() - months);
-  return date.toISOString().slice(0, 10);
+  const [year, month, day] = now.slice(0, 10).split('-').map(Number);
+  const index = year * 12 + (month - 1) - months;
+  const targetYear = Math.floor(index / 12);
+  const targetMonth = index - targetYear * 12;
+  const lastDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+  const pad = (value: number, width = 2) => String(value).padStart(width, '0');
+  return `${pad(targetYear, 4)}-${pad(targetMonth + 1)}-${pad(Math.min(day, lastDay))}`;
 }
 
-const usage = 'usage: list | grant <household> [days] | expire <household> | suspend <membership> | resume <membership> | keys status | keys rotate | keys retire <kid> | totp reset --user <id> | audit verify [--anchors <file>] | audit prune [--before <YYYY-MM-DD>] | audit anchor';
+const usage = 'usage: list | grant <household> [days] | expire <household> | suspend <membership> | resume <membership> | keys status | keys rotate | keys retire <kid> | totp reset --user <id> | audit verify [--anchors <file>] | audit prune [--before <YYYY-MM-DD>] | audit anchor | backup now | backup list | backup verify <id> | restore <id> --to <dir>';
 
 export function runOperatorCommand(argv: readonly string[], env: OperatorEnv): number {
   const { db, keys, now, out, err } = env;

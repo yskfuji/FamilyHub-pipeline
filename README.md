@@ -47,6 +47,9 @@ API（`server/config.ts`、`server/main.ts`）の設定です。
 | `FAMILY_HUB_AUDIT_DB` | `FAMILY_HUB_DATABASE` と同じディレクトリの `audit.db` | 監査の記録（変更の記録）のファイル。権限 0600 で作る。改ざんに気づく仕組みと限界は [配備の覚え書き](deploy/README.md#監査の記録) |
 | `FAMILY_HUB_AUDIT_RETENTION_MONTHS` | `24` | 監査の記録を残す月数。過ぎた分は毎日 checkpoint を残してから消す。0 なら消さない |
 | `FAMILY_HUB_MEDIA` | `data/media` | 写真、動画、添付の保存先 |
+| `FAMILY_HUB_BACKUP_DIR` | 未設定 | 暗号化したバックアップの置き場所。`FAMILY_HUB_BACKUP_KEY` と両方あるときだけ毎日作る。なければ自動のバックアップは止まり、起動のときに運用ログへ出す（[配備の覚え書き](deploy/README.md#バックアップ)） |
+| `FAMILY_HUB_BACKUP_KEY` | 未設定 | バックアップ専用の鍵。32文字以上。`FAMILY_HUB_SECRET`・`FAMILY_HUB_KEYS` と同じ値では起動しない。API の機械とも置き場所とも別に保管する |
+| `FAMILY_HUB_BACKUP_AT`、`FAMILY_HUB_BACKUP_TZ` | `03:00`、`Asia/Tokyo` | 毎日のバックアップの時刻と、日・週・月（日7・週4・月6）を数える時間帯 |
 | `FAMILY_HUB_RECENT_AUTH_MS` | `300000` | 金銭や権限の操作に必要な、直近の本人確認の有効時間 |
 | `FAMILY_HUB_SMTP_HOST`、`_PORT`、`_USER`、`_PASSWORD`、`_FROM` | 未設定（ポートは587） | メール送信。未設定の間は、メールを使う機能を画面に出しません |
 | `FAMILY_HUB_CLAMD_HOST`、`_PORT`、`_TIMEOUT_MS` | 未設定（3310、600000） | ウイルス検査。`NODE_ENV=production` では `FAMILY_HUB_CLAMD_HOST` が必須 |
@@ -76,9 +79,13 @@ npx tsx server/cli.ts keys status               # 鍵ごとの状態と、確認
 npx tsx server/cli.ts keys rotate               # 確認コードの秘密を有効な鍵で暗号化し直す（何度実行してもよい）
 npx tsx server/cli.ts keys retire <kid>         # 参照が0件の鍵を引退させる
 npx tsx server/cli.ts totp reset --user <id>    # その人の確認コードと回復コードを消す
+npx tsx server/cli.ts backup now                # 暗号化したバックアップを作って確かめる
+npx tsx server/cli.ts backup list               # バックアップの世代の一覧
+npx tsx server/cli.ts backup verify <id>        # 世代を確かめる（食い違いは終了コード2）
+npx tsx server/cli.ts restore <id> --to <dir>   # 新しいか空のディレクトリへ復元する（API が動いている間は断る）
 ```
 
-終了コードは、成功が0、使い方の誤りと断ったときが1です（理由は標準エラーに出ます）。
+終了コードは、成功が0、使い方の誤りと断ったときが1です（理由は標準エラーに出ます）。`audit verify` と `backup verify` などの確認で食い違いを見つけたときは2です。
 
 ## ビルド
 

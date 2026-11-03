@@ -1,6 +1,6 @@
 import { chmodSync, closeSync, mkdirSync, openSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync, backup } from 'node:sqlite';
 import type { SQLInputValue } from 'node:sqlite';
 import { migrations as mainMigrations } from './migrations';
 
@@ -11,6 +11,11 @@ export interface DbOptions {
   migrations?: readonly string[];
   /** ファイルの権限。作るときに付け、すでにあるファイルも開く前にこの権限へそろえる。 */
   mode?: number;
+  /**
+   * バックアップの写しを確かめるときに使う。readOnly は読むだけで開き、スキーマの変更も設定の変更もしない。
+   * single は WAL をやめて1つのファイルにまとめる（写しを暗号化する前と、復元したファイル）。
+   */
+  access?: 'readOnly' | 'single';
 }
 
 /** データベースの入口はこのファイルだけにする。駆動の差し替えをここで閉じるため。 */
@@ -30,9 +35,25 @@ export class Db {
         chmodSync(path, options.mode);
       }
     }
+    if (options.access === 'readOnly') {
+      this.raw = new DatabaseSync(path, { readOnly: true });
+      return;
+    }
     this.raw = new DatabaseSync(path);
+    if (options.access === 'single') {
+      this.raw.exec('PRAGMA journal_mode = DELETE; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
+      return;
+    }
     this.raw.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
     this.migrate(options.migrations ?? mainMigrations);
+  }
+
+  /**
+   * SQLite のバックアップ API で、動いている間も一貫した写しを path へ作る（A8）。
+   * 少しずつ写し、その間に同じ接続で書いた分も写しに含まれる。写したページの数を返す。
+   */
+  backupTo(path: string, options: { rate?: number; progress?: (progress: { totalPages: number; remainingPages: number }) => void } = {}): Promise<number> {
+    return backup(this.raw, path, { rate: options.rate ?? 256, progress: options.progress });
   }
 
   private migrate(migrations: readonly string[]) {

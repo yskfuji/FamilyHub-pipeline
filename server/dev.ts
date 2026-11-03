@@ -10,12 +10,14 @@ import { createMailer } from './adapters/mail';
 import { createScanner } from './adapters/scanner';
 import { createPageFetcher } from './adapters/urlFetcher';
 import { createWeatherSource } from './adapters/weather';
+import { holdServerLock } from './backup/lock';
 import { buildApp } from './http/app';
 import { startJobs } from './jobs';
 import { SEED_PASSWORD, seedHousehold } from './testing/seed';
 
 /** 開発用の起動。見本の家族を入れる。本番の組み立てには含めない。 */
 const config = loadConfig({ ...process.env, FAMILY_HUB_DATABASE: process.env.FAMILY_HUB_DATABASE ?? 'data/dev.sqlite' });
+holdServerLock(config.databasePath);
 const db = new Db(config.databasePath);
 const now = () => toJstRfc3339(new Date());
 if (!db.get('SELECT id FROM users LIMIT 1')) seedHousehold(db, await hashPassword(SEED_PASSWORD), now());

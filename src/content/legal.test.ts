@@ -38,6 +38,10 @@ describe('規約とポリシーの草案', () => {
     expect(documentText('privacy')).toContain('見られない記録');
     expect(documentText('privacy')).toContain('IPアドレスは含みません');
   });
+  it('削除した記録とアカウントも、最長6か月はバックアップに残ることを明記する（A8-9）', () => {
+    const text = documentText('privacy');
+    for (const phrase of ['バックアップ', '暗号化', '最長6か月', '削除した記録や退会したアカウントの情報も']) expect(text).toContain(phrase);
+  });
   it('本文は構造化した文字列だけで、HTML を含まない', () => {
     expect(JSON.stringify(legalDocuments)).not.toMatch(/<[a-z/]/i);
   });

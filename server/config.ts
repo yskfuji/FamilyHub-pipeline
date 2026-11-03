@@ -2,6 +2,9 @@ import { dirname, join } from 'node:path';
 import { AUDIT_RETENTION_MONTHS } from '../src/domain/auditLog';
 import { checkLlmUrl } from './adapters/llm';
 import { Keyring, keyringSourceFrom } from './auth/keyring';
+import type { KeyringSource } from './auth/keyring';
+import { isTimeZone } from './backup/calendar';
+import { MIN_BACKUP_KEY_LENGTH } from './backup/format';
 
 export interface ServerConfig {
   production: boolean;
@@ -26,6 +29,34 @@ export interface ServerConfig {
    * allowLanHttp は、loopback 以外へ平文の http で送ることを運営者が明示したとき（FAMILY_HUB_LLM_ALLOW_LAN_HTTP=1）だけ true。
    */
   llm: { url: string; key?: string; model: string; timeoutMs: number; allowLanHttp?: boolean } | null;
+  /**
+   * 暗号化したバックアップ（A8、server/backup）。FAMILY_HUB_BACKUP_DIR と FAMILY_HUB_BACKUP_KEY の両方があるときだけ、毎日自動で作る。
+   * どちらかがなければ null（自動のバックアップは止まり、起動のときに運用ログへ出す。起動は止めない）。
+   */
+  backup: BackupConfig | null;
+}
+
+export interface BackupConfig {
+  dir: string;
+  /** 32文字以上。鍵束（FAMILY_HUB_KEYS・FAMILY_HUB_SECRET）とは別の値にする。 */
+  key: string;
+  /** 毎日の実行の時刻（家族の時間帯）。既定は 03:00。 */
+  at: { hour: number; minute: number };
+  /** 日・週・月を数える時間帯。既定は Asia/Tokyo。 */
+  timeZone: string;
+}
+
+/** バックアップの設定。鍵が短い・鍵束と同じ・時刻や時間帯の形が違うときは起動しない。置き場所か鍵がないときは null。 */
+export function loadBackup(env: NodeJS.ProcessEnv, keyring: KeyringSource): BackupConfig | null {
+  const key = env.FAMILY_HUB_BACKUP_KEY ?? '';
+  if (key && key.length < MIN_BACKUP_KEY_LENGTH) throw new Error('FAMILY_HUB_BACKUP_KEY must be at least 32 characters');
+  if (key && keyring.keys.some((item) => item.secret === key)) throw new Error('FAMILY_HUB_BACKUP_KEY must differ from FAMILY_HUB_SECRET and every key in FAMILY_HUB_KEYS');
+  const at = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(env.FAMILY_HUB_BACKUP_AT ?? '03:00');
+  if (!at) throw new Error('FAMILY_HUB_BACKUP_AT must be a time such as 03:00');
+  const timeZone = env.FAMILY_HUB_BACKUP_TZ ?? 'Asia/Tokyo';
+  if (!isTimeZone(timeZone)) throw new Error('FAMILY_HUB_BACKUP_TZ must be a time zone name such as Asia/Tokyo');
+  if (!env.FAMILY_HUB_BACKUP_DIR || !key) return null;
+  return { dir: env.FAMILY_HUB_BACKUP_DIR, key, at: { hour: Number(at[1]), minute: Number(at[2]) }, timeZone };
 }
 
 const loopback = (host: string) => host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
@@ -45,7 +76,8 @@ function loadLlm(env: NodeJS.ProcessEnv): ServerConfig['llm'] {
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const production = env.NODE_ENV === 'production';
   const origin = new URL(env.FAMILY_HUB_ORIGIN ?? 'http://localhost:4174').origin;
-  const keys = new Keyring(keyringSourceFrom(env, production));
+  const keyringSource = keyringSourceFrom(env, production);
+  const keys = new Keyring(keyringSource);
   const url = new URL(origin);
   const secureCookies = url.protocol === 'https:';
   if (production && !secureCookies) throw new Error('production requires an https origin');
@@ -67,5 +99,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     recentAuthMs: Number(env.FAMILY_HUB_RECENT_AUTH_MS ?? 300_000),
     smtp: env.FAMILY_HUB_SMTP_HOST ? { host: env.FAMILY_HUB_SMTP_HOST, port: Number(env.FAMILY_HUB_SMTP_PORT ?? 587), user: env.FAMILY_HUB_SMTP_USER, password: env.FAMILY_HUB_SMTP_PASSWORD, from: env.FAMILY_HUB_SMTP_FROM ?? 'no-reply@family.example' } : null,
     llm: loadLlm(env),
+    backup: loadBackup(env, keyringSource),
   };
 }

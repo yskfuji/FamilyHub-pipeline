@@ -18,8 +18,9 @@ export const RECENT_ROWS = 5000;
 export class AuditStore {
   readonly db: Db;
 
-  constructor(path: string) {
-    this.db = new Db(path, { migrations: auditMigrations, mode: 0o600 });
+  /** path を渡すとそのファイルを開く。Db を渡すと、その接続を使う（バックアップの写しを読むだけで開くとき）。 */
+  constructor(source: string | Db) {
+    this.db = typeof source === 'string' ? new Db(source, { migrations: auditMigrations, mode: 0o600 }) : source;
   }
 
   /** 末尾の行（なければ最後の checkpoint、それもなければ起点）。 */

@@ -9,10 +9,13 @@ import { createMailer } from './adapters/mail';
 import { createScanner } from './adapters/scanner';
 import { createPageFetcher } from './adapters/urlFetcher';
 import { createWeatherSource } from './adapters/weather';
+import { holdServerLock } from './backup/lock';
 import { buildApp } from './http/app';
 import { startJobs } from './jobs';
 
 const config = loadConfig();
+// 復元の命令は、このロックを持つ API が動いている間は断る。
+holdServerLock(config.databasePath);
 const db = new Db(config.databasePath);
 const auditStore = new AuditStore(config.auditDatabasePath);
 const jobs = new Set<Promise<void>>();

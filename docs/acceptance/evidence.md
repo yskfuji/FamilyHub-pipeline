@@ -118,6 +118,9 @@
 | 動いている途中のファイルの単純な複写は壊れることがある | [How To Corrupt](https://www.sqlite.org/howtocorrupt.html) | O |
 | `integrity_check` は外部キーを見ないので `foreign_key_check` も行う | [PRAGMA](https://www.sqlite.org/pragma.html) | O |
 | `node:sqlite` の `backup()` は v23.8.0 と v22.16.0 で追加。モジュールは Release candidate | [Node.js sqlite](https://nodejs.org/api/sqlite.html) | O |
+| AES-GCM の AAD は暗号化しないが認証する。塊のファイル・番号・最後かを AAD に入れると、入れ替え・並べ替え・切り捨ては復号の確認で失敗する | [NIST SP 800-38D](https://csrc.nist.gov/pubs/sp/800/38/d/final) | O |
+| 1つの秘密から用途ごとの鍵を HKDF で導く | [RFC 5869](https://www.rfc-editor.org/rfc/rfc5869) | O |
+| 写しを3つ、2種類の媒体に、1つは別の場所に置く（3-2-1） | [CISA Data Backup Options](https://www.cisa.gov/sites/default/files/publications/data_backup_options.pdf) | O |
 
 ## 11. 外への通信
 

@@ -6,14 +6,30 @@ import { planNotifications } from '../src/domain/notificationPlan';
 import { loadAggregate, saveAggregate } from './db/aggregateStore';
 import { purgeReadings } from './assistant/jobs';
 import type { AppDeps } from './http/context';
+import { maintenanceLock } from './backup/lock';
+import { createBackupScheduler } from './backup/schedule';
 import { originalPath, quarantinePath } from './media/pipeline';
 import { retentionCutoff } from './operator';
 
 const defaults = { privacy: { defaultAudience: 'household' as const, hideNotificationContent: true, placeLookupConsent: null }, notificationPreferences: { todoDue: true, eventDeparture: true, quietHours: true } };
 const IDEMPOTENCY_KEEP_MS = 72 * 3_600_000;
 
-/** 削除から30日を過ぎた記録とファイルを消し、期限切れの一時的な記録を片付ける。 */
-export async function runRetention(deps: AppDeps) {
+/**
+ * 削除から30日を過ぎた記録とファイルを消し、期限切れの一時的な記録を片付ける。消したファイルの数を返す。
+ * バックアップが動いている間は（メディアの手入れのロックを持てないので）何もせず null を返し、次の回に行う。
+ * 写した DB が参照するファイルを、写し終える前に消さないため（A8-2）。
+ */
+export async function runRetention(deps: AppDeps): Promise<number | null> {
+  const lock = maintenanceLock(deps.config.mediaPath);
+  if (!lock.tryAcquire()) return null;
+  try {
+    return await purgeAndTidy(deps);
+  } finally {
+    lock.release();
+  }
+}
+
+async function purgeAndTidy(deps: AppDeps) {
   const now = deps.clock.now();
   const files: Array<{ householdId: string; id: string }> = [];
   for (const { household_id: householdId } of deps.db.all<{ household_id: string }>('SELECT DISTINCT household_id FROM household_members')) {
@@ -70,7 +86,13 @@ export function runAuditDaily(deps: AppDeps) {
 
 export function startJobs(deps: AppDeps) {
   try { runAuditDaily(deps); } catch (error) { console.error(`audit: daily upkeep failed (${error instanceof Error ? error.message : 'unknown'})`); }
+  const backup = deps.config.backup;
+  const backupTick = backup ? createBackupScheduler(backup, { db: deps.db, audit: deps.audit, mediaPath: deps.config.mediaPath }, { info: (line) => console.log(line), error: (line) => console.error(line) }) : null;
+  if (backup) console.log(`backup: automatic backups are on, every day at ${String(backup.at.hour).padStart(2, '0')}:${String(backup.at.minute).padStart(2, '0')} ${backup.timeZone}`);
+  // 置き場所か鍵がなければ、自動のバックアップは止まる。起動は止めない（本番では警告として出す）。
+  else (deps.config.production ? console.warn : console.log)('backup: automatic backups are OFF; set FAMILY_HUB_BACKUP_DIR and FAMILY_HUB_BACKUP_KEY to turn them on (see deploy/README.md)');
   const timers = [
+    ...(backupTick ? [setInterval(() => { void backupTick(); }, 60_000)] : []),
     // 確定の後に移しそこねた監査の記録を、短い間隔で audit.db へ移す。
     setInterval(() => { deps.audit.flush(); }, 5_000),
     setInterval(() => { try { runAuditDaily(deps); } catch { /* 次の回でやり直す */ } }, 3_600_000),
