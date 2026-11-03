@@ -86,6 +86,10 @@
 | Argon2id m=19MiB t=2 p=1 以上 | [OWASP Password Storage](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html) | 46MiB t=1 などの組もある | O | |
 | Argon2 の推奨 | [RFC 9106](https://www.rfc-editor.org/rfc/rfc9106.html)（Informational） | 2GiB または 64MiB | N（参考） | OWASP の最低値よりかなり重い |
 | `crypto.argon2` は v24.7.0 で追加 | Node.js の crypto の文書 | 個別の安定度の表示はない | O | 本人の決定で `@node-rs/argon2` に移す |
+| 同梱した頻出パスワードの一覧の出典 | [SecLists `Passwords/Common-Credentials/Pwdb_top-1000000.txt`](https://github.com/danielmiessler/SecLists/blob/35d74839e66f44d116e694369d86a5bf07aaed6f/Passwords/Common-Credentials/Pwdb_top-1000000.txt)（commit `35d74839e66f44d116e694369d86a5bf07aaed6f`、2026-11-03 取得、git blob `99665aeb16c221dfb9a258e39dd58fa37116cfdd`） | 100万行。sha256 `e9a88f67aafe65496682dc374559ee714e978bee50314767494c3e37a18c9fc8`。ライセンスは [MIT License](https://github.com/danielmiessler/SecLists/blob/35d74839e66f44d116e694369d86a5bf07aaed6f/LICENSE)（Copyright (c) 2018 Daniel Miessler。LICENSE の sha256 `3dbdc93d5f8829de0941744841730a09c106d0732e5ae0e98ca1d77be7ded66c`） | O（データ） | 漏えいから集めた一覧で、利用者の母集団（日本の家族）とは違う。日本語の項目はほぼない。中身に不快な語を含む |
+| 同梱した形 | `src/domain/commonPasswords.json`（`scripts/build-password-list.mjs` で作る） | NFKC と小文字にそろえ、15〜64文字（UTF-16 の長さ。入力の長さの検査と同じ数え方）の項目を、出現の順のまま重複を除いて残す。メールアドレスの形の項目（12件）は、実在する人の連絡先かもしれないので除いた（自分のメールアドレスの @ より前は、文脈の語として別に拒否する）。**5317件**、sha256 `4816280f240d5d7934ee3bb63eea1be68b46ee6e0634929e7c7c649a1d92783f`、gzip で約44KB | — | 64文字を超える項目は入力できないので除いた。画面では別のファイルとして、新しいパスワードを確かめるときにだけ読む |
+| 漏えいしたパスワードの照会（Have I Been Pwned の k-anonymity）は使わない | criteria A9-6 | 入力の SHA-1 の先頭5文字を外部へ送ることになる | — | 家族の情報を外部へ送らない方針を優先した。代わりに同梱の一覧と文脈・並びの規則で確かめる |
+| `@node-rs/argon2` 2.2.2 | [npm](https://www.npmjs.com/package/@node-rs/argon2)（MIT） | `hashRaw` に salt・m・t・p・出力の長さ・版（0x13）を渡せる。Node 24.22.1（darwin-arm64）で読み込めることを確かめた | O | ネイティブのモジュール。配備先の OS と CPU に合う部品を `npm ci` で入れる |
 
 ## 8. 鍵
 
@@ -94,6 +98,8 @@
 | 漏えいの疑い・期間・使用量の上限で鍵を替える。鍵の ID を付ける。入れ替えの手順を前もって用意する | [OWASP Cryptographic Storage](https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html) | | O | 鍵の ID を付けるより、全部を暗号化し直すほうを勧めている |
 | 暗号化の鍵の使用期間は2年以下 | NIST SP 800-57 Pt1 Rev5 | 表1（二次資料で確かめた） | N（B 経由） | Rev 6 の草案で変わる可能性がある |
 | TOTP の秘密は暗号化して保存する | [RFC 6238](https://www.rfc-editor.org/rfc/rfc6238.txt) 5.1 | | N | |
+| 用途ごとの鍵を1つの秘密から導く | [RFC 5869](https://www.rfc-editor.org/rfc/rfc5869.html)（HKDF） | salt と info で用途を分ける | N（Informational） | 実装は salt `family-hub`、info に用途（`mac:csrf`・`mac:reset`・`mac:attachment`・`totp-secret`・`key-fingerprint`）。`totp-secret` は以前の形式と同じ導き方なので、`legacy` の暗号文をそのまま読める |
+| AES-GCM の IV は鍵ごとに重ねない。96ビットの乱数 IV の上限 | [NIST SP 800-38D](https://csrc.nist.gov/pubs/sp/800/38/d/final) 8.3 | 乱数の IV では、1つの鍵で 2^32 回まで | N | 二段階認証の秘密は人数分しかなく、上限に遠い |
 
 ## 9. 監査記録
 

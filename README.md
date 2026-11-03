@@ -6,7 +6,7 @@
 
 ## 必要なもの
 
-Node.js 24.7.0 以上（`crypto.argon2` と `node:sqlite` を使います。どちらも安定版の API ではありません）。
+Node.js 24.7.0 以上（`node:sqlite` を使います。安定版の API ではありません）。パスワードのハッシュは `@node-rs/argon2`（ネイティブのモジュール）で計算します。
 
 ```bash
 npm install
@@ -40,7 +40,9 @@ API（`server/config.ts`、`server/main.ts`）の設定です。
 | 変数 | 既定 | 内容 |
 |---|---|---|
 | `FAMILY_HUB_ORIGIN` | `http://localhost:4174` | 利用者が開くオリジン。Origin の検査、Cookie、パスキーの RP ID に使う |
-| `FAMILY_HUB_SECRET` | 開発用の値 | CSRF、署名、確認コードの暗号化の鍵。32文字以上。`NODE_ENV=production` では必須 |
+| `FAMILY_HUB_SECRET` | 開発用の値 | 鍵束を使わないときの鍵（kid `legacy`）。CSRF、署名、確認コードの暗号化に使う。32文字以上。`NODE_ENV=production` では、これか `FAMILY_HUB_KEYS` が必須 |
+| `FAMILY_HUB_KEYS` | 未設定 | 鍵束。`kid=秘密` をカンマで並べる（秘密は32文字以上）。設定すると `FAMILY_HUB_SECRET` は kid `legacy` として読むためだけに使う |
+| `FAMILY_HUB_ACTIVE_KID` | `FAMILY_HUB_KEYS` が1つならその kid | 新しく署名・暗号化する鍵。`FAMILY_HUB_KEYS` に2つ以上あるときは必須 |
 | `FAMILY_HUB_DATABASE` | `data/family-hub.sqlite`（`dev:server` は `data/dev.sqlite`） | SQLite のファイル |
 | `FAMILY_HUB_MEDIA` | `data/media` | 写真、動画、添付の保存先 |
 | `FAMILY_HUB_RECENT_AUTH_MS` | `300000` | 金銭や権限の操作に必要な、直近の本人確認の有効時間 |
@@ -54,7 +56,7 @@ API（`server/config.ts`、`server/main.ts`）の設定です。
 | `PORT` | `8799` | API のポート |
 | `HOST` | `127.0.0.1` | API の待ち受けアドレス（`server/main.ts` だけ。`dev:server` は常に `127.0.0.1`） |
 
-`NODE_ENV=production` では、https のオリジン、`FAMILY_HUB_SECRET`、`FAMILY_HUB_CLAMD_HOST` がないと起動しません。開発の転送先を変えるときは、画面側の `FAMILY_HUB_API` を設定します。
+`NODE_ENV=production` では、https のオリジン、`FAMILY_HUB_SECRET` か `FAMILY_HUB_KEYS`、`FAMILY_HUB_CLAMD_HOST` がないと起動しません。鍵の入れ替えの手順は [配備の覚え書き](deploy/README.md#鍵) にあります。開発の転送先を変えるときは、画面側の `FAMILY_HUB_API` を設定します。
 
 版の印は環境変数ではなく、ビルドのときに git の値（`VITE_BUILD_ID` があればその値）を画面と API の両方へ埋めます。
 
@@ -68,7 +70,13 @@ npx tsx server/cli.ts grant <household> [days]  # 利用期間を延ばす（day
 npx tsx server/cli.ts expire <household>        # 利用を止める
 npx tsx server/cli.ts suspend <membership>      # メンバーの参加を止める
 npx tsx server/cli.ts resume <membership>       # メンバーの参加を戻す
+npx tsx server/cli.ts keys status               # 鍵ごとの状態と、確認コードの秘密の件数
+npx tsx server/cli.ts keys rotate               # 確認コードの秘密を有効な鍵で暗号化し直す（何度実行してもよい）
+npx tsx server/cli.ts keys retire <kid>         # 参照が0件の鍵を引退させる
+npx tsx server/cli.ts totp reset --user <id>    # その人の確認コードと回復コードを消す
 ```
+
+終了コードは、成功が0、使い方の誤りと断ったときが1です（理由は標準エラーに出ます）。
 
 ## ビルド
 
@@ -100,7 +108,8 @@ npx tsx server/cli.ts resume <membership>       # メンバーの参加を戻す
 
 - 認証、セッション、CSRF、認可、再認証、監査の記録、添付の検査はサーバーで強制します。画面の非表示は認可の境界ではありません。
 - 通常の `build` は `/showcase`、actor/scenario切替、監査用fixture、source mapを含みません。`build:http` のビルドは確認用データも含みません。どちらも `npm run audit:ui` と `npm run audit:security` が確かめます。
-- 実験的な Node の API は1ファイルに閉じています（`server/auth/password.ts`、`server/db/db.ts`）。
+- 安定版でない Node の API（`node:sqlite`）は1ファイルに閉じています（`server/db/db.ts`）。パスワードのハッシュは `@node-rs/argon2` を `server/auth/password.ts` だけで使い、Node の `crypto.argon2` は `npm run audit:security` が禁じます。
+- 新しいパスワードは、同梱した頻出の一覧（SecLists、MIT）、サービス名・メールアドレス・名前・家族グループの名前、繰り返しと並びで確かめます（`src/domain/passwordPolicy.ts`）。漏えいしたパスワードの照会（Have I Been Pwned など）は、入力の一部を外部へ送ることになるので使いません。
 - 実物の SMTP、clamd、LLM、URL 取得の TLS の経路、H.264 の再生、ピクチャーインピクチャーは未確認です。実スタックの E2E は Chromium だけです。
 - `npm run verify` は3ブラウザの E2E を含みます。最後の確認では Firefox がこの環境で起動できず、WebKit では環境由来の読み込みの時間切れが2件出たので、全体は終了コード0になっていません（[検証結果](docs/audits/verification-report.md)）。
 

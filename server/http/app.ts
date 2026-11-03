@@ -3,6 +3,8 @@ import multipart from '@fastify/multipart';
 import Fastify from 'fastify';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { serverMessages } from '../../src/content/serverMessages';
+import { loadCommonPasswords } from '../../src/domain/passwordPolicy';
+import { logKeyReport, syncKeyring } from '../auth/keyring';
 import { cookieNames, csrfTokenFor, csrfTokenMatches, findSession, presessionValue } from '../auth/sessions';
 import { ApiError, sendError, unauthenticated } from './context';
 import type { AppDeps, RouteDeclaration } from './context';
@@ -80,6 +82,10 @@ export const routeTable: Array<{ method: string; url: string; declaration: Route
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   routeTable.length = 0;
+  // 鍵の指紋を記録と照らし合わせる。鍵のない暗号文があっても起動し、その人の二段階認証を「使えない」として扱う。
+  logKeyReport(syncKeyring(deps.db, deps.config.keys, deps.clock.now()));
+  // 頻出のパスワードの一覧は、最初の要求を待たずに読み込んでおく。
+  await loadCommonPasswords();
   const app = Fastify({ logger: false, bodyLimit: 2 * 1024 * 1024, trustProxy: 'loopback', exposeHeadRoutes: false });
   await app.register(cookie);
   await app.register(multipart);

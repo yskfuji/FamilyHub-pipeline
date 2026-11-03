@@ -3,7 +3,7 @@ import { useApp } from '../../app/AppContext';
 import { navigate } from '../../app/router';
 import { Brand, StatusBadge } from '../../design-system/components';
 import { LockIcon, ShieldIcon } from '../../design-system/icons';
-import { passwordSchema } from '../../domain/schemas';
+import { currentPasswordSchema } from '../../domain/schemas';
 
 export function AuthPage() {
   const { gateway, finishSignIn, runtimeMode } = useApp();
@@ -29,7 +29,7 @@ export function AuthPage() {
   };
   const password = async (form: HTMLFormElement) => {
     setError(''); const data = new FormData(form); const value = String(data.get('password'));
-    const parsed = passwordSchema.safeParse(value); if (!parsed.success) { setError(parsed.error.issues[0]?.message ?? '入力を確認してください'); return; }
+    const parsed = currentPasswordSchema.safeParse(value); if (!parsed.success) { setError(parsed.error.issues[0]?.message ?? '入力を確認してください'); return; }
     const result = await gateway.auth.signInWithPassword(String(data.get('email')), value); if (!result.ok) { setError(result.error.message); return; }
     if ('totpChallengeId' in result.value) { setTotpChallenge(result.value.totpChallengeId); return; }
     navigate(await finishSignIn('/today'));

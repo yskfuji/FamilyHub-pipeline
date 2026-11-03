@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { passwordMessages } from '../content/passwordMessages';
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, hasWeakPattern } from './passwordPolicy';
 import { parseRRule } from './recurrence';
 
 export const idSchema = z.string().min(1).max(100);
@@ -144,10 +146,17 @@ export const householdProfileSchema = z.strictObject({
   name: z.string().trim().min(1, '家族グループの名前を入力してください。').max(40, '40文字以内で入力してください。'),
 });
 
-export const passwordSchema = z.string()
-  .min(15, '15文字以上で入力してください。')
-  .max(64, '64文字以内で入力してください。')
-  .refine((value) => !['passwordpassword', '123456789012345', 'qwertyuiopasdfg'].includes(value.toLowerCase()), 'このパスワードは安全性が低いため使用できません。別のパスワードを入力してください。');
+/** サインインで入力する今のパスワード。長さだけを確かめる（前の規則で作ったものも受け付ける）。 */
+export const currentPasswordSchema = z.string()
+  .min(PASSWORD_MIN_LENGTH, passwordMessages.tooShort)
+  .max(PASSWORD_MAX_LENGTH, passwordMessages.tooLong);
+
+/**
+ * 新しいパスワードの同期の検査（長さと並び）。頻出の一覧と文脈の語は checkNewPassword（passwordPolicy.ts）で確かめる。
+ * API と確認用データは、保存の前に必ず checkNewPassword も通す。
+ */
+export const passwordSchema = currentPasswordSchema
+  .refine((value) => !hasWeakPattern(value), passwordMessages.pattern);
 
 export const memoInputSchema = z.object({
   title: z.string().trim().min(1, 'タイトルを入力してください。').max(120),

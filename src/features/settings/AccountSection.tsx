@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { useApp } from '../../app/AppContext';
+import { ja } from '../../content/ja';
 import { Dialog } from '../../design-system/components';
 import { IDLE_TIMEOUT_CHOICES } from '../../domain/account';
 import type { AccountProfile } from '../../domain/types';
@@ -76,6 +77,7 @@ export function AccountSection() {
       <form className="stack" onSubmit={(event) => void saveEmail(event)}><div className="field"><label htmlFor="account-email">メールアドレス</label><input data-control-id="settings.account.email" className="input" id="account-email" name="email" type="email" defaultValue={account.email} required/><span className="field-help">変更すると、前のアドレスにもお知らせを送ります。</span></div><button data-control-id="settings.account.email-save" className="button" type="submit">メールアドレスを保存</button></form>
       <div className="field"><label htmlFor="account-idle">操作がないときに自動でサインアウトする</label><select data-control-id="settings.account.idle" className="input" id="account-idle" value={account.idleTimeoutMinutes} onChange={(event) => void update({ idleTimeoutMinutes: Number(event.target.value) as 1 }, '自動サインアウトの時間を変更しました。')}>{IDLE_TIMEOUT_CHOICES.map((value) => <option key={value} value={value}>{value}分</option>)}</select></div>
       <div className="stack"><h3>確認コード</h3><p className="muted">パスワードに加えて、認証アプリの6桁のコードを求めます。</p>
+        {account.totpUnavailable && <div className="notice error" role="status"><strong>{ja.totp.unavailableTitle}</strong><p className="mb-0">{ja.totp.unavailableBody}</p></div>}
         {account.totpEnabled ? <button data-control-id="settings.account.totp-disable" className="button" type="button" onClick={() => void disableTotp()}>確認コードを解除</button> : <button data-control-id="settings.account.totp-begin" className="button" type="button" onClick={() => void beginTotp()}>確認コードを設定</button>}
         {runtimeMode === 'mock' && <p className="small muted">このデモでは実際のコードは発行されません。</p>}
       </div>

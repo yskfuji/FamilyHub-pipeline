@@ -28,6 +28,7 @@ export const serverMessages = {
   passwordWrong: 'パスワードを確認してください。',
   totpRequired: '確認コードを入力してください。',
   totpInvalid: '確認コードが正しくありません。',
+  totpUnavailable: '今は確認コードを確かめられません。回復コードを入力してください。サインインの後、設定から確認コードを設定し直してください。',
   ownerHandover: '管理者の役割を別の大人に渡してから、アカウントを削除してください。',
   fileTooLarge: 'ファイルが大きすぎます。',
   heicRejected: 'HEIC の写真は受け付けていません。JPEG で保存し直してください。',

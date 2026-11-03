@@ -4,7 +4,8 @@ import { serverMessages } from '../content/serverMessages';
 import { readingImageProblem, readingUrlProblem } from '../domain/assistant';
 import type { AssistantJob, AssistantJobKind } from '../domain/assistant';
 import { ADULT_AGE, accountUpdateSchema, ageOn, signUpSchema } from '../domain/account';
-import { passwordSchema } from '../domain/schemas';
+import { checkNewPassword } from '../domain/passwordPolicy';
+import { currentPasswordSchema, passwordSchema } from '../domain/schemas';
 import { toJstRfc3339 } from '../domain/calendarDate';
 import { createHouseholdRules } from '../domain/commands';
 import type { HouseholdAggregate } from '../domain/commands';
@@ -97,7 +98,7 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
   };
   const thumbnailUrls = new Map<Id, string>();
   const actorMember = state.memberships.find((item) => item.id === actorMembershipId);
-  const account: AccountProfile = { displayName: actorMember?.displayName ?? '', email: `${actorMember?.userId ?? ''}@example.test`, avatar: { kind: 'initial' }, idleTimeoutMinutes: 30, birthdateDeclared: true, adultDeclared: adultDeclarations.has(actorMember?.userId ?? ''), totpEnabled: false };
+  const account: AccountProfile = { displayName: actorMember?.displayName ?? '', email: `${actorMember?.userId ?? ''}@example.test`, avatar: { kind: 'initial' }, idleTimeoutMinutes: 30, birthdateDeclared: true, adultDeclared: adultDeclarations.has(actorMember?.userId ?? ''), totpEnabled: false, totpUnavailable: false };
 
   return {
     auth: {
@@ -117,9 +118,21 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
       async signOut() { await delay(); return ok(undefined); },
       // 確認用データにはサインインの記録がないので、形だけを返す。実際の検証は API が行う。
       async verifyTotp() { await delay(); return ok({ userId: state.user.id }); },
-      async signUp(input) { await delay(); const parsed = signUpSchema.safeParse(input); return parsed.success ? ok({ userId: state.user.id }) : fail({ code: 'INVALID_INPUT', message: parsed.error.issues[0]?.message ?? '入力を確認してください。', retryable: false }); },
+      async signUp(input) {
+        await delay();
+        const parsed = signUpSchema.safeParse(input);
+        if (!parsed.success) return fail({ code: 'INVALID_INPUT', message: parsed.error.issues[0]?.message ?? '入力を確認してください。', retryable: false });
+        const problem = await checkNewPassword(parsed.data.password, { email: parsed.data.email, displayName: parsed.data.displayName });
+        return problem ? fail({ code: 'INVALID_INPUT', message: problem, retryable: false }) : ok({ userId: state.user.id });
+      },
       async requestPasswordReset() { await delay(); return ok({ resendAfterSeconds: 60 }); },
-      async confirmPasswordReset(input) { await delay(); const parsed = passwordSchema.safeParse(input.newPassword); return parsed.success ? ok(undefined) : fail({ code: 'INVALID_INPUT', message: parsed.error.issues[0]?.message ?? '新しいパスワードを確認してください。', retryable: false }); },
+      async confirmPasswordReset(input) {
+        await delay();
+        const parsed = passwordSchema.safeParse(input.newPassword);
+        if (!parsed.success) return fail({ code: 'INVALID_INPUT', message: parsed.error.issues[0]?.message ?? '新しいパスワードを確認してください。', retryable: false });
+        const problem = await checkNewPassword(parsed.data, input.email ? { email: input.email } : undefined);
+        return problem ? fail({ code: 'INVALID_INPUT', message: problem, retryable: false }) : ok(undefined);
+      },
       async reauthenticate() { await delay(); return ok(undefined); },
       async getAccount() { await delay(); return ok(structuredClone(account)); },
       async updateAccount(input) {
@@ -140,7 +153,7 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
       async deleteAccount() { await delay(); return fail({ code: 'CONFLICT', message: 'この確認用データではアカウントを削除できません。', retryable: false }); },
       async beginTotpEnrollment() { await delay(); return ok({ otpauthUri: 'otpauth://totp/demo?secret=DEMO' }); },
       async confirmTotpEnrollment() { await delay(); account.totpEnabled = true; return ok({ recoveryCodes: ['DEMO1-00000'] }); },
-      async disableTotp() { await delay(); account.totpEnabled = false; return ok(undefined); },
+      async disableTotp() { await delay(); account.totpEnabled = false; account.totpUnavailable = false; return ok(undefined); },
       async getSession() { await delay(10); return ok({ stage: 'active' as const, userId: state.user.id, idleTimeoutMinutes: 30 }); },
       async getVersion() { await delay(10); return ok({ build: 'development' }); },
       async getSecurityOverview() { await delay(); const guard = requireCapability<SecurityOverview>('settings.own'); return guard ?? ok(structuredClone(security)); },
@@ -156,10 +169,11 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
       async changePassword(currentPassword, newPassword) {
         await delay();
         const guard = requireCapability<void>('settings.own'); if (guard) return guard;
-        if (!passwordSchema.safeParse(currentPassword).success) return fail({ code: 'UNAUTHENTICATED', message: '現在のパスワードを確認してください。', retryable: false });
+        if (!currentPasswordSchema.safeParse(currentPassword).success) return fail({ code: 'UNAUTHENTICATED', message: '現在のパスワードを確認してください。', retryable: false });
         const parsed = passwordSchema.safeParse(newPassword);
         if (!parsed.success) return fail({ code: 'INVALID_INPUT', message: parsed.error.issues[0]?.message ?? '新しいパスワードを確認してください。', retryable: false });
-        return ok(undefined);
+        const problem = await checkNewPassword(parsed.data, { email: account.email, displayName: account.displayName, householdName: state.household.name });
+        return problem ? fail({ code: 'INVALID_INPUT', message: problem, retryable: false }) : ok(undefined);
       },
       async revokeSession(sessionId) {
         await delay();

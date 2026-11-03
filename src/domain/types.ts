@@ -422,6 +422,8 @@ export interface AccountProfile {
   birthdateDeclared: boolean;
   adultDeclared: boolean;
   totpEnabled: boolean;
+  /** 確認コードを設定済みだが、鍵がなくて今は確かめられない。回復コードかパスキーでサインインし、設定し直す。 */
+  totpUnavailable: boolean;
 }
 
 export type TrashKind = 'event' | 'task' | 'memo' | 'expense' | 'album' | 'photo' | 'occurrence';

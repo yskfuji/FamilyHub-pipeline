@@ -145,4 +145,12 @@ export const migrations: readonly string[] = [
   CREATE UNIQUE INDEX assistant_jobs_one_active ON assistant_jobs(household_id) WHERE status IN ('queued', 'running');
   CREATE INDEX assistant_jobs_user ON assistant_jobs(user_id);
   `,
+  `
+  CREATE TABLE key_fingerprints (
+    kid TEXT PRIMARY KEY,
+    fingerprint TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    retired_at TEXT
+  ) WITHOUT ROWID;
+  `,
 ];

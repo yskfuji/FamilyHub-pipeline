@@ -148,6 +148,30 @@ for (const path of serverFiles) {
   if (path !== 'server/auth/sessions.ts' && /set-cookie|setCookie|clearCookie/i.test(content)) failures.push(`${path}: Set-Cookie belongs in server/auth/sessions.ts`);
 }
 
+// パスワードのハッシュは @node-rs/argon2 だけで行う。Node の crypto.argon2 / argon2Sync は、試験を含めて server/ と src/ のどこでも使わない（A10-4）。
+{
+  const everyFile = [...(await filesUnder(resolve('server'))), ...(await filesUnder(resolve('src')))].filter((file) => /\.(ts|tsx|mts|js|mjs)$/.test(file));
+  const banned = new Set(['argon2', 'argon2Sync']);
+  for (const file of everyFile) {
+    const path = relative(resolve('.'), file);
+    const content = await readFile(file, 'utf8');
+    if (!/argon2/.test(content)) continue;
+    const ast = ts.createSourceFile(path, content, ts.ScriptTarget.Latest, true, path.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+    const report = (node, what) => failures.push(`${path}:${ast.getLineAndCharacterOfPosition(node.getStart(ast)).line + 1}: ${what} from node:crypto is prohibited; hash passwords through server/auth/password.ts (@node-rs/argon2)`);
+    const visit = (node) => {
+      if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier) && /^(node:)?crypto$/.test(node.moduleSpecifier.text)) {
+        const named = node.importClause?.namedBindings;
+        if (named && ts.isNamedImports(named)) for (const element of named.elements) if (banned.has((element.propertyName ?? element.name).text)) report(element, element.getText());
+      }
+      if (ts.isPropertyAccessExpression(node) && banned.has(node.name.text)) report(node, node.getText());
+      if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression) && banned.has(node.argumentExpression.text)) report(node, node.getText());
+      if (ts.isBindingElement(node) && banned.has((node.propertyName && ts.isIdentifier(node.propertyName) ? node.propertyName : ts.isIdentifier(node.name) ? node.name : { text: '' }).text)) report(node, node.getText());
+      ts.forEachChild(node, visit);
+    };
+    visit(ast);
+  }
+}
+
 // ビルドの中身。代役と確認用データが配信物へ混ざらないこと、画面と API の版の印がそろうこと。
 async function builtText(dir) {
   const files = (await filesUnder(resolve(dir))).filter((file) => ['.js', '.html', '.css'].includes(extname(file)));
@@ -160,6 +184,12 @@ if (!existsSync(resolve('dist-server/main.js')) || !existsSync(resolve('dist-ser
   const http = await builtText('dist-http');
   for (const marker of ['fakeClamd', 'fakeLlm', 'seedHousehold', 'SEED_PASSWORD', 'server/testing', 'test-double', '森さんち', 'member-aoi']) if (server.includes(marker)) failures.push(`dist-server contains a test double or fixture marker: ${marker}`);
   for (const marker of ['森さんち', 'member-aoi', 'runtime.mock']) if (http.includes(marker)) failures.push(`dist-http contains a fixture marker: ${marker}`);
+  // 頻出のパスワードの一覧は、最初の表示で読むファイル（入口と先読み）に入れず、別のファイルとして配る（A9-4）。
+  const indexHtml = await readFile(resolve('dist-http/index.html'), 'utf8');
+  const firstView = [...indexHtml.matchAll(/(?:src|href)="\/(assets\/[^"]+\.js)"/g)].map((match) => match[1]);
+  const listMarker = 'manchesterunited';
+  for (const asset of firstView) if ((await readFile(resolve('dist-http', asset), 'utf8')).includes(listMarker)) failures.push(`dist-http/${asset} is loaded with the first view but contains the common-password list`);
+  if (!firstView.length || !http.includes(listMarker)) failures.push('dist-http must ship the common-password list as a separate file');
   const buildId = (await readFile(resolve('dist-server/build-id.txt'), 'utf8')).trim();
   if (!buildId) failures.push('dist-server/build-id.txt is empty');
   if (!server.includes(buildId)) failures.push(`dist-server does not embed its build id ${buildId}`);

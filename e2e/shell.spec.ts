@@ -588,6 +588,42 @@ test.describe('legal', () => {
   });
 });
 
+test.describe('new passwords (A9)', () => {
+  test('fields name their purpose, allow paste, and load the common list only on submit', async ({ page }) => {
+    const requested: string[] = [];
+    page.on('request', (request) => requested.push(request.url()));
+    await page.goto('/sign-up');
+    const password = page.locator('#signup-password');
+    await expect(password).toHaveAttribute('autocomplete', 'new-password');
+    const pastePrevented = await password.evaluate((input) => {
+      const data = new DataTransfer();
+      data.setData('text/plain', 'pasted from a password manager');
+      const event = new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true });
+      input.dispatchEvent(event);
+      return event.defaultPrevented;
+    });
+    expect(pastePrevented).toBe(false);
+    expect(requested.filter((url) => url.includes('commonPasswords'))).toEqual([]);
+    await page.getByLabel('名前').fill('山田 花子');
+    await page.getByLabel('メールアドレス').fill('hanako.yamada@example.test');
+    await page.getByLabel('誕生日').fill('1990-04-01');
+    await password.fill('ManchesterUnited');
+    await page.getByRole('button', { name: 'アカウントを作る' }).click();
+    await expect(page.getByRole('alert')).toHaveText('よく使われているパスワードのため使えません。別のパスワードを入力してください。');
+    expect(requested.filter((url) => url.includes('commonPasswords')).length).toBeGreaterThan(0);
+    await password.fill('山田花子1990!!!!!!!!');
+    await page.getByRole('button', { name: 'アカウントを作る' }).click();
+    await expect(page.getByRole('alert')).toContainText('名前');
+    await page.goto('/reset-password#token=sample');
+    await expect(page.locator('#reset-password')).toHaveAttribute('autocomplete', 'new-password');
+    await page.goto('/settings/security');
+    await page.getByRole('button', { name: 'パスワードを変更' }).click();
+    await expect(page.getByLabel('現在のパスワード')).toHaveAttribute('autocomplete', 'current-password');
+    await expect(page.getByLabel('新しいパスワード', { exact: true })).toHaveAttribute('autocomplete', 'new-password');
+    await expect(page.getByLabel('新しいパスワード（確認）')).toHaveAttribute('autocomplete', 'new-password');
+  });
+});
+
 test.describe('privacy settings on this device', () => {
   const hide = (page: Page, state: 'hidden' | 'visible') => page.evaluate((value) => {
     Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => value });

@@ -1,12 +1,13 @@
 import { checkLlmUrl } from './adapters/llm';
+import { Keyring, keyringSourceFrom } from './auth/keyring';
 
 export interface ServerConfig {
   production: boolean;
   /** 利用者が開くオリジン。Origin の検査、Cookie、パスキーの RP ID に使う。 */
   origin: string;
   databasePath: string;
-  /** Cookie の値に結ぶ CSRF トークンと、期限付きの署名に使う。 */
-  secret: string;
+  /** 鍵束。Cookie の値に結ぶ CSRF トークン、期限付きの署名、二段階認証の秘密の暗号化に使う（server/auth/keyring.ts）。 */
+  keys: Keyring;
   secureCookies: boolean;
   sessionDays: number;
   /** 金銭や権限の操作に必要な、直近の本人確認の有効時間。 */
@@ -38,8 +39,7 @@ function loadLlm(env: NodeJS.ProcessEnv): ServerConfig['llm'] {
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const production = env.NODE_ENV === 'production';
   const origin = new URL(env.FAMILY_HUB_ORIGIN ?? 'http://localhost:4174').origin;
-  const secret = env.FAMILY_HUB_SECRET ?? (production ? '' : 'development-secret-not-for-production-use');
-  if (secret.length < 32) throw new Error('FAMILY_HUB_SECRET must be at least 32 characters');
+  const keys = new Keyring(keyringSourceFrom(env, production));
   const url = new URL(origin);
   const secureCookies = url.protocol === 'https:';
   if (production && !secureCookies) throw new Error('production requires an https origin');
@@ -47,7 +47,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   return {
     production,
     origin,
-    secret,
+    keys,
     secureCookies,
     databasePath: env.FAMILY_HUB_DATABASE ?? 'data/family-hub.sqlite',
     sessionDays: 30,

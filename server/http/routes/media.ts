@@ -1,4 +1,3 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
 import { createReadStream, createWriteStream } from 'node:fs';
 import { mkdir, rename, rm, stat } from 'node:fs/promises';
 import { dirname } from 'node:path';
@@ -53,7 +52,7 @@ const SERVABLE_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png', 'v
 
 /** 署名の対象は id・期限・表示方法。種類と名前は配信のときに記録から読むので、リンクには入れない。 */
 function signAttachment(deps: AppDeps, attachmentId: string, expires: number, disposition: Disposition) {
-  return createHmac('sha256', deps.config.secret).update(`attachment:${attachmentId}:${expires}:${disposition}`).digest('base64url');
+  return deps.config.keys.sign('attachment', `${attachmentId}:${expires}:${disposition}`);
 }
 
 /** 検査が終わったら記録を更新する。結果の保存に失敗しても、確認待ちのまま開けない状態を保つ。 */
@@ -290,9 +289,8 @@ export function registerMediaRoutes(app: FastifyInstance, deps: AppDeps) {
     const signature = single(query.signature);
     const disposition = DISPOSITIONS.find((item) => item === single(query.disposition));
     if (!Number.isSafeInteger(expires) || !signature || !disposition) return notFound();
-    const expected = Buffer.from(signAttachment(deps, attachmentId, expires, disposition));
-    const presented = Buffer.from(signature);
-    if (expires <= Date.parse(deps.clock.now()) || expected.length !== presented.length || !timingSafeEqual(expected, presented)) return notFound();
+    // 有効な鍵で署名し、引退していないすべての鍵で確かめる。
+    if (expires <= Date.parse(deps.clock.now()) || !deps.config.keys.verify('attachment', `${attachmentId}:${expires}:${disposition}`, signature)) return notFound();
     // 種類と名前は記録から取る。記録が消えたか、見られなくなったか、確認が終わっていなければ開けない。
     const { aggregate } = loadAggregate(deps.db, actor.householdId, actor.membershipId, defaults);
     const memo = aggregate.state.memos.find((item) => item.attachments.some((entry) => entry.id === attachmentId));

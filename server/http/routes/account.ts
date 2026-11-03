@@ -1,14 +1,17 @@
-import { randomBytes, randomInt, createHmac } from 'node:crypto';
+import { randomBytes, randomInt } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { serverMessages } from '../../../src/content/serverMessages';
 import { accountUpdateSchema, ADULT_AGE, ageOn, signUpSchema } from '../../../src/domain/account';
+import { checkNewPassword } from '../../../src/domain/passwordPolicy';
+import type { PasswordContext } from '../../../src/domain/passwordPolicy';
 import { householdProfileSchema, passwordSchema } from '../../../src/domain/schemas';
 import type { HouseholdMembership, Result } from '../../../src/domain/types';
 import { ok } from '../../../src/domain/commands/context';
 import { loadAggregate, saveAggregate } from '../../db/aggregateStore';
-import { hashPassword, verifyPassword } from '../../auth/password';
-import { decryptSecret, encryptSecret, hashRecoveryCode, matchingStep, newRecoveryCodes, totpUri } from '../../auth/totp';
+import { hashPassword, verifyAndUpgradePassword } from '../../auth/password';
+import { Keyring } from '../../auth/keyring';
+import { hashRecoveryCode, matchingStep, newRecoveryCodes, openTotpSecret, sealTotpSecret, totpUri } from '../../auth/totp';
 import { clearSessionCookie } from '../../auth/sessions';
 import { sendError, unauthenticated } from '../context';
 import type { AppDeps, RouteDeclaration } from '../context';
@@ -27,7 +30,16 @@ interface AccountRow { id: string; email: string; display_name: string; password
 const today = (deps: AppDeps) => deps.clock.now().slice(0, 10);
 const audit = (deps: AppDeps, userId: string, action: string) => deps.db.run('INSERT INTO audit_events (id, actor_user_id, action, at) VALUES (?, ?, ?, ?)', deps.ids.next('audit'), userId, action, deps.clock.now());
 const clientKey = (request: FastifyRequest) => request.ip;
-const secretHash = (deps: AppDeps, value: string) => createHmac('sha256', deps.config.secret).update(`reset:${value}`).digest('base64url');
+
+/** 新しいパスワードと比べる、その人に関わる語（メールアドレス・表示名・家族グループの名前）。 */
+export function passwordContextFor(deps: AppDeps, userId: string): PasswordContext {
+  const user = deps.db.get<{ email: string; display_name: string }>('SELECT email, display_name FROM users WHERE id = ?', userId);
+  const member = deps.db.get<{ household_id: string }>('SELECT household_id FROM household_members WHERE user_id = ?', userId);
+  const household = member ? deps.db.get<{ name: string | null }>("SELECT json_extract(body, '$.household.name') AS name FROM records WHERE household_id = ? AND collection = 'meta' AND id = 'household'", member.household_id) : undefined;
+  return { email: user?.email, displayName: user?.display_name, householdName: household?.name ?? null };
+}
+
+const weakPassword = (message: string) => ({ code: 'INVALID_INPUT' as const, message, retryable: false });
 
 function current(deps: AppDeps, request: FastifyRequest) {
   if (!request.session) throw unauthenticated();
@@ -36,16 +48,35 @@ function current(deps: AppDeps, request: FastifyRequest) {
   return row;
 }
 
-const profileOf = (row: AccountRow) => ({
+type SecondFactorRow = Pick<AccountRow, 'id' | 'totp_secret' | 'totp_last_step'>;
+
+/**
+ * 二段階認証の秘密を読む。鍵がない・引退した・秘密が違うときは null にして、運用ログに理由を出す（500 にしない）。
+ * そのときも回復コードとパスキーでサインインでき、設定から登録し直せる（A7-5、A7-6）。
+ */
+function readTotpSecret(deps: AppDeps, row: SecondFactorRow) {
+  if (!row.totp_secret) return null;
+  const secret = openTotpSecret(deps.config.keys, row.id, row.totp_secret);
+  if (!secret) console.warn(`keys: a two-step secret sealed with key ${Keyring.kidOf(row.totp_secret)} cannot be read (${deps.config.keys.stateOf(Keyring.kidOf(row.totp_secret))}); accepting recovery codes only`);
+  return secret;
+}
+
+/** 二段階認証を設定済みなのに、鍵がなくて確認コードを確かめられない。 */
+export const totpUnavailable = (deps: AppDeps, row: SecondFactorRow & { totp_enabled_at: string | null }) => Boolean(row.totp_enabled_at && row.totp_secret && !openTotpSecret(deps.config.keys, row.id, row.totp_secret));
+
+const profileOf = (deps: AppDeps, row: AccountRow) => ({
   displayName: row.display_name, email: row.email, avatar: row.avatar ? JSON.parse(row.avatar) as unknown : { kind: 'initial' as const },
   idleTimeoutMinutes: row.idle_timeout_minutes, birthdateDeclared: Boolean(row.birthdate), adultDeclared: Boolean(row.adult_declared_at), totpEnabled: Boolean(row.totp_enabled_at),
+  totpUnavailable: totpUnavailable(deps, row),
 });
 
 /** 秘密が保存されていて確認も済んだ利用者のコードを確かめ、一度使った時間枠を記録する。回復コードも受け付ける。 */
-export function verifySecondFactor(deps: AppDeps, row: AccountRow | { id: string; totp_secret: string | null; totp_last_step: number | null }, code: string) {
+export function verifySecondFactor(deps: AppDeps, row: SecondFactorRow, code: string) {
   const normalized = code.trim();
   if (row.totp_secret && /^\d{6}$/.test(normalized)) {
-    const step = matchingStep(decryptSecret(deps.config.secret, row.totp_secret), normalized, Date.parse(deps.clock.now()), row.totp_last_step);
+    const secret = readTotpSecret(deps, row);
+    if (!secret) return false;
+    const step = matchingStep(secret, normalized, Date.parse(deps.clock.now()), row.totp_last_step);
     if (step === null) return false;
     deps.db.run('UPDATE users SET totp_last_step = ? WHERE id = ?', step, row.id);
     return true;
@@ -62,6 +93,8 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AppDeps) {
   app.post('/v1/auth/sign-up', { config: anonymous('signUp') }, async (request, reply) => {
     limit(deps, `sign-up:${clientKey(request)}`, 10, 3_600_000);
     const input = parse(signUpSchema, request.body);
+    const problem = await checkNewPassword(input.password, { email: input.email, displayName: input.displayName });
+    if (problem) return sendError(reply, weakPassword(problem));
     const age = ageOn(input.birthdate, today(deps));
     if (age < 0 || age > 130) return sendError(reply, { code: 'INVALID_INPUT', message: serverMessages.birthdateInvalid, retryable: false });
     if (age < ADULT_AGE && !input.guardianConsent) return sendError(reply, { code: 'INVALID_INPUT', message: serverMessages.guardianConsentRequired, retryable: false });
@@ -86,7 +119,7 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AppDeps) {
     const token = randomBytes(32).toString('base64url');
     const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
     deps.db.run('UPDATE password_resets SET used_at = ? WHERE user_id = ? AND used_at IS NULL', deps.clock.now(), user.id);
-    deps.db.run('INSERT INTO password_resets (id, user_id, token_hash, code_hash, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)', deps.ids.next('reset'), user.id, secretHash(deps, token), secretHash(deps, `${user.id}:${code}`), deps.clock.now(), new Date(now + RESET_TTL_MS).toISOString());
+    deps.db.run('INSERT INTO password_resets (id, user_id, token_hash, code_hash, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)', deps.ids.next('reset'), user.id, deps.config.keys.sign('reset', token), deps.config.keys.sign('reset', `${user.id}:${code}`), deps.clock.now(), new Date(now + RESET_TTL_MS).toISOString());
     await deps.mailer.send({ to: user.email, subject: serverMessages.resetSubject, text: serverMessages.resetBody(code, `${deps.config.origin}/reset-password#token=${token}`) });
     return reply.code(202).send({ resendAfterSeconds: 60 });
   });
@@ -97,18 +130,24 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AppDeps) {
     limit(deps, `reset-confirm:${clientKey(request)}`, 20, 3_600_000);
     const parsed = passwordSchema.safeParse(body.newPassword);
     if (!parsed.success) return sendError(reply, { code: 'INVALID_INPUT', message: parsed.error.issues[0]?.message ?? serverMessages.invalidInput, retryable: false });
+    // 一覧と並びは、誰の再設定かを確かめる前に見る。その人に関わる語は、確かめた後に見る。
+    const common = await checkNewPassword(parsed.data);
+    if (common) return sendError(reply, weakPassword(common));
     interface ResetRow { id: string; user_id: string; code_hash: string; attempts: number; expires_at: string; used_at: string | null }
     let row: ResetRow | undefined;
-    if (body.token) row = deps.db.get<ResetRow>('SELECT id, user_id, code_hash, attempts, expires_at, used_at FROM password_resets WHERE token_hash = ?', secretHash(deps, body.token));
+    // 鍵を替えた後も、引退していないすべての鍵で探す。
+    if (body.token) row = deps.db.get<ResetRow>('SELECT id, user_id, code_hash, attempts, expires_at, used_at FROM password_resets WHERE token_hash IN (SELECT value FROM json_each(?))', JSON.stringify(deps.config.keys.candidates('reset', body.token)));
     else if (body.email && body.code) {
       const user = deps.db.get<{ id: string }>('SELECT id FROM users WHERE email = ?', body.email.trim());
       row = user ? deps.db.get<ResetRow>('SELECT id, user_id, code_hash, attempts, expires_at, used_at FROM password_resets WHERE user_id = ? ORDER BY created_at DESC LIMIT 1', user.id) : undefined;
-      if (row && row.code_hash !== secretHash(deps, `${row.user_id}:${body.code}`)) {
+      if (row && !deps.config.keys.verify('reset', `${row.user_id}:${body.code}`, row.code_hash)) {
         deps.db.run('UPDATE password_resets SET attempts = attempts + 1 WHERE id = ?', row.id);
         return sendError(reply, rejected);
       }
     }
     if (!row || row.used_at || row.attempts >= MAX_RESET_ATTEMPTS || Date.parse(row.expires_at) <= Date.parse(deps.clock.now())) return sendError(reply, rejected);
+    const personal = await checkNewPassword(parsed.data, passwordContextFor(deps, row.user_id));
+    if (personal) return sendError(reply, weakPassword(personal));
     const hashed = await hashPassword(parsed.data);
     const { id, user_id: userId } = row;
     deps.db.transaction(() => {
@@ -125,12 +164,12 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AppDeps) {
     const row = current(deps, request);
     limit(deps, `reauth:${row.id}`, 10, 900_000);
     const { password } = parse(z.object({ password: z.string().max(200) }), request.body);
-    if (!(await verifyPassword(password, row.password_hash))) return sendError(reply, { code: 'UNAUTHENTICATED', message: serverMessages.passwordWrong, retryable: false, reason: 'REAUTH_FAILED' });
+    if (!(await verifyAndUpgradePassword(deps.db, row.id, password, row.password_hash))) return sendError(reply, { code: 'UNAUTHENTICATED', message: serverMessages.passwordWrong, retryable: false, reason: 'REAUTH_FAILED' });
     deps.db.run('UPDATE sessions SET reauthenticated_at = ? WHERE id = ?', deps.clock.now(), request.session?.id ?? '');
     return reply.code(204).send();
   });
 
-  app.get('/v1/account', { config: declare('getAccount', { csrf: false }) }, (request) => profileOf(current(deps, request)));
+  app.get('/v1/account', { config: declare('getAccount', { csrf: false }) }, (request) => profileOf(deps, current(deps, request)));
   app.patch('/v1/account', { config: declare('updateAccount') }, (request, reply) => {
     const row = current(deps, request);
     const input = parse(accountUpdateSchema, request.body);
@@ -152,7 +191,7 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AppDeps) {
       }
       audit(deps, row.id, 'updateAccount');
     });
-    return profileOf(current(deps, request));
+    return profileOf(deps, current(deps, request));
   });
   app.post('/v1/account/email', { config: declare('changeEmail', { recentAuth: true }) }, async (request, reply) => {
     const row = current(deps, request);
@@ -162,7 +201,7 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AppDeps) {
     audit(deps, row.id, 'changeEmail');
     // 乗っ取りに気づけるよう、変更前のアドレスへ知らせる。
     await deps.mailer.send({ to: row.email, subject: serverMessages.emailChangedSubject, text: serverMessages.emailChangedBody });
-    return profileOf(current(deps, request));
+    return profileOf(deps, current(deps, request));
   });
   app.delete('/v1/account', { config: declare('deleteAccount', { recentAuth: true }) }, (request, reply) => {
     const row = current(deps, request);
@@ -194,7 +233,7 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AppDeps) {
     const row = current(deps, request);
     if (row.totp_enabled_at) return sendError(reply, { code: 'CONFLICT', message: serverMessages.alreadySet, retryable: false });
     const secret = randomBytes(20);
-    deps.db.run('UPDATE users SET totp_secret = ?, totp_last_step = NULL WHERE id = ?', encryptSecret(deps.config.secret, secret), row.id);
+    deps.db.run('UPDATE users SET totp_secret = ?, totp_last_step = NULL WHERE id = ?', sealTotpSecret(deps.config.keys, row.id, secret), row.id);
     return { otpauthUri: totpUri(row.email, secret) };
   });
   app.post('/v1/account/totp/confirm', { config: declare('confirmTotpEnrollment', { recentAuth: true }) }, (request, reply) => {

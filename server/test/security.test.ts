@@ -122,7 +122,7 @@ describe('secrets at rest', () => {
   it('hashes passwords with a random salt', async () => {
     const [a, b] = await Promise.all([hashPassword('same-password-long-enough'), hashPassword('same-password-long-enough')]);
     expect(a).not.toBe(b);
-    expect(a).toMatch(/^argon2id\$/);
+    expect(a).toMatch(/^\$argon2id\$v=19\$/);
   });
 });
 

@@ -6,6 +6,7 @@ erDiagram
   users ||--o{ password_resets : requests
   users ||--o{ uploads : sends
   users ||--o{ assistant_jobs : starts
+  key_fingerprints ||--o{ users : seals_totp_secret
   household_members }o--|| records : household_id
   records ||--o{ entitlements : household_id
   records ||--o{ audit_events : household_id
@@ -40,7 +41,7 @@ erDiagram
     text adult_declared_at
     text avatar
     integer idle_timeout_minutes
-    text totp_secret "暗号化して保存"
+    text totp_secret "v2.kid.iv.tag.本文 の形で暗号化して保存"
     text totp_enabled_at
     integer totp_last_step "再利用の防止"
   }
@@ -152,6 +153,12 @@ erDiagram
     text error_code
     text created_at
     text finished_at
+  }
+  key_fingerprints {
+    text kid PK "users.totp_secret の v2.kid から参照"
+    text fingerprint "HKDF の指紋。秘密は分からない"
+    text created_at
+    text retired_at "引退した鍵では署名を確かめない"
   }
 
   memberships {

@@ -1,9 +1,11 @@
+import { randomUUID } from 'node:crypto';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { toJstRfc3339 } from '../../src/domain/calendarDate';
 import type { FamilyHubGateway } from '../../src/data/gateway';
 import { createHttpGateway } from '../../src/data/httpGateway';
+import { Keyring, LEGACY_KID } from '../auth/keyring';
 import { hashPassword } from '../auth/password';
 import { cookieNames, createSession } from '../auth/sessions';
 import { createLlmClient } from '../adapters/llm';
@@ -19,7 +21,7 @@ import { startFakeLlm } from './fakeLlm';
 import { SEED_PASSWORD, seedHousehold } from './seed';
 
 const ORIGIN = 'https://family.example.test';
-export const testConfig: ServerConfig = { production: false, origin: ORIGIN, databasePath: ':memory:', secret: 'test-secret-test-secret-test-secret-00', secureCookies: true, sessionDays: 30, recentAuthMs: 300_000, smtp: null, mediaPath: '', clamd: null, llm: null };
+export const testConfig: ServerConfig = { production: false, origin: ORIGIN, databasePath: ':memory:', keys: new Keyring({ keys: [{ kid: LEGACY_KID, secret: 'test-secret-test-secret-test-secret-00' }], activeKid: LEGACY_KID }), secureCookies: true, sessionDays: 30, recentAuthMs: 300_000, smtp: null, mediaPath: '', clamd: null, llm: null };
 
 let cachedHash: Promise<string> | undefined;
 const passwordHash = () => (cachedHash ??= hashPassword(SEED_PASSWORD));
@@ -47,12 +49,15 @@ export interface World {
 }
 
 /** 実際の Fastify を起動し、Cookie を保持する fetch で httpGateway をつなぐ。時計は1回の変更の操作ごとに1分進む。 */
-export function createWorld(actorMembershipId = 'member-aoi', inspect?: (body: unknown, request: { method: string; url: string; status: number }) => void, scanner: Scanner = { scan: async () => 'clean', ready: async () => true }, reading: { llm?: LlmClient; pages?: PageFetcher } = {}): World {
+/** 鍵の試験のための差し替え。databasePath を渡すと、そのファイルを使い（起動し直しの試験）、見本の家族は空のときだけ入れる。 */
+export interface WorldOptions { keys?: ServerConfig['keys']; databasePath?: string }
+
+export function createWorld(actorMembershipId = 'member-aoi', inspect?: (body: unknown, request: { method: string; url: string; status: number }) => void, scanner: Scanner = { scan: async () => 'clean', ready: async () => true }, reading: { llm?: LlmClient; pages?: PageFetcher } = {}, options: WorldOptions = {}): World {
   let tick = 0; let sequence = 0;
   const mail: World['mail'] = [];
-  const db = new Db(':memory:');
+  const db = new Db(options.databasePath ?? ':memory:');
   const deps: AppDeps = {
-    db, config: { ...testConfig, mediaPath: mkdtempSync(join(tmpdir(), 'family-hub-media-')) }, scanner, jobs: new Set(), runningReads: new Set(), llm: reading.llm ?? defaultLlm, pages: reading.pages ?? defaultPages,
+    db, config: { ...testConfig, keys: options.keys ?? testConfig.keys, mediaPath: mkdtempSync(join(tmpdir(), 'family-hub-media-')) }, scanner, jobs: new Set(), runningReads: new Set(), llm: reading.llm ?? defaultLlm, pages: reading.pages ?? defaultPages,
     clock: { now: () => toJstRfc3339(new Date(Date.parse('2026-09-30T07:45:00+09:00') + tick * 60_000)) },
     weather: { current: () => ({ location: '東京', condition: 'rain', temperatureC: 20, precipitationPercent: 70, alert: '見本の天気' }), refresh: async () => undefined },
     mailer: { available: true, send: async (message) => { mail.push(message); } },
@@ -60,10 +65,10 @@ export function createWorld(actorMembershipId = 'member-aoi', inspect?: (body: u
   };
   const cookies = new Map<string, string>();
   const boot = (async () => {
-    seedHousehold(db, await passwordHash(), '2026-09-01T00:00:00+09:00');
+    if (!db.get('SELECT id FROM users LIMIT 1')) seedHousehold(db, await passwordHash(), '2026-09-01T00:00:00+09:00');
     const member = db.get<{ user_id: string }>('SELECT user_id FROM household_members WHERE membership_id = ?', actorMembershipId);
     if (!member) throw new Error('unknown member');
-    cookies.set(cookieNames(testConfig).session, createSession(db, testConfig, member.user_id, '2026-09-30T07:44:00+09:00', '試験', `session-${actorMembershipId}`));
+    cookies.set(cookieNames(testConfig).session, createSession(db, testConfig, member.user_id, '2026-09-30T07:44:00+09:00', '試験', options.databasePath ? `session-${actorMembershipId}-${randomUUID()}` : `session-${actorMembershipId}`));
     // 本人確認の期限を気にせず規則を試すため、確認の時刻を先へ置く。
     db.run("UPDATE sessions SET reauthenticated_at = '2027-01-01T00:00:00+09:00'");
     const app = await buildApp(deps);

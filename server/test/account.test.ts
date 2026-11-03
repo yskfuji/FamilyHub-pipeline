@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { base32Encode, decryptSecret, hotp, matchingStep, stepAt } from '../auth/totp';
+import { base32Encode, hotp, matchingStep, openTotpSecret, stepAt } from '../auth/totp';
 import { createWorld, testConfig } from '../testing/world';
 import type { World } from '../testing/world';
 
@@ -114,7 +114,8 @@ describe('confirmation codes', () => {
     const stored = world.deps.db.get<{ totp_secret: string }>("SELECT totp_secret FROM users WHERE id = 'user-aoi'");
     expect(begun.ok && begun.value.otpauthUri).not.toContain(stored?.totp_secret);
     expect(await world.gateway.auth.confirmTotpEnrollment('000000')).toMatchObject({ ok: false });
-    const secret = decryptSecret(testConfig.secret, stored?.totp_secret ?? '');
+    const secret = openTotpSecret(testConfig.keys, 'user-aoi', stored?.totp_secret ?? '') ?? Buffer.alloc(0);
+    expect(stored?.totp_secret).toMatch(/^v2\.legacy\./);
     const code = hotp(secret, stepAt(Date.parse(world.deps.clock.now())));
     const confirmed = await world.gateway.auth.confirmTotpEnrollment(code);
     expect(confirmed.ok && confirmed.value.recoveryCodes).toHaveLength(8);

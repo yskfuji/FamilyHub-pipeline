@@ -2,15 +2,16 @@ import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simp
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { serverMessages } from '../../../src/content/serverMessages';
+import { checkNewPassword } from '../../../src/domain/passwordPolicy';
 import { idSchema, passwordSchema } from '../../../src/domain/schemas';
-import { hashPassword, verifyPassword } from '../../auth/password';
+import { hashPassword, verifyAndUpgradePassword, verifyPassword } from '../../auth/password';
 import { beginAuthentication, beginRegistration, finishAuthentication, finishRegistration } from '../../auth/passkeys';
 import { clearSessionCookie, createSession, issueSessionCookie } from '../../auth/sessions';
 import { sendError, unauthenticated } from '../context';
 import type { AppDeps, RouteDeclaration } from '../context';
 import { parse } from '../parse';
 import { limit } from '../rateLimit';
-import { verifySecondFactor } from './account';
+import { passwordContextFor, totpUnavailable, verifySecondFactor } from './account';
 import { entitlementActive } from '../app';
 
 const declare = (operationId: string, overrides: Partial<RouteDeclaration> = {}) => ({ route: { operationId, auth: 'session', csrf: true, capability: 'own', idempotent: false, ...overrides } as RouteDeclaration });
@@ -53,7 +54,7 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
     const user = deps.db.get<UserRow>('SELECT id, email, display_name, password_hash, totp_enabled_at FROM users WHERE email = ? AND deleted_at IS NULL', email.trim());
     limit(deps, `sign-in:${request.ip}`, 50, 900_000);
     limit(deps, `sign-in:${email.trim().toLowerCase()}`, 10, 900_000);
-    const matched = await verifyPassword(password, user?.password_hash);
+    const matched = await verifyAndUpgradePassword(deps.db, user?.id, password, user?.password_hash);
     if (!user || !matched) return sendError(reply, rejected);
     if (user.totp_enabled_at) {
       const challengeId = deps.ids.next('totp');
@@ -68,7 +69,11 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
     limit(deps, `totp-sign-in:${body.challengeId}`, 5, 300_000);
     const challenge = deps.db.get<{ user_id: string; expires_at: string }>("SELECT user_id, expires_at FROM webauthn_challenges WHERE id = ? AND purpose = 'totp'", body.challengeId);
     const user = challenge ? deps.db.get<UserRow & { id: string; totp_secret: string | null; totp_last_step: number | null }>('SELECT id, email, display_name, password_hash, totp_enabled_at, totp_secret, totp_last_step FROM users WHERE id = ?', challenge.user_id) : undefined;
-    if (!challenge || !user || Date.parse(challenge.expires_at) <= Date.parse(deps.clock.now()) || !verifySecondFactor(deps, user, body.code)) return sendError(reply, { code: 'UNAUTHENTICATED', message: serverMessages.totpInvalid, retryable: true });
+    if (!challenge || !user || Date.parse(challenge.expires_at) <= Date.parse(deps.clock.now()) || !verifySecondFactor(deps, user, body.code)) {
+      // 鍵がなくて確認コードを確かめられないときは、回復コードを使うよう案内する（パスワードは確かめ済み）。
+      const message = challenge && user && /^\d{6}$/.test(body.code.trim()) && totpUnavailable(deps, user) ? serverMessages.totpUnavailable : serverMessages.totpInvalid;
+      return sendError(reply, { code: 'UNAUTHENTICATED', message, retryable: true });
+    }
     deps.db.run('DELETE FROM webauthn_challenges WHERE id = ?', body.challengeId);
     startSession(deps, request, reply, user.id);
     return { userId: user.id };
@@ -117,6 +122,8 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
     if (!(await verifyPassword(body.currentPassword, user.password_hash))) return sendError(reply, { code: 'UNAUTHENTICATED', message: serverMessages.currentPasswordWrong, retryable: false });
     const parsed = passwordSchema.safeParse(body.newPassword);
     if (!parsed.success) return sendError(reply, { code: 'INVALID_INPUT', message: parsed.error.issues[0]?.message ?? serverMessages.invalidInput, retryable: false });
+    const problem = await checkNewPassword(parsed.data, passwordContextFor(deps, user.id));
+    if (problem) return sendError(reply, { code: 'INVALID_INPUT', message: problem, retryable: false });
     const hashed = await hashPassword(parsed.data);
     deps.db.transaction(() => {
       deps.db.run('UPDATE users SET password_hash = ? WHERE id = ?', hashed, user.id);

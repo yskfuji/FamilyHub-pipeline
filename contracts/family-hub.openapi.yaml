@@ -1621,7 +1621,7 @@ components:
         locationKept: { type: boolean }
     AccountProfile:
       type: object
-      required: [displayName, email, avatar, idleTimeoutMinutes, birthdateDeclared, adultDeclared, totpEnabled]
+      required: [displayName, email, avatar, idleTimeoutMinutes, birthdateDeclared, adultDeclared, totpEnabled, totpUnavailable]
       properties:
         displayName: { type: string }
         email: { type: string }
@@ -1630,6 +1630,9 @@ components:
         birthdateDeclared: { type: boolean }
         adultDeclared: { type: boolean }
         totpEnabled: { type: boolean }
+        totpUnavailable:
+          type: boolean
+          description: The confirmation code is set up but cannot be checked because the key that sealed it is missing or retired. Sign in with a recovery code or a passkey, then set it up again.
     GatewayError:
       type: object
       required: [code, message, retryable]

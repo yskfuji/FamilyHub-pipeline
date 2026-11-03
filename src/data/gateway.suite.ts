@@ -222,6 +222,20 @@ export function runGatewaySuite(world: (actorMembershipId?: string) => FamilyHub
       const result = await gateway.auth.changePassword('current-password-long-enough', '123456789012345');
       expect(result).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
     });
+
+    it('refuses common, personal and patterned new passwords everywhere and accepts a passphrase (A9)', async () => {
+      const gateway = world();
+      // 一覧の見本（全件は passwordPolicy.test.ts）、表示名・家族の名前・サービス名、並び。
+      for (const value of ['manchesterunited', 'TransportOnline', '1q2w3e4r5t6y7u8i9o0p', 'qazwsxedcrfvtgb', '碧1234567890123456', '森さんち2026!!!!!!!!!', 'yoridokoro2026!!!!!', 'zzzzzzzzzzzzzzzz']) {
+        expect(await gateway.auth.changePassword('current-password-long-enough', value)).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+      }
+      expect(await gateway.auth.confirmPasswordReset({ token: 'not-a-real-token', newPassword: 'manchesterunited' })).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+      const person = { displayName: '山田 花子', email: 'hanako.yamada@example.test', birthdate: '1990-04-01' };
+      expect(await gateway.auth.signUp({ ...person, password: 'manchesterunited' })).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+      expect(await gateway.auth.signUp({ ...person, password: 'Hanako.Yamada-1990-04-01' })).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+      expect(await gateway.auth.signUp({ ...person, password: '山田花子1990!!!!!!!!' })).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+      expect(await gateway.auth.changePassword('current-password-long-enough', 'みかんの木の下で猫が三匹ねむる')).toEqual({ ok: true, value: undefined });
+    });
   });
 
   describe('gateway places and privacy', () => {

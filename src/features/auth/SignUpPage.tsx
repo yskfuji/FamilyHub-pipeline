@@ -4,6 +4,7 @@ import { useApp } from '../../app/AppContext';
 import { navigate } from '../../app/router';
 import { Brand } from '../../design-system/components';
 import { ADULT_AGE, ageOn, signUpSchema } from '../../domain/account';
+import { checkNewPassword } from '../../domain/passwordPolicy';
 
 export function SignUpPage() {
   const { gateway, finishSignIn } = useApp();
@@ -18,6 +19,8 @@ export function SignUpPage() {
     const parsed = signUpSchema.safeParse(input);
     if (!parsed.success) { setError(parsed.error.issues[0]?.message ?? '入力を確認してください。'); return; }
     setBusy(true); setError('');
+    const problem = await checkNewPassword(parsed.data.password, { email: parsed.data.email, displayName: parsed.data.displayName });
+    if (problem) { setError(problem); setBusy(false); return; }
     const created = await gateway.auth.signUp(parsed.data);
     if (!created.ok) { setError(created.error.message); setBusy(false); return; }
     const signedIn = await gateway.auth.signInWithPassword(input.email, input.password);

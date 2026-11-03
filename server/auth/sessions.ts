@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { ServerConfig } from '../config';
 import type { Db } from '../db/db';
@@ -50,13 +50,12 @@ export function presessionValue(request: FastifyRequest, reply: FastifyReply, co
   return value;
 }
 
+/** 有効な鍵で作り、引退していないすべての鍵で確かめる（鍵を替えても開いている画面のトークンが使える）。 */
 export function csrfTokenFor(config: ServerConfig, binding: string) {
-  return createHmac('sha256', config.secret).update(`csrf:${binding}`).digest('base64url');
+  return config.keys.sign('csrf', binding);
 }
 
 export function csrfTokenMatches(config: ServerConfig, binding: string | undefined, presented: string | undefined) {
   if (!binding || !presented) return false;
-  const expected = Buffer.from(csrfTokenFor(config, binding));
-  const actual = Buffer.from(presented);
-  return expected.length === actual.length && timingSafeEqual(expected, actual);
+  return config.keys.verify('csrf', binding, presented);
 }

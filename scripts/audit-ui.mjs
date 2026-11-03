@@ -18,6 +18,7 @@ const sourceFiles = (await filesUnder(resolve('src'))).filter((file) => (
   || file.endsWith('/offline/queue.ts')
   || file.endsWith('/content/ja.ts')
   || file.endsWith('/content/serverMessages.ts')
+  || file.endsWith('/content/passwordMessages.ts')
   || file.endsWith('/content/help.ts')
   || file.endsWith('/content/legal.ts')
   || (/\/features\/place\/[^/]+\.ts$/.test(file) && !file.endsWith('.test.ts'))

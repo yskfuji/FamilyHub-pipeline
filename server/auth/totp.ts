@@ -1,4 +1,5 @@
-import { createCipheriv, createDecipheriv, createHash, createHmac, hkdfSync, randomBytes } from 'node:crypto';
+import { createHash, createHmac, randomBytes } from 'node:crypto';
+import type { Keyring } from './keyring';
 import { serverMessages } from '../../src/content/serverMessages';
 
 /** RFC 6238 の確認コード（SHA-1、30秒、6桁）。 */
@@ -34,22 +35,11 @@ export function matchingStep(secret: Buffer, code: string, nowMs: number, lastSt
   return null;
 }
 
-const keyFor = (masterSecret: string) => Buffer.from(hkdfSync('sha256', masterSecret, 'family-hub', 'totp-secret', 32));
+/** TOTP の秘密は検証に元の値が要るので、ハッシュではなく暗号化して保存する（RFC 6238 5.1）。鍵束の有効な鍵で封をする。 */
+export const sealTotpSecret = (keys: Keyring, userId: string, secret: Buffer) => keys.seal('totp-secret', userId, secret);
 
-/** TOTP の秘密は検証に元の値が要るので、ハッシュではなく暗号化して保存する。 */
-export function encryptSecret(masterSecret: string, secret: Buffer) {
-  const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', keyFor(masterSecret), iv);
-  const body = Buffer.concat([cipher.update(secret), cipher.final()]);
-  return [iv, cipher.getAuthTag(), body].map((part) => part.toString('base64url')).join('.');
-}
-
-export function decryptSecret(masterSecret: string, stored: string) {
-  const [iv, tag, body] = stored.split('.').map((part) => Buffer.from(part, 'base64url'));
-  const decipher = createDecipheriv('aes-256-gcm', keyFor(masterSecret), iv);
-  decipher.setAuthTag(tag);
-  return Buffer.concat([decipher.update(body), decipher.final()]);
-}
+/** 読めなければ null。鍵がない・引退した・秘密が違うときも、例外にせず「使えない」として扱う。 */
+export const openTotpSecret = (keys: Keyring, userId: string, stored: string) => keys.open('totp-secret', userId, stored);
 
 export const hashRecoveryCode = (code: string) => createHash('sha256').update(`recovery:${code.replaceAll('-', '').toUpperCase()}`).digest('base64url');
 

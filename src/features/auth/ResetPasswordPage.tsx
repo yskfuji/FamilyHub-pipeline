@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useApp } from '../../app/AppContext';
 import { Brand } from '../../design-system/components';
+import { checkNewPassword } from '../../domain/passwordPolicy';
+import { passwordSchema } from '../../domain/schemas';
 
 export function ResetPasswordPage() {
   const { gateway } = useApp();
@@ -24,7 +26,12 @@ export function ResetPasswordPage() {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     setError('');
-    const result = await gateway.auth.confirmPasswordReset({ ...(token ? { token } : { email, code: String(data.get('code')) }), newPassword: String(data.get('password')) });
+    const newPassword = String(data.get('password'));
+    const parsed = passwordSchema.safeParse(newPassword);
+    if (!parsed.success) { setError(parsed.error.issues[0]?.message ?? '新しいパスワードを確認してください。'); return; }
+    const problem = await checkNewPassword(newPassword, token ? undefined : { email });
+    if (problem) { setError(problem); return; }
+    const result = await gateway.auth.confirmPasswordReset({ ...(token ? { token } : { email, code: String(data.get('code')) }), newPassword });
     if (result.ok) setStep('done'); else setError(result.error.message);
   };
   return <main className="auth-layout auth-layout-single"><section className="auth-main"><div className="auth-card"><Brand/><h1>パスワードの再設定</h1>
