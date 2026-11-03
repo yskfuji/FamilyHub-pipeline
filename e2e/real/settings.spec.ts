@@ -163,6 +163,8 @@ test('the version banner appears only when the served build differs', async ({ p
 });
 
 test('member scope, two panes and resync work on real data', async ({ page }) => {
+  // 一覧の横に詳細を並べるのは、本文（#main）が 1100px 以上のとき（段階8）。レールを除くので窓は 1440px。
+  await page.setViewportSize({ width: 1440, height: 900 });
   await signIn(page, 'hana@example.test', PASSWORD);
   await page.goto('/tasks');
   await expect(page.getByRole('link', { name: /音読の記録/ })).toBeVisible();

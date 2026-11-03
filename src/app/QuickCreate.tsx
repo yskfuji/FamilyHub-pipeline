@@ -9,7 +9,7 @@ const QuickCreateDialog = lazy(() => import('./QuickCreateDialog'));
 const kindTable: ReadonlyArray<readonly [QuickCreateKind, string, Capability]> = [['todo', 'タスク', 'task.create'], ['event', '予定', 'event.create'], ['memo', 'メモ', 'memo.create'], ['expense', '家計', 'expense.create']];
 
 /** path が変わったら閉じる。保存していない入力の確認で「破棄する」を選んで移動したときも、開いたまま残さない。 */
-export function QuickCreate({ path }: { path: string }) {
+export function QuickCreate({ path, placement }: { path: string; placement: 'floating' | 'topbar' }) {
   const { can } = useApp();
   const [openOn, setOpenOn] = useState<string | null>(null);
   const open = openOn === path;
@@ -34,7 +34,7 @@ export function QuickCreate({ path }: { path: string }) {
   });
 
   return <>
-    <button type="button" className="button primary quick-create" data-control-id="quick-create.open" onClick={() => openWith()}><PlusIcon width="20"/><span>すぐに追加</span></button>
+    <button type="button" className="button primary quick-create" data-placement={placement} data-control-id="quick-create.open" onClick={() => openWith()}><PlusIcon width="20"/><span>すぐに追加</span></button>
     {open && <Suspense fallback={null}><QuickCreateDialog key={opening} kinds={kinds} kind={kind} onKind={(value) => { setKind(value); setSeed(null); }} prefill={prefill} expenseKind={expenseKind} seed={seed} onClose={() => setOpenOn(null)}/></Suspense>}
   </>;
 }

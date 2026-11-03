@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 // 円記号はブラウザの Intl 実装で全角（Chromium）と半角（WebKit）が異なるため、どちらも受け付ける。
 const yen = (amount: string) => `[¥￥]${amount.replace(',', '\\,')}`;

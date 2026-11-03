@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 import { allThemes } from '../src/domain/theme';
 import { openedStates, screens, viewports } from './screens';
 
@@ -236,7 +236,7 @@ async function axeProblems(page: Page): Promise<string[]> {
 }
 
 test.describe.configure({ mode: 'parallel' });
-test.use({ reducedMotion: 'reduce' });
+test.use({ contextOptions: { reducedMotion: 'reduce' } });
 
 const pages: Array<{ name: string; route: string; viewport: 'mobile' | 'desktop'; open?: (page: Page) => Promise<void> }> = [
   ...(['mobile', 'desktop'] as const).flatMap((viewport) => screens.map(([name, route]) => ({ name, route, viewport }))),

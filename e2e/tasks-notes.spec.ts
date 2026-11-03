@@ -1,5 +1,5 @@
-import { expect, test } from '@playwright/test';
-import type { Page } from '@playwright/test';
+import { expect, test } from './fixtures';
+import type { Page } from './fixtures';
 
 const pdf = { name: 'notice.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.7 mock') };
 const filter = (page: Page) => page.getByRole('group', { name: 'タスクの絞り込み' });
@@ -180,6 +180,8 @@ test.describe('tasks', () => {
     await page.getByRole('button', { name: 'タスクを追加' }).click();
     const form = page.getByRole('dialog', { name: 'すぐに追加' });
     await expect(form.getByLabel('タスク名')).toBeVisible();
+    // 開く動き（150ms の移動）の途中では、高さが小数の誤差で 44px をわずかに下回る。動きが終わってから測る。
+    await form.evaluate((element) => Promise.all(element.getAnimations().map((animation) => animation.finished)));
     const small = await form.locator('button:visible').evaluateAll((buttons) => buttons.filter((button) => button.getBoundingClientRect().height < 44).length);
     expect(small).toBe(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);

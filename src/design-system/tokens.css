@@ -78,6 +78,12 @@
     --space-8: 4rem;
     /* 下のナビとすぐに追加のボタンに隠れないよう、ページの最後に空ける高さ。 */
     --layout-page-end: 7.5rem;
+    /* 固定の部品の高さ。焦点を動かしてスクロールするとき、これらに隠れないよう scroll-padding に使う（WCAG 2.4.11）。 */
+    --layout-topbar: 5.25rem;
+    --layout-topbar-compact: 4.4rem;
+    --layout-bottom-nav: 4.6rem;
+    --layout-fab: 3.25rem;
+    --layout-fab-bottom: 5.5rem;
 
     --radius-xs: 6px;
     --radius-sm: 10px;

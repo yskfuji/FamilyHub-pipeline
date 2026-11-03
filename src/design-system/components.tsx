@@ -1,11 +1,12 @@
-import type { PropsWithChildren, ReactNode } from 'react';
+import type { FormHTMLAttributes, PropsWithChildren, ReactNode } from 'react';
 import { useEffectEvent, useId, useLayoutEffect, useRef, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertIcon, CloseIcon, FileIcon } from './icons';
-import { closeGuarded, finishLeaving, pendingLeave, stayHere, subscribeUnsaved } from './unsavedGuard';
+import { closeGuarded, finishLeaving, pendingLeave, stayHere, subscribeUnsaved, useUncontrolledUnsaved } from './unsavedGuard';
 import { addDateKeyDays, dateKeyFromRfc3339 } from '../domain/calendarDate';
 import { ja } from '../content/ja';
 import { wordmark } from './wordmark';
+import { useSizeClass } from './sizeClass';
 
 export function BrandMark() {
   return <svg className="brand-mark" viewBox="0 0 48 48" role="img" aria-label={ja.brand.markLabel}><path d="M24 4c7 8 16 10 16 21 0 9-7 17-16 17S8 34 8 25C8 14 17 12 24 4Z" fill="var(--brand-soft)" stroke="var(--brand)" strokeWidth="2"/><path d="M16 27c4-7 12-7 16 0M24 18v17" fill="none" stroke="var(--accent-strong)" strokeWidth="2" strokeLinecap="round"/></svg>;
@@ -96,10 +97,25 @@ export function Dialog({ title, description, onClose, children, actions }: Props
   return createPortal(<div ref={root as React.RefObject<HTMLDivElement>} data-modal-root className="dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}><section className="dialog" role="dialog" aria-modal="true" aria-labelledby={titleId}><div className="dialog-head"><div><h2 id={titleId}>{title}</h2>{description && <p className="muted mb-0">{description}</p>}</div><button data-control-id="dialog.close" data-autofocus className="icon-button" type="button" onClick={close} aria-label={ja.actions.close}><CloseIcon /></button></div>{children}{actions && <div className="dialog-actions">{actions}</div>}</section></div>, document.body);
 }
 
+/**
+ * 右からのドロワー（medium）と全画面のシート（narrow）。見た目は html の data-size-class で CSS が切り替える。
+ * Esc・背景・× のどの経路で閉じても、中のフォームに保存していない入力があれば確かめる。
+ */
 export function Drawer({ title, eyebrow, onClose, children }: PropsWithChildren<{ title: string; eyebrow: string; onClose: () => void }>) {
   const titleId = useId();
   const root = useModalBehavior(onClose);
-  return createPortal(<div ref={root as React.RefObject<HTMLDivElement>} data-modal-root><div className="backdrop" onClick={onClose} /><aside className="drawer" role="dialog" aria-modal="true" aria-labelledby={titleId}><div className="drawer-head"><div><p className="eyebrow">{eyebrow}</p><h2 id={titleId}>{title}</h2></div><button data-control-id="drawer.close" data-autofocus className="icon-button" type="button" onClick={onClose} aria-label={ja.actions.close}><CloseIcon /></button></div>{children}</aside></div>, document.body);
+  const close = () => closeGuarded(root.current, onClose);
+  const presentation = useSizeClass() === 'narrow' ? 'sheet' : 'drawer';
+  return createPortal(<div ref={root as React.RefObject<HTMLDivElement>} data-modal-root><div className="backdrop" onClick={close} /><aside className="drawer" data-presentation={presentation} role="dialog" aria-modal="true" aria-labelledby={titleId}><div className="drawer-head"><div><p className="eyebrow">{eyebrow}</p><h2 id={titleId} data-detail-title>{title}</h2></div><button data-control-id="drawer.close" data-autofocus className="icon-button" type="button" onClick={close} aria-label={ja.actions.close}><CloseIcon /></button></div>{children}</aside></div>, document.body);
+}
+
+/**
+ * 値を状態に持たないフォーム（設定の名前・メールアドレス・パスワードなど）。初めの値から変えたまま、
+ * 重ね表示を閉じる・別の画面へ移る・戻るときに確かめる。取り消しのボタンは closeGuarded を通す。
+ */
+export function GuardedForm({ children, ...props }: PropsWithChildren<FormHTMLAttributes<HTMLFormElement>>) {
+  const unsaved = useUncontrolledUnsaved();
+  return <form {...props} {...unsaved.formProps}>{children}</form>;
 }
 
 /** 保存していない入力を残して離れようとしたときの確認。アプリに1つだけ置く。 */

@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useRef, useState, type PropsWithChildren, type ReactNode } from 'react';
+import { Suspense, lazy, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type PropsWithChildren, type ReactNode } from 'react';
 import { useApp } from './AppContext';
 import { Brand, Drawer, EmptyState, PageHeader, StatusBadge, formatTime } from '../design-system/components';
 import { filterTasks } from '../domain/taskList';
@@ -10,6 +10,8 @@ import { ja, notificationStatusLabels, roleLabels } from '../content/ja';
 import { auditPath, auditSurface } from '@audit-surface';
 import { setDevicePreferences, useDevicePreferences } from './devicePreferences';
 import { useNewVersion } from './useNewVersion';
+import { useSizeClass } from '../design-system/sizeClass';
+import { markReady } from './routeLoading';
 
 /** 検索は開いたときに読む。 */
 const SearchOverlay = lazy(async () => ({ default: (await import('./SearchOverlay')).SearchOverlay }));
@@ -36,6 +38,11 @@ function NavCount({ count }: { count: number }) {
 function NavAnchor({ href, label, icon: Icon, path, match, count = 0 }: { href: string; label: string; icon: (props: any) => ReactNode; path: string; match?: string; count?: number }) {
   return <a data-control-id={`navigation.open.${href.replace(/^\//, "").replaceAll("/", ".")}`} className="nav-link" href={href} data-link aria-current={isCurrent(path, match ?? href) ? 'page' : undefined}><Icon/><span className="nav-label">{label}</span><NavCount count={count}/></a>;
 }
+/** 下のナビを出す幅（レールが本文の幅を決めるので、ここだけはウィンドウの幅で決める）。 */
+const BOTTOM_NAV_QUERY = '(max-width: 760px)';
+const subscribeBottomNav = (notify: () => void) => { const query = window.matchMedia(BOTTOM_NAV_QUERY); query.addEventListener('change', notify); return () => query.removeEventListener('change', notify); };
+const useBottomNav = () => useSyncExternalStore(subscribeBottomNav, () => window.matchMedia(BOTTOM_NAV_QUERY).matches);
+
 const topbarDate = (asOf: string) => new Intl.DateTimeFormat('ja-JP', { month: 'long', day: 'numeric', weekday: 'long', timeZone: 'Asia/Tokyo' }).format(new Date(asOf));
 
 export function Shell({ path, children }: PropsWithChildren<{ path: string }>) {
@@ -43,6 +50,9 @@ export function Shell({ path, children }: PropsWithChildren<{ path: string }>) {
   const canNotify = can('notification.manage');
   const { night } = useDevicePreferences();
   const newVersion = useNewVersion();
+  const bottomNav = useBottomNav();
+  // html の data-size-class を保つ（ドロワーとシートの見た目、試験の確かめに使う）。
+  const sizeClass = useSizeClass();
   const openTasks = can('task.read') ? filterTasks(snapshot.todos, 'open', snapshot.viewer.membershipId).length : 0;
   // 「通知の内容を表示しない」設定のときは、題名と本文を伏せ、利用者が開いたものだけ表示する。
   const hideContent = privacy?.hideNotificationContent ?? true;
@@ -67,6 +77,10 @@ export function Shell({ path, children }: PropsWithChildren<{ path: string }>) {
   // 画面を移ったら「その他」を閉じる（開いたまま次の画面に重ならないようにする）。
   useEffect(() => { setMore(false); }, [path]);
   const unauthenticated = error?.code === 'UNAUTHENTICATED';
+  // 本人確認が要るときは本文を描かないので、ここで描き終えた印を書く（読み込み中は書かない）。
+  useLayoutEffect(() => { if (unauthenticated && !loading) markReady(window.location.pathname); });
+  // すぐに追加は、下のナビがある幅では右下に浮かべ、レールのある幅では上部に置く（本文の上に重ならないように）。
+  const quickCreate = !unauthenticated && !loading && (can('event.create') || can('task.create') || can('memo.create') || can('expense.create')) ? <QuickCreate path={path} placement={bottomNav ? 'floating' : 'topbar'}/> : null;
   const available = primary.filter((item) => !item.capability || can(item.capability));
   const mobilePrimary = available.filter((item) => ['/today','/calendar','/tasks','/notes','/budget'].includes(item.href)).slice(0, 4);
   const overflow = available.filter((item) => !mobilePrimary.some((mobile) => mobile.href === item.href));
@@ -86,15 +100,15 @@ export function Shell({ path, children }: PropsWithChildren<{ path: string }>) {
       setNotificationBusy(null);
     }
   };
-  return <div className="app-shell">
+  return <div className="app-shell" data-size-class={sizeClass}>
     <a data-control-id="navigation.skip-to-content" className="skip-link" href="#main">本文へ移動</a>
     <aside className="rail"><Brand/><nav aria-label="主な機能"><ul className="nav-list">{available.map((item) => <li key={item.href}><NavAnchor {...item} path={path} count={item.href === '/tasks' ? openTasks : 0}/></li>)}</ul></nav><div className="rail-footer">{auditSurface && <a data-control-id="navigation.audit" className="nav-link" href={auditPath} data-link aria-current={isCurrent(path, auditPath) ? 'page' : undefined}><SparkIcon/><span className="nav-label">内部監査</span></a>}<div className="identity"><span className="avatar" aria-hidden="true">{snapshot.user.displayName.slice(0, 1)}</span><span className="identity-copy"><strong>{snapshot.household.name}</strong><br/><span className="muted">{snapshot.user.displayName} · {roleLabels[snapshot.viewer.role]}</span></span></div></div></aside>
     <div className="shell-main">
-      <header className="topbar"><div className="split"><span className="mobile-brand"><Brand compact/></span><div className="topbar-date"><strong>{topbarDate(snapshot.context.asOf)}</strong><br/><span>{snapshot.context.weather.location}・{snapshot.context.weather.temperatureC}℃</span></div></div><div className="topbar-actions">{pendingCommands.length > 0 && <button type="button" className="button" data-control-id="queue.open" onClick={() => setQueueOpen(true)}><span className="label">未送信の変更</span><StatusBadge tone="attention">{pendingCommands.length}</StatusBadge></button>}<button ref={searchButton} type="button" className="button" data-control-id="search.open" aria-label="検索（⌘K）" onClick={() => setSearch(true)}><SearchIcon width="18"/><span className="label">検索</span><span className="small muted">⌘K</span></button>{canNotify && <button type="button" className="icon-button notification-button" data-control-id="notifications.open" aria-label={`通知を確認、未読${notifications.filter((item) => !item.read).length}件`} onClick={async () => { await loadNotifications(); setNotificationsOpen(true); }}><BellIcon/>{notifications.some((item) => !item.read) && <span className="notification-dot" aria-hidden="true"/>}</button>}<button type="button" className="icon-button" data-control-id="settings.theme.toggle" aria-label={night ? '明るいテーマに切り替え' : '暗いテーマに切り替え'} onClick={() => setDevicePreferences({ colorMode: night ? 'day' : 'night' })}>{night ? <SunIcon/> : <MoonIcon/>}</button></div></header>
+      <header className="topbar"><div className="split"><span className="mobile-brand"><Brand compact/></span><div className="topbar-date"><strong>{topbarDate(snapshot.context.asOf)}</strong><br/><span>{snapshot.context.weather.location}・{snapshot.context.weather.temperatureC}℃</span></div></div><div className="topbar-actions">{pendingCommands.length > 0 && <button type="button" className="button" data-control-id="queue.open" onClick={() => setQueueOpen(true)}><span className="label">未送信の変更</span><StatusBadge tone="attention">{pendingCommands.length}</StatusBadge></button>}<button ref={searchButton} type="button" className="button" data-control-id="search.open" aria-label="検索（⌘K）" onClick={() => setSearch(true)}><SearchIcon width="18"/><span className="label">検索</span><span className="small muted">⌘K</span></button>{canNotify && <button type="button" className="icon-button notification-button" data-control-id="notifications.open" aria-label={`通知を確認、未読${notifications.filter((item) => !item.read).length}件`} onClick={async () => { await loadNotifications(); setNotificationsOpen(true); }}><BellIcon/>{notifications.some((item) => !item.read) && <span className="notification-dot" aria-hidden="true"/>}</button>}<button type="button" className="icon-button" data-control-id="settings.theme.toggle" aria-label={night ? '明るいテーマに切り替え' : '暗いテーマに切り替え'} onClick={() => setDevicePreferences({ colorMode: night ? 'day' : 'night' })}>{night ? <SunIcon/> : <MoonIcon/>}</button>{!bottomNav && quickCreate}</div></header>
       {newVersion && <div className="version-banner" role="status"><span>新しい版があります。読み込み直すと最新の内容になります。</span><button data-control-id="shell.version.reload" className="button" type="button" onClick={() => window.location.reload()}>読み込み直す</button></div>}
       {error && <div className="page" style={{ paddingBottom: 0 }}><div className="callout" role="alert"><span className="status-dot"/><div><strong>{error.message}</strong><p className="small muted mb-0">{unauthenticated ? '本人確認が終わるまで、家族の情報は表示しません。' : '最後に取得できた情報を表示しています。'}</p></div>{error.retryable && <button data-control-id="shell.error.retry" className="button" type="button" onClick={() => void refresh()}>{ja.actions.retry}</button>}</div></div>}
       {refreshing && <div className="refresh-indicator" aria-hidden="true"/>}<main id="main" tabIndex={-1} aria-busy={loading || refreshing}>{unauthenticated ? <div className="page"><EmptyState title="本人確認が必要です" action={<a data-control-id="auth.sign-in" className="button primary" href="/auth" data-link>サインインする</a>}>家族の情報を表示するには、もう一度サインインしてください。</EmptyState></div> : loading ? <div className="page" aria-label="家族の情報を読み込んでいます"><PageHeader eyebrow={ja.states.loading} title="最新の情報を読み込んでいます" description="読み込みが終わるまで、変更はできません。"/><div className="grid two"><div className="skeleton"/><div className="skeleton"/></div></div> : children}</main>
-      {!unauthenticated && !loading && (can('event.create') || can('task.create') || can('memo.create') || can('expense.create')) && <QuickCreate path={path}/>}
+      {bottomNav && quickCreate}
       <nav className="mobile-nav" aria-label="モバイルの主な機能">{mobilePrimary.map((item) => <a data-control-id={`navigation.mobile.${item.href.replace(/^\//, "").replaceAll("/", ".")}`} key={item.href} href={item.href} data-link aria-current={isCurrent(path,item.href) ? 'page' : undefined}><item.icon/><span>{item.label}</span>{item.href === '/tasks' && <NavCount count={openTasks}/>}</a>)}<button type="button" data-control-id="navigation.more" className={overflowCurrent ? 'is-current' : undefined} aria-haspopup="dialog" aria-expanded={more} aria-label={overflowCurrent ? `${ja.navigation.more}（表示中：${overflowCurrent.label}）` : ja.navigation.more} onClick={() => setMore(true)}><MoreIcon/><span>{ja.navigation.more}</span></button></nav>
     </div>
     {more && <Drawer eyebrow="メニュー" title={ja.navigation.more} onClose={() => setMore(false)}><nav aria-label="その他の機能"><ul className="more-list">{overflow.map((item) => <li key={item.href}><a data-control-id={`navigation.more.${item.href.replace(/^\//, "").replaceAll("/", ".")}`} className="nav-link" href={item.href} data-link aria-current={isCurrent(path, item.match ?? item.href) ? 'page' : undefined}><item.icon width="20"/><span>{item.label}</span>{item.href === '/tasks' && <NavCount count={openTasks}/>}</a></li>)}{auditSurface && <li><a data-control-id="navigation.more.audit" className="nav-link" href={auditPath} data-link><SparkIcon width="20"/><span>内部監査</span></a></li>}</ul></nav><div className="identity mt-1"><span className="avatar" aria-hidden="true">{snapshot.user.displayName.slice(0, 1)}</span><span className="identity-copy"><strong>{snapshot.household.name}</strong><br/><span className="muted">{snapshot.user.displayName} · {roleLabels[snapshot.viewer.role]}</span></span></div></Drawer>}

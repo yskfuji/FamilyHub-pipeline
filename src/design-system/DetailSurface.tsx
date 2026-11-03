@@ -1,32 +1,22 @@
-import { useEffect, useEffectEvent, useId, useLayoutEffect, useRef, useSyncExternalStore, type PropsWithChildren } from 'react';
+import { useEffect, useEffectEvent, useId, useLayoutEffect, useRef, type PropsWithChildren } from 'react';
 import { ja } from '../content/ja';
 import { Drawer, focusReturnTarget } from './components';
+import { useSizeClass } from './sizeClass';
+import { closeGuarded } from './unsavedGuard';
 import { CloseIcon } from './icons';
 
-/** 一覧と詳細を横に並べられる、本文の領域の幅（rem）。 */
-const TWO_PANE_MIN_REM = 52;
-
-function subscribeContentWidth(notify: () => void) {
-  const main = document.getElementById('main');
-  window.addEventListener('resize', notify);
-  const observer = main && typeof ResizeObserver !== 'undefined' ? new ResizeObserver(notify) : null;
-  if (main) observer?.observe(main);
-  return () => { window.removeEventListener('resize', notify); observer?.disconnect(); };
-}
-
-const contentIsWide = () => {
-  const main = document.getElementById('main');
-  if (!main) return false;
-  return main.clientWidth >= TWO_PANE_MIN_REM * parseFloat(getComputedStyle(document.documentElement).fontSize);
-};
-
-/** 本文の領域が、一覧と詳細を並べられる幅かどうか。ウィンドウではなく本文の領域で判断する。 */
-export const useContentWide = () => useSyncExternalStore(subscribeContentWidth, contentIsWide);
+/**
+ * 本文の領域が、一覧と詳細を並べられる幅（wide、#main が 1100px 以上）かどうか。ウィンドウではなく本文の領域で判断する。
+ * 段階の決め方は sizeClass.ts。
+ */
+export const useContentWide = () => useSizeClass() === 'wide';
 
 function DetailPane({ title, eyebrow, onClose, children }: PropsWithChildren<{ title: string; eyebrow: string; onClose: () => void }>) {
   const titleId = useId();
   const pane = useRef<HTMLElement>(null);
-  const close = useEffectEvent(onClose);
+  // ×・Esc のどちらで閉じても、保存していない入力があれば確かめる。
+  const guardedClose = () => closeGuarded(pane.current, onClose);
+  const close = useEffectEvent(guardedClose);
   const trigger = useRef<HTMLElement | null>(focusReturnTarget());
   useLayoutEffect(() => {
     const returnTarget = trigger.current;
@@ -46,12 +36,15 @@ function DetailPane({ title, eyebrow, onClose, children }: PropsWithChildren<{ t
     return () => document.removeEventListener('keydown', keydown);
   }, []);
   return <section ref={pane} className="detail-pane" role="dialog" aria-labelledby={titleId}>
-    <div className="drawer-head"><div><p className="eyebrow">{eyebrow}</p><h2 id={titleId}>{title}</h2></div><button data-control-id="drawer.close" data-autofocus className="icon-button" type="button" onClick={onClose} aria-label={ja.actions.close}><CloseIcon/></button></div>
+    <div className="drawer-head"><div><p className="eyebrow">{eyebrow}</p><h2 id={titleId} data-detail-title>{title}</h2></div><button data-control-id="drawer.close" data-autofocus className="icon-button" type="button" onClick={guardedClose} aria-label={ja.actions.close}><CloseIcon/></button></div>
     {children}
   </section>;
 }
 
-/** 詳細の表示。広い本文の領域では一覧の横に並べ、狭いときは今までどおり重ねて開く。 */
+/**
+ * 詳細の表示。wide では一覧の横に並べ、medium では右からのドロワー、narrow では全画面のシートで開く
+ * （ドロワーとシートの違いは html の data-size-class で CSS が切り替える）。開く・閉じるは URL が決める。
+ */
 export function DetailSurface({ title, eyebrow, onClose, children }: PropsWithChildren<{ title: string; eyebrow: string; onClose: () => void }>) {
   return useContentWide()
     ? <DetailPane title={title} eyebrow={eyebrow} onClose={onClose}>{children}</DetailPane>

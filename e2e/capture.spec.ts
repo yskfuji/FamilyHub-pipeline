@@ -1,5 +1,5 @@
 import { mkdir } from 'node:fs/promises';
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 import { openedStates, screens, viewports } from './screens';
 
 test.use({ deviceScaleFactor: 2 });

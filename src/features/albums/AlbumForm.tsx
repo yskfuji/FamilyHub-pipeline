@@ -4,6 +4,7 @@ import { bgmLabels, ja } from '../../content/ja';
 import { albumDraftProblem, type AlbumDraft } from '../../domain/albumForm';
 import type { BgmPreset } from '../../domain/types';
 import { VisibilityFields } from '../shared/VisibilityFields';
+import { useUnsavedGuard } from '../../design-system/unsavedGuard';
 
 interface Props {
   /** 操作の ID の末尾に使う。新規は new。 */
@@ -23,6 +24,7 @@ export function AlbumForm({ formId, initial, submitLabel, busyLabel, busy, error
   const { snapshot } = useApp();
   const [draft, setDraft] = useState(initial);
   const [problem, setProblem] = useState('');
+  const unsaved = useUnsavedGuard(draft, busy);
   const patch = (changes: Partial<AlbumDraft>) => setDraft((current) => ({ ...current, ...changes }));
   const people = snapshot.memberships.filter((member) => member.status === 'active' || draft.selectedIds.includes(member.id));
   const submit = (event: FormEvent) => {
@@ -32,7 +34,7 @@ export function AlbumForm({ formId, initial, submitLabel, busyLabel, busy, error
     if (!found) onSubmit(draft);
   };
   const shown = problem || error;
-  return <form className="stack" aria-busy={busy} noValidate onSubmit={submit}>
+  return <form {...unsaved.formProps} className="stack" aria-busy={busy} noValidate onSubmit={submit}>
     <label className="field"><span>アルバム名</span><input data-control-id={`albums.form.title.${formId}`} className="input" name="title" autoFocus required maxLength={120} value={draft.title} onChange={(event) => patch({ title: event.target.value })}/></label>
     <label className="field"><span>説明（任意）</span><textarea data-control-id={`albums.form.description.${formId}`} className="textarea" name="description" maxLength={2000} value={draft.description} onChange={(event) => patch({ description: event.target.value })}/></label>
     <VisibilityFields kind="album" formId={formId} audience={draft.audience} selectedIds={draft.selectedIds} initialAudience={initial.audience} people={people} onChange={(changes) => patch(changes as Partial<AlbumDraft>)}/>
@@ -42,7 +44,7 @@ export function AlbumForm({ formId, initial, submitLabel, busyLabel, busy, error
     </select><span className="field-help" id={`album-bgm-help-${formId}`}>再生ボタンを押すまで音は鳴りません。</span></label>
     {shown && <p className="field-error" role="alert">{shown}</p>}
     <div className="dialog-actions">
-      <button data-control-id={`albums.form.cancel.${formId}`} className="button" type="button" disabled={busy} onClick={onCancel}>{ja.actions.cancel}</button>
+      <button data-control-id={`albums.form.cancel.${formId}`} className="button" type="button" disabled={busy} onClick={() => unsaved.leave(onCancel)}>{ja.actions.cancel}</button>
       <button data-control-id={`albums.form.submit.${formId}`} className="button primary" type="submit" disabled={busy}>{busy ? busyLabel : submitLabel}</button>
     </div>
   </form>;

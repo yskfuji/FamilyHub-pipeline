@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 test('notification bell opens an operable notification center', async ({ page }) => {
   await page.goto('/today');

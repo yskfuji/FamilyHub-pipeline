@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 // 一覧は下へ進むと続きを読み込むので、数えるのは10月の分だけにする。
 const listRows = (page: import('@playwright/test').Page, title: string) => page.locator('.agenda-day[data-date^="2026-10"] .list-row').filter({ hasText: title });

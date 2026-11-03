@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 test('owner sees administration with localized role and status labels', async ({ page }) => {
   await page.goto('/settings/household');

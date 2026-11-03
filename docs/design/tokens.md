@@ -138,6 +138,23 @@
 - 影 `--shadow-1`（カード）・`-2`（固定の部品）・`-3`（ダイアログ・ドロワー・検索・知らせ・警告）。夜のテーマでは黒い影が見えにくいので、1px の明るい縁（白 5〜9%）を重ねる。
 - 動き `--duration-1`〜`-5` = 100/150/200/250/300ms、`--ease-standard`・`--ease-enter`・`--ease-exit`。前は 120/180/260ms。300ms を超えてよいのは、スライドショーの写真の拡大（6s）と、読み込み中の骨組み（1.4s の繰り返し）・帯（1.1s の繰り返し）だけで、どれも `scripts/audit-css.mjs` に名前と理由がある。動きを減らす設定では止める。
 - 重なり `--z-raised`〜`--z-skip`（1〜1000）。
+- 固定の部品の高さ（段階8）: `--layout-topbar` 5.25rem・`--layout-topbar-compact` 4.4rem（760px 以下）・`--layout-bottom-nav` 4.6rem・`--layout-fab` 3.25rem・`--layout-fab-bottom` 5.5rem。`html` の `scroll-padding-block` に使い、Tab で焦点が動いたときに上部・下のナビ・すぐに追加の下へ隠れないようにする（WCAG 2.4.11）。
+- 重ね表示の動き（段階8）: ドロワーは右から `--duration-3`（200ms）、narrow のシートは下から 200ms、ダイアログは `--duration-2`（150ms）。どれも `transform` だけを動かし、透明度は動かさない（濃さの確かめが途中の値で崩れないように）。画面の切り替えは View Transitions（本文の入れ替え 150ms、題名の移動 200ms）。動きを減らす設定（端末とこの端末の設定のどちらでも）では View Transitions を呼ばず、CSS の動きも止める。
+- 押したときの反応（段階8）: ボタン・ナビ・一覧の項目は `:active` で縮むか地の色が変わる。押した瞬間は遷移させず（`transition-duration: 0s`）、次のフレームで変わって見えるようにする。
+
+## 画面分割（段階8）
+
+段階は本文の領域 `#main` の幅で決める（`src/design-system/sizeClass.ts`。`html` の `data-size-class` にも書く）。
+
+| 段階 | #main の幅 | 詳細の出し方 |
+|---|---|---|
+| narrow | 600px 未満 | 全画面のシート（`.drawer[data-presentation='sheet']`） |
+| medium | 600〜1100px | 右からのドロワー |
+| wide | 1100px 以上 | 一覧の横に詳細を並べる（タスク・メモ・家計・場所。`DetailSurface`） |
+
+- 上部と下のナビ・レールの切り替えは、レールが本文の幅を決めるため、これまでどおりウィンドウの幅（760px）で決める。そのため 600〜760px の窓は、下のナビと medium の詳細（ドロワー）の組になる。
+- `#main` に `container-type` を付けないのは、付けると中の `position: fixed`（予定の日のシートなど）の基準が `#main` に変わるため。段階は JavaScript の ResizeObserver で測る。
+- すぐに追加は、下のナビがある幅では右下に浮かべ、レールのある幅では上部の操作の並びに置く（本文の上に重ならない）。
 
 ## 画面の地
 

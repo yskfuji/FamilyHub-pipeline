@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 for (const route of ['/welcome','/auth','/onboarding','/today','/calendar','/calendar?view=week','/calendar?view=day','/calendar?view=list','/calendar/event-clean','/tasks','/tasks?filter=done','/tasks?filter=review','/tasks/todo-form','/notes','/notes?sort=oldest','/notes/memo-school','/notes/memo-receipt','/budget','/budget?view=list','/budget?view=list&period=custom','/budget?view=members','/budget?view=settlements','/budget?month=2026-07','/budget/expense-books','/albums','/albums/album-sports','/albums/album-sports?filter=videos','/albums/unknown-album','/places','/places/00000000','/insights','/settings/household','/settings/security','/settings/privacy','/settings/notifications','/settings/accessibility','/settings/resources','/settings/recently-deleted','/settings/help','/settings/help?q=写真&category=records&item=album-formats','/settings/legal','/settings/location','/showcase','/showcase/management','/showcase/management/services','/showcase/management/jobs','/showcase/management/backups','/showcase/management/audit-log','/showcase/management/households','/showcase/management/records','/todayx','/budget?actor=member-hana']) {
   test(`axe serious and critical: ${route}`, async ({ page }) => {

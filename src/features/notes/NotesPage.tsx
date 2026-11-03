@@ -86,7 +86,7 @@ export function NotesPage({ path }: { path: string }) {
       ? <EmptyState title="条件に合うメモはありません">{memberId ? <ScopeNote/> : '検索語を短くするか、新しいメモを追加してください。'}</EmptyState>
       : <div className="grid three">{memos.map((memo) => <a data-control-id={`notes.open.${memo.id}`} className="card memo-card" href={`/notes/${memo.id}${search}`} data-link data-keep-scroll key={memo.id}>
         <div className="split"><NoteIcon width="24"/><span className="meta">{dayLabel(memoDateKey(memo))}</span></div>
-        <h2>{memo.title}</h2>
+        <h2 data-transition-title>{memo.title}</h2>
         <p className="muted">{memo.body}</p>
         {memo.place && <span className="place-chip"><MapPinIcon width="14"/>{memo.place.name}</span>}
         <div className="split">

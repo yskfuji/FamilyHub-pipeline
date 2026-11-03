@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 /** 管理コンソールの見本。監査用ビルドでだけ開き、どの項目でも見本と分かること。 */
 const sections = [

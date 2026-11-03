@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { useApp } from '../../app/AppContext';
 import { ja } from '../../content/ja';
-import { Dialog } from '../../design-system/components';
+import { Dialog, GuardedForm } from '../../design-system/components';
 import { IDLE_TIMEOUT_CHOICES } from '../../domain/account';
 import type { AccountProfile } from '../../domain/types';
 import { LeaveHousehold } from './MemberActions';
@@ -65,16 +65,16 @@ export function AccountSection() {
   return <div className="stack">
     {error && <p className="field-error" role="alert">{error}</p>}
     <section className="card stack"><h2>プロフィール</h2>
-      <form className="stack" onSubmit={saveName}><div className="field"><label htmlFor="account-name">名前</label><input data-control-id="settings.account.name" className="input" id="account-name" name="displayName" maxLength={40} defaultValue={account.displayName} required/></div><button data-control-id="settings.account.name-save" className="button" type="submit">名前を保存</button></form>
+      <GuardedForm className="stack" onSubmit={saveName}><div className="field"><label htmlFor="account-name">名前</label><input data-control-id="settings.account.name" className="input" id="account-name" name="displayName" maxLength={40} defaultValue={account.displayName} required/></div><button data-control-id="settings.account.name-save" className="button" type="submit">名前を保存</button></GuardedForm>
       <fieldset className="field"><legend>アイコン</legend><div className="choice-row">
         <button data-control-id="settings.account.avatar-initial" className="button" type="button" aria-pressed={account.avatar.kind === 'initial'} onClick={() => void update({ avatar: { kind: 'initial' } }, 'アイコンを変更しました。')}>頭文字</button>
         {avatarPresets.map(([preset, glyph]) => <button data-control-id={`settings.account.avatar-preset.${preset}`} key={preset} className="button" type="button" aria-label={`${glyph}のアイコン`} aria-pressed={account.avatar.kind === 'preset' && account.avatar.preset === preset} onClick={() => void update({ avatar: { kind: 'preset', preset } }, 'アイコンを変更しました。')}>{glyph}</button>)}
         <label className="button">画像を選ぶ<input data-control-id="settings.account.avatar-image" className="sr-only" type="file" accept="image/jpeg,image/png" onChange={(event) => void pickImage(event)}/></label>
       </div></fieldset>
-      {!account.birthdateDeclared && <form className="stack" onSubmit={saveBirthdate}><div className="field"><label htmlFor="account-birthdate">誕生日（一度だけ記録できます）</label><input data-control-id="settings.account.birthdate" className="input" id="account-birthdate" name="birthdate" type="date" required/></div><button data-control-id="settings.account.birthdate-save" className="button" type="submit">誕生日を記録</button></form>}
+      {!account.birthdateDeclared && <GuardedForm className="stack" onSubmit={saveBirthdate}><div className="field"><label htmlFor="account-birthdate">誕生日（一度だけ記録できます）</label><input data-control-id="settings.account.birthdate" className="input" id="account-birthdate" name="birthdate" type="date" required/></div><button data-control-id="settings.account.birthdate-save" className="button" type="submit">誕生日を記録</button></GuardedForm>}
     </section>
     <section className="card stack"><h2>サインイン</h2>
-      <form className="stack" onSubmit={(event) => void saveEmail(event)}><div className="field"><label htmlFor="account-email">メールアドレス</label><input data-control-id="settings.account.email" className="input" id="account-email" name="email" type="email" defaultValue={account.email} required/><span className="field-help">変更すると、前のアドレスにもお知らせを送ります。</span></div><button data-control-id="settings.account.email-save" className="button" type="submit">メールアドレスを保存</button></form>
+      <GuardedForm className="stack" onSubmit={(event) => void saveEmail(event)}><div className="field"><label htmlFor="account-email">メールアドレス</label><input data-control-id="settings.account.email" className="input" id="account-email" name="email" type="email" defaultValue={account.email} required/><span className="field-help">変更すると、前のアドレスにもお知らせを送ります。</span></div><button data-control-id="settings.account.email-save" className="button" type="submit">メールアドレスを保存</button></GuardedForm>
       <div className="field"><label htmlFor="account-idle">操作がないときに自動でサインアウトする</label><select data-control-id="settings.account.idle" className="input" id="account-idle" value={account.idleTimeoutMinutes} onChange={(event) => void update({ idleTimeoutMinutes: Number(event.target.value) as 1 }, '自動サインアウトの時間を変更しました。')}>{IDLE_TIMEOUT_CHOICES.map((value) => <option key={value} value={value}>{value}分</option>)}</select></div>
       <div className="stack"><h3>確認コード</h3><p className="muted">パスワードに加えて、認証アプリの6桁のコードを求めます。</p>
         {account.totpUnavailable && <div className="notice error" role="status"><strong>{ja.totp.unavailableTitle}</strong><p className="mb-0">{ja.totp.unavailableBody}</p></div>}

@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useApp } from '../../app/AppContext';
 import { ja } from '../../content/ja';
 import { Dialog } from '../../design-system/components';
+import { useUnsavedGuard } from '../../design-system/unsavedGuard';
 import { colorLabelInputSchema } from '../../domain/schemas';
 import type { ColorLabel } from '../../domain/types';
 
@@ -19,6 +20,7 @@ function ColorListForm({ editing, onClose }: { editing: Editing; onClose: () => 
   const [color, setColor] = useState(editing.color);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const unsaved = useUnsavedGuard({ name, color }, busy);
   // 今の色が選択肢にないときも、変えずに保存できるように残す。
   const choices = palette.some(([value]) => value === editing.color) ? palette : [[editing.color, '今の色'] as const, ...palette];
   const submit = async (event: FormEvent) => {
@@ -35,12 +37,12 @@ function ColorListForm({ editing, onClose }: { editing: Editing; onClose: () => 
     announce(`リスト「${result.value.name}」を保存しました。`);
   };
   return <Dialog title={editing.label ? 'リストを編集' : 'リストを追加'} description="予定とタスクに付ける色と名前です。" onClose={() => { if (!busy) onClose(); }}>
-    <form className="stack" aria-busy={busy} noValidate onSubmit={(event) => void submit(event)}>
+    <form {...unsaved.formProps} className="stack" aria-busy={busy} noValidate onSubmit={(event) => void submit(event)}>
       <label className="field"><span>名前</span><input data-control-id="settings.color-list.name" className="input" maxLength={40} required value={name} onChange={(event) => setName(event.target.value)}/></label>
       <fieldset className="fieldset"><legend>色</legend><div className="color-palette">{choices.map(([value, label]) => <label className="color-choice" key={value}><input data-control-id={`settings.color-list.color.${value.slice(1)}`} type="radio" name="color-list-color" value={value} checked={color === value} aria-label={label} onChange={() => setColor(value)}/><span className="color-swatch" style={{ background: value }} aria-hidden="true"/></label>)}</div></fieldset>
       {error && <p className="field-error" role="alert">{error}</p>}
       <div className="dialog-actions">
-        <button data-control-id="settings.color-list.cancel" className="button" type="button" disabled={busy} onClick={onClose}>{ja.actions.cancel}</button>
+        <button data-control-id="settings.color-list.cancel" className="button" type="button" disabled={busy} onClick={() => unsaved.leave(onClose)}>{ja.actions.cancel}</button>
         <button data-control-id="settings.color-list.save" className="button primary" type="submit" disabled={busy}>{busy ? ja.actions.saving : '保存する'}</button>
       </div>
     </form>

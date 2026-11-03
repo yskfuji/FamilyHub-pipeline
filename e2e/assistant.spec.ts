@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
-import type { Page } from '@playwright/test';
+import { expect, test } from './fixtures';
+import type { Page } from './fixtures';
 
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
 const roster = ['2026年10月 シフト表', '氏名\t1\t2\t3\t4\t5\t6', '\t木\t金\t土\t日\t月\t火', '田中 花\tA\tB\t休\tC\tA\t研修', '碧\t早\t遅\t休\t夜\t早\t研修'].join('\n');

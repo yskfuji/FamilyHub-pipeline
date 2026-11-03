@@ -4,6 +4,8 @@ const auditBuild = process.env.PLAYWRIGHT_AUDIT === 'true';
 
 export default defineConfig({
   testDir: './e2e',
+  // 実際の API の試験は playwright.real.config.ts で動かす（見本のデータでは動かない）。
+  testIgnore: ['real/**'],
   fullyParallel: false,
   forbidOnly: true,
   retries: 0,

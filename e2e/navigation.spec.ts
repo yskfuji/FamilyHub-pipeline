@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 test('the mobile "more" menu is a dialog: focus, Escape, current page and closing on navigation', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });

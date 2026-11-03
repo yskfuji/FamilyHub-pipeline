@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useApp } from '../../app/AppContext';
 import { detailId, useCloseTo } from '../../app/router';
-import { DetailNotFound, Drawer, EmptyState, PageHeader, formatDateOnly, formatYen } from '../../design-system/components';
+import { DetailNotFound, EmptyState, PageHeader, formatDateOnly, formatYen } from '../../design-system/components';
+import { DetailSurface, useContentWide } from '../../design-system/DetailSurface';
 import { MapPinIcon, NoteIcon, YenIcon } from '../../design-system/icons';
 import { ja } from '../../content/ja';
 import { aggregatePlaces, sortPlaces, type PlaceSort } from '../../domain/places';
@@ -23,10 +24,12 @@ export function PlacesPage({ path }: { path: string }) {
   const items = sortPlaces(all, sort).filter((item) => !normalized || `${item.place.name} ${item.place.address ?? ''}`.toLowerCase().includes(normalized));
   const activeKey = detailId(path, '/places');
   const active = all.find((item) => item.key === activeKey);
+  const wide = useContentWide();
 
   return <div className="page">
     <PageHeader eyebrow="場所" title="記録した場所" description="支出やメモに付けた場所を、まとめて確認できます。地図や現在地は使いません。"/>
     {activeKey && !active && <DetailNotFound what="場所" feature="places" backHref="/places"/>}
+    <div className="detail-layout" data-pane={wide && active ? 'open' : undefined}><div className="detail-main">
     {all.length === 0 ? <EmptyState title="まだ場所を記録していません" action={can('expense.create') ? <button data-control-id="places.expense.create" className="button primary" type="button" onClick={() => requestQuickCreate('expense')}><YenIcon width="18"/>支出を追加</button> : undefined}>支出やメモを追加するときに「場所を追加（任意）」から、現在地・写真・名前・手入力で場所を付けられます。</EmptyState> : <>
       <div className="places-toolbar">
         <div className="field"><label htmlFor="places-search">場所を検索</label><input data-control-id="places.search" id="places-search" className="input" type="search" value={query} onChange={(event) => setQuery(event.target.value)} aria-describedby="places-search-help"/><span className="field-help" id="places-search-help">場所の名前と住所から探します。</span></div>
@@ -34,8 +37,8 @@ export function PlacesPage({ path }: { path: string }) {
       </div>
       <p className="small muted" role="status">{items.length}か所{normalized ? `（「${query.trim()}」に一致）` : ''}</p>
       {items.length === 0 ? <EmptyState title="条件に合う場所はありません">検索語を短くしてください。</EmptyState> : <ul className="places-grid">{items.map((item) => <li key={item.key}>
-        <a data-control-id={`places.open.${item.key}`} className="card place-card" href={`/places/${item.key}`} data-link>
-          <span className="place-card-head"><MapPinIcon width="20"/><strong className="wrap">{item.place.name}</strong></span>
+        <a data-control-id={`places.open.${item.key}`} className="card place-card" href={`/places/${item.key}`} data-link data-keep-scroll>
+          <span className="place-card-head"><MapPinIcon width="20"/><strong className="wrap" data-transition-title>{item.place.name}</strong></span>
           {item.place.address && <span className="meta wrap">{item.place.address}</span>}
           <span className="place-card-stats">
             {item.expenseCount > 0 && <span>支出{item.expenseCount}件・<span className="amount">{formatYen(item.expenseTotalJpy)}</span></span>}
@@ -45,7 +48,8 @@ export function PlacesPage({ path }: { path: string }) {
         </a>
       </li>)}</ul>}
     </>}
-    {active && <Drawer eyebrow="記録した場所" title={active.place.name} onClose={close}>
+    </div>
+    {active && <DetailSurface key={active.key} eyebrow="記録した場所" title={active.place.name} onClose={close}>
       <div className="stack">
         <PlaceSummary place={active.place}/>
         {active.place.provenance && <PlaceAttributionLink where="places"/>}
@@ -58,6 +62,7 @@ export function PlacesPage({ path }: { path: string }) {
         </section>
         <p className="small muted mb-0">{ja.place.legend}は、記録した支出・メモからまとめています。場所を外したり支出・メモを削除したりすると、この一覧からも外れます。見られるのは管理者と大人のメンバーだけです。</p>
       </div>
-    </Drawer>}
+    </DetailSurface>}
+    </div>
   </div>;
 }

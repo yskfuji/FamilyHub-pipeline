@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
-import type { Locator, Page } from '@playwright/test';
+import { expect, test } from './fixtures';
+import type { Locator, Page } from './fixtures';
 
 const clip = readFileSync(new URL('./fixtures/clip.webm', import.meta.url));
 const photo = (name: string) => ({ name, mimeType: 'image/jpeg', buffer: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, name.length]) });

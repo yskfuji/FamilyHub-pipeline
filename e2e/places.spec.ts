@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Request } from '@playwright/test';
+import { expect, test, type Page, type Request } from './fixtures';
 import { buildJpegWithGps, buildJpegWithoutGps } from '../src/features/place/exif.fixtures';
 
 /** 架空の施設データ。並びは距離順ではなく、重複・座標なし・カテゴリ不明を含む（実データの性質を再現）。 */

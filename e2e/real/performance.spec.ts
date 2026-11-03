@@ -44,7 +44,7 @@ function collect(page: Page) {
   page.on('response', (response) => {
     const type = response.request().resourceType();
     const url = response.url();
-    const kind = type === 'script' ? 'script' : type === 'font' || url.endsWith('.woff2') ? 'font' : null;
+    const kind: Loaded['kind'] | null = type === 'script' ? 'script' : type === 'font' || url.endsWith('.woff2') ? 'font' : null;
     if (!kind || !url.startsWith('http') || url.includes('/v1/')) return;
     loaded.push(response.body().then((body) => ({ url, kind, bytes: body.length, gzip6: kind === 'script' ? gzipSync(body, { level: 6 }).length : body.length })).catch(() => null));
   });

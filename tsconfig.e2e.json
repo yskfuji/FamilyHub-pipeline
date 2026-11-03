@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "target": "ES2023",
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "noEmit": true,
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "e2e/**/*.ts",
+    "src/domain/theme.ts",
+    "src/domain/types.ts",
+    "src/domain/captureTime.ts",
+    "src/domain/exifTiff.ts",
+    "src/features/place/exif.ts",
+    "src/features/place/exif.fixtures.ts"
+  ]
+}

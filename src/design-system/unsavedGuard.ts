@@ -62,3 +62,24 @@ export function useUnsavedGuard(value: unknown, busy = false) {
     leave: (proceed: () => void) => (dirty ? askToLeave(proceed) : proceed()),
   };
 }
+
+const changed = (element: Element) => {
+  if (element instanceof HTMLInputElement) return element.type === 'checkbox' || element.type === 'radio' ? element.checked !== element.defaultChecked : element.value !== element.defaultValue;
+  if (element instanceof HTMLTextAreaElement) return element.value !== element.defaultValue;
+  if (element instanceof HTMLSelectElement) return [...element.options].some((option) => option.selected !== option.defaultSelected);
+  return false;
+};
+
+/**
+ * 値を状態に持たないフォーム（defaultValue で初めの値を入れるもの）の、保存していない入力の確認。
+ * 入力のたびに初めの値と比べる。送ったら確認しない（失敗したときは、入力はそのまま残る）。
+ */
+export function useUncontrolledUnsaved() {
+  const [dirty, setDirty] = useState(false);
+  const unsaved = useUnsavedGuard(dirty);
+  const check = (event: { currentTarget: HTMLFormElement }) => setDirty([...event.currentTarget.elements].some(changed));
+  return {
+    ...unsaved,
+    formProps: { ...unsaved.formProps, onInput: check, onChange: check, onSubmitCapture: () => setDirty(false) },
+  };
+}

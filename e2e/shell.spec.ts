@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 
 const dataset = (page: Page, name: string) => page.evaluate((key) => document.documentElement.dataset[key], name);
 const openPalette = async (page: Page) => {
@@ -328,6 +328,8 @@ test.describe('unsaved changes', () => {
 test.describe('two-pane layout', () => {
   for (const [path, title, list] of [['/tasks/todo-form', '就学援助の確認票', '図書館の本を返す'], ['/notes/memo-clinic', '小児科の控え', '学校公開のお知らせ'], ['/budget/expense-books?view=list', '学校教材', '週末の食材']] as const) {
     test(`shows the list beside ${path} on a wide content area`, async ({ page }) => {
+      // wide は本文（#main）が 1100px 以上。レールを除くので、窓は 1440px にする。
+      await page.setViewportSize({ width: 1440, height: 900 });
       await page.goto(path);
       const pane = page.locator('.detail-pane');
       await expect(pane.getByRole('heading', { name: title })).toBeVisible();
@@ -351,7 +353,7 @@ test.describe('two-pane layout', () => {
   }
 
   test('changing items keeps the place in the list and moves focus into the detail', async ({ page }) => {
-    await page.setViewportSize({ width: 1280, height: 500 });
+    await page.setViewportSize({ width: 1440, height: 500 });
     await page.goto('/tasks');
     await page.getByRole('link', { name: /資源ごみをまとめる/ }).click();
     await expect(page.locator('.detail-pane').getByRole('heading', { name: '資源ごみをまとめる' })).toBeVisible();
@@ -362,11 +364,12 @@ test.describe('two-pane layout', () => {
   });
 
   test('the pane follows the resized window', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/tasks/todo-form');
     await expect(page.locator('.detail-pane')).toBeVisible();
     await page.setViewportSize({ width: 800, height: 900 });
     await expect(page.locator('.drawer')).toBeVisible();
-    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.setViewportSize({ width: 1440, height: 900 });
     await expect(page.locator('.detail-pane')).toBeVisible();
     await expect(page.locator('#root')).not.toHaveAttribute('inert', '');
   });
