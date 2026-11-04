@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSubmission } from '../../app/useSubmission';
 import { memberName, useApp } from '../../app/AppContext';
 import { detailId } from '../../app/router';
 import { canDeleteResource, canMutateOwnedResource } from '../../authz/policy';
@@ -58,7 +59,9 @@ export function TaskDrawer({ todo, onClose, onDeleted }: Props) {
   const [deleting, setDeleting] = useState(false);
   const [scope, setScope] = useState<RecurrenceScope>('this');
   const [formError, setFormError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  // 送信中の印は ref でも持ち、同じフレームの二度押しを止める（更新は版で守るので冪等キーは使わない）。
+  const submission = useSubmission();
+  const submitting = submission.submitting;
   const { viewer, colorLabels } = snapshot;
   const canEdit = canMutateOwnedResource(viewer, 'task.update', todo.creatorMembershipId).allowed;
   const canDelete = canDeleteResource(viewer, 'task.delete', [todo.creatorMembershipId, todo.assigneeMembershipId]).allowed;
@@ -70,11 +73,11 @@ export function TaskDrawer({ todo, onClose, onDeleted }: Props) {
   const closeIfShown = () => { if (detailId(window.location.pathname, '/tasks') === todo.id) onClose(); };
 
   const update = async (draft: TaskDraft) => {
-    if (submitting) return;
-    setFormError(''); setSubmitting(true);
+    if (!submission.start()) return;
+    setFormError('');
     const input = taskDraftToUpdateInput(draft, todo, { recurrenceEditable });
     const outcome = await executeQueueable({ operation: 'task.update', summary: `タスク「${todo.title}」を変更`, payload: { id: todo.id, scope, input, expectedVersion: todo.version } }, () => gateway.todos.updateTodo(todo.id, scope, input, todo.version));
-    setSubmitting(false);
+    submission.end();
     if (outcome.status === 'failed') { setFormError(outcome.error.message); return; }
     if (outcome.status === 'queued') { setEditing(false); return; }
     await refresh(); setEditing(false); announce(`「${outcome.value.title}」を更新しました`);
@@ -94,10 +97,10 @@ export function TaskDrawer({ todo, onClose, onDeleted }: Props) {
         <div className="card flat"><span className="meta">状態</span><p className="task-state"><StatusBadge tone={todo.status === 'review' ? 'attention' : todo.status === 'done' ? 'success' : 'neutral'}>{taskStatusLabels[todo.status]}</StatusBadge>{todo.priority && todo.priority !== 'normal' && <StatusBadge tone={todo.priority === 'high' ? 'attention' : 'neutral'}>優先度：{ja.taskPriority[todo.priority]}</StatusBadge>}</p></div>
         <div className="card flat"><span className="meta">期限</span><p><strong className="task-due">{dueText(todo, snapshot.context.asOf)}</strong></p>{rule && <p className="small muted mb-0">{rule}</p>}</div>
       </div>
-      <div className="card flat"><h3><PeopleIcon width="18"/> 担当する人と確認する人</h3><dl>
-        <dt className="meta">担当する人</dt><dd>{memberName(snapshot, todo.assigneeMembershipId)}</dd>
-        <dt className="meta">確認する人</dt><dd>{todo.reviewerMembershipId ? memberName(snapshot, todo.reviewerMembershipId) : 'なし'}</dd>
-        <dt className="meta">作成した人</dt><dd>{memberName(snapshot, todo.creatorMembershipId)}</dd>
+      <div className="card flat"><h3><PeopleIcon width="18"/> 担当する人と確認する人</h3><dl className="detail-list">
+        <div><dt>担当する人</dt><dd>{memberName(snapshot, todo.assigneeMembershipId)}</dd></div>
+        <div><dt>確認する人</dt><dd>{todo.reviewerMembershipId ? memberName(snapshot, todo.reviewerMembershipId) : 'なし'}</dd></div>
+        <div><dt>作成した人</dt><dd>{memberName(snapshot, todo.creatorMembershipId)}</dd></div>
       </dl></div>
       {todo.note && <div><h3>メモ</h3><p>{todo.note}</p></div>}
       {todo.handoffNote && <div><h3>引き継ぎの一言</h3><p>{todo.handoffNote}</p></div>}

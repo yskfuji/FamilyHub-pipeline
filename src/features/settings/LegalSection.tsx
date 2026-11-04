@@ -3,10 +3,16 @@ import { legalDocuments, legalNotice, legalPlaceholders } from '../../content/le
 import { AlertIcon } from '../../design-system/icons';
 
 const placeholderPattern = new RegExp(`(${legalPlaceholders.join('|')})`);
+/** 数と単位（「24か月」「約100m単位」など）。文節で折り返すと「24か / 月」と分かれるので、ひとまとまりにする。 */
+const quantityPattern = /((?:約|最長)?\d+(?:か月|日間|日|人|m単位|分|時間|歳))/;
+
+function Quantities({ text }: { text: string }) {
+  return <>{text.split(quantityPattern).map((part, index) => index % 2 === 1 ? <span className="phrase" key={index}>{part}</span> : <Fragment key={index}>{part}</Fragment>)}</>;
+}
 
 /** 空欄の印だけを目立たせて、文を組み立てる。 */
 function LegalText({ text }: { text: string }) {
-  return <>{text.split(placeholderPattern).map((part, index) => <Fragment key={index}>{legalPlaceholders.includes(part as typeof legalPlaceholders[number]) ? <mark className="legal-placeholder">{part}</mark> : part}</Fragment>)}</>;
+  return <>{text.split(placeholderPattern).map((part, index) => <Fragment key={index}>{legalPlaceholders.includes(part as typeof legalPlaceholders[number]) ? <mark className="legal-placeholder">{part}</mark> : <Quantities text={part}/>}</Fragment>)}</>;
 }
 
 /** 利用規約とプライバシーポリシーの草案。本文は構造化したデータから組み立てる。 */

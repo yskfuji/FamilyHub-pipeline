@@ -37,7 +37,7 @@ export function navigate(to: string, replace = false, keepScroll = false) {
 }
 
 /** 利用者の操作で別の画面へ移る。保存していない入力があれば先に確かめる。 */
-export const navigateGuarded = (to: string, keepScroll = false) => guardLeaving(() => navigate(to, false, keepScroll));
+export const navigateGuarded = (to: string, keepScroll = false) => guardLeaving(() => navigate(to, false, keepScroll), to);
 
 /**
  * ブラウザの戻る・進むは起きたあとにしか分からない。保存していない入力があれば、
@@ -45,7 +45,7 @@ export const navigateGuarded = (to: string, keepScroll = false) => guardLeaving(
  */
 function holdHistoryMove(event: PopStateEvent) {
   if (internalMove) return;
-  if (confirmedMove || !hasUnsavedForms()) { confirmedMove = false; shownUrl = hereUrl(); return; }
+  if (confirmedMove || !hasUnsavedForms(hereUrl())) { confirmedMove = false; shownUrl = hereUrl(); return; }
   event.stopImmediatePropagation();
   window.history.pushState({}, '', shownUrl);
   askToLeave(() => { confirmedMove = true; window.history.go(-1); });

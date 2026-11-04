@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSubmission } from '../../app/useSubmission';
 import { useApp, memberName } from '../../app/AppContext';
 import { canDeleteResource, canMutateOwnedResource } from '../../authz/policy';
 import { Dialog, Drawer, StatusBadge } from '../../design-system/components';
@@ -36,7 +37,9 @@ export function EventDrawer({ active, series, onClose, onDeleted }: Props) {
   const [deleting, setDeleting] = useState(false);
   const [scope, setScope] = useState<RecurrenceScope>('this');
   const [formError, setFormError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  // 送信中の印は ref でも持ち、同じフレームの二度押しを止める（更新は版で守るので冪等キーは使わない）。
+  const submission = useSubmission();
+  const submitting = submission.submitting;
   const todayKey = dateKeyFromRfc3339(snapshot.context.asOf);
   const seriesStart = dateKeyFromRfc3339(series.startsAt);
   const viewer = snapshot.viewer;
@@ -50,18 +53,18 @@ export function EventDrawer({ active, series, onClose, onDeleted }: Props) {
   const recurrenceEditable = !recurring || scope === 'series';
 
   const update = async (draft: EventDraft) => {
-    if (submitting) return;
-    setFormError(''); setSubmitting(true);
+    if (!submission.start()) return;
+    setFormError('');
     const wholeSeries = recurring && scope === 'series';
     // 日付を動かすときは、シリーズ全体を同じ日数だけずらす。編集の画面が保存の前に見通しを示し、ずらせない規則は送らない。
     const preview = wholeSeries ? seriesEditPreview(draft, series, active.occurrenceDate, recurrenceEditable) : null;
-    if (preview?.kind === 'refused') { setFormError(preview.text); setSubmitting(false); return; }
+    if (preview?.kind === 'refused') { setFormError(preview.text); submission.end(); return; }
     const input = draftToUpdateInput(draft, series, { recurrenceEditable, seriesStart: wholeSeries ? seriesStart : undefined, occurrenceDate: wholeSeries ? active.occurrenceDate : undefined });
     const parsed = eventUpdateSchema.safeParse(input);
-    if (!parsed.success) { setFormError(parsed.error.issues[0]?.message ?? '入力内容を確認してください。'); setSubmitting(false); return; }
+    if (!parsed.success) { setFormError(parsed.error.issues[0]?.message ?? '入力内容を確認してください。'); submission.end(); return; }
     const occurrenceDate = recurring && scope !== 'series' ? active.occurrenceDate : undefined;
     const outcome = await executeQueueable({ operation: 'event.update', summary: `予定「${active.title}」を変更`, payload: { id: active.id, scope, input, expectedVersion: active.version, occurrenceDate } }, () => gateway.events.updateEvent(active.id, scope, input, active.version, undefined, occurrenceDate));
-    setSubmitting(false);
+    submission.end();
     if (outcome.status === 'failed') { setFormError(outcome.error.message); return; }
     setEditing(false);
     if (outcome.status === 'queued') return;

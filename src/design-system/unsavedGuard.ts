@@ -6,7 +6,8 @@ const UNSAVED_ATTRIBUTE = 'data-unsaved';
 interface PendingLeave { proceed: () => void }
 
 let pending: PendingLeave | null = null;
-const dirtyForms = new Set<symbol>();
+/** 保存していない入力。値は、その入力が残る画面かどうか（なければ、どこへ移っても失われる）。 */
+const dirtyForms = new Map<symbol, ((pathname: string) => boolean) | undefined>();
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((listener) => listener());
 
@@ -14,7 +15,8 @@ const warnBeforeUnload = (event: BeforeUnloadEvent) => event.preventDefault();
 
 export const subscribeUnsaved = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
 export const pendingLeave = () => pending;
-export const hasUnsavedForms = () => dirtyForms.size > 0;
+/** to を渡すと、その画面へ移っても残る入力（アルバムの送る前のファイルなど）は数えない。 */
+export const hasUnsavedForms = (to?: string) => [...dirtyForms.values()].some((keptOn) => !(keptOn && to !== undefined && keptOn(new URL(to, window.location.origin).pathname)));
 
 /** 確認を開く。破棄を選ぶと proceed を実行する。 */
 export function askToLeave(proceed: () => void) {
@@ -33,7 +35,7 @@ export function finishLeaving() {
 }
 
 /** 画面の移動。どこかに保存していない入力があれば確かめる。 */
-export const guardLeaving = (proceed: () => void) => (hasUnsavedForms() ? askToLeave(proceed) : proceed());
+export const guardLeaving = (proceed: () => void, to?: string) => (hasUnsavedForms(to) ? askToLeave(proceed) : proceed());
 
 /** 重ね表示を閉じる。その中のフォームに保存していない入力があるときだけ確かめる。 */
 export const closeGuarded = (root: Element | null, proceed: () => void) => (root?.querySelector(`[${UNSAVED_ATTRIBUTE}]`) ? askToLeave(proceed) : proceed());
@@ -43,19 +45,20 @@ export const closeGuarded = (root: Element | null, proceed: () => void) => (root
  * 重ね表示の閉じるボタン、Escape、背景の押下は formProps の印を見て確認する。
  * 取り消しのボタンは leave を通す。保存中は確認しない。
  */
-export function useUnsavedGuard(value: unknown, busy = false) {
+export function useUnsavedGuard(value: unknown, busy = false, keptOn?: (pathname: string) => boolean) {
   const [baseline] = useState(() => JSON.stringify(value));
+  const [kept] = useState(() => keptOn);
   const dirty = !busy && JSON.stringify(value) !== baseline;
   useEffect(() => {
     if (!dirty) return;
     const token = Symbol('unsaved-form');
-    dirtyForms.add(token);
+    dirtyForms.set(token, kept);
     window.addEventListener('beforeunload', warnBeforeUnload);
     return () => {
       dirtyForms.delete(token);
       if (!dirtyForms.size) window.removeEventListener('beforeunload', warnBeforeUnload);
     };
-  }, [dirty]);
+  }, [dirty, kept]);
   return {
     dirty,
     formProps: { [UNSAVED_ATTRIBUTE]: dirty ? 'true' : undefined },
