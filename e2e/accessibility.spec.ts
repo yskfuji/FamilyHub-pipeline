@@ -64,11 +64,13 @@ test('all visible buttons and button-like links meet the 44 by 44 CSS pixel targ
   await page.setViewportSize({ width: 390, height: 844 });
   for (const route of ['/welcome','/auth','/onboarding','/today','/calendar','/calendar?view=week','/calendar?view=day','/calendar?view=list','/calendar/event-clean','/tasks','/tasks?filter=done','/tasks/todo-form','/notes','/notes?sort=oldest','/notes/memo-school','/notes/memo-receipt','/budget','/budget?view=list','/budget?view=list&period=custom','/budget?view=members','/budget?view=settlements','/budget?month=2026-07','/budget/expense-books','/albums','/albums/album-sports','/places','/insights','/settings/household','/settings/security','/settings/privacy','/settings/notifications','/settings/accessibility','/settings/resources','/settings/recently-deleted','/settings/help','/settings/help?q=写真&category=records&item=album-formats','/settings/legal','/settings/location','/showcase','/showcase/management','/showcase/management/services','/showcase/management/jobs','/showcase/management/backups','/showcase/management/audit-log','/showcase/management/households','/showcase/management/records']) {
     await page.goto(route);
+    // 開く途中のドロワーは transform で縮んで見えるので、動きが終わってから測る。差 0.01px 未満は浮動小数の誤差として扱う。
+    await page.evaluate(() => Promise.all(document.getAnimations().filter((animation) => animation.effect?.getComputedTiming().endTime !== Infinity).map((animation) => animation.finished.catch(() => undefined))));
     // 文中のリンク（WCAG 2.5.8 の例外）以外の、ボタンとして振る舞うリンクも測る。
     const undersized = await page.locator('button:visible, a.button:visible, .mobile-nav a:visible, a.nav-link:visible, a.place-card:visible, a.task-card-link:visible').evaluateAll((buttons) => buttons.map((button) => {
       const rect = button.getBoundingClientRect();
       return { label: button.getAttribute('aria-label') || button.textContent?.trim(), width: rect.width, height: rect.height };
-    }).filter((item) => item.width < 44 || item.height < 44));
+    }).filter((item) => item.width < 43.99 || item.height < 43.99));
     expect(undersized, `${route}: ${JSON.stringify(undersized)}`).toEqual([]);
   }
 });
