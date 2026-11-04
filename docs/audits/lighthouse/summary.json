@@ -1,0 +1,176 @@
+{
+  "lighthouse": "12.8.2",
+  "measuredOn": "2026-11-05",
+  "targets": {
+    "performance": ">=90",
+    "accessibility": 100,
+    "bestPractices": 100,
+    "lcpMs": "<2500",
+    "cls": "<0.1"
+  },
+  "note": "INP needs field data; TBT is the lab proxy. albums Best Practices 96 is the thumbnail 502 of seeded items whose media files do not exist in the measurement media folder.",
+  "results": [
+    {
+      "screen": "today",
+      "path": "/today",
+      "formFactor": "mobile",
+      "performance": 94,
+      "accessibility": 100,
+      "bestPractices": 100,
+      "lcpMs": 2714,
+      "fcpMs": 2180,
+      "cls": 0.0156,
+      "tbtMs": 0,
+      "failingBinaryAudits": [
+        "label-content-name-mismatch"
+      ],
+      "meetsTargets": false
+    },
+    {
+      "screen": "today",
+      "path": "/today",
+      "formFactor": "desktop",
+      "performance": 100,
+      "accessibility": 100,
+      "bestPractices": 100,
+      "lcpMs": 610,
+      "fcpMs": 487,
+      "cls": 0.0034,
+      "tbtMs": 0,
+      "failingBinaryAudits": [
+        "label-content-name-mismatch"
+      ],
+      "meetsTargets": true
+    },
+    {
+      "screen": "calendar",
+      "path": "/calendar",
+      "formFactor": "mobile",
+      "performance": 93,
+      "accessibility": 100,
+      "bestPractices": 100,
+      "lcpMs": 2730,
+      "fcpMs": 2260,
+      "cls": 0.016,
+      "tbtMs": 99,
+      "failingBinaryAudits": [
+        "label-content-name-mismatch"
+      ],
+      "meetsTargets": false
+    },
+    {
+      "screen": "calendar",
+      "path": "/calendar",
+      "formFactor": "desktop",
+      "performance": 100,
+      "accessibility": 100,
+      "bestPractices": 100,
+      "lcpMs": 612,
+      "fcpMs": 488,
+      "cls": 0.0025,
+      "tbtMs": 0,
+      "failingBinaryAudits": [
+        "label-content-name-mismatch"
+      ],
+      "meetsTargets": true
+    },
+    {
+      "screen": "budget",
+      "path": "/budget",
+      "formFactor": "mobile",
+      "performance": 93,
+      "accessibility": 100,
+      "bestPractices": 100,
+      "lcpMs": 2730,
+      "fcpMs": 2333,
+      "cls": 0.016,
+      "tbtMs": 0,
+      "failingBinaryAudits": [
+        "label-content-name-mismatch"
+      ],
+      "meetsTargets": false
+    },
+    {
+      "screen": "budget",
+      "path": "/budget",
+      "formFactor": "desktop",
+      "performance": 100,
+      "accessibility": 100,
+      "bestPractices": 100,
+      "lcpMs": 651,
+      "fcpMs": 507,
+      "cls": 0.0027,
+      "tbtMs": 0,
+      "failingBinaryAudits": [
+        "label-content-name-mismatch"
+      ],
+      "meetsTargets": true
+    },
+    {
+      "screen": "albums",
+      "path": "/albums",
+      "formFactor": "mobile",
+      "performance": 92,
+      "accessibility": 100,
+      "bestPractices": 96,
+      "lcpMs": 2952,
+      "fcpMs": 2332,
+      "cls": 0.016,
+      "tbtMs": 0,
+      "failingBinaryAudits": [
+        "errors-in-console",
+        "label-content-name-mismatch"
+      ],
+      "meetsTargets": false
+    },
+    {
+      "screen": "albums",
+      "path": "/albums",
+      "formFactor": "desktop",
+      "performance": 100,
+      "accessibility": 100,
+      "bestPractices": 96,
+      "lcpMs": 650,
+      "fcpMs": 486,
+      "cls": 0.0032,
+      "tbtMs": 0,
+      "failingBinaryAudits": [
+        "errors-in-console",
+        "label-content-name-mismatch"
+      ],
+      "meetsTargets": false
+    },
+    {
+      "screen": "notes",
+      "path": "/notes",
+      "formFactor": "mobile",
+      "performance": 93,
+      "accessibility": 100,
+      "bestPractices": 100,
+      "lcpMs": 2732,
+      "fcpMs": 2335,
+      "cls": 0.0158,
+      "tbtMs": 0,
+      "failingBinaryAudits": [
+        "label-content-name-mismatch"
+      ],
+      "meetsTargets": false
+    },
+    {
+      "screen": "notes",
+      "path": "/notes",
+      "formFactor": "desktop",
+      "performance": 100,
+      "accessibility": 100,
+      "bestPractices": 100,
+      "lcpMs": 654,
+      "fcpMs": 509,
+      "cls": 0.0032,
+      "tbtMs": 0,
+      "failingBinaryAudits": [
+        "label-content-name-mismatch"
+      ],
+      "meetsTargets": true
+    }
+  ]
+}

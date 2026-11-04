@@ -1,0 +1,20 @@
+{
+  "lighthouse": "12.8.2",
+  "fetchTime": "2026-11-04T21:53:37.098Z",
+  "build": "dist-http, signed in (seeded demo household), vite preview + server/dev.ts on this machine",
+  "throttling": "simulate {\"rttMs\":40,\"throughputKbps\":10240,\"requestLatencyMs\":0,\"downloadThroughputKbps\":0,\"uploadThroughputKbps\":0,\"cpuSlowdownMultiplier\":1}",
+  "screen": "notes",
+  "path": "/notes",
+  "formFactor": "desktop",
+  "performance": 100,
+  "accessibility": 100,
+  "bestPractices": 100,
+  "lcpMs": 654,
+  "fcpMs": 509,
+  "cls": 0.0032,
+  "tbtMs": 0,
+  "failingBinaryAudits": [
+    "label-content-name-mismatch"
+  ],
+  "meetsTargets": true
+}

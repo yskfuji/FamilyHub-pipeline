@@ -1,3 +1,5 @@
+%% バックアップの実行は表に残さない（運用ログと、置き場所の目録に残す）。計画の BACKUP_RUNS は作っていない。
+%% 成人の申告は users.adult_declared_at（見本のデータでは利用者ごとの adultDeclared）。
 erDiagram
   users ||--o| household_members : belongs_through
   users ||--o{ sessions : owns
@@ -209,7 +211,7 @@ erDiagram
     json body "支出と収入、負担、精算（まとめた精算の記録は batchId を持つ）"
   }
   settlementBatches {
-    json body "まとめた精算。含めた負担と精算の記録、実際に渡した送金の一覧、取り消した時刻"
+    json body "まとめた精算（id が batchId）。含めた負担と精算の記録 items、実際に渡した送金の一覧 transfers、取り消した時刻 reversedAt"
   }
   resources {
     json body "関連リンク"
@@ -233,7 +235,7 @@ erDiagram
     json body "アルバム"
   }
   albumItems {
-    json body "写真と動画の情報"
+    json body "写真と動画の情報。撮影日時 takenAt と出どころ takenAtSource（exif-offset・exif-local・quicktime-key・mvhd）"
   }
   archive {
     json body "archive.events ほか、削除の前の状態"

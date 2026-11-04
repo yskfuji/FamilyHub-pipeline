@@ -8,18 +8,21 @@
 
 | 項目 | 判定 | 場所・補足 |
 |---|---|---|
-| API サーバー（既存の全操作、監査の記録） | 実装 | `server/`。OpenAPI は102操作 |
+| API サーバー（既存の全操作、監査の記録） | 実装 | `server/`。OpenAPI は106操作 |
 | データの保存と移行 | 実装 | SQLite（`node:sqlite`）と `server/db/migrations.ts`。記録の本文は `records` 表の JSON |
 | CSRF、冪等、権限リビジョン、既定の拒否 | 実装 | `server/http/app.ts`、`server/http/rules.ts` |
 | `/health`、`/ready`、`/version` | 実装 | `server/http/routes/operational.ts`。版の印は画面と API で同じ値 |
 | 運営者の操作（延長、停止） | 実装 | `server/cli.ts`。HTTP の経路なし |
+| 変更の記録 | 実装 | 別のファイル `audit.db`（`FAMILY_HUB_AUDIT_DB`、権限 0600）の hash の鎖。家族の記録は管理者だけ（`audit.read`）、アカウントの記録は本人だけ。既定で24か月残す。別のファイルにしても同じ OS の利用者や root からは守れず、改ざんに気づけるのは外に残した基準点（運用ログ、バックアップの目録、`audit_anchors`）の範囲だけ。最後の基準点より後の切り捨ては検出できない |
+| 鍵の入れ替えと、鍵をなくしたとき | 実装 | `FAMILY_HUB_KEYS` と `FAMILY_HUB_ACTIVE_KID`（なければ `FAMILY_HUB_SECRET` を kid `legacy`）。`keys status`・`keys rotate`・`keys retire <kid>`、`totp reset --user <id>`。鍵をなくしても起動し、その人は回復コードかパスキーでサインインして確認コードを設定し直す |
+| バックアップと復元 | 実装（運営者の命令） | `server/backup/`。`FAMILY_HUB_BACKUP_DIR` と `FAMILY_HUB_BACKUP_KEY` を設定したとき、毎日（既定 03:00）作り、`FAMILY_HUB_BACKUP_KEY` で暗号化する。鍵は置き場所とも API の機械とも別に保管する。世代は日7・週4・月6で、削除した記録やアカウントも最長6か月残る。`backup now`・`backup list`・`backup verify <id>`、`restore <id> --to <dir>`。アプリの画面からは操作しない |
 | 30日の削除ジョブ、通知の生成 | 実装 | `server/jobs.ts` |
 
 ## アカウントと家族グループ
 
 | 項目 | 判定 | 場所・補足 |
 |---|---|---|
-| 登録、年齢の申告、14日の試用 | 実装 | `server/http/routes/account.ts` |
+| 登録、年齢の申告、14日の試用 | 実装 | `server/http/routes/account.ts`。18歳未満は保護者の同意の印がないと登録できない（印は記録しない）。管理者になれるのは18歳以上と申告した人だけ |
 | パスワードとパスキーのサインイン | 実装 | パスキーは Chromium の仮想認証器で確認 |
 | パスワードの再設定、メールアドレスの変更、アカウントの削除 | 実装 | 実物の SMTP は未確認 |
 | 本人再確認の重ね表示 | 実装 | `src/app/reauth.tsx` |
@@ -77,4 +80,3 @@
 ## 未決事項
 
 - 支払いの仕組み。今は運営者の命令で延長する。
-- バックアップと復元。アプリの機能としては持たない（管理コンソールの見本の画面は架空）。

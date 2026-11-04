@@ -4,9 +4,9 @@
 
 ## 資産・主体・境界
 
-- 資産: 家族構成、予定、タスク、学校書類/OCR、支出、記録した場所、招待、セッション、監査記録、写真と動画、添付、パスワードの確認用の値、パスキーの公開鍵、確認コード（TOTP）の秘密、回復コード、鍵束（`FAMILY_HUB_KEYS`、または `FAMILY_HUB_SECRET`）、読み取りの補助の接続鍵。端末の正確な現在地と写真の位置情報も、既定では保存しない一時的な資産として扱う。
+- 資産: 家族構成、予定、タスク、学校書類/OCR、支出、記録した場所、招待、セッション、監査記録、写真と動画、添付、パスワードの確認用の値、パスキーの公開鍵、確認コード（TOTP）の秘密、回復コード、鍵束（`FAMILY_HUB_KEYS`、または `FAMILY_HUB_SECRET`）、暗号化したバックアップとその鍵（`FAMILY_HUB_BACKUP_KEY`）、読み取りの補助の接続鍵。端末の正確な現在地と写真の位置情報も、既定では保存しない一時的な資産として扱う。
 - 主体: 管理者／大人のメンバー／子どもメンバー／ゲスト、未認証者、招待受領者、運営者（`server/cli.ts` を実行できる人）、外部サービス。API内部値は `owner/adult/child/guest` を維持する。
-- 信頼境界: ブラウザ↔API、API↔SQLite（本体の DB と監査の記録のファイル `audit.db`）、API↔メディアの保存先、API↔clamd、API↔SMTP、API↔読み取りの補助（LLM、同じ機械か家庭内だけ）、API↔利用者が指定したURLのページ、API↔Open-Meteo、家族グループA↔家族グループB、運営者の手元↔データベース、ブラウザ↔端末の位置情報、ブラウザ↔OpenPOI API（同意後だけ、Cookieなし）。
+- 信頼境界: ブラウザ↔API、API↔SQLite（本体の DB と監査の記録のファイル `audit.db`）、API↔メディアの保存先、API↔バックアップの置き場所（`FAMILY_HUB_BACKUP_DIR`）、API↔clamd、API↔SMTP、API↔読み取りの補助（LLM、同じ機械か家庭内だけ）、API↔利用者が指定したURLのページ、API↔Open-Meteo、家族グループA↔家族グループB、運営者の手元↔データベース、ブラウザ↔端末の位置情報、ブラウザ↔OpenPOI API（同意後だけ、Cookieなし）。
 
 ## STRIDE要約
 
@@ -28,6 +28,8 @@
 | Repudiation（同意） | 外部送信への同意の有無を争う | 同意の版と日時をサーバーの時計で記録し、監査記録に残す | 実装（`savePrivacySettings`）。現在の説明の版との照合は画面で行い、サーバーは古い版を拒否しない。文言の法的な十分さは未確認 |
 
 一覧・検索・詳細取得も、能力と対象の公開範囲をサーバーで毎回判定する。閲覧不可の個別対象は `NOT_FOUND` とし、存在の有無を漏らさない。フロント側の非表示は誤操作防止であって認可境界ではない。権限、招待、金融操作は直近の本人確認（既定5分、`FAMILY_HUB_RECENT_AUTH_MS`）がないと `403 REAUTH_REQUIRED` で拒否し、監査記録を残す。
+
+年齢と役割: 誕生日は本人の申告で、確かめない。18歳未満（`ADULT_AGE`）の登録は保護者の同意の印（`guardianConsent`）がないと断るが、印は記録せず、保護者にも確かめない。18歳以上と申告した人にだけ `adult_declared_at` を残し、家族グループの作成と管理者への変更・移譲はこの人だけに許す（`ownerCandidateProblem`）。役割は招待のときと後の変更で管理者が選び、年齢からは決めない。子どもメンバーの上限には家計・場所・ヒント・読み取りの補助・家族の管理を入れない（`roleCeilings`）。16歳未満の法定代理人の同意（令和8年の改正）を扱う仕組みはなく、法務の確認は `evidence-pending`。
 
 ## セッションとCSRF
 
@@ -67,6 +69,7 @@ Cookie は `server/auth/sessions.ts` だけが発行する（`npm run audit:secu
 - **暗号**: `FAMILY_HUB_BACKUP_KEY`（32文字以上、鍵束とは別の値）から HKDF で用途ごとの鍵を導く。塊ごとに AES-256-GCM、AAD はファイルの ID・塊の番号・最後の塊か。ファイルと塊の名前は鍵つきの HMAC。目録も AES-256-GCM（AAD は世代の ID）で暗号化し、HMAC を付ける。置き場所に平文の hash や SQLite・JPEG の先頭のバイトが出ないことを試験で確かめる。
 - **改ざん**: 1バイトの変更、塊の入れ替え・並べ替え・切り捨て、別の世代の目録の付け替えは、`backup verify` と復元で見つかる（終了コード2）。置き場所を消す・古い世代だけを残すことは防げない。別の場所へ持ち出すことで備える（deploy/README.md の 3-2-1）。
 - **鍵**: バックアップの鍵を API の機械と置き場所の両方から離して保管すること。鍵と置き場所を同時に取られると読まれる。鍵をなくすと復元できない。
+- **頻度と世代**: `FAMILY_HUB_BACKUP_DIR` と `FAMILY_HUB_BACKUP_KEY` があるときだけ、毎日（既定 03:00、`FAMILY_HUB_BACKUP_AT`）作り、作ったその場で確かめる。どちらかがなければ作らず、起動のときに運用ログへ出す。世代は日7・週4・月6（`src/domain/backupRetention.ts`）。命令は `backup now|list|verify <id>` と `restore <id> --to <dir>`（`deploy/README.md` の「バックアップ」）。
 - **残る期間**: 削除したアカウントや記録も、最長6か月（月の世代の数）はバックアップに残る。規約とポリシーに書いた。
 
 ## 運営者の命令（`server/cli.ts`）
@@ -93,9 +96,9 @@ Cookie は `server/auth/sessions.ts` だけが発行する（`npm run audit:secu
 配信:
 
 - すべて `/v1/` の下だけで配る。`public/sw.js` は `/v1/` をキャッシュしない。
-- 応答には `X-Content-Type-Options: nosniff` と `Content-Security-Policy: default-src 'none'; sandbox` を付ける。添付は `Content-Disposition: attachment` で返す。
-- 添付のリンクは5分で切れる署名付きで、さらにセッションが要る。署名は添付のIDと期限だけに掛かり、`mime` と `name` は問い合わせの値を使う。`mime` は許可した種類に限り、それ以外は `application/octet-stream` にする。名前は保存時と異なる値に書き換えられるが、影響は本人が受け取るファイル名だけである。
-- 発行済みのリンクは5分の間、権限が変わっても開ける。
+- 応答には `X-Content-Type-Options: nosniff` と `Content-Security-Policy: default-src 'none'; sandbox` を付ける。添付は、画面の中で開くリンクで種類が JPEG・PNG・MP4・PDF のときだけ `inline`、ほかは `Content-Disposition: attachment` で返す。
+- 添付のリンクは5分で切れる署名付きで、さらにセッションが要る。署名は添付の ID・期限・表示方法（`inline` か `attachment`）に掛かる。種類と名前は配信のときに記録から読み、問い合わせの値は使わない。種類は許可した種類に限り、それ以外は `application/octet-stream` にする。
+- 配信のたびに、閲覧者がその添付を今も見られるかを確かめる。権限や公開範囲が変わったり記録が消えたりすれば、期限の前でも開けない。
 
 AVのclean判定は絶対安全を意味しない。未知脅威、パーサ脆弱性、誤検知に備え、最小権限と更新・監視を併用する。
 
@@ -141,7 +144,7 @@ AVのclean判定は絶対安全を意味しない。未知脅威、パーサ脆�
 
 ## 鍵
 
-- 鍵束（`server/auth/keyring.ts`）。鍵には kid を付け、用途ごとの鍵を HKDF で導く。CSRF・パスワードの再設定・添付のリンクは有効な鍵で署名し、引退していないすべての鍵で確かめる。確認コードの秘密は `v2.<kid>.<iv>.<tag>.<本文>`（AES-256-GCM、AAD は用途と利用者 ID）で保存する。
+- 鍵束（`server/auth/keyring.ts`）は `FAMILY_HUB_KEYS`（`kid=秘密` の並び）と `FAMILY_HUB_ACTIVE_KID`。`FAMILY_HUB_KEYS` がなければ `FAMILY_HUB_SECRET` を kid `legacy` の有効な鍵とする。鍵には kid を付け、用途ごとの鍵を HKDF で導く。CSRF・パスワードの再設定・添付のリンクは有効な鍵で署名し、引退していないすべての鍵で確かめる。確認コードの秘密は `v2.<kid>.<iv>.<tag>.<本文>`（AES-256-GCM、AAD は用途と利用者 ID）で保存する。
 - 起動のたびに kid ごとの指紋を `key_fingerprints` と照らし合わせる。鍵のない暗号文や、指紋の違う kid があっても起動し、運用ログに理由を出す。その人の確認コードは「使えない」として扱い、回復コード（鍵に依存しないハッシュ）とパスキーでサインインでき、設定から登録し直せる。要求が 500 になることはない。
 - 未確認: 鍵束は API と同じ機械の環境変数に置く。機械を取られたときの保護（HSM や外部の鍵管理）はない。
 

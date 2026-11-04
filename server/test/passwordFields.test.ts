@@ -25,6 +25,17 @@ describe('password fields', () => {
     expect(purpose('reauth-password')).toBe('current-password');
   });
 
+  it('ask for a two-step or e-mailed code in one field marked one-time-code (B 認証, WCAG 3.3.8)', () => {
+    const codes = screens.flatMap((file) => [...file.text.matchAll(/<input[^>]*name="code"[^>]*>/g)].map((match) => ({ path: file.path, tag: match[0] })));
+    expect(codes.map((code) => code.path).sort()).toEqual(['src/features/auth/AuthPage.tsx', 'src/features/auth/ResetPasswordPage.tsx', 'src/features/settings/AccountSection.tsx']);
+    for (const code of codes) {
+      expect(code.tag, code.path).toContain('autoComplete="one-time-code"');
+      expect(code.tag, code.path).toContain('inputMode="numeric"');
+    }
+    // 1桁ごとに欄を分けない（1つの画面に code の欄は1つ）。
+    for (const file of screens) expect([...file.text.matchAll(/autoComplete="one-time-code"/g)].length, file.path).toBeLessThanOrEqual(1);
+  });
+
   it('never block paste, copy or cut', () => {
     for (const file of screens) expect(file.text, file.path).not.toMatch(/onPaste|onCopy|onCut|addEventListener\(['"](paste|copy|cut)['"]/);
   });

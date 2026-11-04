@@ -1414,7 +1414,13 @@
       "failures": [
         "唯一の管理者"
       ],
-      "recovery": "ただ1人の管理者には理由と「管理者を引き継ぐ」への道を示す"
+      "recovery": "ただ1人の管理者には理由と「管理者を引き継ぐ」への道を示す",
+      "tests": [
+        "e2e/features.spec.ts#S9-LEAVE-1",
+        "e2e/features.spec.ts#S9-LEAVE-2",
+        "src/data/gateway.suite.ts#lets an owner promote only a declared adult, and lets one of two owners leave",
+        "src/domain/householdLimits.test.ts#lets an owner leave only while another active owner remains"
+      ]
     },
     {
       "id": "UC-H12",
@@ -1543,7 +1549,13 @@
         "支出にするのに負担がない",
         "版の競合"
       ],
-      "recovery": "先に精算を取り消すよう案内し、費目と負担を選び直す"
+      "recovery": "先に精算を取り消すよう案内し、費目と負担を選び直す",
+      "tests": [
+        "e2e/features.spec.ts#S9-KIND-1",
+        "e2e/features.spec.ts#S9-KIND-2",
+        "e2e/features.spec.ts#S9-KIND-3",
+        "src/data/gateway.suite.ts#changing the kind of a record (A3)"
+      ]
     },
     {
       "id": "UC-B11",
@@ -1565,7 +1577,43 @@
         "本人確認切れ",
         "人で絞り込んでいる"
       ],
-      "recovery": "画面を読み込み直す、1件ずつ精算する、同じ冪等キーで前の結果を受け取る"
+      "recovery": "画面を読み込み直す、1件ずつ精算する、同じ冪等キーで前の結果を受け取る",
+      "tests": [
+        "e2e/features.spec.ts#S9-SETTLE-1",
+        "e2e/features.spec.ts#S9-SETTLE-2",
+        "e2e/features.spec.ts#S9-SETTLE-3",
+        "e2e/real/budget.spec.ts#S9-REAL-SETTLE",
+        "src/data/gateway.suite.ts#settling everything at once (A4)",
+        "src/domain/commands/settleAll.test.ts#balances sum to zero"
+      ]
+    },
+    {
+      "id": "UC-B12",
+      "title": "家計の図表（費目ごとの支出・6か月の推移・人ごとの差し引き）を読み、「表で見る」で同じ数値の表を開く",
+      "products": [
+        "F"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "expense.read",
+      "success": "位置か長さで表した棒に金額が直接書かれ、「表で見る」で同じ数値の表（見出しつき）が開く。表示する人で絞ると図表も同じ記録だけになる",
+      "failures": [
+        "記録が1か月だけ",
+        "見えない記録がある",
+        "子どもとゲスト（家計を見る権限がない）"
+      ],
+      "recovery": "記録が少ないときは文で知らせる。見えない記録は数えない",
+      "tests": [
+        "e2e/charts.spec.ts#CHART-1",
+        "e2e/charts.spec.ts#CHART-2",
+        "e2e/charts.spec.ts#CHART-3",
+        "e2e/charts.spec.ts#CHART-6",
+        "e2e/charts.spec.ts#CHART-7",
+        "e2e/charts.spec.ts#CHART-9",
+        "src/domain/budgetTrend.test.ts#describe("
+      ]
     },
     {
       "id": "UC-R03",
@@ -1777,6 +1825,30 @@
       "recovery": "別の URL を入れる、手で入力する"
     },
     {
+      "id": "UC-E05",
+      "title": "ヒントの「今日から7日の予定とタスクの件数」を図表で見て、「表で見る」で同じ数値の表を開く",
+      "products": [
+        "F"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "insight.read",
+      "success": "日ごとの予定とタスクの件数が棒と数で並び、「表で見る」で同じ数値の表が開く。数える記録の種類を外すと、その系列が消える",
+      "failures": [
+        "数える記録をすべて外した",
+        "子どもとゲスト（ヒントの図表は出さない）"
+      ],
+      "recovery": "数える記録を選び直す",
+      "tests": [
+        "e2e/charts.spec.ts#CHART-4",
+        "e2e/charts.spec.ts#CHART-5",
+        "e2e/charts.spec.ts#CHART-8",
+        "src/domain/advisor/weekLoad.test.ts#describe("
+      ]
+    },
+    {
       "id": "UC-Y01",
       "title": "コマンドパレット、キーボード操作、2面表示",
       "products": [
@@ -1921,7 +1993,12 @@
         "サインインしていない",
         "条件の形が正しくない"
       ],
-      "recovery": "サインインし直して開き直す"
+      "recovery": "サインインし直して開き直す",
+      "tests": [
+        "e2e/features.spec.ts#S9-AUDIT-3",
+        "src/data/gateway.suite.ts#change record (A5)",
+        "server/test/audit.test.ts#the record API (A5)"
+      ]
     },
     {
       "id": "UC-H13",
@@ -1939,7 +2016,14 @@
         "家族にいない人を選んだ",
         "鎖に食い違いがある"
       ],
-      "recovery": "食い違いがあれば運営者が audit verify で位置を確かめる"
+      "recovery": "食い違いがあれば運営者が audit verify で位置を確かめる",
+      "tests": [
+        "e2e/features.spec.ts#S9-AUDIT-1",
+        "e2e/features.spec.ts#S9-AUDIT-2",
+        "e2e/features.spec.ts#S9-AUDIT-4",
+        "src/data/gateway.suite.ts#change record (A5)",
+        "src/domain/auditView.test.ts#describe("
+      ]
     },
     {
       "id": "UC-O04",
@@ -1956,7 +2040,12 @@
         "改変・削除・並べ替え・挿入・基準点より前の切り捨て（終了コード2で位置を示す）",
         "日付の形が正しくない"
       ],
-      "recovery": "バックアップと運用ログの基準点で、どこから食い違うかを確かめる"
+      "recovery": "バックアップと運用ログの基準点で、どこから食い違うかを確かめる",
+      "tests": [
+        "server/test/audit.test.ts#tampering is detected with its position (A6-6, A6-9)",
+        "server/test/audit.test.ts#retention and prune (A6-7)",
+        "server/test/audit.test.ts#keeps everything when the retention period is 0"
+      ]
     },
     {
       "id": "UC-M06",
@@ -1978,7 +2067,15 @@
         "壊れた PDF",
         "期限切れや書き換えたリンク（404）"
       ],
-      "recovery": "「保存して開く」で端末のアプリで開く。リンクは開き直すと作り直される"
+      "recovery": "「保存して開く」で端末のアプリで開く。リンクは開き直すと作り直される",
+      "tests": [
+        "e2e/features.spec.ts#S9-VIEW-1",
+        "e2e/features.spec.ts#S9-VIEW-2",
+        "e2e/features.spec.ts#S9-VIEW-3",
+        "e2e/features.spec.ts#S9-VIEW-4",
+        "e2e/features.spec.ts#S9-VIEW-5",
+        "e2e/real/tasks-notes.spec.ts#S9-REAL-VIEW"
+      ]
     },
     {
       "id": "UC-G06",
@@ -1998,7 +2095,12 @@
         "撮影日時の記録がない",
         "時差の記録がない"
       ],
-      "recovery": "アルバムの順に戻す"
+      "recovery": "アルバムの順に戻す",
+      "tests": [
+        "e2e/features.spec.ts#S9-TAKEN-1",
+        "e2e/features.spec.ts#S9-TAKEN-2",
+        "src/domain/albumView.test.ts#sorting by capture time (A15-5)"
+      ]
     },
     {
       "id": "UC-Y05",
@@ -2018,7 +2120,13 @@
         "該当なし",
         "見る権限のない記録"
       ],
-      "recovery": "検索語を変える"
+      "recovery": "検索語を変える",
+      "tests": [
+        "e2e/features.spec.ts#S9-SEARCH-1",
+        "e2e/features.spec.ts#S9-SEARCH-2",
+        "src/app/searchGroups.test.ts#describe(",
+        "src/data/gateway.suite.ts#albums in the household search (A17)"
+      ]
     },
     {
       "id": "UC-C08",
@@ -2037,7 +2145,13 @@
         "月末・BYSETPOS・週をまたぐ・1〜28日に収まらない規則",
         "版の競合"
       ],
-      "recovery": "理由を示し、「これ以降の予定」へ切り替える"
+      "recovery": "理由を示し、「これ以降の予定」へ切り替える",
+      "tests": [
+        "e2e/features.spec.ts#S9-SERIES-1",
+        "e2e/features.spec.ts#S9-SERIES-2",
+        "e2e/recurrence.spec.ts#changing the date for",
+        "src/domain/seriesShift.test.ts#moves every occurrence by the same number of days"
+      ]
     }
   ]
 }
