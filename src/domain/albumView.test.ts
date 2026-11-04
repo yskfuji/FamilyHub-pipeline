@@ -82,3 +82,18 @@ describe('slideshowItems', () => {
     expect(slideshowItems([item('v', { kind: 'video' })], false)).toMatchObject({ keptVideos: true, items: [{ id: 'v' }] });
   });
 });
+
+describe('sorting by capture time (A15-5)', () => {
+  const at = (id: string, takenAt?: string) => ({ id, takenAt });
+  it('keeps the album order, or puts the oldest first and items without a capture time last', async () => {
+    const { parseAlbumSort, sortItems } = await import('./albumView');
+    const items = [at('none-1'), at('late', '2026-09-20T11:40:12+09:00'), at('early', '2026-09-20T09:12:30+09:00'), at('none-2'), at('same-a', '2026-09-20T10:00:00+09:00'), at('same-b', '2026-09-20T01:00:00Z')];
+    expect(sortItems(items, 'album').map((item) => item.id)).toEqual(['none-1', 'late', 'early', 'none-2', 'same-a', 'same-b']);
+    // 時差の違う書き方でも、同じ時刻なら並べた順を保つ（10:00+09:00 と 01:00Z は同じ時刻）。
+    expect(sortItems(items, 'taken').map((item) => item.id)).toEqual(['early', 'same-a', 'same-b', 'late', 'none-1', 'none-2']);
+    expect(sortItems([at('x', 'not a date'), at('y', '2026-01-01T00:00:00Z')], 'taken').map((item) => item.id)).toEqual(['y', 'x']);
+    expect(parseAlbumSort('taken')).toBe('taken');
+    expect(parseAlbumSort('other')).toBe('album');
+    expect(parseAlbumSort(null)).toBe('album');
+  });
+});

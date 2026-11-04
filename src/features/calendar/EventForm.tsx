@@ -1,7 +1,8 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useApp } from '../../app/AppContext';
 import { allowedAudiencesFor } from '../../authz/policy';
-import { ja } from '../../content/ja';
+import { ja, seriesPreviewCopy } from '../../content/ja';
+import { AlertIcon, CalendarIcon } from '../../design-system/icons';
 import { useUnsavedGuard } from '../../design-system/unsavedGuard';
 import { applyTemplate, draftProblem, pastEventTemplates, reminderChoices, reminderLabel, withStart, type EventDraft } from '../../domain/eventForm';
 import { ColorLabelFields } from '../shared/ColorLabelFields';
@@ -21,11 +22,17 @@ interface Props {
   recurrenceNote?: ReactNode;
   /** 今の規則がこの画面で作れないときの表示名。 */
   keptRuleLabel?: string;
+  /**
+   * 保存の前に示す見通し（繰り返しの「すべて」の編集で日付を変えたとき。A13-6）。入力のたびに呼ぶ。
+   * refused のときは理由と、「これ以降の予定」へ切り替える操作（onSwitchToFuture）を出す。
+   */
+  preview?: (draft: EventDraft) => { kind: 'shift' | 'refused'; text: string } | null;
+  onSwitchToFuture?: () => void;
   onSubmit: (draft: EventDraft) => void;
   onCancel: () => void;
 }
 
-export function EventForm({ formId, initial, submitLabel, busy, error, offerTemplates, recurrenceNote, keptRuleLabel, onSubmit, onCancel }: Props) {
+export function EventForm({ formId, initial, submitLabel, busy, error, offerTemplates, recurrenceNote, keptRuleLabel, preview, onSwitchToFuture, onSubmit, onCancel }: Props) {
   const { snapshot } = useApp();
   const [draft, setDraft] = useState(initial);
   const [problem, setProblem] = useState('');
@@ -42,6 +49,7 @@ export function EventForm({ formId, initial, submitLabel, busy, error, offerTemp
     if (!found) onSubmit(draft);
   };
   const shown = problem || error;
+  const outlook = preview?.(draft) ?? null;
   return <form {...unsaved.formProps} className="stack" aria-busy={busy} noValidate onSubmit={submit}>
     {templates.length > 0 && <div className="event-templates" role="group" aria-label="過去の予定から入力">
       <span className="field-help">過去の予定から入力</span>
@@ -69,10 +77,15 @@ export function EventForm({ formId, initial, submitLabel, busy, error, offerTemp
       {[...reminderChoices, ...(draft.reminderMinutes !== null && !(reminderChoices as readonly number[]).includes(draft.reminderMinutes) ? [draft.reminderMinutes] : [])].map((minutes) => <option key={minutes} value={minutes}>{reminderLabel(minutes)}</option>)}
     </select></label>
     <label className="check-row"><input data-control-id={`calendar.event.weather-sensitive.${formId}`} type="checkbox" checked={draft.weatherSensitive} onChange={(event) => patch({ weatherSensitive: event.target.checked })}/>天気の影響を表示する</label>
+    {outlook && <div className={`callout series-preview${outlook.kind === 'refused' ? ' refused' : ' info'}`} role="status" data-series-preview={outlook.kind}>
+      {outlook.kind === 'refused' ? <AlertIcon/> : <CalendarIcon/>}
+      <p className="mb-0">{outlook.text}</p>
+      {outlook.kind === 'refused' && onSwitchToFuture && <button data-control-id={`calendar.event.series-future.${formId}`} className="button" type="button" onClick={onSwitchToFuture}>{seriesPreviewCopy.switchToFuture}</button>}
+    </div>}
     {shown && <p className="field-error" role="alert">{shown}</p>}
     <div className="dialog-actions">
       <button data-control-id={`calendar.event.form-cancel.${formId}`} className="button" type="button" disabled={busy} onClick={() => unsaved.leave(onCancel)}>{ja.actions.cancel}</button>
-      <button data-control-id={`calendar.event.form-save.${formId}`} className="button primary" type="submit" disabled={busy}>{busy ? ja.actions.saving : submitLabel}</button>
+      <button data-control-id={`calendar.event.form-save.${formId}`} className="button primary" type="submit" disabled={busy || outlook?.kind === 'refused'}>{busy ? ja.actions.saving : submitLabel}</button>
     </div>
   </form>;
 }

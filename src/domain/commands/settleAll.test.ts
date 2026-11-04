@@ -88,3 +88,50 @@ describe('settling everything at once (A4, property, seeded)', () => {
     expect(settleAllRequest([], { memberFilterActive: false })).toBeNull();
   });
 });
+
+describe('the settlement history groups a batch into one row (A4-4)', () => {
+  it('shows a batch and its reversal as one row each, and offers the whole reversal only while no part was reversed on its own', async () => {
+    const { groupedSettlementHistory } = await import('../ledger');
+    const aggregate = initialAggregate();
+    const rules = rulesFor(aggregate, 'member-ren');
+    const visible = () => aggregate.state.expenses.filter((expense) => !expense.deletedAt);
+    const request = settleAllRequest(visible(), { memberFilterActive: false });
+    expect(request).not.toBeNull();
+    const settled = rules.expenses.settleAll(request!);
+    expect(settled.ok).toBe(true);
+    if (!settled.ok) return;
+    let rows = groupedSettlementHistory(visible(), aggregate.state.settlementBatches);
+    const batchRows = rows.filter((row) => row.kind === 'batch');
+    expect(batchRows).toHaveLength(1);
+    const [batch] = batchRows;
+    if (batch.kind !== 'batch') return;
+    expect(batch.entries).toHaveLength(request!.shares.length);
+    expect(batch.totalJpy).toBe(request!.shares.reduce((sum, share) => sum + share.remainingJpy, 0));
+    expect(batch.transfers).toEqual(request!.transfers);
+    expect(batch.canReverse).toBe(true);
+    // 前からある記録ごとの精算は、そのまま1件ずつ並ぶ。
+    expect(rows.some((row) => row.kind === 'single' && row.entry.record.id === 'settlement-1')).toBe(true);
+
+    // 一部を個別に取り消すと、まとめごとの取り消しは出さない。
+    const part = batch.entries[0];
+    expect(rules.expenses.reverseSettlement(part.expenseId, part.record.id).ok).toBe(true);
+    rows = groupedSettlementHistory(visible(), aggregate.state.settlementBatches);
+    const partly = rows.find((row) => row.kind === 'batch' && !row.reversal);
+    expect(partly).toMatchObject({ kind: 'batch', partlyReversed: true, canReverse: false });
+
+    // 取り消しの記録は、まとめにも記録ごとにも数えない。まとめた精算をもう一度作り、まとめごと取り消す。
+    const again = settleAllRequest(visible(), { memberFilterActive: false });
+    const second = rules.expenses.settleAll(again!);
+    expect(second.ok).toBe(true);
+    if (!second.ok) return;
+    expect(rules.expenses.reverseBatch(second.value.id).ok).toBe(true);
+    rows = groupedSettlementHistory(visible(), aggregate.state.settlementBatches);
+    const ofSecond = rows.filter((row) => row.kind === 'batch' && row.batchId === second.value.id);
+    // 時計を止めているので、並びではなく中身で確かめる。
+    const original = ofSecond.find((row) => row.kind === 'batch' && !row.reversal);
+    const reversal = ofSecond.find((row) => row.kind === 'batch' && row.reversal);
+    expect(ofSecond).toHaveLength(2);
+    expect(original).toMatchObject({ reversed: true, canReverse: false, partlyReversed: false });
+    expect(reversal).toMatchObject({ totalJpy: (original as { totalJpy: number }).totalJpy });
+  });
+});

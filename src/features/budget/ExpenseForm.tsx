@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from 'react';
 import { useApp } from '../../app/AppContext';
-import { ja } from '../../content/ja';
+import { ja, kindChangeCopy } from '../../content/ja';
 import { AlertIcon } from '../../design-system/icons';
 import { useUnsavedGuard } from '../../design-system/unsavedGuard';
-import { activeAdults, defaultCategory, expenseDraftProblem, expenseTitleLabel, payerChoices, peopleOutsideExpense, type ExpenseDraft } from '../../domain/expenseForm';
+import { activeAdults, defaultCategory, expenseDraftProblem, expenseTitleLabel, kindChangeEffects, payerChoices, peopleOutsideExpense, withKind, type ExpenseDraft } from '../../domain/expenseForm';
+import { formatYen } from '../../design-system/components';
 import { expenseCategories, incomeCategories } from '../../domain/ledger';
 import type { Expense } from '../../domain/types';
 import { PlaceField } from '../place/PlaceField';
@@ -16,7 +17,7 @@ interface Props {
   /** 操作の ID の末尾に使う。新規は new。 */
   formId: string;
   initial: ExpenseDraft;
-  /** 編集のときの元の記録。種類は作るときにだけ選べる。 */
+  /** 編集のときの元の記録。記録したあとも種類を変えられる（A3-5）。 */
   original?: Expense;
   /** 精算の記録があり、金額と負担を変えられないとき。 */
   splitLocked: boolean;
@@ -40,6 +41,9 @@ export function ExpenseForm({ formId, initial, original, splitLocked, submitLabe
   const categories = income ? incomeCategories : expenseCategories;
   const selectable = snapshot.memberships.filter((member) => member.status === 'active' || draft.selectedIds.includes(member.id));
   const outside = peopleOutsideExpense(draft, adultIds, snapshot.memberships, original?.creatorMembershipId ?? snapshot.viewer.membershipId);
+  // 記録したあとの種類の切り替えで起きること。収入にすると負担が消えるので、保存の前に誰の分かを示す。
+  const effects = original ? kindChangeEffects(original, draft.kind) : null;
+  const sharesText = original?.shares.filter((share) => share.membershipId !== original.payerMembershipId).map((share) => `${snapshot.memberships.find((member) => member.id === share.membershipId)?.displayName ?? '非公開'}さん ${formatYen(share.amountJpy)}`).join('・') ?? '';
   const submit = (event: FormEvent) => {
     event.preventDefault();
     const found = expenseDraftProblem(draft, splitLocked);
@@ -48,9 +52,9 @@ export function ExpenseForm({ formId, initial, original, splitLocked, submitLabe
   };
   const shown = problem || error;
   return <form {...unsaved.formProps} className="stack budget-form" aria-busy={busy} noValidate onSubmit={submit}>
-    {original
-      ? <p className="small muted mb-0">種類：{ja.expenseKind[original.kind]}（記録したあとは変えられません）</p>
-      : <fieldset className="fieldset"><legend>種類</legend><div className="choice-grid">{kinds.map((kind) => <label key={kind}><input data-control-id={`budget.form.kind.${formId}.${kind}`} type="radio" name={`kind-${formId}`} value={kind} checked={draft.kind === kind} onChange={() => patch({ kind, category: defaultCategory(kind) })}/>{ja.expenseKind[kind]}</label>)}</div></fieldset>}
+    <fieldset className="fieldset" aria-describedby={effects?.changes ? `kind-change-${formId}` : undefined}><legend>{kindChangeCopy.legend}</legend><div className="choice-grid">{kinds.map((kind) => <label key={kind}><input data-control-id={`budget.form.kind.${formId}.${kind}`} type="radio" name={`kind-${formId}`} value={kind} checked={draft.kind === kind} onChange={() => setDraft((current) => (original ? withKind(current, kind) : { ...current, kind, category: defaultCategory(kind) }))}/>{ja.expenseKind[kind]}</label>)}</div>
+      {effects?.changes && <div className="callout kind-change" id={`kind-change-${formId}`} role="status"><AlertIcon/><p className="small mb-0">{effects.blockedBySettlement ? kindChangeCopy.blockedBySettlement : effects.clearsShares ? (sharesText ? kindChangeCopy.clearsShares(sharesText) : kindChangeCopy.clearsSharesPlain) : kindChangeCopy.requiresShares}</p></div>}
+    </fieldset>
     <label className="field"><span>{expenseTitleLabel(draft.kind)}</span><input data-control-id={`budget.form.title.${formId}`} className="input" name="title" autoFocus required maxLength={120} aria-describedby={`expense-title-help-${formId}`} value={draft.title} onChange={(event) => patch({ title: event.target.value })}/><span className="field-help" id={`expense-title-help-${formId}`}>{income ? '例：9月の給与' : '例：学校教材'}</span></label>
     <div className="grid two">
       <label className="field"><span>日付</span><input data-control-id={`budget.form.date.${formId}`} className="input" type="date" name="date" required value={draft.date} onChange={(event) => patch({ date: event.target.value })}/></label>

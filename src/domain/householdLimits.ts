@@ -12,3 +12,16 @@ export const recentNameChanges = (changes: readonly Rfc3339[] | undefined, now: 
 export const nameChangesLeft = (changes: readonly Rfc3339[] | undefined, now: Rfc3339) => Math.max(0, MAX_NAME_CHANGES_PER_DAY - recentNameChanges(changes, now).length);
 
 export const activeMemberCount = (memberships: readonly HouseholdMembership[]) => memberships.filter((member) => member.status === 'active').length;
+
+/** 利用中の管理者。最後の1人は退出できない（A12-1）。規則と画面が同じものを使う。 */
+export const activeOwners = <T extends Pick<HouseholdMembership, 'role' | 'status'>>(memberships: readonly T[]) => memberships.filter((member) => member.role === 'owner' && member.status === 'active');
+
+/**
+ * 退出の画面に出すもの。管理者でなければ member、ほかにも利用中の管理者がいれば co-owner（退出できる）、
+ * 自分だけが管理者なら sole-owner（先に管理者を引き継いでもらう）。
+ */
+export function leaveStateFor(memberships: readonly HouseholdMembership[], viewerMembershipId: string): 'member' | 'co-owner' | 'sole-owner' {
+  const self = memberships.find((member) => member.id === viewerMembershipId);
+  if (self?.role !== 'owner') return 'member';
+  return activeOwners(memberships).some((member) => member.id !== viewerMembershipId) ? 'co-owner' : 'sole-owner';
+}

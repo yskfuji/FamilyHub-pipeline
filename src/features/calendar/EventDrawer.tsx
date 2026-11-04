@@ -53,7 +53,7 @@ export function EventDrawer({ active, series, onClose, onDeleted }: Props) {
     if (submitting) return;
     setFormError(''); setSubmitting(true);
     const wholeSeries = recurring && scope === 'series';
-    // 日付を動かすときは、シリーズ全体を同じ日数だけずらす。ずらせない規則は理由を示して送らない（確かめの文の表示は後の段階）。
+    // 日付を動かすときは、シリーズ全体を同じ日数だけずらす。編集の画面が保存の前に見通しを示し、ずらせない規則は送らない。
     const preview = wholeSeries ? seriesEditPreview(draft, series, active.occurrenceDate, recurrenceEditable) : null;
     if (preview?.kind === 'refused') { setFormError(preview.text); setSubmitting(false); return; }
     const input = draftToUpdateInput(draft, series, { recurrenceEditable, seriesStart: wholeSeries ? seriesStart : undefined, occurrenceDate: wholeSeries ? active.occurrenceDate : undefined });
@@ -104,7 +104,10 @@ export function EventDrawer({ active, series, onClose, onDeleted }: Props) {
       </div>}
     </div></Drawer>
     {editing && <Dialog title="予定を編集" description={recurring ? `変更する範囲：${recurrenceLabel('event', scope)}` : 'この予定の内容を変更します。'} onClose={() => { if (!submitting) { setEditing(false); setFormError(''); } }}>
-      <EventForm formId={active.id} initial={{ ...eventToDraft(active), ...(recurring ? recurrenceOf(series) : {}) }} submitLabel={ja.actions.saveChanges} busy={submitting} error={formError} keptRuleLabel={active.recurrence ? describeRule(seriesStart, active.recurrence) : undefined} recurrenceNote={recurrenceEditable ? undefined : `繰り返しの変更は、対象を「${recurrenceLabel('event', 'series')}」にすると行えます。`} onSubmit={(draft) => void update(draft)} onCancel={() => { setEditing(false); setFormError(''); }}/>
+      <EventForm formId={active.id} initial={{ ...eventToDraft(active), ...(recurring ? recurrenceOf(series) : {}) }} submitLabel={ja.actions.saveChanges} busy={submitting} error={formError} keptRuleLabel={active.recurrence ? describeRule(seriesStart, active.recurrence) : undefined} recurrenceNote={recurrenceEditable ? undefined : `繰り返しの変更は、対象を「${recurrenceLabel('event', 'series')}」にすると行えます。`}
+        preview={recurring && scope === 'series' ? (draft) => seriesEditPreview(draft, series, active.occurrenceDate, recurrenceEditable) : undefined}
+        onSwitchToFuture={() => { setScope('future'); setFormError(''); }}
+        onSubmit={(draft) => void update(draft)} onCancel={() => { setEditing(false); setFormError(''); }}/>
     </Dialog>}
     {deleting && <Dialog title="予定を削除しますか" description={`「${active.title}」${recurring ? `（${recurrenceLabel('event', scope)}）` : ''}を削除します。`} onClose={() => setDeleting(false)} actions={<>
       <button data-control-id={`calendar.event.delete-cancel.${active.id}`} className="button" type="button" onClick={() => setDeleting(false)}>{ja.actions.cancel}</button>

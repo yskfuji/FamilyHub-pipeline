@@ -1,7 +1,7 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, createReadStream, existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
 import { constants, gzipSync } from 'node:zlib';
 
@@ -59,6 +59,36 @@ function precompress() {
   };
 }
 
+/**
+ * PDF の表示（pdf.js、A14-2）が読む CMap と標準の書体を、同じオリジンの /pdfjs/ から配る。
+ * 画面のビルドの出力先へ pdfjs-dist から写し（API の出力先には写さない）、開発中は node_modules から配る。
+ * CID の書体を使う日本語の PDF は、CMap がないと字を描けない。外のオリジン（CDN）からは読まない（CSP の connect-src 'self'）。
+ */
+const PDFJS_SOURCE = resolve(import.meta.dirname, 'node_modules/pdfjs-dist');
+const PDFJS_RESOURCES = ['cmaps', 'standard_fonts'] as const;
+function pdfjsResources() {
+  let outDir = '';
+  return {
+    name: 'family-hub-pdfjs-resources',
+    apply: (_config: unknown, env: { isSsrBuild?: boolean }) => !env.isSsrBuild,
+    configResolved(config: { root: string; build: { outDir: string } }) { outDir = resolve(config.root, config.build.outDir); },
+    configureServer(server: { middlewares: { use(path: string, handler: (request: { url?: string }, response: { setHeader(name: string, value: string): void; end(): void; statusCode: number } & NodeJS.WritableStream, next: () => void) => void): void } }) {
+      server.middlewares.use('/pdfjs/', (request, response, next) => {
+        const [folder, ...rest] = decodeURIComponent((request.url ?? '').split('?')[0]).replace(/^\/+/, '').split('/');
+        const name = rest.join('/');
+        if (!(PDFJS_RESOURCES as readonly string[]).includes(folder) || !/^[\w.-]+$/.test(name)) return next();
+        const file = join(PDFJS_SOURCE, folder, name);
+        if (!existsSync(file)) return next();
+        response.setHeader('Content-Type', 'application/octet-stream');
+        createReadStream(file).pipe(response);
+      });
+    },
+    writeBundle() {
+      for (const folder of PDFJS_RESOURCES) cpSync(join(PDFJS_SOURCE, folder), join(outDir, 'pdfjs', folder), { recursive: true });
+    },
+  };
+}
+
 const apiProxy = { '/v1': { target: process.env.FAMILY_HUB_API ?? 'http://127.0.0.1:8799', changeOrigin: false } };
 
 export default defineConfig(({ isSsrBuild }) => {
@@ -69,7 +99,9 @@ export default defineConfig(({ isSsrBuild }) => {
   preview: { proxy: apiProxy, ...(realStack ? { headers: deliveryHeaders() } : {}) },
   // public/ は画面の配信物で、API の出力先には入れない。
   ...(isSsrBuild ? { publicDir: false as const } : {}),
-  plugins: [react(), buildIdFile(), precompress()],
+  plugins: [react(), buildIdFile(), pdfjsResources(), precompress()],
+  // pdf.js の worker は ES モジュール（type: 'module' の worker）として出す。
+  worker: { format: 'es' as const },
   define: { 'import.meta.env.VITE_BUILD_ID': JSON.stringify(buildId()), __FAMILY_HUB_BUILD__: JSON.stringify(buildId()) },
   resolve: {
     alias: {

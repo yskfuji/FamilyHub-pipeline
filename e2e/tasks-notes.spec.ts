@@ -251,14 +251,14 @@ test.describe('memos', () => {
     await expect(drawer.getByText('notice.pdf')).toBeVisible();
     await expect(drawer.getByText('clip.mp4')).toBeVisible();
     await expect(drawer.getByText('確認中', { exact: true })).toHaveCount(2);
-    await expect(drawer.getByRole('button', { name: 'notice.pdfを開く（新しいタブ）' })).toBeVisible({ timeout: 9000 });
-    // 確認用データは原本を持たないので、同じ種類の見本のファイル（同じオリジン）を開く。開いた先を記録して確かめる。
-    await page.evaluate(() => { window.open = (url) => { document.body.dataset.openedUrl = String(url); return null; }; });
-    await drawer.getByRole('button', { name: 'notice.pdfを開く（新しいタブ）' }).click();
-    await expect(page.locator('body')).toHaveAttribute('data-opened-url', /^\/assets\/sample-notice-[\w-]+\.pdf$/);
-    const sample = await page.request.get(await page.locator('body').getAttribute('data-opened-url') ?? '');
+    await expect(drawer.getByRole('button', { name: 'notice.pdfを開く', exact: true })).toBeVisible({ timeout: 9000 });
+    // 確認用データは原本を持たないので、同じ種類の見本のファイル（同じオリジン）を、アプリの中の表示で開く（A14）。
+    const sampleRequest = page.waitForResponse((response) => /\/assets\/sample-notice-[\w-]+\.pdf$/.test(new URL(response.url()).pathname));
+    await drawer.getByRole('button', { name: 'notice.pdfを開く', exact: true }).click();
+    const sample = await sampleRequest;
     expect(sample.status()).toBe(200);
     expect((await sample.body()).subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    await expect(page.getByRole('dialog', { name: '「notice.pdf」を表示' }).locator('[data-pdf-state="ready"]')).toBeVisible({ timeout: 15_000 });
   });
 
   test('deleting an attachment asks first', async ({ page }) => {

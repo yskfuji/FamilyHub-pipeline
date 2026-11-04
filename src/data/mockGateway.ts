@@ -1,6 +1,6 @@
 import type { FamilyHubGateway } from './gateway';
 import { auditedGatewayOperations } from './gatewayOperations';
-import { baseAlbumItems, baseAlbums, baseInvites, baseNotificationPreferences, baseNotifications, basePrivacySettings, baseSecurityOverview, adultDeclaredUsers, sampleEventCandidates, sampleReceipt, seededSnapshot } from './fixtures';
+import { baseAlbumItems, baseAlbums, baseInvites, baseNotificationPreferences, baseNotifications, basePrivacySettings, baseSecurityOverview, adultDeclaredUsers, sampleEventCandidates, sampleReceipt, seedAuditHistory, seededSnapshot, withCoOwner } from './fixtures';
 import { serverMessages } from '../content/serverMessages';
 import { sampleAttachmentUrls } from './sampleAttachments';
 import { readingImageProblem, readingUrlProblem } from '../domain/assistant';
@@ -31,9 +31,17 @@ const scenarioError = (scenario?: Scenario): GatewayError | null => {
   return null;
 };
 
-export function initialAggregate(): HouseholdAggregate {
+/** 確認用の画面だけで使う見本の設定。同等性の試験は既定（どれもなし）で動かす。 */
+export interface MockOptions {
+  /** 管理者を2人にする（碧さんと蓮さん）。 */
+  coOwner?: boolean;
+  /** これまでの変更の記録の見本を入れておく。 */
+  auditHistory?: boolean;
+}
+
+export function initialAggregate(options: MockOptions = {}): HouseholdAggregate {
   return {
-    state: seededSnapshot(),
+    state: options.coOwner ? withCoOwner(seededSnapshot()) : seededSnapshot(),
     permissionOverrides: [],
     permissionRevision: 1,
     invites: structuredClone(baseInvites),
@@ -68,8 +76,8 @@ async function imageRejection(file: File): Promise<GatewayError | null> {
   return imageMarks.some((mark) => mark.every((value, index) => head[index] === value)) ? null : { code: 'ATTACHMENT_REJECTED', message: serverMessages.fileTypeRejected, retryable: false };
 }
 
-export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyHubGateway {
-  const aggregate = initialAggregate();
+export function createMockGateway(actorMembershipId: Id = 'member-aoi', options: MockOptions = {}): FamilyHubGateway {
+  const aggregate = initialAggregate(options);
   const security: SecurityOverview = structuredClone(baseSecurityOverview);
   let offline = false;
   let sequence = 0;
@@ -81,7 +89,7 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi'): FamilyH
   /** 時計を進めずに今の時刻を読む（変更の記録に使い、ほかの記録の時刻をずらさない）。 */
   const peek = () => timeAt(clockTick);
   /** 変更の記録。API と同じく、成功した変更の操作ごとに1行を残す（src/data/gatewayOperations.ts の対応表で決める）。 */
-  const auditRows: StoredAuditRow[] = [];
+  const auditRows: StoredAuditRow[] = options.auditHistory ? seedAuditHistory.map((row, index) => ({ ...row, seq: index + 1, id: `audit-seed-${index + 1}` })) : [];
   const recordAudit = (key: string, args: readonly unknown[], value: unknown) => {
     const operation = auditedGatewayOperations[key];
     const actor = state.memberships.find((item) => item.id === actorMembershipId);

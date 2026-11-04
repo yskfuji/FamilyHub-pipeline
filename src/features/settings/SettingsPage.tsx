@@ -4,6 +4,7 @@ import { useApp } from '../../app/AppContext';
 import { setDevicePreferences, useDevicePreferences, type Density } from '../../app/devicePreferences';
 import { densityLabels } from '../../app/paletteCommands';
 import { capabilityCeilingFor, defaultCapabilitiesFor } from '../../authz/policy';
+import { auditCopy } from '../../content/auditLabels';
 import { externalLinkLabel, ja, membershipStatusLabels, roleLabels } from '../../content/ja';
 import { settingsTabFor, settingsTabs } from './settingsTabs';
 import { closeGuarded } from '../../design-system/unsavedGuard';
@@ -26,6 +27,8 @@ import { RecentlyDeleted } from './RecentlyDeleted';
 
 const HelpSection = lazy(() => import('./HelpSection'));
 const LegalSection = lazy(() => import('./LegalSection'));
+const AuditLog = lazy(() => import('./AuditLog'));
+const AccountActivity = lazy(async () => ({ default: (await import('./AuditLog')).AccountActivity }));
 
 const inviteRoles: Array<Exclude<MembershipRole, 'owner'>> = ['adult', 'child', 'guest'];
 
@@ -55,6 +58,7 @@ export function SettingsPage({ path }: { path: string }) {
           : path.startsWith('/settings/resources') ? <Resources/>
             : path.startsWith('/settings/household') ? <Household/>
               : path.startsWith('/settings/recently-deleted') ? <RecentlyDeleted/>
+                : path.startsWith('/settings/audit') ? <Suspense fallback={<div className="skeleton"/>}><AuditLog/></Suspense>
                 : path.startsWith('/settings/help') ? <Suspense fallback={<div className="skeleton"/>}><HelpSection/></Suspense>
                   : path.startsWith('/settings/legal') ? <Suspense fallback={<div className="skeleton"/>}><LegalSection/></Suspense>
                     : null}
@@ -154,7 +158,7 @@ function Household() {
   return <>
     {canManage && <section className="card household-profile"><h2>家族グループの名前</h2><GuardedForm className="inline-form" onSubmit={(event) => { event.preventDefault(); void renameHousehold(event.currentTarget); }}><label className="field"><span>名前</span><input data-control-id="settings.household.name" className="input" name="householdName" required maxLength={40} defaultValue={snapshot.household.name} key={snapshot.household.name}/></label><button data-control-id="settings.household.name-save" className="button" type="submit" disabled={renamesLeft === 0}>名前を保存</button></GuardedForm><p className="small muted mb-0">{renamesLeft > 0 ? `あと${renamesLeft}回変更できます（24時間で${MAX_NAME_CHANGES_PER_DAY}回まで）。` : `名前の変更は24時間で${MAX_NAME_CHANGES_PER_DAY}回までです。時間をおいてお試しください。`} 日時は日本時間で表示します。</p></section>}
     <div className="grid two">
-      <section className="card">
+      <section className="card" id="household-members" tabIndex={-1}>
         <p className="eyebrow">家族</p><h2>{snapshot.household.name}</h2><p className="muted">利用中 {activeCount}人 / {MAX_HOUSEHOLD_MEMBERS}人まで · 日時の表示 · 日本時間</p>
         <ul className="list">{people.map((item) => <li className="list-row" key={item.id}>
           <span className="avatar" style={{ background: item.color, color: readableTextOn(item.color) }} aria-hidden="true">{item.displayName.slice(0, 1)}</span>
@@ -256,6 +260,7 @@ function Security() {
       <section className="card"><h2>サインイン中の端末</h2><ul className="list">{overview?.sessions.map((session) => <li className="list-row" key={session.id}><span className="status-dot" style={{ color: session.current ? 'var(--success)' : undefined }}/><div className="row-main"><strong>{session.label}</strong><span className="meta">{session.location} · {session.current ? 'この端末' : `最終利用：${formatRelative(session.lastSeenAt, snapshot.context.asOf)}`}</span></div>{session.current ? <StatusBadge tone="success">利用中</StatusBadge> : <button data-control-id={`settings.session.revoke-open.${session.id}`} className="button danger" type="button" onClick={() => setRevoke(session.id)}>サインアウト</button>}</li>)}</ul></section>
       <section className="card"><h2>この端末からサインアウト</h2><p>共用の端末や、しばらく使わない端末では、使い終わったらサインアウトしてください。次回の利用時には、もう一度本人確認が必要です。</p><button data-control-id="settings.session.sign-out-current" className="button full" type="button" onClick={() => setSigningOut(true)}>この端末からサインアウト</button><p className="small muted mt-1 mb-0">紛失した端末は、左の一覧から個別にサインアウトできます。</p></section>
     </div>
+    <section className="card mt-1" aria-labelledby="account-activity-title"><h2 id="account-activity-title">{auditCopy.mineHeading}</h2><p className="small muted">{auditCopy.mineDescription}</p><Suspense fallback={<div className="skeleton"/>}><AccountActivity/></Suspense></section>
     {passwordOpen && <Dialog title="パスワードを変更" description="この画面を閉じると、入力中のパスワードは消去されます。" onClose={() => { setPasswordOpen(false); setPasswordError(''); }}><GuardedForm className="stack" onSubmit={(event) => { event.preventDefault(); void changePassword(event.currentTarget); }}><label className="field"><span>現在のパスワード</span><input data-control-id="settings.password.current" className="input" name="current" type="password" autoComplete="current-password" minLength={15} maxLength={64} required/></label><label className="field"><span>新しいパスワード</span><input data-control-id="settings.password.new" className="input" name="next" type="password" autoComplete="new-password" minLength={15} maxLength={64} required/></label><label className="field"><span>新しいパスワード（確認）</span><input data-control-id="settings.password.confirm" className="input" name="confirm" type="password" autoComplete="new-password" minLength={15} maxLength={64} required/></label>{passwordError && <p className="field-error" role="alert">{passwordError}</p>}<div className="dialog-actions"><button data-control-id="settings.password.cancel" className="button" type="button" onClick={(event) => closeGuarded(event.currentTarget.closest('[data-modal-root]'), () => setPasswordOpen(false))}>{ja.actions.cancel}</button><button data-control-id="settings.password.submit" className="button primary" type="submit">変更する</button></div></GuardedForm></Dialog>}
     {signingOut && <Dialog title="この端末からサインアウトしますか" description="未送信の変更があれば、この端末に残ります。もう一度サインインすると送信できます。" onClose={() => setSigningOut(false)} actions={<><button data-control-id="settings.session.sign-out-cancel" className="button" type="button" onClick={() => setSigningOut(false)}>{ja.actions.cancel}</button><button data-control-id="settings.session.sign-out-confirm" className="button danger" type="button" onClick={() => void signOut()}>サインアウト</button></>}/>}
     {revoke && <Dialog title="この端末からサインアウトしますか" description="現在使用中の端末はサインアウトされません。" onClose={() => setRevoke(null)} actions={<><button data-control-id="settings.session.revoke-cancel" className="button" type="button" onClick={() => setRevoke(null)}>{ja.actions.cancel}</button><button data-control-id="settings.session.revoke-confirm" className="button danger" type="button" onClick={() => void revokeSession()}>サインアウト</button></>}/>}

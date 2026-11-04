@@ -24,6 +24,7 @@ import type { TaskFilter } from '../domain/taskList';
 import type { TodoAction } from '../domain/todoFlow';
 import type { SharedKind } from '../domain/visibilityForm';
 import type { SeriesShiftRefusal } from '../domain/seriesShift';
+import type { TakenAtSource } from '../domain/captureTime';
 
 const recurrence = {
   event: {
@@ -502,4 +503,95 @@ export const seriesShiftCopy = {
     unsupported: 'この繰り返しは、すべての回を同じ日数だけ移せません。',
   } satisfies Record<SeriesShiftRefusal, string>,
   pointer: '日付を変えるときは、対象を「これ以降の予定」にしてください。',
+} as const;
+
+/** 写真・動画の撮影日時（A15-5）。推し量った日時には、どこから求めたかを添える。 */
+export const captureTimeCopy = {
+  heading: '撮影日時',
+  added: '追加日',
+  taken: (text: string) => `撮影 ${text}`,
+  /** 時差の記録がなく推し量った日時に添える。理由は詳しい情報に出す。 */
+  estimated: '（推定）',
+  /** 時差の記録がなく、推し量った日時の出どころ。時差つきの記録（exif-offset・quicktime-key）には添えない。 */
+  sourceNote: {
+    'exif-local': '写真に時差の記録がないため、日本時間で撮ったものとして表示しています。',
+    mvhd: '動画の作成日時の記録から求めました。撮った場所の時差は分かりません。',
+  } as Partial<Record<TakenAtSource, string>>,
+  sort: { album: 'アルバムの順', taken: '撮影日順' },
+  sortLabel: '並べ方',
+  sortNote: '撮影日時の分からない写真や動画は、最後に並べます。',
+} as const;
+
+/** 記録した支出と収入の種類の切り替え（A3-5）。 */
+export const kindChangeCopy = {
+  legend: '種類',
+  clearsShares: (people: string) => `収入にすると、負担の記録（${people}）は消えます。保存するまでは元のままです。`,
+  clearsSharesPlain: '収入にすると、負担の記録は消えます。保存するまでは元のままです。',
+  requiresShares: '支出にするには、費目と負担する人を選んでください。',
+  blockedBySettlement: '取り消していない精算があります。収入にするには、先に精算を取り消してください。',
+} as const;
+
+/** まとめて精算（A4）。 */
+export const settleAllCopy = {
+  open: 'まとめて精算する',
+  title: 'まとめて精算しますか',
+  description: (count: number) => `残りのある負担${count}件を、次の受け渡しでまとめて精算済みにします。`,
+  transfersHeading: '受け渡し',
+  noTransfer: '受け渡しは要りません（貸し借りが打ち消し合います）。',
+  records: (count: number) => `含める記録：${count}件`,
+  stale: '表示中の内容が古くなりました。',
+  transfer: (from: string, to: string) => `${from}さんから${to}さんへ`,
+  note: 'お金の受け渡しは、この記録とは別に行ってください。間違えたときは、精算の履歴から「まとめて取り消す」で元に戻せます。',
+  confirm: '精算を記録する',
+  busy: '記録しています…',
+  reload: '最新の内容を読み込む',
+  reloaded: '最新の内容を読み込みました。受け渡しを確かめてから、もう一度記録してください。',
+  done: (count: number) => `${count}件の負担をまとめて精算しました。精算の履歴から、まとめて取り消せます。`,
+  filtered: '表示する人を「すべて」にすると、まとめて精算できます。',
+  batchTitle: (count: number) => `まとめて精算（${count}件）`,
+  batchReversalTitle: (count: number) => `まとめた精算の取り消し（${count}件）`,
+  reverse: 'まとめて取り消す',
+  reversing: '取り消し中…',
+  reversed: 'まとめて取り消し済み',
+  partlyReversed: '一部を個別に取り消したため、残りは1件ずつ取り消してください。',
+  reverseDone: 'まとめた精算を取り消しました。元の記録と取り消しの記録は履歴に残ります。',
+  includes: '含めた記録',
+  partOfBatch: 'まとめた精算の一部',
+  total: (amount: string) => `負担の合計 ${amount}`,
+} as const;
+
+/** 管理者の退出（A12-1）。 */
+export const leaveCopy = {
+  heading: '家族グループから退出',
+  member: '退出すると、この家族の情報は表示できなくなります。作った記録は残ります。もう一度参加するには、新しい招待コードが必要です。',
+  coOwner: (others: string) => `ほかに管理者（${others}さん）がいるので、退出できます。退出すると、この家族の情報は表示できなくなり、メンバーの管理は${others}さんが続けます。作った記録は残ります。`,
+  soleOwner: 'あなたはこの家族のただ1人の管理者なので、このままでは退出できません。先に大人のメンバーへ管理者を引き継いでください。',
+  handOver: '管理者を引き継ぐ',
+  handOverHelp: '大人のメンバーの「権限を設定」から「管理者を渡す」を選びます。',
+  confirmOwner: (name: string, others: string) => `「${name}」の情報は表示できなくなります。管理者の役割は外れ、${others}さんが管理者として残ります。元に戻すには、新しい招待コードで参加し直し、管理者を渡してもらう必要があります。`,
+} as const;
+
+/** 添付をアプリの中で開く（A14）。 */
+export const attachmentViewerCopy = {
+  label: (name: string) => `「${name}」を表示`,
+  open: '開く',
+  openLabel: (name: string) => `${name}を開く`,
+  save: '保存',
+  saveLabel: (name: string) => `${name}を端末に保存`,
+  saveAndOpen: '保存して開く',
+  loading: '読み込んでいます…',
+  unsupported: 'この形式はアプリの中では表示できません。端末に保存してから開いてください。',
+  videoFailed: 'この動画はこの端末では再生できません。端末に保存してから開いてください。',
+  imageFailed: 'この画像を読み込めませんでした。',
+  pdfFailed: 'このPDFを表示できませんでした。端末に保存してから開いてください。',
+  page: (page: number, total: number) => `${total}ページ中${page}ページ目`,
+  pageText: (page: number) => `${page}ページ目の文字`,
+  link: (label: string) => `PDFの中のリンク：${label}（新しいタブ）`,
+  tooMany: (shown: number, total: number) => `最初の${shown}ページを表示しています（全${total}ページ）。続きは保存して開いてください。`,
+  saving: '保存を始めました。保存先はブラウザの設定によります。',
+} as const;
+
+/** 繰り返しの予定の「すべて」の編集で、保存の前に示す（A13-6）。 */
+export const seriesPreviewCopy = {
+  switchToFuture: '「これ以降の予定」に切り替える',
 } as const;

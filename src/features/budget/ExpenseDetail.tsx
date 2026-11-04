@@ -15,7 +15,7 @@ import { audienceText } from '../shared/visibilityText';
 import { ExpenseForm } from './ExpenseForm';
 import { payerLabel } from './ExpenseRow';
 import { SettlementForm } from './SettlementForm';
-import { SettlementHistory } from './SettlementHistory';
+import { SettlementHistory, singleRows } from './SettlementHistory';
 import type { ExpenseActions } from './useBudgetActions';
 
 function ShareSection({ expense, actions }: { expense: Expense; actions: ExpenseActions }) {
@@ -38,7 +38,7 @@ function ShareSection({ expense, actions }: { expense: Expense; actions: Expense
     </section>
     <section aria-labelledby={`history-${expense.id}`}>
       <h3 id={`history-${expense.id}`}>精算の履歴</h3>
-      <SettlementHistory entries={history} showExpense={false} onReverse={(entry) => void actions.reverse(entry)} busyId={actions.busy}/>
+      <SettlementHistory rows={singleRows(history)} showExpense={false} onReverse={(entry) => void actions.reverse(entry)} busyId={actions.busy}/>
     </section>
   </>;
 }

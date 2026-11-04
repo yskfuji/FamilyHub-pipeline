@@ -147,6 +147,10 @@
 | `nosniff` で、HTML として解釈させない | [MDN X-Content-Type-Options](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-Content-Type-Options) | O |
 | CSP の `sandbox` はヘッダーで送る | [MDN sandbox](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/sandbox) | O |
 | `sandbox` は Chromium と Safari の PDF の表示を壊すという報告がある | redmine.org #40647 など | B（そのため PDF はアプリの中で描く） |
+| PDF はアプリの中で pdf.js（`pdfjs-dist` 6.5.438、Apache-2.0、Mozilla）で描く。依存として固定し、PDF を開いたときにだけ読み込む | [pdfjs-dist](https://www.npmjs.com/package/pdfjs-dist)・[LICENSE](https://github.com/mozilla/pdf.js/blob/master/LICENSE) | O |
+| pdf.js 6 は `isEvalSupported` の設定も、文字列を評価する道も持たない（ビルドに `new Function(`・`eval(` がないことを `audit:security` が確かめる）。前の版へ戻したときのために `isEvalSupported: false` を渡す | `node_modules/pdfjs-dist/types/src/display/api.d.ts`（6.5.438 の `DocumentInitParameters`） | O |
+| `useWasm: false` で WebAssembly を使わない。JPX・JBIG2・色の変換・PostScript の関数には JavaScript の代わりの道がある。CSP に `'wasm-unsafe-eval'` を足さない | 同上の `useWasm` の説明、`PDFFunctionFactory`（WebAssembly に失敗すると JavaScript で計算する） | O |
+| 同梱して同じオリジンから配る CMap（Adobe の CMap、BSD 3 条項に近い Adobe の許諾）と標準の書体（Foxit の書体は PDFium の BSD 3 条項、Liberation Sans は SIL OFL 1.1）。許諾の文は `dist*/pdfjs/cmaps/LICENSE`・`dist*/pdfjs/standard_fonts/LICENSE_*` として一緒に配る | `node_modules/pdfjs-dist/cmaps/LICENSE`・`standard_fonts/LICENSE_FOXIT`・`LICENSE_LIBERATION` | O |
 
 ## 14. 日本の法令
 

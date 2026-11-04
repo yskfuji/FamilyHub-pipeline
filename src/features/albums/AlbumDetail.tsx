@@ -1,12 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { memberName, useApp } from '../../app/AppContext';
 import { navigate, useSearch, withQueryParam } from '../../app/router';
-import { audienceLabel, ja } from '../../content/ja';
+import { audienceLabel, captureTimeCopy, ja } from '../../content/ja';
 import { DetailNotFound, Dialog, EmptyState, PageHeader, StatusBadge } from '../../design-system/components';
 import { ChevronLeftIcon, ChevronRightIcon, DownloadIcon, ImageIcon, LockIcon, MapPinIcon, PlayIcon, SettingsIcon, TrashIcon, UploadIcon, VideoIcon } from '../../design-system/icons';
 import { authorize, canDeleteResource, canMutateOwnedResource } from '../../authz/policy';
 import { albumDraftToUpdateInput, albumToDraft, type AlbumDraft } from '../../domain/albumForm';
-import { albumFilters, filterCounts, gridItems, moveItem, parseAlbumFilter, readyItems, rejectedItems, type AlbumFilter } from '../../domain/albumView';
+import { albumFilters, albumSorts, filterCounts, gridItems, moveItem, parseAlbumFilter, parseAlbumSort, readyItems, rejectedItems, sortItems, type AlbumFilter } from '../../domain/albumView';
 import type { Album, AlbumItem, Id } from '../../domain/types';
 import { audienceText } from '../shared/visibilityText';
 import { AlbumForm } from './AlbumForm';
@@ -52,14 +52,21 @@ interface ContentProps {
 function AlbumContent({ album, items, uploads, load, change, hold, release, onDeleted }: ContentProps) {
   const { snapshot, gateway, announce } = useApp();
   const search = useSearch();
-  const filter = parseAlbumFilter(new URLSearchParams(search).get('filter'));
+  const params = new URLSearchParams(search);
+  const filter = parseAlbumFilter(params.get('filter'));
+  const sort = parseAlbumSort(params.get('sort'));
+  const requestedItem = params.get('item');
   const [panel, setPanel] = useState<'upload' | 'edit' | 'delete' | null>(null);
   const [organizing, setOrganizing] = useState(false);
   // 全体の検索から写真や動画を選ぶと ?item=<id> で来る。準備ができた項目なら表示画面を開いておく。
-  const [viewing, setViewing] = useState<Id | null>(() => {
-    const requested = new URLSearchParams(search).get('item');
-    return requested && readyItems(gridItems(items, filter)).some((item) => item.id === requested) ? requested : null;
-  });
+  const openable = (id: string | null) => Boolean(id && readyItems(gridItems(items, filter)).some((item) => item.id === id));
+  const [viewing, setViewing] = useState<Id | null>(() => (openable(requestedItem) ? requestedItem : null));
+  // 同じアルバムを開いたまま検索から別の項目を選んだときも、その項目を開く（描画の中で前の値と比べて合わせる）。
+  const [followedItem, setFollowedItem] = useState(requestedItem);
+  if (followedItem !== requestedItem) {
+    setFollowedItem(requestedItem);
+    if (openable(requestedItem)) setViewing(requestedItem);
+  }
   const [showing, setShowing] = useState(false);
   const [deletedItem, setDeletedItem] = useState<AlbumItem | null>(null);
   const [busy, setBusy] = useState(false);
@@ -77,7 +84,8 @@ function AlbumContent({ album, items, uploads, load, change, hold, release, onDe
   const canDeleteAlbum = canDeleteResource(viewer, 'album.delete', [album.creatorMembershipId]).allowed;
   const canDeleteItem = (item: AlbumItem) => canDeleteResource(viewer, 'album.delete', [album.creatorMembershipId, item.uploaderMembershipId]).allowed;
 
-  const shown = useMemo(() => gridItems(items, filter), [items, filter]);
+  // 並べ替え・整理の間は、アルバムに並べた順で動かす（撮影日順のまま動かすと、隣が分からなくなる）。
+  const shown = useMemo(() => sortItems(gridItems(items, filter), organizing ? 'album' : sort), [items, filter, sort, organizing]);
   const counts = useMemo(() => filterCounts(items), [items]);
   const ready = useMemo(() => readyItems(items), [items]);
   const viewable = useMemo(() => readyItems(shown), [shown]);
@@ -171,6 +179,8 @@ function AlbumContent({ album, items, uploads, load, change, hold, release, onDe
   };
   const closeViewer = (lastId: Id | undefined) => {
     setViewing(null);
+    // 検索から ?item= で開いたときは、URL から外す。履歴を積まずに置き換えるので、戻るで表示画面が開き直らない。
+    if (new URLSearchParams(window.location.search).has('item')) navigate(withQueryParam('item', null), true, true);
     // 見ていた項目へ戻す。消えていたら見出しへ。
     window.setTimeout(() => {
       const tile = lastId ? document.querySelector<HTMLElement>(`[data-control-id="albums.item.open.${lastId}"]`) : null;
@@ -198,7 +208,11 @@ function AlbumContent({ album, items, uploads, load, change, hold, release, onDe
     {activeUploads > 0 && !panel && <div className="callout info" role="status"><UploadIcon/><div><strong>{activeUploads}件を送っています</strong><p className="small muted mb-0">アルバムの画面を離れると、送信は止まります。</p></div><button data-control-id="albums.detail.upload-status" className="button" type="button" onClick={() => setPanel('upload')}>状況を見る</button></div>}
     {deletedItem && <div className="callout info" role="status"><ImageIcon/><div><strong>「{deletedItem.originalName}」を削除しました</strong><p className="small muted mb-0">7日以内は元に戻せます。</p></div><button data-control-id="albums.item.restore" className="button" type="button" onClick={() => void restoreItem()}>{ja.actions.restore}</button></div>}
 
-    <div className="segmented album-filter" role="group" aria-label="表示する種類">{albumFilters.map((value) => <button data-control-id={`albums.filter.${value}`} key={value} type="button" aria-pressed={filter === value} onClick={() => navigate(withQueryParam('filter', value === 'all' ? null : value), true, true)}>{filterLabels[value]} {counts[value]}</button>)}</div>
+    <div className="album-view-controls">
+      <div className="segmented album-filter" role="group" aria-label="表示する種類">{albumFilters.map((value) => <button data-control-id={`albums.filter.${value}`} key={value} type="button" aria-pressed={filter === value} onClick={() => navigate(withQueryParam('filter', value === 'all' ? null : value), true, true)}>{filterLabels[value]} {counts[value]}</button>)}</div>
+      {!organizing && <div className="segmented album-sort" role="group" aria-label={captureTimeCopy.sortLabel} aria-describedby={sort === 'taken' ? 'album-sort-note' : undefined}>{albumSorts.map((value) => <button data-control-id={`albums.sort.${value}`} key={value} type="button" aria-pressed={sort === value} onClick={() => navigate(withQueryParam('sort', value === 'album' ? null : value), true, true)}>{captureTimeCopy.sort[value]}</button>)}</div>}
+    </div>
+    {sort === 'taken' && !organizing && <p className="small muted album-sort-note" id="album-sort-note">{captureTimeCopy.sortNote}</p>}
 
     {shown.length === 0
       ? <EmptyState title={filter === 'all' ? 'まだ写真や動画はありません' : `${filterLabels[filter]}はありません`} action={filter === 'all' && canUpload ? <button data-control-id="albums.detail.upload-empty" className="button primary" type="button" onClick={() => setPanel('upload')}>写真や動画を追加</button> : undefined}>{filter === 'all' ? '追加すると、ここに並びます。' : 'ほかの種類を選んでください。'}</EmptyState>

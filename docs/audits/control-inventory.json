@@ -2101,6 +2101,47 @@
       "undo": "やめる",
       "alternative": null,
       "entity": "ManagementSample"
+    },
+    {
+      "idPattern": "^settings\\.audit\\.",
+      "routes": [
+        "/settings/audit",
+        "/settings/security"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "audit.read|settings.own",
+      "risk": "navigation",
+      "onlineRequired": true,
+      "successObservation": "変更の記録を人・種類・期間で絞って日付ごとに表示し、続きを読み込む。自分の操作の記録はどの人も見られる",
+      "failureRecovery": "読めなかった理由と「もう一度読み込む」を示し、読めた分は残す",
+      "undo": "絞り込みを「すべて」に戻す",
+      "alternative": "URLのクエリ（who・kind・period・view）",
+      "entity": "AuditEvent"
+    },
+    {
+      "idPattern": "^albums\\.sort\\.",
+      "routes": [
+        "/albums/*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "album.read",
+      "risk": "navigation",
+      "onlineRequired": false,
+      "successObservation": "アルバムの順か撮影日順に並べ替え、URLのsortに残す。撮影日時の分からない項目は最後",
+      "failureRecovery": "現在の並びを保つ",
+      "undo": "アルバムの順に戻す",
+      "alternative": "URLのクエリ（sort=taken）",
+      "entity": "AlbumItem"
     }
   ]
 }

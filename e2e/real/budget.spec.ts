@@ -147,3 +147,46 @@ test('deleting asks for the password again and the record can be restored', asyn
   await withPassword(page, () => page.getByRole('button', { name: '元に戻す' }).click());
   await expect(page.getByRole('link', { name: title })).toBeVisible();
 });
+
+test('S9-REAL-SETTLE settling everything says when the shown content is stale, records once after reloading, and reverses as a whole', async ({ page }) => {
+  const violations = failOnCspViolation(page);
+  const title = unique('実スタックのまとめ');
+  await signInAsRen(page);
+  await addRecord(page, '支出', async (form) => {
+    await form.getByLabel('支出名').fill(title);
+    await form.getByLabel('金額（円）').fill('1000');
+  });
+  await page.goto('/budget?view=settlements');
+  await page.getByRole('button', { name: 'まとめて精算する' }).click();
+  const dialog = page.getByRole('dialog', { name: 'まとめて精算しますか' });
+  await expect(dialog).toBeVisible();
+
+  // 開いている間に、別の画面で同じ負担の一部を精算する。示した残りの額が古くなる。
+  const other = await page.context().newPage();
+  await other.goto('/budget');
+  await other.getByRole('button', { name: '一覧', exact: true }).click();
+  await other.getByRole('link', { name: title }).click();
+  const drawer = other.getByRole('dialog', { name: title });
+  await drawer.getByLabel(/碧さんの精算額/).fill('100');
+  await withPassword(other, () => drawer.getByRole('button', { name: new RegExp(`^碧さんの${yen('100')}を精算$`) }).click());
+  await expect(drawer.locator('.history-list .list-row')).toHaveCount(1);
+  await other.close();
+
+  await withPassword(page, () => dialog.getByRole('button', { name: '精算を記録する' }).click());
+  await expect(dialog.getByRole('alert')).toContainText('表示中の内容が古くなりました。');
+  await expect(dialog.getByRole('alert')).toContainText('精算の内容が変わっています。');
+  await dialog.getByRole('button', { name: '最新の内容を読み込む' }).click();
+  await expect(dialog).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'まとめて精算する' }).click();
+  await withPassword(page, () => page.getByRole('dialog', { name: 'まとめて精算しますか' }).getByRole('button', { name: '精算を記録する' }).click());
+  await expect(page.getByText('すべて精算済みです')).toBeVisible();
+  const batch = page.getByRole('region', { name: '精算の履歴' }).locator('.batch-row').first();
+  await expect(batch).toContainText(/まとめて精算（\d+件）/);
+  await page.reload();
+  await expect(page.getByRole('region', { name: '精算の履歴' }).locator('.batch-row').first()).toContainText(/まとめて精算（\d+件）/);
+  await withPassword(page, () => page.getByRole('region', { name: '精算の履歴' }).locator('.batch-row').first().getByRole('button', { name: /まとめて取り消す/ }).click());
+  await expect(page.getByRole('region', { name: '精算の履歴' }).getByText('まとめて取り消し済み').first()).toBeVisible();
+  await expect(page.getByText('すべて精算済みです')).toHaveCount(0);
+  expect(violations).toEqual([]);
+});

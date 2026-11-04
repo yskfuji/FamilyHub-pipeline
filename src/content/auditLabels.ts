@@ -66,6 +66,22 @@ export const auditTargetLabels: Readonly<Record<AuditTargetKind, string>> = {
   event: '予定', task: 'タスク', memo: 'メモ', expense: '家計の記録', settlementBatch: 'まとめた精算', album: 'アルバム', member: 'メンバー', invite: '招待', colorLabel: '色のリスト', link: '関連づけ', notification: '通知',
 };
 
+/**
+ * 記録の detail に残る項目の名前（値は残らない）。変更の入力の形（src/domain/auditLog.ts の fieldSchemas）のすべての項目を持つ。
+ * 足りなければ src/content/auditLabels.test.ts が失敗する。
+ */
+export const auditFieldLabels: Readonly<Record<string, string>> = {
+  allDay: '終日', amountJpy: '金額', assigneeMembershipId: '担当', avatar: 'アイコン', bgmPreset: '音楽', birthdate: '誕生日', body: '本文',
+  category: '費目', colorLabelId: '色のリスト', coverItemId: '表紙', description: '説明', displayName: '表示名', dueAt: '期限', dueStartAt: '期限の開始',
+  endsAt: '終了', idleTimeoutMinutes: '無操作の時間', incurredOn: '日付', kind: '種類', location: '場所', memoDate: 'メモの日付', note: 'メモ',
+  ocrText: '読み取った文字', participantMembershipIds: '参加者', payerMembershipId: '支払った人', place: '場所', priority: '優先度', recurrence: '繰り返し',
+  reminderMinutesBefore: '通知', reviewerMembershipId: '確認する人', shareAmounts: '負担', shareMembershipIds: '負担', startsAt: '開始', tags: 'タグ',
+  timezone: '時間帯', title: '題名', visibility: '公開範囲', weatherSensitive: '天気の影響',
+};
+
+/** 変えた項目の名前を並べる。同じ名前（負担など）は1つにする。名前のない項目は「そのほかの項目」。 */
+export const auditFieldsText = (fields: readonly string[]) => [...new Set(fields.map((field) => auditFieldLabels[field] ?? 'そのほかの項目'))].join('・');
+
 export const auditCopy = {
   hiddenTarget: '見られない記録',
   operator: '運営者',
@@ -75,4 +91,25 @@ export const auditCopy = {
   chainProblem: '記録に食い違いが見つかりました。運営者に連絡してください',
   chainUnchecked: 'まだ確かめていません',
   retention: `変更の記録は${AUDIT_RETENTION_MONTHS}か月残し、その後は消します`,
+  tab: '変更の記録',
+  description: '家族の記録を誰がいつ変えたかを、新しい順に表示します。記録の中身や入力した値は残していません。',
+  views: { household: '家族の記録', mine: '自分の操作' },
+  chainHeading: '改ざんの確認',
+  chainCheckedAt: (at: string) => `最後に確かめた日時：${at}`,
+  filterPerson: '人', filterKind: '種類', filterPeriod: '期間',
+  everyone: 'すべての人', everyKind: 'すべての種類',
+  periods: { all: 'すべての期間', today: '今日', week: '最近7日間', month: '最近30日間' },
+  more: 'もっと見る', loadingMore: '読み込んでいます…',
+  empty: 'まだ記録はありません',
+  emptyBody: '家族の記録が変わると、ここに表示します。',
+  emptyFiltered: 'この条件の記録はありません',
+  emptyFilteredBody: '絞り込みを「すべて」に戻すと、ほかの記録を確認できます。',
+  emptyMine: 'まだ記録はありません',
+  emptyMineBody: 'サインインやパスワードの変更などをすると、ここに表示します。',
+  fields: (text: string) => `変えた項目：${text}`,
+  hiddenHelp: '今の権限では見られない記録か、すでに消えた記録です。',
+  mineHeading: '自分の操作の記録',
+  mineDescription: 'サインインやパスワードの変更など、自分のアカウントで行った操作です。',
+  failed: '変更の記録を読み込めませんでした。',
+  retry: 'もう一度読み込む',
 } as const;

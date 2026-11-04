@@ -5,7 +5,7 @@ import { detailId, navigate, useSearch } from '../../app/router';
 import { DetailNotFound, EmptyState, PageHeader, formatYen } from '../../design-system/components';
 import { useContentWide } from '../../design-system/DetailSurface';
 import { CheckIcon, YenIcon } from '../../design-system/icons';
-import { ja } from '../../content/ja';
+import { ja, settleAllCopy } from '../../content/ja';
 import { budgetSearch, latestBudgetMonth, monthChange, readBudgetLocation, type BudgetLocation } from '../../domain/budgetView';
 import { monthKeyFromRfc3339 } from '../../domain/calendarDate';
 import { ReceiptReader } from '../assistant/ReceiptReader';
@@ -46,6 +46,7 @@ export function BudgetPage({ path }: { path: string }) {
       <button data-control-id="budget.expense.create" className="button primary" type="button" onClick={() => requestQuickCreate('expense')}><YenIcon width="18"/>支出を追加</button>
     </div>}</div>}/>
     {undo?.kind === 'settlement' && <div className="callout info" role="status"><CheckIcon/><div><strong>{formatYen(undo.amountJpy)}の精算を記録しました</strong><p className="small muted mb-0">取り消しても、元の記録と取り消しの記録は履歴に残ります。</p></div><button data-control-id="budget.settlement.undo" className="button" type="button" disabled={actions.busy !== null} onClick={() => void actions.reverse(undo.entry)}>精算を取り消す</button></div>}
+    {undo?.kind === 'batch' && <div className="callout info" role="status"><CheckIcon/><div><strong>{settleAllCopy.done(undo.batch.items.length)}</strong><p className="small muted mb-0">取り消しても、元の記録と取り消しの記録は履歴に残ります。</p></div><button data-control-id="budget.settle-all.undo" className="button" type="button" disabled={actions.busy !== null} onClick={() => void actions.reverseBatch(undo.batch.id)}>{settleAllCopy.reverse}</button></div>}
     {undo?.kind === 'deleted' && <div className="callout info" role="status"><CheckIcon/><div><strong>「{undo.expense.title}」を削除しました</strong><p className="small muted mb-0">7日以内なら元に戻せます。</p></div><button data-control-id="budget.expense.restore" className="button" type="button" disabled={actions.busy !== null} onClick={() => void restore(undo.expense)}>{ja.actions.restore}</button></div>}
     {activeId && !active && <DetailNotFound what="支出" feature="budget" backHref={`/budget${search}`}/>}
     <div className="detail-layout" data-pane={wide && active ? 'open' : undefined}><div className="detail-main">
@@ -57,7 +58,7 @@ export function BudgetPage({ path }: { path: string }) {
         {location.view === 'overview' && <BudgetOverview expenses={expenses} location={location} search={search} href={href}/>}
         {location.view === 'list' && <BudgetList expenses={expenses} location={location} currentMonth={currentMonth} search={search} onChange={filter}/>}
         {location.view === 'members' && <BudgetMembers expenses={expenses} month={location.month}/>}
-        {location.view === 'settlements' && <BudgetSettlements expenses={expenses} search={search} onReverse={(entry) => void actions.reverse(entry)} busyId={actions.busy}/>}
+        {location.view === 'settlements' && <BudgetSettlements expenses={expenses} search={search} onReverse={(entry) => void actions.reverse(entry)} busyId={actions.busy} memberFilterActive={Boolean(memberId)} actions={actions}/>}
       </>}
     {hasProvenance && location.view !== 'members' && <div className="mt-1"><PlaceAttributionLink where="budget"/></div>}
     </div>

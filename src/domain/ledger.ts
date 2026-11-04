@@ -1,4 +1,4 @@
-import type { Expense, Id, IncomeCategory, SettleAllInput, SettlementRecord, SettlementTransfer, SpendingCategory } from './types';
+import type { Expense, Id, IncomeCategory, Rfc3339, SettleAllInput, SettlementBatch, SettlementRecord, SettlementTransfer, SpendingCategory } from './types';
 
 /**
  * 家計の集計。画面・ヒント・今日の画面が同じ計算を使い、表示が食い違わないようにする。
@@ -154,6 +154,58 @@ export function settlementHistory(expenses: Expense[]): SettlementHistoryEntry[]
     const reversedBy = expense.settlements.find((item) => item.reversalOfSettlementId === record.id);
     return { expenseId: expense.id, expenseTitle: expense.title, record, reverses, reversedBy, canReverse: record.amountJpy > 0 && !record.reversedAt };
   })).sort((a, b) => b.record.recordedAt.localeCompare(a.record.recordedAt) || b.record.id.localeCompare(a.record.id));
+}
+
+/** まとめた精算（A4-4）を1件にまとめた履歴の行。取り消しのまとめも1件になる。 */
+export interface SettlementBatchRow {
+  kind: 'batch';
+  batchId: Id;
+  /** まとめの取り消しの行か。 */
+  reversal: boolean;
+  recordedAt: Rfc3339;
+  /** 実際に渡した送金。 */
+  transfers: SettlementTransfer[];
+  /** まとめに含めた記録ごとの精算（または取り消し）。 */
+  entries: SettlementHistoryEntry[];
+  /** 含めた額の合計（取り消しも正の額で持つ）。 */
+  totalJpy: number;
+  /** まとめごと取り消せるか。取り消し済み、または一部を個別に取り消していれば false。 */
+  canReverse: boolean;
+  /** 一部をすでに個別に取り消している。 */
+  partlyReversed: boolean;
+  /** まとめごと取り消した。 */
+  reversed: boolean;
+}
+export type SettlementHistoryRow = { kind: 'single'; entry: SettlementHistoryEntry } | SettlementBatchRow;
+
+/**
+ * 精算の履歴を、まとめた精算ごとに1件にまとめる（新しい順）。まとめの記録が見えない（含めた支出の一部が見えない）ときは、
+ * 記録ごとの行のまま出す。batches は閲覧者に見えるまとめ（snapshot.settlementBatches）。
+ */
+export function groupedSettlementHistory(expenses: Expense[], batches: readonly SettlementBatch[]): SettlementHistoryRow[] {
+  const rows: SettlementHistoryRow[] = [];
+  const groups = new Map<string, SettlementBatchRow>();
+  for (const entry of settlementHistory(expenses)) {
+    const batch = entry.record.batchId ? batches.find((item) => item.id === entry.record.batchId) : undefined;
+    if (!batch) { rows.push({ kind: 'single', entry }); continue; }
+    const reversal = Boolean(entry.reverses);
+    const key = `${batch.id}:${reversal ? 'reversal' : 'batch'}`;
+    let row = groups.get(key);
+    if (!row) {
+      row = { kind: 'batch', batchId: batch.id, reversal, recordedAt: entry.record.recordedAt, transfers: batch.transfers, entries: [], totalJpy: 0, canReverse: false, partlyReversed: false, reversed: Boolean(batch.reversedAt) };
+      groups.set(key, row);
+      rows.push(row);
+    }
+    row.entries.push(entry);
+    row.totalJpy += Math.abs(entry.record.amountJpy);
+  }
+  for (const row of groups.values()) {
+    if (row.reversal) continue;
+    // まとめの取り消しの記録は reversedAt と batchId を持つ。個別の取り消しは batchId を持たない。
+    row.partlyReversed = !row.reversed && row.entries.some((entry) => entry.reversedBy && !entry.reversedBy.batchId);
+    row.canReverse = !row.reversed && !row.partlyReversed && row.entries.every((entry) => entry.canReverse);
+  }
+  return rows;
 }
 
 /** 金額・支払った人・負担を変えてよいか。精算が1件でも生きていれば、記録の整合のため変えられない。 */

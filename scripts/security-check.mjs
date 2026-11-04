@@ -60,6 +60,15 @@ for (const file of production.filter((item) => item.path.startsWith('src/feature
   if (/localStorage|sessionStorage|indexedDB/.test(file.text)) failures.push(`${file.path} must not persist place data in browser storage`);
 }
 
+// 添付は新しい窓で開かず、アプリの中で表示する（A14-3）。PDF の表示は eval と WebAssembly を使わず、同じオリジンの資源だけを読む（A14-2）。
+const windowOpeners = production.filter((file) => /\bwindow\.open\s*\(/.test(file.text));
+if (windowOpeners.length) failures.push(`window.open is prohibited (found in ${windowOpeners.map((file) => file.path).join(', ')})`);
+const pdfOptions = sources.find((file) => file.path === 'src/features/notes/pdfOptions.ts')?.text ?? '';
+for (const required of ['isEvalSupported: false', 'useWasm: false', 'cMapUrl: new URL(`${PDF_RESOURCES}cmaps/`, origin)', 'standardFontDataUrl: new URL(`${PDF_RESOURCES}standard_fonts/`, origin)', "PDF_RESOURCES = '/pdfjs/'"]) if (!pdfOptions.includes(required)) failures.push(`src/features/notes/pdfOptions.ts must keep ${required}`);
+const pdfImporters = production.filter((file) => /from 'pdfjs-dist|import\('pdfjs-dist/.test(file.text)).map((file) => file.path);
+if (pdfImporters.join() !== 'src/features/notes/pdfDocument.ts') failures.push(`pdfjs-dist must be imported only by src/features/notes/pdfDocument.ts (found: ${pdfImporters.join(', ') || 'none'})`);
+if (/^import (?!PdfWorker)[^;]*'pdfjs-dist/m.test(sources.find((file) => file.path === 'src/features/notes/pdfDocument.ts')?.text ?? '')) failures.push('src/features/notes/pdfDocument.ts must load pdf.js with a dynamic import');
+
 // 外への接続は server/adapters だけ。代役と試験のほかで、接続の部品を読み込まない。
 const serverFiles = (await filesUnder(resolve('server'))).filter((file) => file.endsWith('.ts')).map((file) => relative(resolve('.'), file)).filter((file) => !file.startsWith('server/testing/') && !file.startsWith('server/test/'));
 const outbound = /\bfetch\(|\bXMLHttpRequest\b|\bWebSocket\b|from 'node:(http|https|http2|net|tls|dns|dns\/promises|dgram)'|from '(http|https|http2|net|tls|dns|dgram|undici|axios|got)'|require\('(node:)?(http|https|net|tls|dns)'\)/;
@@ -205,6 +214,16 @@ if (!existsSync(resolve('dist-server/main.js')) || !existsSync(resolve('dist-ser
       if (joined.includes(sample.bytes.subarray(0, 48).toString('base64'))) failures.push(`${dir} embeds the mock sample ${sample.name}`);
     }
   }
+  // PDF の表示（A14-2）: pdf.js は最初の表示で読まず、eval の道を持たず、CMap と標準の書体を同じオリジンの /pdfjs/ から配る。
+  const pdfChunks = (await filesUnder(resolve('dist-http/assets'))).filter((file) => /\/assets\/pdf(\.worker[^/]*)?-[\w-]+\.js$/.test(file));
+  if (pdfChunks.length < 2) failures.push('dist-http must ship pdf.js and its worker as separate files (found ' + pdfChunks.length + ')');
+  for (const file of pdfChunks) {
+    const content = await readFile(file, 'utf8');
+    if (/\bnew Function\s*\(|\beval\s*\(/.test(content)) failures.push(`${relative(resolve('.'), file)} must not evaluate strings (new Function or eval)`);
+    if (firstView.includes(relative(resolve('dist-http'), file))) failures.push(`${relative(resolve('.'), file)} must not load with the first view`);
+  }
+  for (const folder of ['cmaps', 'standard_fonts']) if (!existsSync(resolve('dist-http/pdfjs', folder))) failures.push(`dist-http/pdfjs/${folder} is missing: the PDF viewer reads it from the same origin`);
+  if (existsSync(resolve('dist-http/pdfjs/cmaps')) && !existsSync(resolve('dist-http/pdfjs/cmaps/UniJIS-UCS2-H.bcmap'))) failures.push('dist-http/pdfjs/cmaps must hold the Japanese CMaps (UniJIS-UCS2-H.bcmap)');
   // 前もって圧縮した .gz は、隣の元のファイルと同じ中身であること（上の確かめを .gz でかわせないように）。nginx は gzip_static で配る。
   const httpFiles = await filesUnder(resolve('dist-http'));
   const packed = httpFiles.filter((file) => file.endsWith('.gz'));
@@ -222,4 +241,4 @@ if (!existsSync(resolve('dist-server/main.js')) || !existsSync(resolve('dist-ser
 }
 
 if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
-console.log(`Security static checks passed across ${sourceFiles.length} source files and ${serverFiles.length} server files (headers in sync; one place-lookup egress; outbound calls only in server/adapters; the LLM connects only through the checked lookup; literal SQL; cookies in one module; server imports limited; no Japanese literals in server; builds free of test doubles, fixtures and mock sample files; precompressed files equal to their originals; matching build ids).`);
+console.log(`Security static checks passed across ${sourceFiles.length} source files and ${serverFiles.length} server files (headers in sync; one place-lookup egress; outbound calls only in server/adapters; the LLM connects only through the checked lookup; literal SQL; cookies in one module; server imports limited; no Japanese literals in server; builds free of test doubles, fixtures and mock sample files; precompressed files equal to their originals; pdf.js loaded late without eval or WebAssembly and with same-origin CMaps and fonts; no window.open; matching build ids).`);

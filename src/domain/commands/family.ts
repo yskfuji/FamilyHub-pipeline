@@ -1,4 +1,5 @@
 import type { FamilyPort } from '../../data/gateway';
+import { activeOwners } from '../householdLimits';
 import { colorLabelInputSchema } from '../schemas';
 import type { ColorLabel, HouseholdMembership, Id, Result } from '../types';
 import { conflict, denied, fail, invalid, missing, ok } from './context';
@@ -10,7 +11,7 @@ export function createFamilyCommands(c: CommandContext): SyncPort<FamilyPort> {
   const { a, state, nextId, viewer, requireCapability, ownerCandidateProblem } = c;
   const member = (id: Id) => state.memberships.find((item) => item.id === id && item.status !== 'left');
   const changed = () => { a.permissionRevision += 1; };
-  const owners = () => state.memberships.filter((item) => item.role === 'owner' && item.status === 'active');
+  const owners = () => activeOwners(state.memberships);
   const removalGuard = <T,>(target: Membership): Result<T> | null => {
     if (target.id === viewer().membershipId) return denied({ allowed: false, reason: 'SCOPE_DENIED' }, '自分自身には行えません。');
     if (target.role === 'owner') return denied({ allowed: false, reason: 'OWNER_REQUIRED' }, '管理者には行えません。先に管理者を移してください。');

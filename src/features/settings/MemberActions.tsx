@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useApp } from '../../app/AppContext';
 import { navigate } from '../../app/router';
-import { ja } from '../../content/ja';
+import { ja, leaveCopy } from '../../content/ja';
+import { activeOwners, leaveStateFor } from '../../domain/householdLimits';
 import { Dialog } from '../../design-system/components';
 import type { HouseholdMembership } from '../../domain/types';
 
@@ -67,13 +68,17 @@ export function MemberActions({ member, onDone }: { member: HouseholdMembership;
   </section>;
 }
 
-/** 家族グループからの退出。管理者は先に管理者を渡す必要がある。 */
+/**
+ * 家族グループからの退出（A12-1）。管理者でも、ほかに利用中の管理者がいれば退出できる。
+ * ただ1人の管理者なら、理由と「管理者を引き継ぐ」への道を出す（規則も同じ判定で断る）。
+ */
 export function LeaveHousehold() {
   const { snapshot, gateway, announce, finishSignIn } = useApp();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  if (snapshot.viewer.role === 'owner') return null;
+  const state = leaveStateFor(snapshot.memberships, snapshot.viewer.membershipId);
+  const others = activeOwners(snapshot.memberships).filter((member) => member.id !== snapshot.viewer.membershipId).map((member) => member.displayName).join('さん、');
   const leave = async () => {
     if (busy) return;
     setBusy(true); setError('');
@@ -84,9 +89,14 @@ export function LeaveHousehold() {
     announce(`「${snapshot.household.name}」から退出しました。`);
     navigate(await finishSignIn('/welcome'));
   };
-  return <section className="card mt-1"><h2>家族グループから退出</h2><p className="muted">退出すると、この家族の情報は表示できなくなります。作った記録は残ります。もう一度参加するには、新しい招待コードが必要です。</p>
-    <button data-control-id="settings.household.leave-open" className="button danger" type="button" onClick={() => { setError(''); setOpen(true); }}>家族グループから退出</button>
-    {open && <Dialog title="家族グループから退出しますか" description={`「${snapshot.household.name}」の情報は表示できなくなります。`} onClose={() => { if (!busy) setOpen(false); }} actions={<>
+  if (state === 'sole-owner') return <section className="card mt-1" aria-labelledby="leave-title"><h2 id="leave-title">{leaveCopy.heading}</h2>
+    <p className="muted">{leaveCopy.soleOwner}</p>
+    <a data-control-id="settings.household.leave-hand-over" className="button" href="#household-members">{leaveCopy.handOver}</a>
+    <p className="small muted mt-1 mb-0">{leaveCopy.handOverHelp}</p>
+  </section>;
+  return <section className="card mt-1" aria-labelledby="leave-title"><h2 id="leave-title">{leaveCopy.heading}</h2><p className="muted">{state === 'co-owner' ? leaveCopy.coOwner(others) : leaveCopy.member}</p>
+    <button data-control-id="settings.household.leave-open" className="button danger" type="button" onClick={() => { setError(''); setOpen(true); }}>{leaveCopy.heading}</button>
+    {open && <Dialog title="家族グループから退出しますか" description={state === 'co-owner' ? leaveCopy.confirmOwner(snapshot.household.name, others) : `「${snapshot.household.name}」の情報は表示できなくなります。`} onClose={() => { if (!busy) setOpen(false); }} actions={<>
       <button data-control-id="settings.household.leave-cancel" className="button" type="button" disabled={busy} onClick={() => setOpen(false)}>{ja.actions.cancel}</button>
       <button data-control-id="settings.household.leave-confirm" className="button danger" type="button" disabled={busy} onClick={() => void leave()}>{busy ? '処理中…' : '退出する'}</button>
     </>}>{error && <p className="field-error" role="alert">{error}</p>}</Dialog>}

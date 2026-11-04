@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import type { Page, Route } from '@playwright/test';
-import { failOnCspViolation, signIn } from './support';
+import { readFileSync } from 'node:fs';
+import { failOnCspViolation, signInOnce } from './support';
 
 const pdf = (name: string) => ({ name, mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.7\n%%EOF\n') });
 const attachments = '**/v1/memos/*/attachments';
@@ -29,7 +30,7 @@ async function createMemo(page: Page, title: string, fileName?: string) {
 
 test('a memo attachment that failed is retried without a second memo, opens through the API, and can be deleted', async ({ page }) => {
   const violations = failOnCspViolation(page);
-  await signIn(page);
+  await signInOnce(page);
   await failOnce(page, false);
   const drawer = await createMemo(page, '実スタックの添付', 'お知らせ.pdf');
 
@@ -39,11 +40,16 @@ test('a memo attachment that failed is retried without a second memo, opens thro
   await expect(drawer.getByRole('button', { name: 'お知らせ.pdfを削除' })).toBeVisible();
   await expect(retry).toHaveCount(0);
 
-  const open = drawer.getByRole('button', { name: 'お知らせ.pdfを開く（新しいタブ）' });
+  const open = drawer.getByRole('button', { name: 'お知らせ.pdfを開く', exact: true });
   await expect(open).toBeVisible({ timeout: 10_000 });
   const served = page.context().waitForEvent('response', (response) => response.url().includes('/v1/attachment-files/'));
   await open.click();
   expect((await served).status()).toBe(200);
+  // 中身のない PDF なので、表示はできず「保存して開く」を示す。閉じて一覧へ戻る。
+  const viewer = page.getByRole('dialog', { name: '「お知らせ.pdf」を表示' });
+  await expect(viewer.getByRole('button', { name: '保存して開く' })).toBeVisible({ timeout: 15_000 });
+  await page.keyboard.press('Escape');
+  await expect(viewer).toHaveCount(0);
 
   await drawer.getByRole('button', { name: 'お知らせ.pdfを削除' }).click();
   await page.getByRole('dialog', { name: '添付ファイルを削除しますか' }).getByRole('button', { name: '削除する' }).click();
@@ -57,9 +63,62 @@ test('a memo attachment that failed is retried without a second memo, opens thro
   expect(violations).toEqual([]);
 });
 
+test('S9-REAL-VIEW a Japanese PDF opens inside the app under CSP, saves with ?download=1, and a tampered link is 404', async ({ page }) => {
+  const violations = failOnCspViolation(page);
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await signInOnce(page);
+  await page.goto('/notes');
+  await page.getByRole('button', { name: 'メモを追加' }).click();
+  const form = page.getByRole('dialog', { name: 'メモを作る' });
+  await form.getByLabel('タイトル').fill('実スタックのPDF');
+  await form.getByLabel('本文').fill('見本のお知らせ');
+  await form.getByLabel('一緒に添付するファイルを選択').setInputFiles({ name: 'お知らせ見本.pdf', mimeType: 'application/pdf', buffer: readFileSync('src/data/samples/sample-notice.pdf') });
+  await form.getByRole('button', { name: '作成する' }).click();
+  const drawer = page.getByRole('dialog', { name: '実スタックのPDF' });
+  const open = drawer.getByRole('button', { name: 'お知らせ見本.pdfを開く', exact: true });
+  await expect(open).toBeVisible({ timeout: 10_000 });
+
+  const served = page.waitForResponse((response) => response.url().includes('/v1/attachment-files/'));
+  await open.click();
+  const inline = await served;
+  expect(inline.status()).toBe(200);
+  expect(inline.headers()['content-disposition']).toMatch(/^inline;/);
+  const viewer = page.getByRole('dialog', { name: '「お知らせ見本.pdf」を表示' });
+  await expect(viewer.locator('.pdf-page[data-drawn="true"]')).toHaveCount(1, { timeout: 15_000 });
+  await expect(viewer.locator('figcaption')).toContainText('学校公開のお知らせ（見本）');
+  await expect(viewer.getByRole('link', { name: /PDFの中のリンク/ })).toHaveAttribute('rel', 'noopener noreferrer');
+
+  // ブラウザの保存に渡ったリクエストはページの応答として通知されないので、保存のURLを確かめ、同じURLの応答の見出しを調べる。
+  const download = page.waitForEvent('download');
+  await viewer.getByRole('button', { name: 'お知らせ見本.pdfを端末に保存' }).click();
+  const saved = await download;
+  expect(saved.suggestedFilename()).toBe('お知らせ見本.pdf');
+  expect(saved.url()).toContain('/v1/attachment-files/');
+  expect(new URL(saved.url()).searchParams.get('download')).toBe('1');
+  const savedResponse = await page.request.get(saved.url());
+  expect(savedResponse.status()).toBe(200);
+  expect(savedResponse.headers()['content-disposition']).toMatch(/^attachment;/);
+
+  // 署名を書き換えたリンクと、開くリンクに保存の指定を足したリンクは、どちらも 404。
+  const url = new URL(inline.url());
+  const signature = url.searchParams.get('signature') ?? '';
+  const tampered = new URL(url); tampered.searchParams.set('signature', `${signature.slice(0, -2)}${signature.endsWith('AA') ? 'BB' : 'AA'}`);
+  expect((await page.request.get(tampered.href)).status()).toBe(404);
+  const asDownload = new URL(url); asDownload.searchParams.set('download', '1');
+  expect((await page.request.get(asDownload.href)).status()).toBe(404);
+  expect((await page.request.get(url.href)).status()).toBe(200);
+
+  await page.keyboard.press('Escape');
+  await expect(viewer).toHaveCount(0);
+  await expect(open).toBeFocused();
+  expect(violations).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
 test('retrying after a lost response does not attach the file twice', async ({ page }) => {
   const violations = failOnCspViolation(page);
-  await signIn(page);
+  await signInOnce(page);
   const drawer = await createMemo(page, '実スタックの応答切れ');
   await failOnce(page, true);
   await drawer.getByLabel('添付するファイルを選択').setInputFiles(pdf('応答切れ.pdf'));
@@ -73,7 +132,7 @@ test('retrying after a lost response does not attach the file twice', async ({ p
 });
 
 test('a file the server refuses by its contents says so and offers no retry', async ({ page }) => {
-  await signIn(page);
+  await signInOnce(page);
   const drawer = await createMemo(page, '実スタックの拒否');
   await drawer.getByLabel('添付するファイルを選択').setInputFiles({ name: 'fake.pdf', mimeType: 'application/pdf', buffer: Buffer.from('<script>alert(1)</script>') });
   await expect(drawer.getByText(/この形式のファイルは受け付けていません/)).toBeVisible();
@@ -83,7 +142,7 @@ test('a file the server refuses by its contents says so and offers no retry', as
 
 test('task status comments and the full task form work against the API under CSP', async ({ page }) => {
   const violations = failOnCspViolation(page);
-  await signIn(page);
+  await signInOnce(page);
   await page.goto('/tasks');
   await page.getByRole('button', { name: 'タスクを追加' }).click();
   const form = page.getByRole('dialog', { name: 'すぐに追加' });

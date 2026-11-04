@@ -61,3 +61,22 @@ export function neighborAfterRemoval(items: readonly AlbumItem[], id: Id) {
   const index = items.findIndex((item) => item.id === id);
   return items[index + 1] ?? items[index - 1];
 }
+
+/** 一覧の並べ方（A15-5）。album はアルバムに並べた順、taken は撮影日時の古い順。 */
+export const albumSorts = ['album', 'taken'] as const;
+export type AlbumSort = (typeof albumSorts)[number];
+export const parseAlbumSort = (value: string | null): AlbumSort => (value === 'taken' ? 'taken' : 'album');
+
+/**
+ * 並べ方に合わせた項目の並び。撮影日順では、撮影日時の古い順にし、撮影日時の分からない項目は最後に置く。
+ * 同じ日時の項目と、撮影日時の分からない項目どうしは、アルバムに並べた順を保つ。
+ */
+export function sortItems<T extends Pick<AlbumItem, 'takenAt'>>(items: readonly T[], sort: AlbumSort): T[] {
+  if (sort === 'album') return [...items];
+  const time = (item: T) => (item.takenAt ? Date.parse(item.takenAt) : Number.NaN);
+  return items.map((item, index) => ({ item, index, at: time(item) })).sort((a, b) => {
+    const aKnown = Number.isFinite(a.at); const bKnown = Number.isFinite(b.at);
+    if (aKnown !== bKnown) return aKnown ? -1 : 1;
+    return (aKnown && a.at !== b.at ? a.at - b.at : 0) || a.index - b.index;
+  }).map(({ item }) => item);
+}

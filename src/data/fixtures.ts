@@ -122,3 +122,49 @@ export const baseAlbumItems: AlbumItem[] = [
   fixtureItem('item-sports-3', 'album-sports', 2, 'member-ren', '2026-09-20T11:40:12+09:00', 'exif-offset'),
   fixtureItem('item-park-1', 'album-park', 0, 'member-ren', '2026-09-13T10:20:00+09:00', 'exif-offset'),
 ];
+
+/**
+ * 見本の家族で、管理者を2人にする（A12-1 の退出の確認用）。蓮さんも管理者になる。
+ * 内部監査のビルドで ?household=two-owners を付けたときだけ使う（src/app/runtime.mock.ts）。
+ */
+export function withCoOwner(snapshot: HouseholdSnapshot): HouseholdSnapshot {
+  snapshot.memberships = snapshot.memberships.map((member) => (member.id === 'member-ren' ? { ...member, role: 'owner' } : member));
+  return snapshot;
+}
+
+/**
+ * 見本の家族の、これまでの変更の記録（A5-8 の画面の見本）。記録の時刻は見本の時計（9月30日 7:45）より前。
+ * 確認用の画面だけが使い、同等性の試験の家族には入れない（試験は空の記録から始める）。
+ * 碧さんには見えない蓮さんの支出（expense-ren-private・expense-ren-deleted）を指す行は、画面では「見られない記録」になる。
+ */
+const auditRow = (at: string, actor: string | null, action: string, target: string | null, fields?: string[], household = true) => ({ at: `2026-09-${at}:00+09:00`, actor_user_id: actor, action, target, detail: fields ? JSON.stringify({ fields }) : null, household_id: household ? 'house-mori' : null });
+export const seedAuditHistory = [
+  auditRow('24T19:02', 'user-ren', 'createEvent', 'event-park'),
+  auditRow('24T21:15', 'user-aoi', 'updateRecurringEvent', 'event-clean', ['startsAt', 'endsAt']),
+  auditRow('25T08:30', 'user-aoi', 'createExpense', 'income-salary'),
+  auditRow('25T20:40', 'user-ren', 'createTodo', 'todo-library'),
+  auditRow('26T10:12', 'user-aoi', 'createExpense', 'expense-groceries'),
+  auditRow('26T18:05', 'user-ren', 'updateTodoStatus', 'todo-done'),
+  auditRow('27T03:00', 'operator', 'operator.grant', null),
+  auditRow('27T09:00', 'user-ren', 'createExpense', 'expense-train'),
+  auditRow('27T16:20', 'user-aoi', 'uploadAttachment', 'memo-school'),
+  auditRow('28T07:00', 'user-aoi', 'signInWithPassword', null, undefined, false),
+  auditRow('28T08:10', 'user-ren', 'createExpense', 'expense-ren-private'),
+  auditRow('28T18:40', 'user-ren', 'createMemo', 'memo-clinic'),
+  auditRow('28T20:00', 'user-ren', 'recordSettlement', 'expense-groceries'),
+  auditRow('29T08:00', 'user-aoi', 'recordSettlement', 'expense-ren-private'),
+  auditRow('29T09:30', 'user-aoi', 'createExpense', 'expense-books'),
+  auditRow('29T12:00', 'user-hana', 'updateTodoStatus', 'todo-practice'),
+  auditRow('29T20:00', 'user-ren', 'deleteExpense', 'expense-ren-deleted'),
+  auditRow('29T21:10', 'user-aoi', 'updateMemo', 'memo-school', ['body', 'tags']),
+  auditRow('29T21:12', 'user-aoi', 'createItemLink', 'link-school'),
+  auditRow('29T22:00', 'user-aoi', 'updateHouseholdProfile', null),
+  auditRow('29T23:10', 'user-aoi', 'finishPasskeyRegistration', null, undefined, false),
+  auditRow('30T06:50', 'user-aoi', 'createMemo', 'memo-receipt'),
+  auditRow('30T06:55', 'user-aoi', 'uploadAttachment', 'memo-receipt'),
+  auditRow('30T07:05', 'user-ren', 'updateTodo', 'todo-garbage', ['dueAt']),
+  auditRow('30T07:10', 'user-aoi', 'updateExpense', 'expense-books', ['note', 'title']),
+  auditRow('30T07:18', 'user-aoi', 'finishPasskey', null, undefined, false),
+  auditRow('30T07:20', 'user-aoi', 'createHouseholdInvite', 'invite-demo'),
+  auditRow('30T07:25', 'user-ren', 'updateAlbum', 'album-park', ['title']),
+];

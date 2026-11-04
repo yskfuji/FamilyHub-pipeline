@@ -18,3 +18,16 @@ describe('家族グループの上限', () => {
     expect(activeMemberCount([member('active'), member('suspended'), member('left'), member('active')])).toBe(2);
   });
 });
+
+describe('leaving as an owner (A12-1)', () => {
+  const person = (id: string, role: HouseholdMembership['role'], status: HouseholdMembership['status'] = 'active'): HouseholdMembership => ({ id, householdId: 'h', userId: `user-${id}`, displayName: id, role, status, color: '#315c80', version: 1 });
+  it('lets an owner leave only while another active owner remains', async () => {
+    const { leaveStateFor } = await import('./householdLimits');
+    expect(leaveStateFor([person('a', 'owner'), person('b', 'adult')], 'a')).toBe('sole-owner');
+    expect(leaveStateFor([person('a', 'owner'), person('b', 'owner')], 'a')).toBe('co-owner');
+    // 一時停止中・退出済みの管理者は数えない。
+    expect(leaveStateFor([person('a', 'owner'), person('b', 'owner', 'suspended')], 'a')).toBe('sole-owner');
+    expect(leaveStateFor([person('a', 'owner'), person('b', 'owner', 'left')], 'a')).toBe('sole-owner');
+    expect(leaveStateFor([person('a', 'owner'), person('b', 'adult')], 'b')).toBe('member');
+  });
+});

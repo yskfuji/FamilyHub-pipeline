@@ -13,6 +13,8 @@ export const settingsTabs: ReadonlyArray<{ href: typeof settingsRoutes[number]; 
   { href: '/settings/accessibility', label: '表示・操作', capability: 'settings.own' },
   { href: '/settings/resources', label: '関連リンク', capability: 'resource.read' },
   { href: '/settings/recently-deleted', label: '最近削除', capability: 'settings.own' },
+  // 変更の記録は管理者だけ（audit.read）。ほかの人にはタブも出さず、URL で開いても表示しない。
+  { href: '/settings/audit', label: '変更の記録', capability: 'audit.read' },
   { href: '/settings/help', label: 'ヘルプ', capability: 'settings.own' },
   { href: '/settings/legal', label: '規約（草案）', capability: 'settings.own' },
 ];

@@ -227,8 +227,8 @@ test('income is recorded with its own categories and no split', async ({ page })
   await expect(drawer.getByRole('table')).toHaveCount(0);
   await drawer.getByRole('button', { name: '内容を編集' }).click();
   const edit = page.getByRole('dialog', { name: '収入を編集' });
-  await expect(edit.getByText('記録したあとは変えられません')).toBeVisible();
-  await expect(edit.getByRole('radio')).toHaveCount(0);
+  // 記録したあとも種類を変えられる（A3-5）。開いたときは今の種類が選ばれている。
+  await expect(edit.getByRole('radio', { name: '収入' })).toBeChecked();
   await edit.getByLabel('金額（円）').fill('20000');
   await edit.getByRole('button', { name: '変更を保存' }).click();
   await expect(drawer.locator('.detail-list')).toContainText(new RegExp(yen('20,000')));
