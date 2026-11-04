@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 test('notification bell opens an operable notification center', async ({ page }) => {
   await page.goto('/today');
@@ -54,7 +54,8 @@ test('calendar week/list, edit, cancel delete, and confirmed delete work', async
   await expect(page.getByRole('heading', { name: '学校公開（更新）' })).toBeVisible();
   await page.getByRole('button', { name: '予定を削除' }).click();
   await page.getByRole('button', { name: '削除する' }).click();
-  await expect(page).toHaveURL(/\/calendar$/);
+  // 一覧を最後に使ったので、閉じた後もこの端末では一覧のまま。
+  await expect(page).toHaveURL(/\/calendar\?view=list$/);
   await expect(page.locator('.toast-visible')).toContainText('削除しました');
 });
 
@@ -90,6 +91,9 @@ test('all household permission controls, sole-owner guard, and invite creation w
   await page.getByRole('button', { name: '役割を保存' }).click();
   await expect(page.getByRole('alert')).toContainText('管理者は1人以上');
   await page.getByRole('button', { name: 'キャンセル' }).click();
+  // 段階12: 役割を変えたまま閉じると、未保存の確認が出る。
+  await page.getByRole('dialog', { name: '入力中の内容を破棄しますか' }).getByRole('button', { name: '破棄する' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await permissionButtons.nth(1).click();
   await page.getByRole('dialog').getByLabel('メンバーの役割', { exact: true }).selectOption('guest');
   await page.getByRole('button', { name: '役割を保存' }).click();
@@ -136,7 +140,7 @@ test('three notification preferences persist and change what the bell shows; the
 test('onboarding privacy draft toggles and saves creator-only default', async ({ page }) => {
   await page.goto('/onboarding');
   await page.getByRole('button', { name: /次へ/ }).click();
-  const household = page.getByRole('button', { name: '家族全員と共有する' });
+  const household = page.getByRole('button', { name: '大人のメンバーと関わる人に共有する' });
   const preview = page.getByRole('button', { name: '通知の内容を表示しない' });
   await household.click(); await preview.click();
   await expect(household).toHaveAttribute('aria-pressed', 'false');

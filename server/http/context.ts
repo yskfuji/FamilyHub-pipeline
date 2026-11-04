@@ -1,0 +1,80 @@
+import type { FastifyReply, FastifyRequest } from 'fastify';
+import type { ServerConfig } from '../config';
+import type { Db } from '../db/db';
+import type { AuditLog } from '../audit/log';
+import type { SessionRow } from '../auth/sessions';
+import { serverMessages } from '../../src/content/serverMessages';
+import type { GatewayError, Id, Rfc3339 } from '../../src/domain/types';
+import type { LlmClient } from '../adapters/llm';
+import type { Mailer } from '../adapters/mail';
+import type { Scanner } from '../adapters/scanner';
+import type { PageFetcher } from '../adapters/urlFetcher';
+import type { WeatherSource } from '../adapters/weather';
+
+export interface ServerClock { now(): Rfc3339; }
+export interface IdSource { next(prefix: string): Id; inviteToken(): string; }
+
+export interface AppDeps {
+  db: Db;
+  /** 監査の記録。本体の DB の送り出しの箱へ書き、確定した後に audit.db へ移す（server/audit/log.ts）。 */
+  audit: AuditLog;
+  config: ServerConfig;
+  clock: ServerClock;
+  ids: IdSource;
+  mailer: Mailer;
+  scanner: Scanner;
+  weather: WeatherSource;
+  llm: LlmClient;
+  pages: PageFetcher;
+  /** 読み取りを進めている仕事の ID。止まって残った行を見分ける。 */
+  runningReads: Set<Id>;
+  /** 受け付けた後に裏で進めている処理。終了のときと試験で待つ。 */
+  jobs: Set<Promise<void>>;
+}
+
+/** 経路ごとに必ず宣言する。宣言のない経路は起動時に止める。 */
+export interface RouteDeclaration {
+  operationId: string;
+  auth: 'public' | 'session';
+  csrf: boolean;
+  /** 権限の判定を行う場所。rule は共有の規則の中で判定することを表す。 */
+  capability: 'rule' | 'own' | 'none';
+  idempotent: boolean;
+  /** 直近の本人確認が要る操作。 */
+  recentAuth?: boolean;
+  /** 200 以外で成功を返す操作。 */
+  successStatus?: 201 | 202;
+}
+
+declare module 'fastify' {
+  interface FastifyContextConfig { route?: RouteDeclaration }
+  interface FastifyRequest {
+    session: SessionRow | null;
+    actor: { userId: Id; householdId: Id; membershipId: Id } | null;
+  }
+}
+
+export class ApiError extends Error {
+  readonly status: number;
+  readonly error: GatewayError;
+  constructor(status: number, error: GatewayError) { super(error.message); this.status = status; this.error = error; }
+}
+
+const statuses: Record<GatewayError['code'], number> = {
+  UNAUTHENTICATED: 401, FORBIDDEN: 403, NOT_FOUND: 404, REAUTH_REQUIRED: 403, INVALID_INPUT: 422,
+  CONFLICT: 409, OFFLINE: 503, RATE_LIMITED: 429, UPSTREAM_FAILURE: 502, ATTACHMENT_REJECTED: 422,
+};
+
+export const statusOf = (error: GatewayError) => error.reason === 'IDEMPOTENCY' ? 409 : statuses[error.code];
+
+export function sendError(reply: FastifyReply, error: GatewayError) {
+  return reply.code(statusOf(error)).type('application/problem+json').send(error);
+}
+
+export const unauthenticated = () => new ApiError(401, { code: 'UNAUTHENTICATED', message: serverMessages.signInRequired, retryable: false, reason: 'SESSION_EXPIRED' });
+export const invalidInput = (message: string = serverMessages.invalidInput) => new ApiError(422, { code: 'INVALID_INPUT', message, retryable: false });
+
+export function requireActor(request: FastifyRequest) {
+  if (!request.actor) throw new ApiError(403, { code: 'FORBIDDEN', message: serverMessages.noHousehold, retryable: false, reason: 'MEMBERSHIP_INACTIVE' });
+  return request.actor;
+}

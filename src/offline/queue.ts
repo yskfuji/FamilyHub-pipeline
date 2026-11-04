@@ -1,11 +1,11 @@
-import type { EventInput, MemoInput, TodoInput } from '../domain/schemas';
+import type { EventInput, EventUpdateInput, MemoInput, TodoInput, TodoUpdateInput } from '../domain/schemas';
 import type { Id, IsoDate, RecurrenceScope } from '../domain/types';
 
 export type QueueableCommand =
   | { operation: 'event.create'; summary: string; payload: { input: EventInput } }
-  | { operation: 'event.update'; summary: string; payload: { id: Id; scope: RecurrenceScope; input: Partial<EventInput>; expectedVersion: number; occurrenceDate?: IsoDate } }
+  | { operation: 'event.update'; summary: string; payload: { id: Id; scope: RecurrenceScope; input: EventUpdateInput; expectedVersion: number; occurrenceDate?: IsoDate } }
   | { operation: 'task.create'; summary: string; payload: { input: TodoInput } }
-  | { operation: 'task.update'; summary: string; payload: { id: Id; scope: RecurrenceScope; input: Partial<TodoInput>; expectedVersion: number } }
+  | { operation: 'task.update'; summary: string; payload: { id: Id; scope: RecurrenceScope; input: TodoUpdateInput; expectedVersion: number } }
   | { operation: 'memo.create'; summary: string; payload: { input: MemoInput } }
   | { operation: 'memo.update'; summary: string; payload: { id: Id; input: Partial<MemoInput>; expectedVersion: number } };
 
@@ -116,7 +116,10 @@ export class EncryptedOfflineQueue {
     return records;
   }
 
-  async enqueue(command: QueueableCommand, context: { actorUserId: Id; householdId: Id; permissionRevision: number }) {
+  /** clientOperationId を渡すと、それを送り直しの冪等キーにする（フォームで最初に送ったときと同じキー。応答だけが失われていても記録は増えない）。 */
+  async enqueue(command: QueueableCommand, context: { actorUserId: Id; householdId: Id; permissionRevision: number; clientOperationId?: string }) {
+    // 家計の変更・種類の変更・精算は、接続できるときだけ行う（待ち行列に入れない）。型の外から渡されても断る。
+    if (!queueableOperations.has(command.operation)) throw new Error('この変更は接続してから行ってください。');
     const records = await this.currentRecords();
     if (records.length >= MAX_ITEMS) throw new Error('未送信の変更は50件まで保存できます。不要な項目を削除してください。');
     const createdAt = this.now();

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 test('registration and onboarding reach the Today page', async ({ page }) => {
   await page.goto('/welcome');
@@ -33,9 +33,9 @@ test('calendar exposes recurring edit scope', async ({ page }) => {
 
 test('task reviewer and state update are visible', async ({ page }) => {
   await page.goto('/tasks/todo-form');
-  await expect(page.getByText('確認する人', { exact: true })).toBeVisible();
-  await expect(page.getByText('蓮', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '完了にする' }).click();
+  await expect(page.getByRole('dialog').getByText('確認する人', { exact: true })).toBeVisible();
+  await expect(page.getByRole('dialog').getByText('蓮', { exact: true })).toBeVisible();
+  await page.getByRole('dialog').getByRole('button', { name: '完了にする' }).click();
   await expect(page.locator('.toast-visible')).toContainText('完了にしました');
 });
 
@@ -93,7 +93,7 @@ test('expired session hides household content until sign-in', async ({ page }) =
 for (const width of [320, 390, 768, 1024, 1440, 1920]) {
   test(`no horizontal overflow at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
-    for (const route of ['/today','/calendar','/tasks','/notes','/budget','/insights','/settings/security','/showcase']) {
+    for (const route of ['/today','/calendar','/tasks','/notes','/budget','/albums','/albums/album-sports','/insights','/settings/security','/settings/recently-deleted','/settings/help','/settings/legal','/showcase']) {
       await page.goto(route);
       await page.waitForLoadState('networkidle');
       const metrics = await page.evaluate(() => ({ document: document.documentElement.scrollWidth - document.documentElement.clientWidth, body: document.body.scrollWidth - document.body.clientWidth, main: (() => { const el = document.querySelector('main'); return el ? el.scrollWidth - el.clientWidth : 0; })() }));

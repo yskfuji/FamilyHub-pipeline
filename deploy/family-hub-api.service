@@ -1,0 +1,23 @@
+# 例。この環境では動かしていない。パスとユーザーは配備先に合わせる。
+[Unit]
+Description=よりどころ API
+After=network.target
+
+[Service]
+Type=simple
+User=family-hub
+WorkingDirectory=/opt/family-hub
+# NODE_ENV=production と FAMILY_HUB_* をここに書く。読めるのは実行するユーザーだけにする。
+EnvironmentFile=/etc/family-hub/api.env
+ExecStart=/usr/bin/node dist-server/main.js
+Restart=on-failure
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+# データベース・監査の記録（audit.db、既定は FAMILY_HUB_DATABASE と同じディレクトリ）・メディア・バックアップ（FAMILY_HUB_BACKUP_DIR）の置き場所だけ書けるようにする。
+# FAMILY_HUB_AUDIT_DB を別のディレクトリに置くなら、ここに足す。バックアップは DB と別のディスクに置く。
+ReadWritePaths=/var/lib/family-hub /var/backups/family-hub
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "noEmit": true,
+    "types": ["node", "vite/client"]
+  },
+  "include": ["server/test/**/*.ts", "server/testing/**/*.ts", "server/**/*.ts", "src/data/**/*.ts", "src/domain/**/*.ts", "src/authz/**/*.ts", "src/content/*.ts", "src/offline/*.ts"],
+  "exclude": ["server/types/**"]
+}

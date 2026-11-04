@@ -1,0 +1,32 @@
+/* 管理コンソールの見本だけで使う。監査用ビルドの外には出さない。 */
+.mgmt-banner { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-3); align-items: start; margin-bottom: var(--space-4); padding: var(--space-4) var(--space-4); border: 2px solid var(--brand); border-radius: var(--radius-md); background: var(--brand-soft); color: var(--ink); }
+.mgmt-banner p { margin: 0; line-height: var(--leading-body); }
+.mgmt-banner-mark { padding: var(--space-1) var(--space-3); border-radius: var(--radius-pill); background: var(--brand); color: var(--on-brand); font-weight: 800; letter-spacing: .1em; white-space: nowrap; }
+.mgmt-nav { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-4) 0 var(--space-5); }
+.mgmt-nav .button[aria-current='page'] { color: var(--on-accent); background: var(--accent-strong); border-color: var(--accent-strong); }
+.mgmt-kpis { display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); }
+.mgmt-kpi { display: grid; gap: var(--space-1); align-content: start; }
+.mgmt-kpi p { margin: 0; }
+.mgmt-kpi-value { font-size: var(--text-2xl); font-weight: 800; font-variant-numeric: tabular-nums; line-height: var(--leading-heading); }
+.mgmt-rows { display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.mgmt-row { display: grid; gap: var(--space-2) var(--space-4); grid-template-columns: minmax(0, 1fr) auto; align-items: start; padding: var(--space-4) var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.mgmt-row h3, .mgmt-row p { margin: 0; }
+.mgmt-row h3 { font-size: var(--text-md); overflow-wrap: anywhere; }
+.mgmt-row-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); justify-content: flex-end; }
+.mgmt-filters { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-4); align-items: end; margin-bottom: var(--space-4); }
+.mgmt-filters .field { flex: 1 1 14rem; max-width: 24rem; }
+.mgmt-filters .segmented { flex-wrap: wrap; border-radius: var(--radius-md); }
+.mgmt-filters .segmented button { flex: 1 1 auto; white-space: nowrap; }
+.mgmt-fields { display: grid; gap: var(--space-1) var(--space-3); grid-template-columns: max-content minmax(0, 1fr); grid-column: 1 / -1; margin: 0; font-size: var(--text-sm); }
+.mgmt-field { display: contents; }
+.mgmt-fields dt { color: var(--ink-soft); }
+.mgmt-fields dd { margin: 0; overflow-wrap: anywhere; }
+.mgmt-check { display: flex; gap: var(--space-2); align-items: center; min-height: 2.75rem; }
+.mgmt-check input { width: 1.25rem; height: 1.25rem; margin: 0; }
+@media (width < 42.7rem) {
+  .mgmt-row { grid-template-columns: minmax(0, 1fr); }
+  .mgmt-row-actions { justify-content: flex-start; }
+  .mgmt-filters .segmented { width: 100%; }
+  .mgmt-filters .field { max-width: none; }
+  .mgmt-nav .button { flex: 1 1 calc(50% - .5rem); justify-content: center; }
+}

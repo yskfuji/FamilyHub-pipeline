@@ -1,7 +1,10 @@
 import type {
+  BgmPreset,
   AttachmentStatus,
   Capability,
+  Expense,
   GatewayError,
+  IncomeCategory,
   HouseholdMembership,
   HouseholdNotification,
   MembershipRole,
@@ -9,9 +12,19 @@ import type {
   RecurrenceScope,
   ResourceLink,
   Scenario,
+  SpendingCategory,
+  TodoPriority,
   TodoStatus,
   VisibilityAudience,
 } from '../domain/types';
+import type { BudgetSort, BudgetView } from '../domain/budgetView';
+import type { SplitMode } from '../domain/expenseForm';
+import type { MemoSort } from '../domain/memoList';
+import type { TaskFilter } from '../domain/taskList';
+import type { TodoAction } from '../domain/todoFlow';
+import type { SharedKind } from '../domain/visibilityForm';
+import type { SeriesShiftRefusal } from '../domain/seriesShift';
+import type { TakenAtSource } from '../domain/captureTime';
 
 const recurrence = {
   event: {
@@ -38,6 +51,7 @@ export const ja = {
     tasks: 'タスク',
     notes: 'メモ',
     budget: '家計',
+    albums: 'アルバム',
     places: '場所',
     insights: 'ヒント',
     settings: '設定',
@@ -53,13 +67,48 @@ export const ja = {
     active: '利用中',
     invited: '招待中',
     suspended: '利用停止',
+    left: '退出済み',
   } satisfies Record<HouseholdMembership['status'], string>,
   taskStatus: {
     open: '未着手',
     doing: '進行中',
     review: '確認待ち',
+    waiting: '相手待ち',
     done: '完了',
   } satisfies Record<TodoStatus, string>,
+  taskFilter: {
+    open: '未完了',
+    mine: '自分の担当',
+    review: '確認待ち',
+    done: '完了',
+  } satisfies Record<TaskFilter, string>,
+  taskPriority: {
+    low: '低い',
+    normal: '普通',
+    high: '高い',
+  } satisfies Record<TodoPriority, string>,
+  taskAction: {
+    complete: '完了にする',
+    'request-review': '確認を依頼する',
+    'confirm-done': '確認して完了にする',
+    start: '着手する',
+    wait: '相手待ちにする',
+    reset: '未着手に戻す',
+    reopen: '未着手に戻す',
+  } satisfies Record<TodoAction, string>,
+  taskActionDone: {
+    complete: 'を完了にしました',
+    'request-review': 'の確認を依頼しました',
+    'confirm-done': 'を確認して完了にしました',
+    start: 'を進行中にしました',
+    wait: 'を相手待ちにしました',
+    reset: 'を未着手に戻しました',
+    reopen: 'を未着手に戻しました',
+  } satisfies Record<TodoAction, string>,
+  memoSort: {
+    newest: '新しい順',
+    oldest: '古い順',
+  } satisfies Record<MemoSort, string>,
   attachmentStatus: {
     selected: '選択済み',
     validating: '確認中',
@@ -75,6 +124,7 @@ export const ja = {
   scenario: {
     normal: '通常',
     empty: 'データなし',
+    'all-done': '全部済んだ夜',
     loading: '読み込み中',
     offline: 'オフライン',
     conflict: '変更の競合',
@@ -84,12 +134,45 @@ export const ja = {
     weather: '荒天',
   } satisfies Record<Scenario, string>,
   visibility: {
-    household: '家族全員',
+    household: '大人のメンバーと関わる人',
     adults: '大人のメンバー',
     participants: '参加者',
     creator: '作成した本人',
     selected: '選択したメンバー',
   } satisfies Record<VisibilityAudience, string>,
+  /** 公開範囲を選ぶときの説明。household は全員ではない（子どもは関わる予定だけ見える）。 */
+  visibilityHelp: {
+    household: '管理者と大人のメンバー、この予定に関わる人に表示します。',
+    adults: '管理者と大人のメンバーに表示します。',
+    participants: '参加者と、作成した本人に表示します。',
+    creator: '作成した本人だけに表示します。',
+    selected: '選んだメンバーと、作成した本人に表示します。',
+  } satisfies Record<VisibilityAudience, string>,
+  /** タスクとメモでは、公開範囲の意味が予定と少し違う。 */
+  visibilityFor: {
+    task: {
+      labels: { participants: 'タスクに関わる人' },
+      help: {
+        household: '管理者と大人のメンバー、このタスクに関わる人に表示します。',
+        participants: '作成した本人、担当する人、確認する人に表示します。',
+      },
+    },
+    memo: {
+      labels: {},
+      help: { household: '管理者と大人のメンバー、作成した本人に表示します。' },
+    },
+    album: {
+      labels: {},
+      help: { household: '管理者と大人のメンバー、作成した本人に表示します。' },
+    },
+    expense: {
+      labels: { participants: '記録に関わる人' },
+      help: {
+        household: '管理者と大人のメンバー、この記録に関わる人に表示します。',
+        participants: '作成した本人、支払った人、負担する人に表示します。',
+      },
+    },
+  } satisfies Record<Exclude<SharedKind, 'event'>, { labels: Partial<Record<VisibilityAudience, string>>; help: Partial<Record<VisibilityAudience, string>> }>,
   recurrence,
   resourceKinds: {
     school: '学校',
@@ -117,12 +200,21 @@ export const ja = {
     'memo.attach': 'メモにファイルを添付する',
     'expense.read': '家計を見る',
     'expense.create': '支出を追加する',
+    'expense.update': '支出を変更する',
+    'expense.delete': '支出を削除する',
     'expense.settle': '精算を記録する',
+    'album.read': 'アルバムを見る',
+    'album.create': 'アルバムを作る',
+    'album.update': 'アルバムを変更する',
+    'album.delete': 'アルバムを削除する',
+    'link.manage': '関連づけを変更する',
+    'assistant.use': '読み取りの補助を使う',
     'place.read': '記録した場所を見る・付ける',
     'insight.read': '暮らしのヒントを見る',
     'resource.read': '関連リンクを見る',
     'settings.own': '自分の設定を変更する',
     'notification.manage': '通知を管理する',
+    'audit.read': '変更の記録を見る',
   } satisfies Record<Capability, string>,
   actions: {
     add: '追加する',
@@ -146,11 +238,46 @@ export const ja = {
   } satisfies Record<'high' | 'medium' | 'low', string>,
   expenseCategory: {
     food: '食費',
+    dining: '外食',
     transport: '交通',
-    education: '教育',
+    utilities: '水道・光熱・通信',
     home: '住まい・日用品',
+    education: '教育・保育',
+    health: '医療・健康',
+    entertainment: '娯楽・おでかけ',
+    shopping: '衣服・買い物',
+    savings: '貯蓄・保険',
     other: 'その他',
-  } satisfies Record<'food' | 'transport' | 'education' | 'home' | 'other', string>,
+    income_salary: '給与',
+    income_bonus: '賞与',
+    income_side: '副収入',
+    income_investment: '運用',
+    income_gift: 'お祝い・贈与',
+    income_other: 'その他の収入',
+  } satisfies Record<SpendingCategory | IncomeCategory, string>,
+  expenseKind: {
+    expense: '支出',
+    income: '収入',
+  } satisfies Record<Expense['kind'], string>,
+  budgetView: {
+    overview: '概要',
+    list: '一覧',
+    members: 'メンバー別',
+    settlements: '精算',
+  } satisfies Record<BudgetView, string>,
+  budgetSort: {
+    'date-new': '日付の新しい順',
+    'date-old': '日付の古い順',
+    'amount-high': '金額の大きい順',
+    'amount-low': '金額の小さい順',
+    category: '費目の順',
+    payer: '支払った人の順',
+  } satisfies Record<BudgetSort, string>,
+  splitMode: {
+    equal: '大人で等分',
+    payer: '支払った人だけ',
+    custom: '金額を指定',
+  } satisfies Record<SplitMode, string>,
   place: {
     legend: '場所',
     add: '場所を追加（任意）',
@@ -280,6 +407,21 @@ export const ja = {
       attribution: '出典と権利表示',
     },
   },
+  /** 読み取りの補助。読み取りは同じ機械か家庭内の機器で行い、外部へは送らない。 */
+  reading: {
+    title: '家庭内で読み取ります',
+    body: '選んだ画像やページの本文は、運営者が用意した同じ機械か家庭内の機器で読み取り、外部へは送りません。終わったら画像を消します。家族の記録は送りません。',
+    sampleTitle: 'これは見本の動作です',
+    sampleBody: '実際の画像やページは読まず、見本の内容を表示します。',
+    keep: '内容を確かめて保存するまで、記録には何も追加しません。',
+    review: '読み取った内容です。誤りがないか確かめてから保存してください。',
+    reviewSample: '見本のデータです。実際の画像やページは読んでいません。',
+  },
+  /** 確認コード（二段階認証）。鍵をなくして確かめられなくなったときの案内（A7-6）。 */
+  totp: {
+    unavailableTitle: '確認コードを確かめられなくなりました',
+    unavailableBody: '運営者の鍵の入れ替えなどで、設定した確認コードを今は確かめられません。サインインには回復コードかパスキーを使えます。「確認コードを解除」を押してから、もう一度設定してください。',
+  },
   errors: {
     UNAUTHENTICATED: 'サインインの有効期限が切れました。もう一度サインインしてください。',
     FORBIDDEN: 'この操作は利用できません。',
@@ -299,6 +441,30 @@ export const membershipStatusLabels = ja.membershipStatus;
 export const taskStatusLabels = ja.taskStatus;
 export const attachmentStatusLabels = ja.attachmentStatus;
 export const notificationStatusLabels = ja.notificationStatus;
+
+export const bgmLabels: Record<BgmPreset, string> = { calm: '落ち着いた曲', bright: '明るい曲', gentle: 'やさしい曲' };
+
+export function audienceLabel(kind: SharedKind, audience: VisibilityAudience): string {
+  const labels: Partial<Record<VisibilityAudience, string>> = kind === 'event' ? {} : ja.visibilityFor[kind].labels;
+  return labels[audience] ?? ja.visibility[audience];
+}
+
+export function audienceHelp(kind: SharedKind, audience: VisibilityAudience): string {
+  const help: Partial<Record<VisibilityAudience, string>> = kind === 'event' ? {} : ja.visibilityFor[kind].help;
+  return help[audience] ?? ja.visibilityHelp[audience];
+}
+
+/** 状態を変えるボタンの文言。戻す先が同じでも、今の状態で言い方が変わる。 */
+export function taskActionLabel(action: TodoAction, status: TodoStatus): string {
+  if (action === 'start' && status === 'waiting') return '再開する';
+  if (action === 'start' && status === 'review') return '進行中に戻す';
+  return ja.taskAction[action];
+}
+
+/** ボタンの読み上げの文言。対象のタスクの名前を含める。 */
+export function taskActionAriaLabel(action: TodoAction, status: TodoStatus, title: string): string {
+  return `「${title}」${action === 'request-review' ? 'の' : 'を'}${taskActionLabel(action, status)}`;
+}
 
 export function recurrenceLabel(kind: 'event' | 'task', scope: RecurrenceScope): string {
   return ja.recurrence[kind][scope];
@@ -326,3 +492,107 @@ export function errorGuidance(error: GatewayError): string {
   if (error.retryable) return '入力した内容は残っています。しばらくしてから、もう一度お試しください。';
   return '表示された項目を確認して、入力内容を修正してください。';
 }
+
+/** 繰り返しの「すべて」の編集で日付を変えるときの文（A13）。理由は src/domain/seriesShift.ts が決める。 */
+export const seriesShiftCopy = {
+  confirm: (deltaDays: number, rule: string) => `すべての予定を${Math.abs(deltaDays)}日${deltaDays > 0 ? '後' : '前'}へ移します（${rule}）`,
+  refusal: {
+    'month-end': '月末に関わる繰り返しは、すべての回を同じ日数だけ移せません。',
+    'set-position': '「最初の日」「最後の日」のように選ぶ繰り返しは、すべての回を同じ日数だけ移せません。',
+    'crosses-week': '隔週などの曜日が週をまたぐため、すべての回を同じ日数だけ移せません。',
+    'out-of-range': '移した後の日が1〜28日に収まらないため、すべての回を同じ日数だけ移せません。',
+    unsupported: 'この繰り返しは、すべての回を同じ日数だけ移せません。',
+  } satisfies Record<SeriesShiftRefusal, string>,
+  pointer: '日付を変えるときは、対象を「これ以降の予定」にしてください。',
+} as const;
+
+/** 写真・動画の撮影日時（A15-5）。推し量った日時には、どこから求めたかを添える。 */
+export const captureTimeCopy = {
+  heading: '撮影日時',
+  added: '追加日',
+  taken: (text: string) => `撮影 ${text}`,
+  /** 時差の記録がなく推し量った日時に添える。理由は詳しい情報に出す。 */
+  estimated: '（推定）',
+  /** 時差の記録がなく、推し量った日時の出どころ。時差つきの記録（exif-offset・quicktime-key）には添えない。 */
+  sourceNote: {
+    'exif-local': '写真に時差の記録がないため、日本時間で撮ったものとして表示しています。',
+    mvhd: '動画の作成日時の記録から求めました。撮った場所の時差は分かりません。',
+  } as Partial<Record<TakenAtSource, string>>,
+  sort: { album: 'アルバムの順', taken: '撮影日順' },
+  sortLabel: '並べ方',
+  sortNote: '撮影日時の分からない写真や動画は、最後に並べます。',
+} as const;
+
+/** 記録した支出と収入の種類の切り替え（A3-5）。 */
+export const kindChangeCopy = {
+  legend: '種類',
+  clearsShares: (people: string) => `収入にすると、負担の記録（${people}）は消えます。保存するまでは元のままです。`,
+  clearsSharesPlain: '収入にすると、負担の記録は消えます。保存するまでは元のままです。',
+  requiresShares: '支出にするには、費目と負担する人を選んでください。',
+  blockedBySettlement: '取り消していない精算があります。収入にするには、先に精算を取り消してください。',
+} as const;
+
+/** まとめて精算（A4）。 */
+export const settleAllCopy = {
+  open: 'まとめて精算する',
+  title: 'まとめて精算しますか',
+  description: (count: number) => `残りのある負担${count}件を、次の受け渡しでまとめて精算済みにします。`,
+  transfersHeading: '受け渡し',
+  noTransfer: '受け渡しは要りません（貸し借りが打ち消し合います）。',
+  records: (count: number) => `含める記録：${count}件`,
+  stale: '表示中の内容が古くなりました。',
+  transfer: (from: string, to: string) => `${from}さんから${to}さんへ`,
+  note: 'お金の受け渡しは、この記録とは別に行ってください。間違えたときは、精算の履歴から「まとめて取り消す」で元に戻せます。',
+  confirm: '精算を記録する',
+  busy: '記録しています…',
+  reload: '最新の内容を読み込む',
+  reloaded: '最新の内容を読み込みました。受け渡しを確かめてから、もう一度記録してください。',
+  done: (count: number) => `${count}件の負担をまとめて精算しました。精算の履歴から、まとめて取り消せます。`,
+  filtered: '表示する人を「すべて」にすると、まとめて精算できます。',
+  batchTitle: (count: number) => `まとめて精算（${count}件）`,
+  batchReversalTitle: (count: number) => `まとめた精算の取り消し（${count}件）`,
+  reverse: 'まとめて取り消す',
+  reversing: '取り消し中…',
+  reversed: 'まとめて取り消し済み',
+  partlyReversed: '一部を個別に取り消したため、残りは1件ずつ取り消してください。',
+  reverseDone: 'まとめた精算を取り消しました。元の記録と取り消しの記録は履歴に残ります。',
+  includes: '含めた記録',
+  partOfBatch: 'まとめた精算の一部',
+  total: (amount: string) => `負担の合計 ${amount}`,
+} as const;
+
+/** 管理者の退出（A12-1）。 */
+export const leaveCopy = {
+  heading: '家族グループから退出',
+  member: '退出すると、この家族の情報は表示できなくなります。作った記録は残ります。もう一度参加するには、新しい招待コードが必要です。',
+  coOwner: (others: string) => `ほかに管理者（${others}さん）がいるので、退出できます。退出すると、この家族の情報は表示できなくなり、メンバーの管理は${others}さんが続けます。作った記録は残ります。`,
+  soleOwner: 'あなたはこの家族のただ1人の管理者なので、このままでは退出できません。先に大人のメンバーへ管理者を引き継いでください。',
+  handOver: '管理者を引き継ぐ',
+  handOverHelp: '大人のメンバーの「権限を設定」から「管理者を渡す」を選びます。',
+  confirmOwner: (name: string, others: string) => `「${name}」の情報は表示できなくなります。管理者の役割は外れ、${others}さんが管理者として残ります。元に戻すには、新しい招待コードで参加し直し、管理者を渡してもらう必要があります。`,
+} as const;
+
+/** 添付をアプリの中で開く（A14）。 */
+export const attachmentViewerCopy = {
+  label: (name: string) => `「${name}」を表示`,
+  open: '開く',
+  openLabel: (name: string) => `${name}を開く`,
+  save: '保存',
+  saveLabel: (name: string) => `${name}を端末に保存`,
+  saveAndOpen: '保存して開く',
+  loading: '読み込んでいます…',
+  unsupported: 'この形式はアプリの中では表示できません。端末に保存してから開いてください。',
+  videoFailed: 'この動画はこの端末では再生できません。端末に保存してから開いてください。',
+  imageFailed: 'この画像を読み込めませんでした。',
+  pdfFailed: 'このPDFを表示できませんでした。端末に保存してから開いてください。',
+  page: (page: number, total: number) => `${total}ページ中${page}ページ目`,
+  pageText: (page: number) => `${page}ページ目の文字`,
+  link: (label: string) => `PDFの中のリンク：${label}（新しいタブ）`,
+  tooMany: (shown: number, total: number) => `最初の${shown}ページを表示しています（全${total}ページ）。続きは保存して開いてください。`,
+  saving: '保存を始めました。保存先はブラウザの設定によります。',
+} as const;
+
+/** 繰り返しの予定の「すべて」の編集で、保存の前に示す（A13-6）。 */
+export const seriesPreviewCopy = {
+  switchToFuture: '「これ以降の予定」に切り替える',
+} as const;

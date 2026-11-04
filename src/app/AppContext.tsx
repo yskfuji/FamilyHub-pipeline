@@ -1,26 +1,40 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react';
-import { createMockGateway } from '../data/mockGateway';
-import { baseSnapshot } from '../data/fixtures';
 import type { FamilyHubGateway } from '../data/gateway';
-import type { Capability, GatewayError, HouseholdSnapshot, PrivacySettings, Result, Scenario, Theme } from '../domain/types';
-import { useModalTriggerTracking } from '../design-system/components';
-import { capabilitiesFor, projectSnapshotForViewer } from '../authz/policy';
+import type { EventDraft, EventPrefill } from '../domain/eventForm';
+import type { ExpenseDraft } from '../domain/expenseForm';
+import type { TaskDraft } from '../domain/taskForm';
+import type { Capability, Expense, GatewayError, HouseholdSnapshot, PrivacySettings, Result, Scenario, SessionInfo } from '../domain/types';
+import { UnsavedPrompt, useModalTriggerTracking } from '../design-system/components';
 import { EncryptedOfflineQueue, IndexedDbQueuePersistence, type QueueableCommand, type QueuedCommand } from '../offline/queue';
 
+import { ReauthDialog, useReauthPrompt, withReauthentication } from './reauth';
+import type { AppRuntime } from './runtime';
+
+export type AppStage = 'restoring' | 'unreachable' | 'signed-out' | 'household-setup' | 'suspended' | 'paywall' | 'ready';
 export type QuickCreateKind = 'todo' | 'event' | 'memo' | 'expense';
+
+/** 提案をフォームへ入れて開くときの中身。開くだけで、保存は利用者が行う。 */
+export interface QuickCreateSeed { event?: Partial<EventDraft>; expense?: Partial<ExpenseDraft>; todo?: Partial<TaskDraft>; note?: string }
 export type CommandOutcome<T> = { status: 'completed'; value: T } | { status: 'queued' } | { status: 'failed'; error: GatewayError };
 
 interface AppState {
-  gateway: FamilyHubGateway; snapshot: HouseholdSnapshot; loading: boolean; refreshing: boolean; error: GatewayError | null;
-  scenario: Scenario; setScenario: (scenario: Scenario) => void; refresh: () => Promise<void>;
-  theme: Theme; setTheme: (theme: Theme) => void; toast: string | null; announce: (message: string) => void;
+  gateway: FamilyHubGateway; runtimeMode: AppRuntime['mode']; appStage: AppStage; session: SessionInfo | null;
+  /** サインインの後に状態を読み直し、次に開くパスを返す。 */
+  finishSignIn: (fallback: string) => Promise<string>;
+  endSession: () => Promise<Result<void>>;
+  snapshot: HouseholdSnapshot; loading: boolean; refreshing: boolean; error: GatewayError | null;
+  scenario: Scenario; setScenario: (scenario: Scenario) => void;
+  /** 最新の内容を読み直す。読み直せなかったときは false。 */
+  refresh: () => Promise<boolean>;
+  toast: string | null; announce: (message: string) => void;
   can: (capability: Capability) => boolean;
   /** 本人のプライバシー設定。読み込み前は null。 */
   privacy: PrivacySettings | null;
   /** 最新の設定を取り直してから、渡した項目だけを変えて保存する（別の画面での変更を上書きしない）。 */
   updatePrivacy: (patch: Partial<PrivacySettings>) => Promise<Result<PrivacySettings>>;
-  requestQuickCreate: (kind?: QuickCreateKind) => void;
-  executeQueueable: <T>(command: QueueableCommand, execute: () => Promise<Result<T>>) => Promise<CommandOutcome<T>>;
+  requestQuickCreate: (kind?: QuickCreateKind, prefill?: EventPrefill, expenseKind?: Expense['kind'], seed?: QuickCreateSeed) => void;
+  /** idempotencyKey は、すぐに送れずに待ち行列へ入れたときの送り直しにも使う（フォームの1つのキー）。 */
+  executeQueueable: <T>(command: QueueableCommand, execute: () => Promise<Result<T>>, idempotencyKey?: string) => Promise<CommandOutcome<T>>;
   pendingCommands: QueuedCommand[]; retryQueued: (id?: string) => Promise<void>;
   discardQueued: (id: string) => Promise<void>; clearQueued: () => Promise<void>;
 }
@@ -29,23 +43,8 @@ const AppContext = createContext<AppState | null>(null);
 
 function queryScenario(): Scenario {
   const value = new URLSearchParams(window.location.search).get('scenario');
-  const allowed: Scenario[] = ['normal','empty','loading','offline','conflict','expired-invite','expired-session','quarantined','weather'];
+  const allowed: Scenario[] = ['normal','empty','all-done','loading','offline','conflict','expired-invite','expired-session','quarantined','weather'];
   return allowed.includes(value as Scenario) ? value as Scenario : 'normal';
-}
-
-function queryActor() {
-  const requested = new URLSearchParams(window.location.search).get('actor');
-  const auditSurface = import.meta.env.VITE_INCLUDE_AUDIT_SURFACE === 'true';
-  return auditSurface && baseSnapshot.memberships.some((item) => item.id === requested) ? requested! : 'member-aoi';
-}
-
-function initialSnapshot(actorId: string): HouseholdSnapshot {
-  let snapshot = structuredClone(baseSnapshot);
-  const member = snapshot.memberships.find((item) => item.id === actorId) ?? snapshot.memberships[0];
-  const viewer = { userId: member.userId, membershipId: member.id, role: member.role, status: member.status, capabilities: capabilitiesFor(member.role), permissionRevision: 1 } as HouseholdSnapshot['viewer'];
-  snapshot = projectSnapshotForViewer(snapshot, viewer);
-  snapshot.user = { ...snapshot.user, id: member.userId, displayName: member.displayName, email: `${member.userId}@example.test` };
-  return snapshot;
 }
 
 function setQueryScenario(next: Scenario) {
@@ -54,19 +53,20 @@ function setQueryScenario(next: Scenario) {
   window.history.replaceState({}, '', `${url.pathname}${url.search}`);
 }
 
-export function AppProvider({ children }: PropsWithChildren) {
+export function AppProvider({ runtime, children }: PropsWithChildren<{ runtime: AppRuntime }>) {
   useModalTriggerTracking();
-  const [actorId] = useState(queryActor);
-  const [gateway] = useState(() => createMockGateway(actorId));
+  const { pending: reauthPending, setPending: setReauthPending, ask: askReauth } = useReauthPrompt();
+  const gateway = useMemo(() => withReauthentication(runtime.gateway, askReauth), [askReauth, runtime.gateway]);
+  const [session, setSession] = useState<SessionInfo | null>(runtime.initialSession);
+  const [unreachable, setUnreachable] = useState(runtime.initialUnreachable ?? false);
   const [queue] = useState(() => new EncryptedOfflineQueue(new IndexedDbQueuePersistence()));
-  const [snapshot, setSnapshot] = useState<HouseholdSnapshot>(() => initialSnapshot(actorId));
+  const [snapshot, setSnapshot] = useState<HouseholdSnapshot>(runtime.initialSnapshot);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   // 最初の読み込みと表示状態の切り替えだけ画面全体を待機表示にする。それ以外の再取得では画面と操作中の状態（取り消し・復元の案内など）を保つ。
   const blockingLoad = useRef(true);
   const [error, setError] = useState<GatewayError | null>(null);
   const [scenario, setScenarioState] = useState<Scenario>(queryScenario);
-  const [theme, setThemeState] = useState<Theme>(() => localStorage.getItem('family-hub-theme') === 'dusk' ? 'dusk' : 'light');
   const [toast, setToast] = useState<string | null>(null);
   const [pendingCommands, setPendingCommands] = useState<QueuedCommand[]>([]);
   const [privacy, setPrivacy] = useState<PrivacySettings | null>(null);
@@ -85,40 +85,76 @@ export function AppProvider({ children }: PropsWithChildren) {
     blockingLoad.current = false;
     if (blocking) setLoading(true); else setRefreshing(true);
     setError(null);
+    if (runtime.mode === 'http') {
+      const current = await gateway.auth.getSession();
+      // 使っている途中で接続が切れたら、画面を残したまま知らせる。全画面の案内は最初の読み込みのときだけ。
+      if (!current.ok && !blocking) { setError(current.error); setRefreshing(false); return false; }
+      setUnreachable(!current.ok);
+      if (current.ok) setSession(current.value);
+      if (!current.ok || current.value.stage !== 'active') {
+        if (blocking) setLoading(false); else setRefreshing(false);
+        return current.ok;
+      }
+    }
     const result = await gateway.household.getSnapshot(scenario);
-    if (result.ok) setSnapshot(result.value); else setError(result.error);
+    if (result.ok) { setSnapshot(result.value); runtime.setPermissionRevision(result.value.viewer.permissionRevision); } else setError(result.error);
     if (blocking) setLoading(false); else setRefreshing(false);
-  }, [gateway, scenario]);
+    return result.ok;
+  }, [gateway, runtime, scenario]);
+
+  const finishSignIn = useCallback(async (fallback: string) => {
+    if (runtime.mode === 'mock') return fallback;
+    blockingLoad.current = true;
+    const current = await gateway.auth.getSession();
+    if (current.ok) setSession(current.value);
+    await refresh();
+    return current.ok && current.value.stage === 'household-setup' ? '/onboarding' : '/today';
+  }, [gateway, refresh, runtime.mode]);
+  const endSession = useCallback(async () => {
+    const result = await gateway.auth.signOut();
+    if (result.ok && runtime.mode === 'http') { setSession({ stage: 'signed-out', idleTimeoutMinutes: 30 }); setSnapshot(runtime.initialSnapshot); setPrivacy(null); }
+    return result;
+  }, [gateway, runtime]);
 
   useEffect(() => { queueMicrotask(() => void refresh()); }, [refresh]);
   useEffect(() => {
     if (!snapshot.viewer.capabilities.includes('settings.own')) return;
     let mounted = true;
-    void gateway.household.getPrivacySettings().then((result) => { if (mounted && result.ok) setPrivacy(result.value); });
+    void gateway.household.getPrivacySettings().then((result) => { if (mounted && result.ok) { setPrivacy(result.value); privacyBefore.current = result.value; } });
     return () => { mounted = false; };
   }, [gateway, snapshot.viewer.capabilities]);
-  const updatePrivacy = useCallback(async (patch: Partial<PrivacySettings>): Promise<Result<PrivacySettings>> => {
-    const latest = await gateway.household.getPrivacySettings();
-    if (!latest.ok) return latest;
-    const result = await gateway.household.savePrivacySettings({ ...latest.value, ...patch });
-    if (result.ok) setPrivacy(result.value);
-    return result;
+  // 読み込みと保存の組を順に処理する。続けて操作しても、先の保存が後の変更を上書きしないようにする。
+  const privacyQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const privacyBefore = useRef<PrivacySettings | null>(null);
+  const updatePrivacy = useCallback((patch: Partial<PrivacySettings>): Promise<Result<PrivacySettings>> => {
+    // 同意の取り消しなどは保存を待たずに全画面へ反映する。保存できなければ記録された内容へ戻す。
+    setPrivacy((current) => current && { ...current, ...patch });
+    const run = async (): Promise<Result<PrivacySettings>> => {
+      const latest = await gateway.household.getPrivacySettings();
+      if (!latest.ok) { setPrivacy((current) => current && { ...current, ...Object.fromEntries(Object.keys(patch).map((key) => [key, privacyBefore.current?.[key as keyof PrivacySettings]])) }); return latest; }
+      const result = await gateway.household.savePrivacySettings({ ...latest.value, ...patch });
+      setPrivacy(result.ok ? result.value : latest.value);
+      if (result.ok) privacyBefore.current = result.value;
+      return result;
+    };
+    const next = privacyQueue.current.then(run, run);
+    privacyQueue.current = next;
+    return next;
   }, [gateway]);
   useEffect(() => { queueMicrotask(() => void loadQueue()); }, [loadQueue]);
-  useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem('family-hub-theme', theme); }, [theme]);
   useEffect(() => { if (!toast) return; const id = window.setTimeout(() => setToast(null), 4200); return () => window.clearTimeout(id); }, [toast]);
 
   const setScenario = (next: Scenario) => { blockingLoad.current = true; setQueryScenario(next); setScenarioState(next); };
   const announce = useCallback((message: string) => setToast(message), []);
-  const requestQuickCreate = useCallback((kind?: QuickCreateKind) => window.dispatchEvent(new CustomEvent('family-hub:quick-create', { detail: { kind } })), []);
+  const requestQuickCreate = useCallback((kind?: QuickCreateKind, prefill?: EventPrefill, expenseKind?: Expense['kind'], seed?: QuickCreateSeed) => window.dispatchEvent(new CustomEvent('family-hub:quick-create', { detail: { kind, prefill, expenseKind, seed } })), []);
   const can = useCallback((capability: Capability) => snapshot.viewer.status === 'active' && snapshot.viewer.capabilities.includes(capability), [snapshot.viewer]);
 
-  const executeQueueable = useCallback(async <T,>(command: QueueableCommand, execute: () => Promise<Result<T>>): Promise<CommandOutcome<T>> => {
+  const executeQueueable = useCallback(async <T,>(command: QueueableCommand, execute: () => Promise<Result<T>>, idempotencyKey?: string): Promise<CommandOutcome<T>> => {
     const result = await execute();
     if (result.ok) return { status: 'completed', value: result.value };
     if (result.error.code !== 'OFFLINE') return { status: 'failed', error: result.error };
     try {
-      await queue.enqueue(command, { actorUserId: snapshot.viewer.userId, householdId: snapshot.household.id, permissionRevision: snapshot.viewer.permissionRevision });
+      await queue.enqueue(command, { actorUserId: snapshot.viewer.userId, householdId: snapshot.household.id, permissionRevision: snapshot.viewer.permissionRevision, ...(idempotencyKey ? { clientOperationId: idempotencyKey } : {}) });
       await loadQueue(); announce('未送信の変更として、この端末に保存しました。'); return { status: 'queued' };
     } catch (cause) {
       return { status: 'failed', error: { code: 'OFFLINE', message: cause instanceof Error ? cause.message : result.error.message, retryable: true } };
@@ -157,8 +193,21 @@ export function AppProvider({ children }: PropsWithChildren) {
   const discardQueued = useCallback(async (id: string) => { await queue.remove(id); await loadQueue(); announce('未送信の変更を削除しました。'); }, [announce, loadQueue, queue]);
   const clearQueued = useCallback(async () => { await queue.clear(); setPendingCommands([]); announce('未送信の変更をすべて削除しました。'); }, [announce, queue]);
 
-  const value = useMemo(() => ({ gateway, snapshot, loading, refreshing, error, scenario, setScenario, refresh, theme, setTheme: setThemeState, toast, announce, can, privacy, updatePrivacy, requestQuickCreate, executeQueueable, pendingCommands, retryQueued, discardQueued, clearQueued }), [gateway, snapshot, loading, refreshing, error, scenario, refresh, theme, toast, announce, can, privacy, updatePrivacy, requestQuickCreate, executeQueueable, pendingCommands, retryQueued, discardQueued, clearQueued]);
-  return <AppContext.Provider value={value}>{children}<div className="sr-only" role="status" aria-live="polite">{toast}</div>{toast && <div className="toast-visible" role="status">{toast}</div>}</AppContext.Provider>;
+  const submitReauth = async (password: string) => {
+    if (!reauthPending) return null;
+    const result = reauthPending.reason === 'expired' ? await runtime.gateway.auth.signInWithPassword(snapshot.user.email, password) : await runtime.gateway.auth.reauthenticate(password);
+    if (!result.ok) return result.error.message;
+    reauthPending.resolve(true); setReauthPending(null);
+    return null;
+  };
+  const cancelReauth = () => {
+    if (reauthPending?.reason === 'expired') setSession({ stage: 'signed-out', idleTimeoutMinutes: 30 });
+    reauthPending?.resolve(false); setReauthPending(null);
+  };
+  const appStage: AppStage = unreachable ? 'unreachable' : session === null ? 'restoring'
+    : session.stage === 'active' ? 'ready' : session.stage;
+  const value = useMemo(() => ({ gateway, runtimeMode: runtime.mode, appStage, session, finishSignIn, endSession, snapshot, loading, refreshing, error, scenario, setScenario, refresh, toast, announce, can, privacy, updatePrivacy, requestQuickCreate, executeQueueable, pendingCommands, retryQueued, discardQueued, clearQueued }), [appStage, endSession, finishSignIn, runtime.mode, session, gateway, snapshot, loading, refreshing, error, scenario, refresh, toast, announce, can, privacy, updatePrivacy, requestQuickCreate, executeQueueable, pendingCommands, retryQueued, discardQueued, clearQueued]);
+  return <AppContext.Provider value={value}>{children}<UnsavedPrompt/>{reauthPending && <ReauthDialog pending={reauthPending} onSubmit={submitReauth} onCancel={cancelReauth}/>}<div className="sr-only" role="status" aria-live="polite">{toast}</div>{toast && <div className="toast-visible" role="status">{toast}</div>}</AppContext.Provider>;
 }
 
 export function useApp() {

@@ -1,6 +1,6 @@
 # 証拠台帳
 
-最終更新: 2026-10-03。資料を「仕様・ガイダンス」「実験」「質的研究」「レビュー」に分け、主張の強さを越えて一般化しない。効果量が原著で統一報告されない場合は `not consistently reported` とし、推測しない。
+最終更新: 2026-11-02。資料を「仕様・ガイダンス」「実験」「質的研究」「レビュー」に分け、主張の強さを越えて一般化しない。効果量が原著で統一報告されない場合は `not consistently reported` とし、推測しない。
 
 | ID | 主張 | 資料種別・標本 | 効果・観察 | 限界・反証 | 採用した設計判断 | 確信度 |
 |---|---|---|---|---|---|---|
@@ -11,9 +11,9 @@
 | E05 | 適切なリマインダーは行動を助けうる | RCT、N=52、およびレビュー | 軽度認知障害等の参加者における2アプリ比較で有効性を示唆 | 小標本・対象限定・無通知対照ではない。一般家庭への直接一般化不可 | 「いつ・何をする」、プレビュー、延期、停止。乱発や効果保証なし | 低〜中 |
 | E06 | ポインタ入力の対象サイズに最低線が必要 | WCAG 2.2 Understanding 2.5.8（規範本文への解説） | 例外を除き24×24 CSS pxまたは間隔条件 | 24pxは優れたタッチ体験を保証しない | 主要タッチ操作を44px以上。自動検査と実機確認を分離 | 高 |
 | E07 | 日本語UIは一貫したコンポーネント、状態、アクセシビリティ説明が必要 | デジタル庁デザインシステム | 日本語行政サービス向けコンポーネントと利用指針 | 本製品のブランドや全ユースケースを規定しない | ラベル、説明、エラー、フォーカス、余白の最低線として参照 | 中〜高 |
-| E08 | パスワードの長さ・漏えい値照合とパスキー優先が現行認証の要点 | NIST SP 800-63B-4 | 単一要素パスワード15文字以上、最大長を十分許容、構成規則・定期変更を避け、blocklist照合 | フロントUIだけでは検証・レート制御・耐フィッシング性を成立させられない | パスキー第一、15〜64文字、文字種強制なし、漏えい拒否理由。サーバー契約を明示 | 高 |
-| E09 | セッション・CSRF・CSPはサーバー境界で強制すべき | OWASP Session / CSRF / CSP Cheat Sheets、ASVS | Secure/HttpOnly/SameSite、CSRF token、Origin/Fetch Metadata、strict CSP等 | Cheat Sheetは脅威モデル固有の完全な保証ではない | `__Host-` Cookie、検証、ヘッダーテンプレートを契約化。認証情報をWeb Storageに置かない | 高 |
-| E10 | ファイルアップロードは多層検証と隔離が必要 | OWASP File Upload Cheat Sheet | allowlist、MIME/signature、ランダム名、webroot外、AV、認可等 | AVでも未知脅威を完全には排除できない | UIで selected/validating/quarantined/clean/rejected を区別し、サーバー必須要件を明記 | 高 |
+| E08 | パスワードの長さ・漏えい値照合とパスキー優先が現行認証の要点 | NIST SP 800-63B-4 | 単一要素パスワード15文字以上、最大長を十分許容、構成規則・定期変更を避け、blocklist照合 | 漏えい値の照合は既知の3語の拒否だけで、公開の一覧とは照合していない | パスキー第一、15〜64文字、文字種強制なし。サーバーで Argon2id と回数制限を実施（`server/auth/password.ts`、`server/http/rateLimit.ts`） | 高 |
+| E09 | セッション・CSRF・CSPはサーバー境界で強制すべき | OWASP Session / CSRF / CSP Cheat Sheets、ASVS | Secure/HttpOnly/SameSite、CSRF token、Origin/Fetch Metadata、strict CSP等 | Cheat Sheetは脅威モデル固有の完全な保証ではない | `__Host-` Cookie、CSRFトークン、Origin と Fetch Metadata の検査をサーバーで実施。ヘッダーは `public/_headers` と `deploy/nginx.conf` で同じ値を配る。認証情報をWeb Storageに置かない | 高 |
+| E10 | ファイルアップロードは多層検証と隔離が必要 | OWASP File Upload Cheat Sheet | allowlist、MIME/signature、ランダム名、webroot外、AV、認可等 | AVでも未知脅威を完全には排除できない | 形式の判定、webroot外の一時領域、clamd の検査（失敗時は拒否）、ランダムなIDをサーバーで実施（`server/media/`）。UIで検査中・拒否を区別する | 高 |
 | E11 | 警告を重ねれば必ず誤操作が減るわけではない | 警告慣れの実験、N=22 | 反復警告に対する注意低下を観察 | 小規模で均質な実験標本。家庭アプリや全確認画面へ直接一般化できない | 可逆操作は取り消し、高リスク操作だけ対象と影響を示す確認にする | 低〜中 |
 | E12 | 認可は最小権限・既定拒否・全リクエスト検査が必要 | OWASP Authorization Cheat Sheet | サーバー側で毎回、属性と対象を含めて認可する指針 | ガイダンスであり、本システムへの侵入試験結果ではない | 能力と公開範囲を分離し、UI非表示を認可境界としない。不可視対象は `NOT_FOUND` | 高 |
 | E13 | Web Cryptoは保存暗号化を提供するが、同一オリジンの悪意あるコードを無効化しない | W3C Web Cryptography API | AES-GCM、非抽出鍵等のブラウザ暗号APIを規定 | XSS・端末侵害・実行中データの保護を保証しない | 再送待ちを暗号化するが多層防御と明記し、対象と保存期間を最小化 | 高 |
@@ -86,6 +86,22 @@
 
 ## 証拠状態
 
-- 実装済みの自動証拠: 型検査、単体、ブラウザE2E、axe、水平オーバーフロー測定、固定シード撮影。
+- 実装済みの自動証拠: 型検査、単体、モックと実サーバーの同等性試験、OpenAPI と経路の照合、応答の形の照合、ブラウザE2E（モックは Chromium の全件、実スタックは Chromium）、axe、水平オーバーフロー測定、固定シード撮影。結果は `docs/audits/verification-report.md`。
+- 代役での確認（実物では未確認）: SMTP、ClamAV（OK・EICAR・無応答・壊れた応答・接続拒否）、LLM、Open-Meteo（`server/testing/`）。
 - 人手監査: 全採用PNGの原寸光学確認後、`docs/audits/visual-audit.md` に記録する。
-- `evidence-pending`: 最低6世帯・12名のペア評価、VoiceOver/Safari実機、バックエンド侵入試験、実運用のCore Web Vitals、iOS Safari実機での現在地と写真の位置情報（「オプション」の既定値を含む）、Android実機での写真の位置情報、配備先でのCSP・Permissions-Policyの適用。これらが未実施の間、実利用者の成功率・満足・安全性を実証済みとは表現しない。
+- `evidence-pending`: 次の項目は未実施で、実施するまで安全性・実利用者の成功率・満足を実証済みとは表現しない。
+  - 外部の侵入試験
+  - 実利用者の評価（最低6世帯・12名のペア評価）
+  - 実機の VoiceOver/Safari
+  - 法務の確認（規約とプライバシーポリシーは草案。運営者名と問い合わせ先は空欄）
+  - 実物の clamd（ウイルス検査）
+  - 実物の SMTP（メール送信）
+  - 実物の LLM（読み取りの補助）
+  - URL の取得の実際の TLS ハンドシェイクの経路（試験は http の代役）
+  - H.264 の動画の再生
+  - ピクチャーインピクチャー
+  - 実スタックの Firefox と WebKit（実スタックの E2E は Chromium だけ）
+  - モックの Firefox（段階16の環境では起動できず未実施）と WebKit（環境由来の読み込みの時間切れ2件を除いて通過。`docs/audits/verification-report.md`）
+  - 配備先での CSP・Permissions-Policy の適用、nginx そのものの動作、TLS 証明書
+  - 実運用の Core Web Vitals
+  - iOS Safari実機での現在地と写真の位置情報（「オプション」の既定値を含む）、Android実機での写真の位置情報

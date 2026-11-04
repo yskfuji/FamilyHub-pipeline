@@ -26,6 +26,543 @@ x-mutation-policy:
   permissionRevisionHeader: If-Permission-Revision
   csrfHeader: X-CSRF-Token
 paths:
+  /health:
+    get:
+      security: []
+      operationId: getHealth
+      x-gateway: none
+      responses:
+        '200': { description: The process is running }
+  /ready:
+    get:
+      security: []
+      operationId: getReadiness
+      x-gateway: none
+      responses:
+        '200': { description: Ready to serve }
+        '503': { description: A dependency is unavailable }
+  /v1/version:
+    get:
+      security: []
+      operationId: getVersion
+      responses:
+        '200':
+          description: Build identifier, used for the new-version notice
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [build]
+                properties:
+                  build: { type: string }
+  /v1/auth/csrf:
+    get:
+      security: []
+      operationId: getCsrfToken
+      x-gateway: none
+      description: >-
+        Returns an HMAC token bound to the session, or to an anonymous
+        pre-session cookie before sign-in so login CSRF is covered as well.
+      responses:
+        '200':
+          description: CSRF token
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token]
+                properties:
+                  token: { type: string }
+  /v1/auth/totp/verify:
+    post:
+      security: []
+      operationId: verifyTotp
+      description: Completes a password sign-in for an account with a confirmation code. Each time step and recovery code works once.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [challengeId, code], properties: { challengeId: { type: string }, code: { type: string, maxLength: 20 } } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, required: [userId], properties: { userId: { type: string } } }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/auth/sign-up:
+    post:
+      security: []
+      operationId: signUp
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, required: [userId], properties: { userId: { type: string } } }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/auth/password-reset:
+    post:
+      security: []
+      operationId: requestPasswordReset
+      description: Answers the same way whether or not the address exists.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [email], properties: { email: { type: string } } }
+      responses:
+        '202':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, required: [resendAfterSeconds], properties: { resendAfterSeconds: { type: integer } } }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/auth/password-reset/confirm:
+    post:
+      security: []
+      operationId: confirmPasswordReset
+      description: Never signs in; ends every session of the account.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '204': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/auth/reauthenticate:
+    post:
+      operationId: reauthenticate
+      description: Confirms the password again for operations that need recent authentication.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [password], properties: { password: { type: string } } }
+      responses:
+        '204': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/account:
+    get:
+      operationId: getAccount
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountProfile' }
+        default: { $ref: '#/components/responses/Error' }
+    patch:
+      operationId: updateAccount
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountProfile' }
+        default: { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: deleteAccount
+      description: An owner with other active members must hand over first.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/account/email:
+    post:
+      operationId: changeEmail
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [email], properties: { email: { type: string } } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountProfile' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/account/totp:
+    post:
+      operationId: beginTotpEnrollment
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, required: [otpauthUri], properties: { otpauthUri: { type: string } } }
+        default: { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: disableTotp
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/account/totp/confirm:
+    post:
+      operationId: confirmTotpEnrollment
+      description: Recovery codes are shown once and stored hashed.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [code], properties: { code: { type: string } } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, required: [recoveryCodes], properties: { recoveryCodes: { type: array, items: { type: string } } } }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/households:
+    post:
+      operationId: createHousehold
+      description: Requires a declared adult. Starts a 14-day trial.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [name], properties: { name: { type: string, maxLength: 40 } } }
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, required: [householdId], properties: { householdId: { type: string } } }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/albums:
+    get:
+      operationId: listAlbums
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/AlbumSummary' } }
+        default: { $ref: '#/components/responses/Error' }
+    post:
+      operationId: createAlbum
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Album' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/albums/{albumId}:
+    get:
+      operationId: getAlbum
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, required: [album, items], properties: { album: { $ref: '#/components/schemas/Album' }, items: { type: array, items: { $ref: '#/components/schemas/AlbumItem' } } } }
+        default: { $ref: '#/components/responses/Error' }
+    patch:
+      operationId: updateAlbum
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Album' }
+        default: { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: deleteAlbum
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/albums/{albumId}/restore:
+    post:
+      operationId: restoreAlbum
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Album' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/albums/{albumId}/order:
+    put:
+      operationId: reorderAlbumItems
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Album' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/albums/{albumId}/items/{itemId}:
+    delete:
+      operationId: deleteAlbumItem
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/albums/{albumId}/items/{itemId}/restore:
+    post:
+      operationId: restoreAlbumItem
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AlbumItem' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/albums/{albumId}/items/{itemId}/file:
+    get:
+      operationId: getAlbumItemFile
+      x-gateway: none
+      description: Served with Range support; the viewer must be able to see the album.
+      responses:
+        '200': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/albums/{albumId}/items/{itemId}/thumbnail:
+    get:
+      operationId: getAlbumItemThumbnail
+      x-gateway: none
+      responses:
+        '200': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+    put:
+      operationId: putAlbumItemThumbnail
+      x-gateway: none
+      description: Client-made video thumbnail. Untrusted; re-encoded before storing.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/uploads:
+    post:
+      operationId: createUpload
+      x-gateway: none
+      description: Starts a resumable upload (tus 1.0.0 core). Checks quota and album access.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, required: [uploadId, itemId, offset], properties: { uploadId: { type: string }, itemId: { type: string }, offset: { type: integer } } }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/uploads/{uploadId}:
+    head:
+      operationId: getUploadOffset
+      x-gateway: none
+      responses:
+        '200': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+    patch:
+      operationId: appendUpload
+      x-gateway: none
+      description: Appends application/offset+octet-stream at Upload-Offset.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: cancelUpload
+      x-gateway: none
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/memos/{memoId}/attachments/{attachmentId}:
+    delete:
+      operationId: deleteAttachment
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/attachment-files/{attachmentId}:
+    get:
+      operationId: getAttachmentFile
+      x-gateway: none
+      description: >-
+        Requires the session and a short-lived signature from getAttachmentLink. The signature covers the
+        attachment id, the expiry and the disposition (inline without download, attachment with download=1).
+        The content type and the file name are read from the stored attachment record, never from the query;
+        other query values are ignored, and a signed value given twice is refused. The attachment must still be
+        readable by the viewer and checked clean. Content-Disposition is inline only when the signed disposition
+        is inline and the stored type is image/jpeg, image/png, video/mp4 or application/pdf; every other type
+        (video/quicktime included) is always attachment. X-Content-Type-Options nosniff and
+        Content-Security-Policy "default-src 'none'; sandbox" are always sent.
+      parameters:
+        - { name: attachmentId, in: path, required: true, schema: { type: string } }
+        - { name: expires, in: query, required: true, schema: { type: integer }, description: Expiry in epoch milliseconds (signed) }
+        - { name: download, in: query, required: false, schema: { enum: ['1'] }, description: Present for the save link; serves attachment (signed) }
+        - { name: signature, in: query, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The file, with Content-Type and the file name taken from the stored record
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '206': { description: Partial content for a Range request }
+        '404': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/households/current/ownership:
+    post:
+      operationId: transferOwnership
+      description: Hands the owner role to an active adult whose user has declared being 18 or older (shared rule with updateMembershipRole).
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HouseholdMembership' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/households/current/leave:
+    post:
+      operationId: leaveHousehold
+      description: The owner must hand over first.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/household-memberships/{membershipId}/status:
+    put:
+      operationId: setMemberStatus
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HouseholdMembership' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/color-labels:
+    post:
+      operationId: createColorLabel
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, required: [id, name, color], properties: { id: { type: string }, name: { type: string }, color: { type: string } } }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/color-labels/{labelId}:
+    put:
+      operationId: updateColorLabel
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, required: [id, name, color], properties: { id: { type: string }, name: { type: string }, color: { type: string } } }
+        default: { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: deleteColorLabel
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/item-links:
+    post:
+      operationId: createItemLink
+      description: Both ends must be visible to the viewer.
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/item-links/{linkId}:
+    delete:
+      operationId: deleteItemLink
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: OK }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/recently-deleted:
+    get:
+      operationId: listRecentlyDeleted
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { type: object, required: [kind, id, title, deletedAt], additionalProperties: true } }
+        default: { $ref: '#/components/responses/Error' }
   /v1/auth/passkey/challenge:
     post:
       security: []
@@ -75,11 +612,28 @@ paths:
               required: [email, password]
               properties:
                 email: { type: string, format: email }
-                password: { type: string, minLength: 15, maxLength: 64 }
+                password: { type: string, maxLength: 200 }
       responses:
-        '204': { description: Session cookie set by server }
+        '200':
+          description: Signed in, or a confirmation code is needed next
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - { type: object, required: [userId], properties: { userId: { type: string } } }
+                  - { type: object, required: [totpChallengeId], properties: { totpChallengeId: { type: string } } }
         default: { $ref: '#/components/responses/Error' }
   /v1/auth/session:
+    get:
+      security: []
+      operationId: getSession
+      description: Tells the client which stage to show. Never fails for a signed-out visitor.
+      responses:
+        '200':
+          description: Current stage
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionInfo' }
     delete:
       operationId: signOut
       parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
@@ -230,8 +784,17 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         default: { $ref: '#/components/responses/Error' }
   /v1/household-memberships/{membershipId}:
+    delete:
+      operationId: removeMember
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: Removed }
+        default: { $ref: '#/components/responses/Error' }
     patch:
       operationId: updateMembershipRole
+      description: >-
+        Making someone owner follows the same shared rule as transferOwnership: the member must be an active adult
+        whose user has declared being 18 or older, otherwise INVALID_INPUT.
       parameters:
         - { $ref: '#/components/parameters/CsrfToken' }
         - { name: membershipId, in: path, required: true, schema: { type: string } }
@@ -460,7 +1023,8 @@ paths:
               type: object
               required: [status, expectedVersion]
               properties:
-                status: { enum: [open, doing, review, done] }
+                status: { enum: [open, doing, review, waiting, done] }
+                note: { type: string, maxLength: 500 }
                 expectedVersion: { type: integer, minimum: 1 }
       responses:
         '200':
@@ -636,10 +1200,14 @@ paths:
   /v1/memos/{memoId}/attachments/{attachmentId}/link:
     get:
       operationId: getAttachmentLink
-      description: Issues a short-lived signed URL only for attachments whose scan status is clean and only to viewers allowed to read the memo.
+      description: >-
+        Issues a short-lived signed URL only for attachments whose scan status is clean and only to viewers allowed to read
+        the memo. Without download the link opens the file inline (for the allowed types, see getAttachmentFile); with
+        download=1 the link carries download=1 and always serves it as attachment.
       parameters:
         - { name: memoId, in: path, required: true, schema: { type: string } }
         - { name: attachmentId, in: path, required: true, schema: { type: string } }
+        - { name: download, in: query, required: false, schema: { enum: ['1'] } }
       responses:
         '200':
           description: Short-lived signed URL
@@ -754,6 +1322,42 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Expense' }
         default: { $ref: '#/components/responses/Error' }
+  /v1/settlement-batches:
+    post:
+      operationId: settleAll
+      description: Settles in one transaction exactly the shares shown on screen. Every share must be visible to the viewer and its remaining amount must match, otherwise 409 and nothing changes. Refused with a generic 409 when a live expense hidden from the viewer still has a remaining share between the parties. Requires recent reauthentication; never queued offline.
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SettleAllInput' }
+      responses:
+        '201':
+          description: One settlement per listed share, all carrying the batch id; the batch keeps the transfers actually made
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SettlementBatch' }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/settlement-batches/{batchId}/reverse:
+    post:
+      operationId: reverseBatch
+      description: Appends a reversal for every settlement of the batch, restoring each remaining amount. 409 when the batch or any of its settlements was already reversed. NOT_FOUND when any expense of the batch is hidden from the viewer.
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+        - { name: batchId, in: path, required: true, schema: { type: string } }
+      responses:
+        '201':
+          description: Reversed batch
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SettlementBatch' }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
   /v1/search:
     get:
       operationId: searchHousehold
@@ -769,12 +1373,20 @@ paths:
             application/json:
               schema:
                 type: array
-                maxItems: 12
+                description: >-
+                  Grouped by kind in this order, at most the number given in x-limits-per-kind for each kind. Albums match
+                  on title, description and place name; the place is matched only for viewers with place.read (the same
+                  redaction as the album list). Album items match on file name and capture date (YYYY-MM-DD, YYYY/M/D or
+                  the Japanese form) and only ready items of visible, undeleted albums are searched. An album opens at
+                  /albums/{albumId}; an album item opens the viewer at /albums/{albumId}?item={itemId}.
+                maxItems: 45
+                x-limits-per-kind: { event: 5, task: 5, memo: 5, expense: 5, place: 5, resource: 5, album: 5, albumItem: 10 }
                 items:
                   type: object
                   required: [kind, id, label, destination]
+                  additionalProperties: false
                   properties:
-                    kind: { enum: [event, task, memo, expense, place, resource] }
+                    kind: { enum: [event, task, memo, expense, place, resource, album, albumItem] }
                     detail: { type: string }
                     id: { type: string }
                     label: { type: string }
@@ -790,6 +1402,115 @@ paths:
           content:
             application/json:
               schema: { type: array, items: { $ref: '#/components/schemas/Insight' } }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/assistant/status:
+    get:
+      operationId: getAssistantStatus
+      description: Whether reading helpers can be used by the requester. False when the server has no LLM configured or the member lacks assistant.use.
+      responses:
+        '200':
+          description: Availability for the requesting member
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AssistantStatus' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/assistant/receipt:
+    post:
+      operationId: readReceipt
+      description: >-
+        Starts reading a receipt image into an expense proposal. Requires
+        assistant.use and expense.create. One reading at a time per household.
+        Nothing is saved; the image is deleted after the job.
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/PermissionRevision'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '202':
+          description: Reading accepted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AssistantJob' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/assistant/event-image:
+    post:
+      operationId: readEventImage
+      description: >-
+        Starts reading a flyer image into event candidates. Requires
+        assistant.use and event.create. Nothing is saved; the image is deleted
+        after the job.
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/PermissionRevision'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '202':
+          description: Reading accepted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AssistantJob' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/assistant/event-url:
+    post:
+      operationId: readEventUrl
+      description: >-
+        Starts reading a public https page into event candidates. Requires
+        assistant.use and event.create. The server refuses internal addresses,
+        pins the checked address, re-checks every redirect and passes the page
+        text to the LLM as data.
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/PermissionRevision'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url: { type: string, maxLength: 2048 }
+      responses:
+        '202':
+          description: Reading accepted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AssistantJob' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/assistant/jobs/{jobId}:
+    get:
+      operationId: getAssistantJob
+      description: Progress of the requester's own reading. Any other job is NOT_FOUND. Proposals are never saved by the server.
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The job
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AssistantJob' }
         default: { $ref: '#/components/responses/Error' }
   /v1/notifications:
     get:
@@ -891,6 +1612,46 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/NotificationPreferences' }
         default: { $ref: '#/components/responses/Error' }
+  /v1/audit-events:
+    get:
+      operationId: listAuditEvents
+      description: >-
+        The household's change record, newest first. Requires audit.read (owners by default; not
+        grantable to adults). Items never carry request bodies, secrets, tokens or addresses; detail
+        holds only the names of changed fields. A target the viewer cannot see (including one that no
+        longer exists) is returned without its ID and with hidden true. chain reports the latest
+        tamper check of the append-only hash chain.
+      parameters:
+        - { name: cursor, in: query, schema: { type: string, pattern: '^[0-9]{1,15}$' } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - { name: membershipId, in: query, schema: { type: string, maxLength: 100 } }
+        - { name: group, in: query, schema: { $ref: '#/components/schemas/AuditGroupFilter' } }
+        - { name: action, in: query, schema: { type: string, pattern: '^[A-Za-z.]{1,60}$' } }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: One page of the change record
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuditPage' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/account/audit-events:
+    get:
+      operationId: listAccountAuditEvents
+      description: >-
+        The caller's own account record (sign-in, password, email and two-step changes, passkeys,
+        signing other devices out), newest first, and the operator removing the caller's two-step code.
+      parameters:
+        - { name: cursor, in: query, schema: { type: string, pattern: '^[0-9]{1,15}$' } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        '200':
+          description: One page of the account record
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountAuditPage' }
+        default: { $ref: '#/components/responses/Error' }
 components:
   securitySchemes:
     sessionCookie:
@@ -920,6 +1681,62 @@ components:
         application/problem+json:
           schema: { $ref: '#/components/schemas/GatewayError' }
   schemas:
+    SessionInfo:
+      type: object
+      required: [stage, idleTimeoutMinutes]
+      properties:
+        stage: { enum: [signed-out, household-setup, suspended, paywall, active] }
+        userId: { type: string }
+        idleTimeoutMinutes: { type: integer }
+    Album:
+      type: object
+      required: [id, householdId, title, creatorMembershipId, visibility, createdAt, version]
+      additionalProperties: true
+      properties:
+        id: { type: string }
+        title: { type: string, maxLength: 120 }
+        visibility: { $ref: '#/components/schemas/VisibilityPolicy' }
+        version: { type: integer }
+    AlbumSummary:
+      allOf:
+        - { $ref: '#/components/schemas/Album' }
+        - { type: object, required: [itemCount], properties: { itemCount: { type: integer } } }
+    AlbumItem:
+      type: object
+      required: [id, albumId, kind, originalName, mimeType, byteSize, status, locationKept, hasThumbnail, position]
+      additionalProperties: true
+      properties:
+        id: { type: string }
+        albumId: { type: string }
+        kind: { enum: [photo, video] }
+        originalName: { type: string }
+        status: { enum: [uploading, processing, ready, rejected] }
+        locationKept: { type: boolean }
+        takenAt:
+          type: string
+          format: date-time
+          description: >-
+            Capture time read before the metadata is removed. Photos use DateTimeOriginal with OffsetTimeOriginal; without an
+            offset the household time zone is assumed. Videos prefer com.apple.quicktime.creationdate (with its offset), else the
+            mvhd creation time (seconds since 1904-01-01, taken as UTC). Zero, values before 1990 and values more than a day in
+            the future are discarded, and then takenAt is absent.
+        takenAtSource:
+          enum: [exif-offset, exif-local, quicktime-key, mvhd]
+          description: Where takenAt came from; exif-local means the photo had no offset and the household time zone was assumed.
+    AccountProfile:
+      type: object
+      required: [displayName, email, avatar, idleTimeoutMinutes, birthdateDeclared, adultDeclared, totpEnabled, totpUnavailable]
+      properties:
+        displayName: { type: string }
+        email: { type: string }
+        avatar: { type: object, additionalProperties: true }
+        idleTimeoutMinutes: { enum: [1, 5, 15, 30, 60] }
+        birthdateDeclared: { type: boolean }
+        adultDeclared: { type: boolean }
+        totpEnabled: { type: boolean }
+        totpUnavailable:
+          type: boolean
+          description: The confirmation code is set up but cannot be checked because the key that sealed it is missing or retired. Sign in with a recovery code or a passkey, then set it up again.
     GatewayError:
       type: object
       required: [code, message, retryable]
@@ -929,7 +1746,7 @@ components:
         message: { type: string }
         retryable: { type: boolean }
         reason:
-          enum: [CAPABILITY_MISSING, SCOPE_DENIED, MEMBERSHIP_INACTIVE, OWNER_REQUIRED, VERSION, PERMISSION_REVISION, IDEMPOTENCY]
+          enum: [CAPABILITY_MISSING, SCOPE_DENIED, MEMBERSHIP_INACTIVE, OWNER_REQUIRED, VERSION, PERMISSION_REVISION, IDEMPOTENCY, CSRF, REAUTH_FAILED, SESSION_EXPIRED]
         fieldErrors:
           type: object
           additionalProperties: { type: string }
@@ -1007,6 +1824,18 @@ components:
         assigneeMembershipId: { type: string }
         reviewerMembershipId: { type: string }
         note: { type: string, maxLength: 2000 }
+        dueStartAt: { type: string, format: date-time }
+        priority: { enum: [low, normal, high] }
+        colorLabelId: { type: string }
+        recurrence: { $ref: '#/components/schemas/Recurrence' }
+        visibility: { $ref: '#/components/schemas/VisibilityInput' }
+    VisibilityInput:
+      type: object
+      additionalProperties: false
+      required: [audience]
+      properties:
+        audience: { enum: [household, adults, participants, creator, selected] }
+        selectedMembershipIds: { type: array, maxItems: 8, items: { type: string } }
     Todo:
       allOf:
         - { $ref: '#/components/schemas/TodoInput' }
@@ -1015,9 +1844,10 @@ components:
           properties:
             id: { type: string }
             householdId: { type: string }
-            status: { enum: [open, doing, review, done] }
+            status: { enum: [open, doing, review, waiting, done] }
             creatorMembershipId: { type: string }
-            recurrence: { $ref: '#/components/schemas/Recurrence' }
+            handoffNote: { type: string }
+            completionNote: { type: string }
             version: { type: integer, minimum: 1 }
             visibility: { $ref: '#/components/schemas/VisibilityPolicy' }
             deletedAt: { type: string, format: date-time }
@@ -1028,7 +1858,7 @@ components:
         id: { type: string }
         status: { enum: [selected, validating, quarantined, clean, rejected] }
         originalName: { type: string }
-        mimeType: { enum: [application/pdf, image/jpeg, image/png] }
+        mimeType: { enum: [application/pdf, image/jpeg, image/png, video/mp4, video/quicktime] }
         byteSize: { type: integer, maximum: 10000000 }
         memoId: { type: string }
         statusMessage: { type: string }
@@ -1051,7 +1881,8 @@ components:
         deletedAt: { type: string, format: date-time }
     ExpenseInput:
       type: object
-      required: [title, amountJpy, incurredOn, payerMembershipId, shareMembershipIds]
+      description: A spending record needs shareMembershipIds or shareAmounts. Income has neither.
+      required: [title, amountJpy, incurredOn, payerMembershipId]
       properties:
         title: { type: string, minLength: 1, maxLength: 120 }
         amountJpy: { type: integer, minimum: 1 }
@@ -1061,19 +1892,35 @@ components:
           type: array
           minItems: 1
           items: { type: string }
-        category: { enum: [food, transport, education, home, other], default: other }
+        category: { enum: [food, dining, transport, utilities, home, education, health, entertainment, shopping, savings, other, income_salary, income_bonus, income_side, income_investment, income_gift, income_other] }
+        kind: { enum: [expense, income], default: expense }
+        shareAmounts:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required: [membershipId, amountJpy]
+            properties:
+              membershipId: { type: string }
+              amountJpy: { type: integer, minimum: 0 }
+        visibility: { $ref: '#/components/schemas/VisibilityInput' }
         note: { type: string, maxLength: 500 }
         place: { $ref: '#/components/schemas/PlaceRef' }
     ExpensePatch:
       type: object
       additionalProperties: false
+      description: Changing kind needs the new kind's category in the same request, and shares when it becomes an expense; an expense with a live settlement cannot become income (409). Income has no shares.
       properties:
+        kind: { enum: [expense, income] }
         title: { type: string, minLength: 1, maxLength: 120 }
         amountJpy: { type: integer, minimum: 1 }
         incurredOn: { type: string, format: date }
         payerMembershipId: { type: string }
         shareMembershipIds: { type: array, minItems: 1, items: { type: string } }
-        category: { enum: [food, transport, education, home, other] }
+        shareAmounts: { type: array, minItems: 1, items: { type: object, additionalProperties: false, required: [membershipId, amountJpy], properties: { membershipId: { type: string }, amountJpy: { type: integer, minimum: 0 } } } }
+        category: { enum: [food, dining, transport, utilities, home, education, health, entertainment, shopping, savings, other, income_salary, income_bonus, income_side, income_investment, income_gift, income_other] }
+        visibility: { $ref: '#/components/schemas/VisibilityInput' }
         note: { oneOf: [{ type: string, maxLength: 500 }, { type: 'null' }] }
         place: { oneOf: [{ $ref: '#/components/schemas/PlaceRef' }, { type: 'null' }] }
     ExpenseShare:
@@ -1095,17 +1942,69 @@ components:
         recordedAt: { type: string, format: date-time }
         reversedAt: { type: string, format: date-time }
         reversalOfSettlementId: { type: string }
-    Expense:
+        batchId: { type: string, description: Set when the settlement or its reversal belongs to a settle-all batch }
+    SettlementTransfer:
       type: object
-      required: [id, householdId, title, amountJpy, incurredOn, payerMembershipId, category, shares, settlements, version]
+      additionalProperties: false
+      required: [from, to, amountJpy]
+      properties:
+        from: { type: string }
+        to: { type: string }
+        amountJpy: { type: integer, minimum: 1 }
+    SettleAllInput:
+      type: object
+      additionalProperties: false
+      required: [shares, transfers]
+      properties:
+        shares:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items:
+            type: object
+            additionalProperties: false
+            required: [expenseId, membershipId, remainingJpy]
+            properties:
+              expenseId: { type: string }
+              membershipId: { type: string }
+              remainingJpy: { type: integer, minimum: 1 }
+        transfers: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/SettlementTransfer' } }
+    SettlementBatch:
+      type: object
+      additionalProperties: false
+      required: [id, householdId, recordedAt, recordedByMembershipId, transfers, items]
       properties:
         id: { type: string }
         householdId: { type: string }
+        recordedAt: { type: string, format: date-time }
+        recordedByMembershipId: { type: string }
+        transfers: { type: array, items: { $ref: '#/components/schemas/SettlementTransfer' } }
+        items:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [expenseId, membershipId, amountJpy, settlementId]
+            properties:
+              expenseId: { type: string }
+              membershipId: { type: string }
+              amountJpy: { type: integer, minimum: 1 }
+              settlementId: { type: string }
+        reversedAt: { type: string, format: date-time }
+    Expense:
+      type: object
+      required: [id, householdId, kind, title, amountJpy, incurredOn, payerMembershipId, creatorMembershipId, category, shares, settlements, visibility, version]
+      properties:
+        id: { type: string }
+        householdId: { type: string }
+        kind: { enum: [expense, income] }
+        creatorMembershipId: { type: string }
+        visibility: { $ref: '#/components/schemas/VisibilityPolicy' }
         title: { type: string, maxLength: 120 }
         amountJpy: { type: integer, minimum: 1 }
         incurredOn: { type: string, format: date }
         payerMembershipId: { type: string }
-        category: { enum: [food, transport, education, home, other] }
+        category: { enum: [food, dining, transport, utilities, home, education, health, entertainment, shopping, savings, other, income_salary, income_bonus, income_side, income_investment, income_gift, income_other] }
         shares: { type: array, items: { $ref: '#/components/schemas/ExpenseShare' } }
         settlements: { type: array, items: { $ref: '#/components/schemas/SettlementRecord' } }
         note: { type: string, maxLength: 500 }
@@ -1119,6 +2018,43 @@ components:
         id: { type: string }
         name: { type: string, maxLength: 40 }
         timezone: { const: Asia/Tokyo }
+    AssistantStatus:
+      type: object
+      required: [available]
+      properties:
+        available: { type: boolean }
+        sample: { type: boolean }
+    ReceiptProposal:
+      type: object
+      required: [amountJpy, date, merchant, category]
+      properties:
+        amountJpy: { type: [integer, 'null'] }
+        date: { type: [string, 'null'], format: date }
+        merchant: { type: [string, 'null'], maxLength: 120 }
+        category: { enum: [food, dining, transport, utilities, home, education, health, entertainment, shopping, savings, other] }
+    EventCandidate:
+      type: object
+      required: [title, date, startTime, endTime, allDay, location]
+      properties:
+        title: { type: string, maxLength: 120 }
+        date: { type: string, format: date }
+        startTime: { type: [string, 'null'] }
+        endTime: { type: [string, 'null'] }
+        allDay: { type: boolean }
+        location: { type: [string, 'null'], maxLength: 200 }
+    AssistantJob:
+      type: object
+      required: [id, kind, status]
+      properties:
+        id: { type: string }
+        kind: { enum: [receipt, event] }
+        status: { enum: [queued, running, done, failed] }
+        receipt: { $ref: '#/components/schemas/ReceiptProposal' }
+        events:
+          type: array
+          items: { $ref: '#/components/schemas/EventCandidate' }
+        message: { type: string }
+        sample: { type: boolean }
     Insight:
       type: object
       required: [id, title, summary, evidence, actionLabel, destination, confidence]
@@ -1292,4 +2228,87 @@ components:
       properties:
         viewer: { $ref: '#/components/schemas/ViewerContext' }
         permissionOverrides: { type: array, items: { $ref: '#/components/schemas/PermissionOverride' } }
+        settlementBatches: { type: array, description: Only batches whose expenses are all visible to the viewer, items: { $ref: '#/components/schemas/SettlementBatch' } }
       additionalProperties: true
+    AuditGroupFilter:
+      enum: [account, household, members, events, tasks, memos, expenses, albums, links, notifications, assistant, operator]
+    AuditGroup:
+      enum: [account, household, members, events, tasks, memos, expenses, albums, links, notifications, assistant, operator, other]
+    AuditDetail:
+      type: [object, 'null']
+      description: Names of the changed fields only, never their values.
+      required: [fields]
+      additionalProperties: false
+      properties:
+        fields: { type: array, items: { type: string } }
+    AuditEvent:
+      type: object
+      additionalProperties: false
+      required: [id, at, actor, action, group, target, detail]
+      properties:
+        id: { type: string }
+        at: { type: string, format: date-time }
+        actor:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [kind, membershipId, displayName]
+              properties:
+                kind: { const: member }
+                membershipId: { type: string }
+                displayName: { type: string }
+            - type: object
+              additionalProperties: false
+              required: [kind]
+              properties: { kind: { enum: [operator, former] } }
+        action: { type: string, description: The operationId, or operator.* for operator commands }
+        group: { $ref: '#/components/schemas/AuditGroup' }
+        target:
+          oneOf:
+            - type: 'null'
+            - type: object
+              additionalProperties: false
+              required: [kind, id, hidden]
+              properties:
+                kind: { enum: [event, task, memo, expense, settlementBatch, album, member, invite, colorLabel, link, notification] }
+                id: { type: [string, 'null'], description: null when hidden }
+                hidden: { type: boolean }
+        detail: { $ref: '#/components/schemas/AuditDetail' }
+    AuditPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor, chain]
+      properties:
+        items: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/AuditEvent' } }
+        nextCursor: { type: [string, 'null'] }
+        chain:
+          type: object
+          additionalProperties: false
+          required: [state, checkedAt]
+          properties:
+            state: { enum: [ok, problem, unchecked] }
+            checkedAt: { type: [string, 'null'], format: date-time }
+    AccountAuditPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, at, actor, action, group, detail]
+            properties:
+              id: { type: string }
+              at: { type: string, format: date-time }
+              actor:
+                type: object
+                additionalProperties: false
+                required: [kind]
+                properties: { kind: { enum: [self, operator] } }
+              action: { type: string }
+              group: { $ref: '#/components/schemas/AuditGroup' }
+              detail: { $ref: '#/components/schemas/AuditDetail' }
+        nextCursor: { type: [string, 'null'] }

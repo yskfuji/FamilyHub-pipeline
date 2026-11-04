@@ -1,0 +1,48 @@
+import { allowedAudiencesFor } from '../authz/policy';
+import type { HouseholdMembership, Id, MembershipRole, VisibilityAudience, VisibilityPolicy } from './types';
+
+/** 公開範囲を持つ記録の種類。メモとアルバムには「参加者」がない。 */
+export type SharedKind = 'event' | 'task' | 'memo' | 'album' | 'expense';
+
+export const MAX_SELECTED_MEMBERS = 8;
+
+const chooseable = (role: MembershipRole, kind: SharedKind) => allowedAudiencesFor(role).filter((audience) => (kind !== 'memo' && kind !== 'album') || audience !== 'participants');
+
+/** 選べる公開範囲。選べない範囲の記録でも、今の範囲は表示する（変えなければ送らない）。 */
+export function audienceChoices(role: MembershipRole, kind: SharedKind, current?: VisibilityAudience): readonly VisibilityAudience[] {
+  const allowed = chooseable(role, kind);
+  return current && !allowed.includes(current) ? [current, ...allowed] : allowed;
+}
+
+/** 新しい記録の公開範囲。本人の初期値を選べないときは、選べる最初の範囲にする。 */
+export function defaultAudience(role: MembershipRole, kind: SharedKind, preferred: VisibilityAudience | undefined): VisibilityAudience {
+  const allowed = chooseable(role, kind);
+  return allowed.find((audience) => audience === preferred) ?? allowed[0];
+}
+
+export function visibilityProblem(audience: VisibilityAudience, selectedIds: readonly Id[]): string | null {
+  if (audience === 'selected' && !selectedIds.length) return '公開する人を1人以上選んでください。';
+  if (selectedIds.length > MAX_SELECTED_MEMBERS) return `選べるのは${MAX_SELECTED_MEMBERS}人までです。`;
+  return null;
+}
+
+export const visibilityInput = <A extends VisibilityAudience>(audience: A, selectedIds: Id[]) => ({ audience, selectedMembershipIds: audience === 'selected' ? selectedIds : [] });
+
+/** 変えたときだけ公開範囲を送る（子どもが選べない範囲の記録を、ほかの項目だけ直せるようにするため）。 */
+export function visibilityChange<A extends VisibilityAudience>(audience: A, selectedIds: Id[], original: VisibilityPolicy) {
+  const next = visibilityInput(audience, selectedIds);
+  const before = original.selectedMembershipIds;
+  const same = audience === original.audience && next.selectedMembershipIds.length === before.length && next.selectedMembershipIds.every((id) => before.includes(id));
+  return same ? {} : { visibility: next };
+}
+
+/** 関わる人のうち、公開範囲の外になる人。記録が見えなくなるので、保存の前に知らせる。 */
+export function peopleOutsideAudience(relatedIds: readonly Id[], audience: VisibilityAudience, selectedIds: readonly Id[], memberships: readonly HouseholdMembership[], creatorId: Id): HouseholdMembership[] {
+  const sees = (member: HouseholdMembership) => {
+    if (member.id === creatorId) return audience !== 'adults' || member.role === 'owner' || member.role === 'adult';
+    if (audience === 'adults') return member.role === 'owner' || member.role === 'adult';
+    if (audience === 'creator') return false;
+    return audience !== 'selected' || selectedIds.includes(member.id);
+  };
+  return memberships.filter((member) => relatedIds.includes(member.id) && !sees(member));
+}

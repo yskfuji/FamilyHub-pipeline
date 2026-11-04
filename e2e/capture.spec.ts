@@ -1,17 +1,8 @@
 import { mkdir } from 'node:fs/promises';
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
+import { openedStates, screens, viewports } from './screens';
 
 test.use({ deviceScaleFactor: 2 });
-
-const screens = [
-  ['welcome','/welcome'],['auth','/auth'],['onboarding','/onboarding'],['today','/today'],['calendar','/calendar'],['tasks','/tasks'],['notes','/notes'],['budget','/budget'],['insights','/insights'],['settings-household','/settings/household'],['settings-security','/settings/security'],['settings-notifications','/settings/notifications'],['settings-accessibility','/settings/accessibility'],['settings-resources','/settings/resources'],['settings-location','/settings/location'],['showcase','/showcase'],
-  ['today-empty','/today?scenario=empty'],['today-offline','/today?scenario=offline'],['today-conflict','/today?scenario=conflict'],['today-expired-session','/today?scenario=expired-session'],['today-weather','/today?scenario=weather'],['notes-quarantined','/notes/memo-school?scenario=quarantined'],['showcase-expired-invite','/showcase?scenario=expired-invite'],
-  ['budget-detail','/budget/expense-books'],['places','/places'],['places-detail','/places/550c29b2'],['calendar-occurrence','/calendar/event-clean?month=2026-10&on=2026-10-08'],['tasks-recurring','/tasks/todo-garbage'],['settings-privacy','/settings/privacy'],['not-found','/todayx'],
-  ['today-child','/today?actor=member-hana'],['calendar-child','/calendar?actor=member-hana'],['today-guest','/today?actor=member-yui'],['resources-guest','/settings/resources?actor=member-yui'],['household-adult','/settings/household?actor=member-ren'],['household-forbidden-guest','/settings/household?actor=member-yui'],
-] as const;
-const viewports = [
-  ['mobile',390,844],['tablet',834,1112],['desktop',1440,1000],
-] as const;
 
 test.beforeAll(async () => { await mkdir('artifacts/screens', { recursive: true }); });
 
@@ -45,38 +36,18 @@ test('mobile calendar viewport positions', async ({ page, browserName }) => {
   }
 });
 
-for (const [viewport,width,height] of [['mobile',390,844],['desktop',1440,1000]] as const) {
-  test(`${viewport} notification center`, async ({ page, browserName }) => {
-    test.skip(browserName !== 'chromium', 'delivery capture uses fixed Chromium DPR 2');
-    await page.setViewportSize({ width, height }); await page.goto('/today');
-    await page.getByRole('button', { name: /通知を確認/ }).click();
-    await expect(page.getByRole('heading', { name: '通知', exact: true })).toBeVisible();
-    await page.screenshot({ path: `artifacts/screens/${viewport}-notification-center-light.png`, fullPage: false, animations: 'disabled' });
-  });
-  test(`${viewport} event editor`, async ({ page, browserName }) => {
-    test.skip(browserName !== 'chromium', 'delivery capture uses fixed Chromium DPR 2');
-    await page.setViewportSize({ width, height }); await page.goto('/calendar/event-clean');
-    await page.getByRole('button', { name: '編集する' }).click();
-    await expect(page.getByRole('heading', { name: '予定を編集' })).toBeVisible();
-    await page.screenshot({ path: `artifacts/screens/${viewport}-calendar-edit-light.png`, fullPage: false, animations: 'disabled' });
-  });
-  test(`${viewport} permission editor`, async ({ page, browserName }) => {
-    test.skip(browserName !== 'chromium', 'delivery capture uses fixed Chromium DPR 2');
-    await page.setViewportSize({ width, height }); await page.goto('/settings/household');
-    await page.getByRole('button', { name: '権限' }).nth(1).click();
-    await expect(page.getByRole('dialog')).toBeVisible();
-    await page.screenshot({ path: `artifacts/screens/${viewport}-settings-permission-light.png`, fullPage: false, animations: 'disabled' });
-  });
-  test(`${viewport} password editor`, async ({ page, browserName }) => {
-    test.skip(browserName !== 'chromium', 'delivery capture uses fixed Chromium DPR 2');
-    await page.setViewportSize({ width, height }); await page.goto('/settings/security');
-    await page.getByRole('button', { name: 'パスワードを変更' }).click();
-    await expect(page.getByRole('heading', { name: 'パスワードを変更' })).toBeVisible();
-    await page.screenshot({ path: `artifacts/screens/${viewport}-settings-password-light.png`, fullPage: false, animations: 'disabled' });
-  });
+for (const [viewport,width,height] of viewports) {
+  for (const state of openedStates.filter((item) => item.viewports.includes(viewport))) {
+    test(`${viewport} ${state.name}`, async ({ page, browserName }) => {
+      test.skip(browserName !== 'chromium', 'delivery capture uses fixed Chromium DPR 2');
+      await page.setViewportSize({ width, height }); await page.goto(state.route);
+      await state.open(page);
+      await page.screenshot({ path: `artifacts/screens/${viewport}-${state.name}-light.png`, fullPage: false, animations: 'disabled' });
+    });
+  }
 }
 
-for (const [name,route] of [['today','/today'],['calendar','/calendar'],['tasks','/tasks'],['budget','/budget'],['showcase','/showcase']] as const) {
+for (const [name,route] of [['today','/today'],['calendar','/calendar'],['tasks','/tasks'],['budget','/budget'],['budget-settlements','/budget?view=settlements'],['insights','/insights'],['showcase','/showcase']] as const) {
   test(`desktop ${name} dusk`, async ({ page, browserName }) => {
     test.skip(browserName !== 'chromium', 'delivery capture uses fixed Chromium DPR 1');
     await page.setViewportSize({ width: 1440, height: 1000 });
@@ -86,16 +57,3 @@ for (const [name,route] of [['today','/today'],['calendar','/calendar'],['tasks'
     await page.screenshot({ path: `artifacts/screens/desktop-${name}-dusk.png`, fullPage: true, animations: 'disabled' });
   });
 }
-
-test('mobile more menu and quick create', async ({ page, browserName }) => {
-  test.skip(browserName !== 'chromium', 'delivery capture uses fixed Chromium DPR 2');
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/budget');
-  await page.getByRole('button', { name: /^その他/ }).click();
-  await page.screenshot({ path: 'artifacts/screens/mobile-more-menu-light.png', fullPage: false, animations: 'disabled' });
-  await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: 'すぐに追加' }).click();
-  await page.getByRole('button', { name: '支出', exact: true }).click();
-  await page.screenshot({ path: 'artifacts/screens/mobile-quick-create-expense-light.png', fullPage: false, animations: 'disabled' });
-});
-

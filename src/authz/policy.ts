@@ -1,11 +1,14 @@
 import type {
   AuthorizationDecision,
   Capability,
+  Expense,
   HouseholdMembership,
   HouseholdSnapshot,
+  LinkedItemRef,
   PermissionOverride,
   PlaceRef,
   ViewerContext,
+  VisibilityAudience,
   VisibilityPolicy,
 } from '../domain/types';
 
@@ -14,21 +17,31 @@ export const allCapabilities: Capability[] = [
   'event.read', 'event.create', 'event.update', 'event.delete',
   'task.read', 'task.create', 'task.update', 'task.delete', 'task.transition',
   'memo.read', 'memo.create', 'memo.update', 'memo.delete', 'memo.attach',
-  'expense.read', 'expense.create', 'expense.settle',
+  'expense.read', 'expense.create', 'expense.update', 'expense.delete', 'expense.settle',
+  'album.read', 'album.create', 'album.update', 'album.delete',
+  'link.manage', 'assistant.use',
   'place.read',
   'insight.read', 'resource.read', 'settings.own', 'notification.manage',
+  'audit.read',
 ];
+
+/**
+ * 管理者だけが持てる能力。大人の上限に入れないので、個別の許可でも大人には渡せない。
+ * audit.read（変更の記録を見る）は、家族全員の操作の履歴を見せるので、家族の管理と同じ扱いにする。
+ */
+const ownerOnly = (item: Capability) => (item.startsWith('household.') && item !== 'household.members.read') || item === 'audit.read';
 
 const roleCeilings: Record<HouseholdMembership['role'], readonly Capability[]> = {
   owner: allCapabilities,
-  adult: allCapabilities.filter((item) => !item.startsWith('household.') || item === 'household.members.read'),
+  adult: allCapabilities.filter((item) => !ownerOnly(item)),
   child: [
     'event.read', 'event.create', 'event.update', 'event.delete',
     'task.read', 'task.create', 'task.update', 'task.delete', 'task.transition',
     'memo.read', 'memo.create', 'memo.update', 'memo.delete', 'memo.attach',
+    'album.read', 'album.create', 'album.update', 'album.delete',
     'resource.read', 'settings.own', 'notification.manage',
   ],
-  guest: ['event.read', 'task.read', 'memo.read', 'resource.read', 'settings.own', 'notification.manage'],
+  guest: ['event.read', 'task.read', 'memo.read', 'album.read', 'resource.read', 'settings.own', 'notification.manage'],
 };
 
 const baseRoleCapabilities: Record<HouseholdMembership['role'], readonly Capability[]> = {
@@ -94,21 +107,60 @@ export function redactPlace<T extends { place?: PlaceRef }>(item: T, viewer: Vie
   return redacted;
 }
 
-export function projectSnapshotForViewer(source: HouseholdSnapshot, viewer: ViewerContext): HouseholdSnapshot {
-  const snapshot = structuredClone(source);
-  snapshot.viewer = structuredClone(viewer);
-  snapshot.events = snapshot.events.filter((item) => !item.deletedAt && authorizeVisibleResource(viewer, 'event.read', item.visibility, [item.ownerMembershipId, ...item.participantMembershipIds]).allowed);
-  snapshot.todos = snapshot.todos.filter((item) => !item.deletedAt && authorizeVisibleResource(viewer, 'task.read', item.visibility, [item.creatorMembershipId, item.assigneeMembershipId, ...(item.reviewerMembershipId ? [item.reviewerMembershipId] : [])]).allowed);
-  snapshot.memos = snapshot.memos.filter((item) => !item.deletedAt && authorizeVisibleResource(viewer, 'memo.read', item.visibility, [item.authorMembershipId]).allowed).map((item) => redactPlace(item, viewer));
-  snapshot.resources = snapshot.resources.filter((item) => authorizeVisibleResource(viewer, 'resource.read', item.visibility).allowed);
-  snapshot.expenses = authorize(viewer, 'expense.read').allowed ? snapshot.expenses.filter((item) => !item.deletedAt).map((item) => redactPlace(item, viewer)) : [];
-  if (!authorize(viewer, 'household.members.read').allowed) {
+/** 支出に関わる人。作った人、支払った人、負担する人。 */
+export const expenseRelated = (item: Expense) => [item.creatorMembershipId, item.payerMembershipId, ...item.shares.map((share) => share.membershipId)];
+
+/** 支出が閲覧者に見えるか。一覧（スナップショット）と、1件を変える操作の両方がこの規則を使う。 */
+export const canSeeExpense = (viewer: ViewerContext, item: Expense) => authorizeVisibleResource(viewer, 'expense.read', item.visibility, expenseRelated(item)).allowed;
+
+/** 1件の支出を閲覧者に返す形にする。見えなければ null。見えても、場所は place.read がなければ除く。 */
+export function projectExpense(item: Expense, viewer: ViewerContext): Expense | null {
+  return canSeeExpense(viewer, item) ? redactPlace(structuredClone(item), viewer) : null;
+}
+
+const canSeeItem = (snapshot: HouseholdSnapshot, viewer: ViewerContext, item: LinkedItemRef) => {
+  if (item.kind === 'event') return snapshot.events.some((entry) => entry.id === item.id);
+  if (item.kind === 'task') return snapshot.todos.some((entry) => entry.id === item.id);
+  if (item.kind === 'memo') return snapshot.memos.some((entry) => entry.id === item.id);
+  return authorize(viewer, 'expense.read').allowed && snapshot.expenses.some((entry) => entry.id === item.id);
+};
+
+type Projector = (snapshot: HouseholdSnapshot, viewer: ViewerContext) => void;
+const unchanged: Projector = () => undefined;
+
+/**
+ * スナップショットの項目ごとの公開の規則。項目を増やすと、ここに規則を書くまで型の検査が通らない。
+ * 上から順に適用する。links と memberships は、ほかの項目の絞り込みの結果を使うので最後に置く。
+ */
+const snapshotProjection: Record<keyof HouseholdSnapshot, Projector> = {
+  viewer: (snapshot, viewer) => { snapshot.viewer = structuredClone(viewer); },
+  permissionOverrides: (snapshot, viewer) => { if (viewer.role !== 'owner') snapshot.permissionOverrides = []; },
+  user: unchanged,
+  household: unchanged,
+  context: unchanged,
+  colorLabels: unchanged,
+  events: (snapshot, viewer) => { snapshot.events = snapshot.events.filter((item) => !item.deletedAt && authorizeVisibleResource(viewer, 'event.read', item.visibility, [item.ownerMembershipId, ...item.participantMembershipIds]).allowed); },
+  todos: (snapshot, viewer) => { snapshot.todos = snapshot.todos.filter((item) => !item.deletedAt && authorizeVisibleResource(viewer, 'task.read', item.visibility, [item.creatorMembershipId, item.assigneeMembershipId, ...(item.reviewerMembershipId ? [item.reviewerMembershipId] : [])]).allowed); },
+  memos: (snapshot, viewer) => { snapshot.memos = snapshot.memos.filter((item) => !item.deletedAt && authorizeVisibleResource(viewer, 'memo.read', item.visibility, [item.authorMembershipId]).allowed).map((item) => redactPlace(item, viewer)); },
+  resources: (snapshot, viewer) => { snapshot.resources = snapshot.resources.filter((item) => authorizeVisibleResource(viewer, 'resource.read', item.visibility).allowed); },
+  expenses: (snapshot, viewer) => { snapshot.expenses = snapshot.expenses.filter((item) => !item.deletedAt).flatMap((item) => projectExpense(item, viewer) ?? []); },
+  // 含めた支出がすべて見えるまとめだけを返す。送金の額は、見えない支出の額を含みうるため。
+  settlementBatches: (snapshot) => { const seen = new Set(snapshot.expenses.map((item) => item.id)); snapshot.settlementBatches = snapshot.settlementBatches.filter((batch) => batch.items.every((item) => seen.has(item.expenseId))); },
+  links: (snapshot, viewer) => { snapshot.links = snapshot.links.filter((link) => canSeeItem(snapshot, viewer, link.from) && canSeeItem(snapshot, viewer, link.to)); },
+  memberships: (snapshot, viewer) => {
+    if (authorize(viewer, 'household.members.read').allowed) return;
     const referenced = new Set([viewer.membershipId]);
     snapshot.events.forEach((item) => { referenced.add(item.ownerMembershipId); item.participantMembershipIds.forEach((id) => referenced.add(id)); });
     snapshot.todos.forEach((item) => { referenced.add(item.creatorMembershipId); referenced.add(item.assigneeMembershipId); if (item.reviewerMembershipId) referenced.add(item.reviewerMembershipId); });
     snapshot.memos.forEach((item) => referenced.add(item.authorMembershipId));
+    snapshot.expenses.forEach((item) => { referenced.add(item.payerMembershipId); referenced.add(item.creatorMembershipId); item.shares.forEach((share) => referenced.add(share.membershipId)); });
     snapshot.memberships = snapshot.memberships.filter((item) => referenced.has(item.id));
-  }
+  },
+};
+
+export function projectSnapshotForViewer(source: HouseholdSnapshot, viewer: ViewerContext): HouseholdSnapshot {
+  const snapshot = structuredClone(source);
+  for (const project of Object.values(snapshotProjection)) project(snapshot, viewer);
   return snapshot;
 }
 
@@ -121,4 +173,21 @@ export function canMutateOwnedResource(
   if (!decision.allowed) return decision;
   if (viewer.role === 'owner' || viewer.role === 'adult' || ownerMembershipId === viewer.membershipId) return { allowed: true };
   return { allowed: false, reason: 'SCOPE_DENIED' };
+}
+
+/**
+ * 削除と復元の規則。関わっている人だけができ、管理者でも関わりのない記録は消せない。
+ * stakeholderIds は記録の種類ごとの関係者（作った人、参加者、担当者、支払った人など）。
+ */
+export function canDeleteResource(viewer: ViewerContext, capability: Capability, stakeholderIds: readonly string[]): AuthorizationDecision {
+  const decision = authorize(viewer, capability);
+  if (!decision.allowed) return decision;
+  return stakeholderIds.includes(viewer.membershipId) ? { allowed: true } : { allowed: false, reason: 'SCOPE_DENIED' };
+}
+
+const allAudiences: readonly VisibilityAudience[] = ['household', 'adults', 'participants', 'creator', 'selected'];
+
+/** 自分で選べる公開範囲。子どもメンバーは家族全体や大人向けの範囲を選べない。 */
+export function allowedAudiencesFor(role: HouseholdMembership['role']): readonly VisibilityAudience[] {
+  return role === 'child' ? ['participants', 'creator', 'selected'] : allAudiences;
 }

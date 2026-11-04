@@ -3,31 +3,2164 @@
   "idAttribute": "data-control-id",
   "generatedAtRuntime": false,
   "contracts": [
-    { "idPattern": "^(brand|navigation|route)\\.", "routes": ["*"], "roles": ["owner", "adult", "child", "guest"], "capability": null, "risk": "navigation", "onlineRequired": false, "successObservation": "目的の画面とURLが一致する", "failureRecovery": "現在の画面を維持して安全な戻り先を示す", "undo": "ブラウザの戻る操作", "alternative": "主ナビゲーションまたはモバイルナビゲーション", "entity": null },
-    { "idPattern": "^(dialog|drawer)\\.close$", "routes": ["*"], "roles": ["owner", "adult", "child", "guest"], "capability": null, "risk": "navigation", "onlineRequired": false, "successObservation": "重ねて表示した画面が閉じて起点へフォーカスが戻る", "failureRecovery": "Escapeキーでも閉じられる", "undo": "再び開く", "alternative": "Escapeキー", "entity": null },
-    { "idPattern": "^auth\\.", "routes": ["/auth"], "roles": ["owner", "adult", "child", "guest"], "capability": null, "risk": "high-impact", "onlineRequired": true, "successObservation": "本人確認後の画面へ移動する", "failureRecovery": "入力を保持して理由と再試行を示す", "undo": "サインアウト", "alternative": "パスキーまたはパスワード", "entity": "User" },
-    { "idPattern": "^(welcome|onboarding)\\.", "routes": ["/welcome", "/onboarding"], "roles": ["owner", "adult", "child", "guest"], "capability": null, "risk": "reversible", "onlineRequired": true, "successObservation": "選択した初期設定を保存して次へ進む", "failureRecovery": "現在の手順と入力を保持する", "undo": "前の手順へ戻る", "alternative": null, "entity": "Household" },
-    { "idPattern": "^search\\.", "routes": ["*"], "roles": ["owner", "adult", "child", "guest"], "capability": "event.read|task.read|memo.read|expense.read|place.read|resource.read", "risk": "navigation", "onlineRequired": true, "successObservation": "閲覧できる結果だけを表示して対象へ移動する", "failureRecovery": "検索語を保持して再試行を示す", "undo": "検索画面を閉じる", "alternative": "各機能の一覧", "entity": null },
-    { "idPattern": "^quick-create\\.", "routes": ["*"], "roles": ["owner", "adult", "child"], "capability": "task.create|event.create|memo.create|expense.create", "risk": "reversible", "onlineRequired": false, "successObservation": "入力どおりの予定・タスク・支出を追加する", "failureRecovery": "入力を保持し、安全な項目だけ未送信として保存する", "undo": "キャンセルまたは作成後の削除", "alternative": "各機能の追加ボタン", "entity": "Event|Todo|Expense" },
-    { "idPattern": "^calendar\\.month", "routes": ["/calendar"], "roles": ["owner", "adult", "child", "guest"], "capability": "event.read", "risk": "navigation", "onlineRequired": false, "successObservation": "URL、年月見出し、月・週・一覧を同じ年月へ更新する", "failureRecovery": "無効な年月は現在月へ戻す", "undo": "前月・次月・今月・ブラウザの戻る", "alternative": "年月選択ダイアログ", "entity": "Event" },
-    { "idPattern": "^calendar\\.(view|day|selected-event|event\\.open)", "routes": ["/calendar"], "roles": ["owner", "adult", "child", "guest"], "capability": "event.read", "risk": "navigation", "onlineRequired": false, "successObservation": "選択日または表示方式に対応する予定を表示する", "failureRecovery": "空状態を明示する", "undo": "別の日付または表示方式を選ぶ", "alternative": "月・週・一覧", "entity": "Event" },
-    { "idPattern": "^calendar\\.(event|resource)\\.", "routes": ["/calendar", "/calendar/*"], "roles": ["owner", "adult", "child", "guest"], "capability": "event.update|event.delete|resource.read", "risk": "high-impact", "onlineRequired": false, "successObservation": "対象予定だけを作成・変更・論理削除する", "failureRecovery": "入力を保持し競合または権限変更を示す", "undo": "削除後7日以内の復元", "alternative": "予定詳細", "entity": "Event" },
-    { "idPattern": "^tasks\\.", "routes": ["/tasks", "/tasks/*"], "roles": ["owner", "adult", "child", "guest"], "capability": "task.create|task.update|task.delete|task.transition", "risk": "reversible", "onlineRequired": false, "successObservation": "対象タスクの表示または状態だけを更新する", "failureRecovery": "入力と直前状態を保持する", "undo": "削除後7日以内の復元", "alternative": "タスク一覧", "entity": "Todo" },
-    { "idPattern": "^notes\\.", "routes": ["/notes", "/notes/*"], "roles": ["owner", "adult", "child", "guest"], "capability": "memo.create|memo.update|memo.delete|memo.attach", "risk": "reversible", "onlineRequired": false, "successObservation": "対象メモだけを表示または更新する", "failureRecovery": "本文を保持し、添付は再選択を求める", "undo": "削除後7日以内の復元", "alternative": "メモ一覧", "entity": "Memo" },
-    { "idPattern": "^budget\\.", "routes": ["/budget", "/budget/*"], "roles": ["owner", "adult"], "capability": "expense.read|expense.create|expense.settle", "risk": "high-impact", "onlineRequired": true, "successObservation": "対象支出または追記型の精算記録だけを更新する", "failureRecovery": "金額を保持し二重記録を拒否する", "undo": "反対記録による取消", "alternative": null, "entity": "Expense|SettlementRecord" },
-    { "idPattern": "^insights\\.", "routes": ["/insights"], "roles": ["owner", "adult"], "capability": "insight.read", "risk": "navigation", "onlineRequired": false, "successObservation": "根拠を保ったまま対象画面へ移動する", "failureRecovery": "提案を実行せず現在状態を維持する", "undo": "ブラウザの戻る操作", "alternative": "各機能の一覧", "entity": null },
-    { "idPattern": "^settings\\.(section|theme|motion|resource)", "routes": ["/settings/*"], "roles": ["owner", "adult", "child", "guest"], "capability": "settings.own", "risk": "navigation", "onlineRequired": false, "successObservation": "本人の表示設定または共有済みリンクを反映する", "failureRecovery": "現在値を保持する", "undo": "設定を戻す", "alternative": null, "entity": "ResourceLink" },
-    { "idPattern": "^settings\\.(member|invite)\\.", "routes": ["/settings/household"], "roles": ["owner"], "capability": "household.members.manage|household.invites.manage", "risk": "high-impact", "onlineRequired": true, "successObservation": "権限revisionと対象メンバーまたは招待だけを更新する", "failureRecovery": "最終管理者保護と競合理由を表示する", "undo": "標準へ戻す、または招待を無効にする", "alternative": null, "entity": "HouseholdMembership|HouseholdInvite" },
-    { "idPattern": "^settings\\.(passkey|password|session)\\.", "routes": ["/settings/security"], "roles": ["owner", "adult", "child", "guest"], "capability": "settings.own", "risk": "high-impact", "onlineRequired": true, "successObservation": "対象の認証器または端末だけを更新する", "failureRecovery": "秘密入力を閉じると破棄し理由を表示する", "undo": null, "alternative": "パスキーまたはパスワード", "entity": "Authenticator|Session" },
-    { "idPattern": "^(notifications|settings\\.notifications)\\.", "routes": ["*", "/settings/notifications"], "roles": ["owner", "adult", "child", "guest"], "capability": "notification.manage", "risk": "reversible", "onlineRequired": true, "successObservation": "対象通知または本人の通知設定だけを更新する", "failureRecovery": "現在値を保持して再試行を示す", "undo": "停止した通知を再開する", "alternative": "通知設定", "entity": "HouseholdNotification" },
-    { "idPattern": "^queue\\.", "routes": ["*"], "roles": ["owner", "adult", "child"], "capability": null, "risk": "reversible", "onlineRequired": true, "successObservation": "確認した未送信変更だけを送信または破棄する", "failureRecovery": "内容を保持して競合・権限変更を示す", "undo": "送信前は破棄可能", "alternative": null, "entity": null },
-    { "idPattern": "^showcase\\.", "routes": ["/showcase"], "roles": ["owner"], "capability": null, "risk": "navigation", "onlineRequired": false, "successObservation": "内部監査の表示条件を切り替える", "failureRecovery": "通常状態へ戻す", "undo": "通常状態を選ぶ", "alternative": null, "entity": null },
-    { "idPattern": "^today\\.", "routes": ["/today"], "roles": ["owner", "adult", "child", "guest"], "capability": "event.read|task.read|expense.read", "risk": "navigation", "onlineRequired": false, "successObservation": "閲覧できる対象の詳細へ移動する", "failureRecovery": "今日の画面を維持する", "undo": "ブラウザの戻る操作", "alternative": "各機能の一覧", "entity": null },
-    { "idPattern": "^shell\\.", "routes": ["*"], "roles": ["owner", "adult", "child", "guest"], "capability": null, "risk": "navigation", "onlineRequired": true, "successObservation": "最新情報を再取得する", "failureRecovery": "最後に取得できた情報を維持する", "undo": null, "alternative": "接続後に再試行", "entity": null },
-    { "idPattern": "^place\\.", "routes": ["/notes", "/notes/*", "/budget", "/budget/*", "*"], "roles": ["owner", "adult"], "capability": "place.read", "risk": "reversible", "onlineRequired": false, "successObservation": "選んだ場所だけを入力中の支出・メモに設定し、正確な現在地は保存しない", "failureRecovery": "拒否・精度不足・写真に位置なし・外部停止の理由を示し、名前で探す・手入力へ切り替える", "undo": "場所を外す、または変えずに戻る", "alternative": "手入力", "entity": "Memo|Expense" },
-    { "idPattern": "^settings\\.location\\.", "routes": ["/settings/location"], "roles": ["owner", "adult"], "capability": "place.read", "risk": "reversible", "onlineRequired": true, "successObservation": "外部検索への同意状態だけを更新し、記録済みの場所は変えない", "failureRecovery": "現在の同意状態を保持して再試行を促す", "undo": "もう一度切り替える", "alternative": "同意せず手入力だけを使う", "entity": "PlaceLookupConsent" },
-    { "idPattern": "^places\\.", "routes": ["/places", "/places/*"], "roles": ["owner", "adult"], "capability": "place.read", "risk": "navigation", "onlineRequired": false, "successObservation": "記録から集めた場所と、その場所が付いた支出・メモへ移動できる", "failureRecovery": "該当がなければ空の状態と、場所の付け方を示す", "undo": "ブラウザの戻る操作", "alternative": "支出・メモの詳細の場所表示", "entity": "PlaceSnapshot" },
-    { "idPattern": "^settings\\.privacy\\.", "routes": ["/settings/privacy"], "roles": ["owner", "adult", "child", "guest"], "capability": "settings.own", "risk": "reversible", "onlineRequired": true, "successObservation": "本人の共有範囲の初期値と通知の表示だけを更新し、ほかの設定は変えない", "failureRecovery": "現在の設定を保持して理由を示す", "undo": "もう一度切り替える", "alternative": "初期設定の共有範囲", "entity": "PrivacySettings" },
-    { "idPattern": "^settings\\.household\\.", "routes": ["/settings/household"], "roles": ["owner"], "capability": "household.members.manage", "risk": "reversible", "onlineRequired": true, "successObservation": "家族グループの名前だけを更新する", "failureRecovery": "入力を保持して理由を示す", "undo": "もう一度名前を変える", "alternative": "初期設定の家族グループ名", "entity": "Household" }
+    {
+      "idPattern": "^(brand|navigation|route)\\.",
+      "routes": [
+        "*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "navigation",
+      "onlineRequired": false,
+      "successObservation": "目的の画面とURLが一致する",
+      "failureRecovery": "現在の画面を維持して安全な戻り先を示す",
+      "undo": "ブラウザの戻る操作",
+      "alternative": "主ナビゲーションまたはモバイルナビゲーション",
+      "entity": null
+    },
+    {
+      "idPattern": "^(dialog|drawer)\\.close$",
+      "routes": [
+        "*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "navigation",
+      "onlineRequired": false,
+      "successObservation": "重ねて表示した画面が閉じて起点へフォーカスが戻る",
+      "failureRecovery": "Escapeキーでも閉じられる",
+      "undo": "再び開く",
+      "alternative": "Escapeキー",
+      "entity": null
+    },
+    {
+      "idPattern": "^auth\\.",
+      "routes": [
+        "/auth"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "high-impact",
+      "onlineRequired": true,
+      "successObservation": "本人確認後の画面へ移動する",
+      "failureRecovery": "入力を保持して理由と再試行を示す",
+      "undo": "サインアウト",
+      "alternative": "パスキーまたはパスワード",
+      "entity": "User"
+    },
+    {
+      "idPattern": "^(welcome|onboarding)\\.",
+      "routes": [
+        "/welcome",
+        "/onboarding"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "選択した初期設定を保存して次へ進む",
+      "failureRecovery": "現在の手順と入力を保持する",
+      "undo": "前の手順へ戻る",
+      "alternative": null,
+      "entity": "Household"
+    },
+    {
+      "idPattern": "^search\\.",
+      "routes": [
+        "*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "event.read|task.read|memo.read|expense.read|place.read|resource.read",
+      "risk": "navigation",
+      "onlineRequired": true,
+      "successObservation": "閲覧できる結果だけを表示して対象へ移動する",
+      "failureRecovery": "検索語を保持して再試行を示す",
+      "undo": "検索画面を閉じる",
+      "alternative": "各機能の一覧",
+      "entity": null
+    },
+    {
+      "idPattern": "^quick-create\\.",
+      "routes": [
+        "*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "task.create|event.create|memo.create|expense.create",
+      "risk": "reversible",
+      "onlineRequired": false,
+      "successObservation": "入力どおりの予定・タスク・支出を追加する",
+      "failureRecovery": "入力を保持し、安全な項目だけ未送信として保存する",
+      "undo": "キャンセルまたは作成後の削除",
+      "alternative": "各機能の追加ボタン",
+      "entity": "Event|Todo|Expense"
+    },
+    {
+      "idPattern": "^calendar\\.month",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "event.read",
+      "risk": "navigation",
+      "onlineRequired": false,
+      "successObservation": "URL、年月見出し、月・週・一覧を同じ年月へ更新する",
+      "failureRecovery": "無効な年月は現在月へ戻す",
+      "undo": "前月・次月・今月・ブラウザの戻る",
+      "alternative": "年月選択ダイアログ",
+      "entity": "Event"
+    },
+    {
+      "idPattern": "^tasks\\.",
+      "routes": [
+        "/tasks",
+        "/tasks/*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "task.create|task.update|task.delete|task.transition",
+      "risk": "reversible",
+      "onlineRequired": false,
+      "successObservation": "対象タスクの表示または状態だけを更新する",
+      "failureRecovery": "入力と直前状態を保持する",
+      "undo": "削除後7日以内の復元",
+      "alternative": "タスク一覧",
+      "entity": "Todo"
+    },
+    {
+      "idPattern": "^notes\\.",
+      "routes": [
+        "/notes",
+        "/notes/*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "memo.create|memo.update|memo.delete|memo.attach",
+      "risk": "reversible",
+      "onlineRequired": false,
+      "successObservation": "対象メモだけを表示または更新する",
+      "failureRecovery": "本文を保持し、添付は再選択を求める",
+      "undo": "削除後7日以内の復元",
+      "alternative": "メモ一覧",
+      "entity": "Memo"
+    },
+    {
+      "idPattern": "^budget\\.",
+      "routes": [
+        "/budget",
+        "/budget/*"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "expense.read|expense.create|expense.update|expense.delete|expense.settle",
+      "risk": "high-impact",
+      "onlineRequired": true,
+      "successObservation": "対象支出または追記型の精算記録だけを更新する",
+      "failureRecovery": "金額を保持し二重記録を拒否する",
+      "undo": "反対記録による取消",
+      "alternative": null,
+      "entity": "Expense|SettlementRecord"
+    },
+    {
+      "idPattern": "^insights\\.",
+      "routes": [
+        "/insights"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "insight.read",
+      "risk": "navigation",
+      "onlineRequired": false,
+      "successObservation": "根拠を保ったまま対象画面へ移動する",
+      "failureRecovery": "提案を実行せず現在状態を維持する",
+      "undo": "ブラウザの戻る操作",
+      "alternative": "各機能の一覧",
+      "entity": null
+    },
+    {
+      "idPattern": "^settings\\.(section|theme|motion|resource)",
+      "routes": [
+        "/settings/*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "settings.own",
+      "risk": "navigation",
+      "onlineRequired": false,
+      "successObservation": "本人の表示設定または共有済みリンクを反映する",
+      "failureRecovery": "現在値を保持する",
+      "undo": "設定を戻す",
+      "alternative": null,
+      "entity": "ResourceLink"
+    },
+    {
+      "idPattern": "^settings\\.(member|invite)\\.",
+      "routes": [
+        "/settings/household"
+      ],
+      "roles": [
+        "owner"
+      ],
+      "capability": "household.members.manage|household.invites.manage",
+      "risk": "high-impact",
+      "onlineRequired": true,
+      "successObservation": "権限revisionと対象メンバーまたは招待だけを更新する",
+      "failureRecovery": "最終管理者保護と競合理由を表示する",
+      "undo": "標準へ戻す、または招待を無効にする",
+      "alternative": null,
+      "entity": "HouseholdMembership|HouseholdInvite"
+    },
+    {
+      "idPattern": "^settings\\.(passkey|password|session)\\.",
+      "routes": [
+        "/settings/security"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "settings.own",
+      "risk": "high-impact",
+      "onlineRequired": true,
+      "successObservation": "対象の認証器または端末だけを更新する",
+      "failureRecovery": "秘密入力を閉じると破棄し理由を表示する",
+      "undo": null,
+      "alternative": "パスキーまたはパスワード",
+      "entity": "Authenticator|Session"
+    },
+    {
+      "idPattern": "^(notifications|settings\\.notifications)\\.",
+      "routes": [
+        "*",
+        "/settings/notifications"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "notification.manage",
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "対象通知または本人の通知設定だけを更新する",
+      "failureRecovery": "現在値を保持して再試行を示す",
+      "undo": "停止した通知を再開する",
+      "alternative": "通知設定",
+      "entity": "HouseholdNotification"
+    },
+    {
+      "idPattern": "^queue\\.",
+      "routes": [
+        "*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": null,
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "確認した未送信変更だけを送信または破棄する",
+      "failureRecovery": "内容を保持して競合・権限変更を示す",
+      "undo": "送信前は破棄可能",
+      "alternative": null,
+      "entity": null
+    },
+    {
+      "idPattern": "^showcase\\.",
+      "routes": [
+        "/showcase"
+      ],
+      "roles": [
+        "owner"
+      ],
+      "capability": null,
+      "risk": "navigation",
+      "onlineRequired": false,
+      "successObservation": "内部監査の表示条件を切り替える",
+      "failureRecovery": "通常状態へ戻す",
+      "undo": "通常状態を選ぶ",
+      "alternative": null,
+      "entity": null
+    },
+    {
+      "idPattern": "^today\\.",
+      "routes": [
+        "/today"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "event.read|task.read|expense.read",
+      "risk": "navigation",
+      "onlineRequired": false,
+      "successObservation": "閲覧できる対象の詳細へ移動する",
+      "failureRecovery": "今日の画面を維持する",
+      "undo": "ブラウザの戻る操作",
+      "alternative": "各機能の一覧",
+      "entity": null
+    },
+    {
+      "idPattern": "^shell\\.",
+      "routes": [
+        "*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "navigation",
+      "onlineRequired": true,
+      "successObservation": "最新情報を再取得する",
+      "failureRecovery": "最後に取得できた情報を維持する",
+      "undo": null,
+      "alternative": "接続後に再試行",
+      "entity": null
+    },
+    {
+      "idPattern": "^place\\.",
+      "routes": [
+        "/notes",
+        "/notes/*",
+        "/budget",
+        "/budget/*",
+        "*"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "place.read",
+      "risk": "reversible",
+      "onlineRequired": false,
+      "successObservation": "選んだ場所だけを入力中の支出・メモに設定し、正確な現在地は保存しない",
+      "failureRecovery": "拒否・精度不足・写真に位置なし・外部停止の理由を示し、名前で探す・手入力へ切り替える",
+      "undo": "場所を外す、または変えずに戻る",
+      "alternative": "手入力",
+      "entity": "Memo|Expense"
+    },
+    {
+      "idPattern": "^settings\\.location\\.",
+      "routes": [
+        "/settings/location"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "place.read",
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "外部検索への同意状態だけを更新し、記録済みの場所は変えない",
+      "failureRecovery": "現在の同意状態を保持して再試行を促す",
+      "undo": "もう一度切り替える",
+      "alternative": "同意せず手入力だけを使う",
+      "entity": "PlaceLookupConsent"
+    },
+    {
+      "idPattern": "^places\\.",
+      "routes": [
+        "/places",
+        "/places/*"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "place.read",
+      "risk": "navigation",
+      "onlineRequired": false,
+      "successObservation": "記録から集めた場所と、その場所が付いた支出・メモへ移動できる",
+      "failureRecovery": "該当がなければ空の状態と、場所の付け方を示す",
+      "undo": "ブラウザの戻る操作",
+      "alternative": "支出・メモの詳細の場所表示",
+      "entity": "PlaceSnapshot"
+    },
+    {
+      "idPattern": "^settings\\.privacy\\.",
+      "routes": [
+        "/settings/privacy"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "settings.own",
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "本人の共有範囲の初期値と通知の表示だけを更新し、ほかの設定は変えない",
+      "failureRecovery": "現在の設定を保持して理由を示す",
+      "undo": "もう一度切り替える",
+      "alternative": "初期設定の共有範囲",
+      "entity": "PrivacySettings"
+    },
+    {
+      "idPattern": "^settings\\.household\\.",
+      "routes": [
+        "/settings/household"
+      ],
+      "roles": [
+        "owner"
+      ],
+      "capability": "household.members.manage",
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "家族グループの名前だけを更新する",
+      "failureRecovery": "入力を保持して理由を示す",
+      "undo": "もう一度名前を変える",
+      "alternative": "初期設定の家族グループ名",
+      "entity": "Household"
+    },
+    {
+      "idPattern": "^stage\\.",
+      "routes": [
+        "/today"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "safe",
+      "onlineRequired": true,
+      "successObservation": "状態に応じた画面から再読み込みまたはサインアウトできる",
+      "failureRecovery": "画面にとどまり再試行できる",
+      "undo": null,
+      "alternative": null,
+      "entity": "Session"
+    },
+    {
+      "idPattern": "^sign-up\\.",
+      "routes": [
+        "/sign-up"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "アカウントが作られ家族の設定へ進む",
+      "failureRecovery": "入力を保ったまま理由を示す",
+      "undo": "サインインに戻る",
+      "alternative": null,
+      "entity": "User"
+    },
+    {
+      "idPattern": "^reset\\.",
+      "routes": [
+        "/reset-password"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "コードを送り、新しいパスワードを設定する",
+      "failureRecovery": "入力を保ったまま理由を示す",
+      "undo": "サインインに戻る",
+      "alternative": null,
+      "entity": "User"
+    },
+    {
+      "idPattern": "^reauth\\.",
+      "routes": [
+        "/today"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "safe",
+      "onlineRequired": true,
+      "successObservation": "本人確認のあと元の操作を続ける",
+      "failureRecovery": "画面の入力を保ったまま再入力できる",
+      "undo": "やめると元の操作は行われない",
+      "alternative": null,
+      "entity": "Session"
+    },
+    {
+      "idPattern": "^idle\\.",
+      "routes": [
+        "/today"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "safe",
+      "onlineRequired": true,
+      "successObservation": "残り時間の案内を閉じて操作を続ける",
+      "failureRecovery": "時間が過ぎるとサインアウトする",
+      "undo": null,
+      "alternative": null,
+      "entity": "Session"
+    },
+    {
+      "idPattern": "^settings\\.account\\.",
+      "routes": [
+        "/settings/account"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "settings.own",
+      "risk": "irreversible",
+      "onlineRequired": true,
+      "successObservation": "アカウントの内容を更新する",
+      "failureRecovery": "入力を保ったまま理由を示す",
+      "undo": null,
+      "alternative": null,
+      "entity": "User"
+    },
+    {
+      "idPattern": "^calendar\\.(view|day|selected-event|event\\.open)",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "event.read",
+      "risk": "navigation",
+      "onlineRequired": true,
+      "successObservation": "選択日または表示方式に対応する予定を表示する",
+      "failureRecovery": "空状態を明示する",
+      "undo": "別の日付または表示方式を選ぶ",
+      "alternative": "月・週・日・一覧",
+      "entity": "Event"
+    },
+    {
+      "idPattern": "^calendar\\.(event|resource)\\.",
+      "routes": [
+        "/calendar",
+        "/calendar/*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "event.create|event.update|event.delete|resource.read",
+      "risk": "high-impact",
+      "onlineRequired": true,
+      "successObservation": "対象予定だけを作成・変更・論理削除する",
+      "failureRecovery": "入力を保持し競合または権限変更を示す",
+      "undo": "削除後7日以内の復元",
+      "alternative": "予定詳細",
+      "entity": "Event"
+    },
+    {
+      "idPattern": "^calendar\\.timeline\\.add",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "event.create",
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "押した30分の枠の日時を入れて予定の追加を開く",
+      "failureRecovery": "入力を保持し権限変更を示す",
+      "undo": "キャンセル",
+      "alternative": "予定を追加",
+      "entity": "Event"
+    },
+    {
+      "idPattern": "^calendar\\.agenda\\.",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "event.read",
+      "risk": "navigation",
+      "onlineRequired": true,
+      "successObservation": "一覧の後の日を読み込んで表示する",
+      "failureRecovery": "下へ進むと続けて読み込む",
+      "undo": "前月・次月・今月",
+      "alternative": "月・週・日",
+      "entity": "Event"
+    },
+    {
+      "idPattern": "^calendar\\.task\\.complete",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "task.transition",
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "その日のタスクを完了にするか確認を依頼する",
+      "failureRecovery": "理由を示し状態を保つ",
+      "undo": "タスクの詳細で状態を戻す",
+      "alternative": "タスクの詳細",
+      "entity": "Todo"
+    },
+    {
+      "idPattern": "^calendar\\.task\\.open",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "task.read",
+      "risk": "navigation",
+      "onlineRequired": true,
+      "successObservation": "タスクの詳細を開く",
+      "failureRecovery": "見つからないことを示す",
+      "undo": "閉じる",
+      "alternative": "タスク",
+      "entity": "Todo"
+    },
+    {
+      "idPattern": "^calendar\\.expense\\.open",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "expense.read",
+      "risk": "navigation",
+      "onlineRequired": true,
+      "successObservation": "支出の詳細を開く",
+      "failureRecovery": "見つからないことを示す",
+      "undo": "閉じる",
+      "alternative": "家計",
+      "entity": "Expense"
+    },
+    {
+      "idPattern": "^tasks\\.form\\.",
+      "routes": [
+        "*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "task.create|task.update",
+      "risk": "reversible",
+      "onlineRequired": false,
+      "successObservation": "入力どおりのタスクを追加または更新する",
+      "failureRecovery": "入力を保持し、問題のある項目を示す",
+      "undo": "キャンセル、または保存後に編集・削除",
+      "alternative": "タスクの詳細",
+      "entity": "Todo"
+    },
+    {
+      "idPattern": "^tasks\\.complete\\.",
+      "routes": [
+        "/tasks"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "task.transition",
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "一覧のまま、見ている人に勧める操作（完了、確認の依頼、確認して完了）を行う",
+      "failureRecovery": "理由を示し状態を保つ",
+      "undo": "タスクの詳細で状態を戻す",
+      "alternative": "タスクの詳細",
+      "entity": "Todo"
+    },
+    {
+      "idPattern": "^tasks\\.action\\.",
+      "routes": [
+        "/tasks/*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "task.transition",
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "状態を変え、一言を次の人への一言または完了の一言として残す",
+      "failureRecovery": "理由を示し、一言の入力を保つ",
+      "undo": "タスクの詳細で状態を戻す",
+      "alternative": "タスクの一覧の丸ボタン",
+      "entity": "Todo"
+    },
+    {
+      "idPattern": "^notes\\.attachment\\.(retry|discard)\\.",
+      "routes": [
+        "/notes/*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "memo.attach",
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "送れなかったファイルを同じ内容で送り直す、または一覧から取り除く",
+      "failureRecovery": "理由を示し、ファイルを一覧に残す",
+      "undo": "取り除いた後はファイルを選び直す",
+      "alternative": "ファイルを追加",
+      "entity": "Attachment"
+    },
+    {
+      "idPattern": "^notes\\.attachment\\.delete\\.",
+      "routes": [
+        "/notes/*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "memo.attach",
+      "risk": "irreversible",
+      "onlineRequired": true,
+      "successObservation": "確認の後で添付ファイルをメモから外す",
+      "failureRecovery": "理由を示し、添付を残す",
+      "undo": null,
+      "alternative": "メモの編集",
+      "entity": "Attachment"
+    },
+    {
+      "idPattern": "^notes\\.ocr\\.",
+      "routes": [
+        "/notes/*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "memo.update",
+      "risk": "reversible",
+      "onlineRequired": false,
+      "successObservation": "文字認識の結果を修正する。空にすると外す",
+      "failureRecovery": "入力を保持し、理由を示す",
+      "undo": "もう一度修正する",
+      "alternative": "メモの編集",
+      "entity": "Memo"
+    },
+    {
+      "idPattern": "^shared\\.visibility\\.",
+      "routes": [
+        "*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "event.create|event.update|task.create|task.update|memo.create|memo.update|expense.create|expense.update",
+      "risk": "reversible",
+      "onlineRequired": false,
+      "successObservation": "選んだ公開範囲を入力に反映する",
+      "failureRecovery": "入力を保持し、問題を示す",
+      "undo": "選び直す",
+      "alternative": "作成した本人だけに公開",
+      "entity": "Household"
+    },
+    {
+      "idPattern": "^shared\\.recurrence\\.",
+      "routes": [
+        "*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "event.create|event.update|task.create|task.update",
+      "risk": "reversible",
+      "onlineRequired": false,
+      "successObservation": "選んだ繰り返しを入力に反映する",
+      "failureRecovery": "入力を保持し、問題を示す",
+      "undo": "選び直す",
+      "alternative": "繰り返さない",
+      "entity": "Household"
+    },
+    {
+      "idPattern": "^shared\\.color-label\\.",
+      "routes": [
+        "*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "event.create|event.update|task.create|task.update",
+      "risk": "reversible",
+      "onlineRequired": false,
+      "successObservation": "選んだリストを入力に反映する",
+      "failureRecovery": "入力を保持する",
+      "undo": "選び直す",
+      "alternative": "なし",
+      "entity": "Household"
+    },
+    {
+      "idPattern": "^budget\\.view\\.",
+      "routes": [
+        "/budget",
+        "/budget/*"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "expense.read",
+      "risk": "navigation",
+      "onlineRequired": false,
+      "successObservation": "選んだ表示に切り替わり、URLの?view=が変わる",
+      "failureRecovery": "現在の表示を保つ",
+      "undo": "ブラウザの戻る操作",
+      "alternative": "表示の切り替えは主ナビゲーションの家計からも開ける",
+      "entity": "Expense"
+    },
+    {
+      "idPattern": "^budget\\.month\\.",
+      "routes": [
+        "/budget",
+        "/budget/*"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "expense.read",
+      "risk": "navigation",
+      "onlineRequired": false,
+      "successObservation": "選んだ月の集計に切り替わり、URLの?month=が変わる",
+      "failureRecovery": "最後の月より先へは進めず、ボタンを無効にする",
+      "undo": "ブラウザの戻る操作または今月",
+      "alternative": "一覧の日付の指定",
+      "entity": "Expense"
+    },
+    {
+      "idPattern": "^budget\\.list\\.",
+      "routes": [
+        "/budget",
+        "/budget/*"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "expense.read",
+      "risk": "navigation",
+      "onlineRequired": false,
+      "successObservation": "費目・期間・並び順に合う記録だけを表示し、件数を知らせる",
+      "failureRecovery": "該当がなければ絞り込みを外す操作を示す",
+      "undo": "絞り込みを外す",
+      "alternative": null,
+      "entity": "Expense"
+    },
+    {
+      "idPattern": "^budget\\.category\\.open\\.",
+      "routes": [
+        "/budget",
+        "/budget/*"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "expense.read",
+      "risk": "navigation",
+      "onlineRequired": false,
+      "successObservation": "その費目で絞り込んだ一覧を開く",
+      "failureRecovery": "現在の画面を維持する",
+      "undo": "ブラウザの戻る操作",
+      "alternative": "一覧の費目の絞り込み",
+      "entity": "Expense"
+    },
+    {
+      "idPattern": "^budget\\.(recent|unsettled)\\.",
+      "routes": [
+        "/budget",
+        "/budget/*"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "expense.read",
+      "risk": "navigation",
+      "onlineRequired": false,
+      "successObservation": "一覧または精算の表示を開く",
+      "failureRecovery": "現在の画面を維持する",
+      "undo": "ブラウザの戻る操作",
+      "alternative": "家計の表示の切り替え",
+      "entity": "Expense"
+    },
+    {
+      "idPattern": "^budget\\.form\\.",
+      "routes": [
+        "*"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "expense.create|expense.update",
+      "risk": "high-impact",
+      "onlineRequired": true,
+      "successObservation": "入力どおりの支出または収入を保存する。金額を指定した負担は合計が金額と一致するときだけ保存する",
+      "failureRecovery": "入力を保持して理由を示す。精算の記録があれば金額と負担は変えられない",
+      "undo": "キャンセル、作成後の編集または削除",
+      "alternative": null,
+      "entity": "Expense"
+    },
+    {
+      "idPattern": "^budget\\.income\\.create$",
+      "routes": [
+        "/budget",
+        "/budget/*"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "expense.create",
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "収入の入力を開く",
+      "failureRecovery": "現在の画面を維持する",
+      "undo": "キャンセル",
+      "alternative": "すぐに追加の支出で種類を収入にする",
+      "entity": "Expense"
+    },
+    {
+      "idPattern": "^budget\\.settlement\\.(amount|preset)\\.",
+      "routes": [
+        "/budget",
+        "/budget/*"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "expense.settle",
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "精算額の入力を変える。保存はしない",
+      "failureRecovery": "残りを超える額は記録せず理由を示す",
+      "undo": "入力を変える",
+      "alternative": null,
+      "entity": "SettlementRecord"
+    },
+    {
+      "idPattern": "^albums\\.(open|detail\\.back|filter)\\.?",
+      "routes": [
+        "/albums",
+        "/albums/*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "album.read",
+      "risk": "navigation",
+      "onlineRequired": true,
+      "successObservation": "アルバムの一覧や詳細、表示する種類へ移る",
+      "failureRecovery": "現在の画面を維持する",
+      "undo": null,
+      "alternative": null,
+      "entity": "Album"
+    },
+    {
+      "idPattern": "^albums\\.(list|detail)\\.retry",
+      "routes": [
+        "/albums",
+        "/albums/*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "album.read",
+      "risk": "safe",
+      "onlineRequired": true,
+      "successObservation": "アルバムを読み直して表示する",
+      "failureRecovery": "失敗の理由と再読み込みの操作を残す",
+      "undo": null,
+      "alternative": null,
+      "entity": "Album"
+    },
+    {
+      "idPattern": "^albums\\.(create\\.(open|empty)|form\\.)",
+      "routes": [
+        "/albums",
+        "/albums/*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "album.create|album.update",
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "アルバムの作成や編集の入力を開き、保存すると一覧と詳細に反映する",
+      "failureRecovery": "入力を残して理由を示す",
+      "undo": "キャンセル",
+      "alternative": null,
+      "entity": "Album"
+    },
+    {
+      "idPattern": "^albums\\.(detail\\.delete|delete\\.)",
+      "routes": [
+        "/albums/*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "album.delete",
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "確認のあとアルバムを削除し、一覧で元に戻す操作を示す",
+      "failureRecovery": "現在の画面を維持して理由を示す",
+      "undo": "元に戻す（7日以内）",
+      "alternative": null,
+      "entity": "Album"
+    },
+    {
+      "idPattern": "^albums\\.restore$",
+      "routes": [
+        "/albums"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "album.delete",
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "削除したアルバムを一覧へ戻す",
+      "failureRecovery": "理由を示し、元に戻す操作を残す",
+      "undo": null,
+      "alternative": null,
+      "entity": "Album"
+    },
+    {
+      "idPattern": "^albums\\.detail\\.(upload|upload-empty|upload-status)$",
+      "routes": [
+        "/albums/*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "album.create|album.update",
+      "risk": "navigation",
+      "onlineRequired": true,
+      "successObservation": "追加の画面を開く",
+      "failureRecovery": "現在の画面を維持する",
+      "undo": "閉じる",
+      "alternative": null,
+      "entity": "AlbumItem"
+    },
+    {
+      "idPattern": "^albums\\.upload\\.(choose|file|keep-location|earlier|later|remove|clear|close)",
+      "routes": [
+        "/albums/*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "album.create|album.update",
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "送る前の一覧を変える。撮影場所を残す設定は既定でオフ",
+      "failureRecovery": "選べないファイルは理由と一緒に一覧に残す",
+      "undo": "一覧から外す",
+      "alternative": null,
+      "entity": "AlbumItem"
+    },
+    {
+      "idPattern": "^albums\\.upload\\.(start|retry|cancel)",
+      "routes": [
+        "/albums/*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "album.create|album.update",
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "同時に3件まで送り、ファイルごとの進み具合と完了の件数を示す",
+      "failureRecovery": "失敗は一覧に残して送り直せる。拒否は理由を示す",
+      "undo": "送信を中止、または項目を削除",
+      "alternative": null,
+      "entity": "AlbumItem"
+    },
+    {
+      "idPattern": "^albums\\.detail\\.(slideshow|save-all|organize)",
+      "routes": [
+        "/albums/*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "album.read",
+      "risk": "safe",
+      "onlineRequired": true,
+      "successObservation": "スライドショーを開く、実際のファイルを1件ずつ保存する、または整理の表示に切り替える",
+      "failureRecovery": "現在の画面を維持する",
+      "undo": "閉じる、または止める",
+      "alternative": null,
+      "entity": "AlbumItem"
+    },
+    {
+      "idPattern": "^albums\\.detail\\.edit$",
+      "routes": [
+        "/albums/*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "album.update",
+      "risk": "navigation",
+      "onlineRequired": true,
+      "successObservation": "編集の入力を開く",
+      "failureRecovery": "現在の画面を維持する",
+      "undo": "キャンセル",
+      "alternative": null,
+      "entity": "Album"
+    },
+    {
+      "idPattern": "^albums\\.item\\.open\\.",
+      "routes": [
+        "/albums/*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "album.read",
+      "risk": "navigation",
+      "onlineRequired": true,
+      "successObservation": "全画面で開き、閉じるとその項目へ戻る",
+      "failureRecovery": "読み込めないときは理由を示す",
+      "undo": "閉じる",
+      "alternative": null,
+      "entity": "AlbumItem"
+    },
+    {
+      "idPattern": "^albums\\.item\\.(move-earlier|move-later|cover)\\.",
+      "routes": [
+        "/albums/*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "album.update",
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "並び順や表紙を保存して表示を変える",
+      "failureRecovery": "理由を示して保存された並びへ戻す",
+      "undo": "もう一度動かす",
+      "alternative": null,
+      "entity": "Album"
+    },
+    {
+      "idPattern": "^albums\\.(item\\.delete\\.|item\\.restore$|rejected\\.remove\\.|viewer\\.delete$|viewer\\.undo$)",
+      "routes": [
+        "/albums/*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "album.delete",
+      "risk": "reversible",
+      "onlineRequired": true,
+      "successObservation": "項目を削除し、元に戻す操作を示す。関わっている人だけに表示する",
+      "failureRecovery": "理由を示して項目を残す",
+      "undo": "元に戻す（7日以内）",
+      "alternative": null,
+      "entity": "AlbumItem"
+    },
+    {
+      "idPattern": "^albums\\.viewer\\.(close|previous|next|info|download|pip)$",
+      "routes": [
+        "/albums/*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "album.read",
+      "risk": "safe",
+      "onlineRequired": true,
+      "successObservation": "項目を切り替える、情報を見る、実際のファイルを保存する、または小さな窓で再生する",
+      "failureRecovery": "読み込めないときは理由を示す",
+      "undo": "閉じる",
+      "alternative": null,
+      "entity": "AlbumItem"
+    },
+    {
+      "idPattern": "^albums\\.slideshow\\.",
+      "routes": [
+        "/albums/*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "album.read",
+      "risk": "safe",
+      "onlineRequired": true,
+      "successObservation": "自動で送り、止める、動画の有無を変える、合成した曲を操作の後だけ流す",
+      "failureRecovery": "再生できない動画は時間で送る。曲を鳴らせなければ理由を示す",
+      "undo": "閉じる",
+      "alternative": null,
+      "entity": "AlbumItem"
+    },
+    {
+      "idPattern": "^shell\\.member-scope$",
+      "routes": [
+        "/today",
+        "/calendar",
+        "/tasks",
+        "/notes",
+        "/budget"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "display",
+      "onlineRequired": false,
+      "successObservation": "選んだ人に関わる記録だけを表示し、端末に覚える",
+      "failureRecovery": "保存できなくてもこの画面の間は絞り込みを保つ",
+      "undo": "「すべて」に戻す",
+      "alternative": "コマンドの一覧",
+      "entity": null
+    },
+    {
+      "idPattern": "^shell\\.version\\.reload$",
+      "routes": [
+        "*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "navigation",
+      "onlineRequired": true,
+      "successObservation": "画面を読み込み直して最新の版を開く",
+      "failureRecovery": "読み込めないときはブラウザの再読み込みを案内する",
+      "undo": null,
+      "alternative": "ブラウザの再読み込み",
+      "entity": null
+    },
+    {
+      "idPattern": "^sync\\.now$",
+      "routes": [
+        "/today",
+        "/settings/accessibility"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "read",
+      "onlineRequired": true,
+      "successObservation": "最新の内容を読み直し、最終更新の時刻を更新する",
+      "failureRecovery": "失敗を知らせ、もう一度更新できるようにする",
+      "undo": null,
+      "alternative": "ブラウザの再読み込み",
+      "entity": "Household"
+    },
+    {
+      "idPattern": "^palette\\.command\\.",
+      "routes": [
+        "*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "navigation",
+      "onlineRequired": false,
+      "successObservation": "選んだ画面、追加の画面、表示の設定を実行する",
+      "failureRecovery": "一覧を閉じて今の画面を維持する",
+      "undo": "同じ一覧から元に戻す",
+      "alternative": "主ナビゲーションと設定",
+      "entity": null
+    },
+    {
+      "idPattern": "^unsaved\\.(stay|discard)$",
+      "routes": [
+        "*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "destructive-local",
+      "onlineRequired": false,
+      "successObservation": "編集に戻るか、入力を破棄して離れる",
+      "failureRecovery": "選ぶまで入力を残す",
+      "undo": null,
+      "alternative": "編集に戻って保存する",
+      "entity": null
+    },
+    {
+      "idPattern": "^settings\\.density\\.",
+      "routes": [
+        "/settings/accessibility"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "settings.own",
+      "risk": "display",
+      "onlineRequired": false,
+      "successObservation": "表示の密度が変わり、端末に保存する",
+      "failureRecovery": "保存できなくてもこの画面の間は反映する",
+      "undo": "もう一方を選ぶ",
+      "alternative": "コマンドの一覧",
+      "entity": null
+    },
+    {
+      "idPattern": "^settings\\.privacy\\.(blur-hidden|keep-photo-location)$",
+      "routes": [
+        "/settings/privacy"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "settings.own",
+      "risk": "privacy",
+      "onlineRequired": false,
+      "successObservation": "端末の設定を切り替える",
+      "failureRecovery": "保存できなくてもこの画面の間は反映する",
+      "undo": "もう一度押す",
+      "alternative": null,
+      "entity": null
+    },
+    {
+      "idPattern": "^settings\\.member\\.(transfer|status|remove|action-cancel|action-confirm)\\.",
+      "routes": [
+        "/settings/household"
+      ],
+      "roles": [
+        "owner"
+      ],
+      "capability": "household.members.manage",
+      "risk": "destructive",
+      "onlineRequired": true,
+      "successObservation": "確認のあとメンバーの役割や状態が変わる",
+      "failureRecovery": "理由を表示し、確認の画面を保つ",
+      "undo": "停止は解除できる。管理者は渡し直してもらう。外したメンバーは招待し直す",
+      "alternative": "権限の画面の役割の変更",
+      "entity": "Membership"
+    },
+    {
+      "idPattern": "^settings\\.household\\.leave-",
+      "routes": [
+        "/settings/household",
+        "/settings/account"
+      ],
+      "roles": [
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "destructive",
+      "onlineRequired": true,
+      "successObservation": "確認のあと家族グループを退出する",
+      "failureRecovery": "理由を表示し、確認の画面を保つ",
+      "undo": "新しい招待コードで参加し直す",
+      "alternative": null,
+      "entity": "Membership"
+    },
+    {
+      "idPattern": "^settings\\.color-list\\.",
+      "routes": [
+        "/settings/household"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "event.create|event.update",
+      "risk": "write",
+      "onlineRequired": true,
+      "successObservation": "リストの追加、変更、削除が一覧と入力欄に反映される",
+      "failureRecovery": "理由を表示し、入力を残す",
+      "undo": "削除は取り消せない。色だけが外れ記録は残る",
+      "alternative": null,
+      "entity": "ColorLabel"
+    },
+    {
+      "idPattern": "^settings\\.recently-deleted\\.",
+      "routes": [
+        "/settings/recently-deleted"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "settings.own",
+      "risk": "write",
+      "onlineRequired": true,
+      "successObservation": "記録が元の場所に戻り、一覧から消える",
+      "failureRecovery": "理由を知らせ、一覧を保つ",
+      "undo": "もう一度削除する",
+      "alternative": "削除の直後の元に戻す",
+      "entity": "TrashItem"
+    },
+    {
+      "idPattern": "^settings\\.help\\.",
+      "routes": [
+        "/settings/help"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "settings.own",
+      "risk": "read",
+      "onlineRequired": false,
+      "successObservation": "検索語と分類で質問を絞り、URL に残す",
+      "failureRecovery": "0件の案内と条件を消す操作を示す",
+      "undo": "条件を消す",
+      "alternative": null,
+      "entity": null
+    },
+    {
+      "idPattern": "^settings\\.legal\\.jump\\.",
+      "routes": [
+        "/settings/legal"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "navigation",
+      "onlineRequired": false,
+      "successObservation": "文書の位置へ移る",
+      "failureRecovery": "画面の位置を保つ",
+      "undo": "ブラウザの戻る操作",
+      "alternative": null,
+      "entity": null
+    },
+    {
+      "idPattern": "^sign-up\\.legal$",
+      "routes": [
+        "/sign-up"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "navigation",
+      "onlineRequired": false,
+      "successObservation": "規約の草案を新しいタブで開く",
+      "failureRecovery": "入力中の内容は元のタブに残る",
+      "undo": null,
+      "alternative": null,
+      "entity": null
+    },
+    {
+      "idPattern": "^calendar\\.shift\\.open$",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "event.create",
+      "risk": "dialog",
+      "onlineRequired": false,
+      "successObservation": "シフトの読み取りを開く",
+      "failureRecovery": "開かなければ画面の位置を保つ",
+      "undo": null,
+      "alternative": "予定を1件ずつ追加する",
+      "entity": "CalendarEvent"
+    },
+    {
+      "idPattern": "^calendar\\.shift\\.(text|month|member|person|work-label|off-label)$",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "event.create",
+      "risk": "input",
+      "onlineRequired": false,
+      "successObservation": "確認の表が入力に合わせて変わる",
+      "failureRecovery": "読めないときは理由を表示する",
+      "undo": null,
+      "alternative": null,
+      "entity": "CalendarEvent"
+    },
+    {
+      "idPattern": "^calendar\\.shift\\.row\\.",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "event.create",
+      "risk": "input",
+      "onlineRequired": false,
+      "successObservation": "保存する件数が変わる",
+      "failureRecovery": "分からない記号の行は選べない",
+      "undo": null,
+      "alternative": null,
+      "entity": "CalendarEvent"
+    },
+    {
+      "idPattern": "^calendar\\.shift\\.add-rule\\.",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "event.create",
+      "risk": "input",
+      "onlineRequired": false,
+      "successObservation": "記号の規則を追加し、時刻を編集できるように開く",
+      "failureRecovery": "規則が重なるときは理由を表示する",
+      "undo": null,
+      "alternative": null,
+      "entity": null
+    },
+    {
+      "idPattern": "^calendar\\.shift\\.rule\\.",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "event.create",
+      "risk": "input",
+      "onlineRequired": false,
+      "successObservation": "時刻の規則を変えて端末に保存し、表を読み直す",
+      "failureRecovery": "名前や別名が重なるときは理由を表示し、端末には保存しない",
+      "undo": "初期の規則に戻す",
+      "alternative": null,
+      "entity": null
+    },
+    {
+      "idPattern": "^calendar\\.shift\\.rules\\.(add|reset|sample-text|sample-save|save-legend)$",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "event.create",
+      "risk": "input",
+      "onlineRequired": false,
+      "successObservation": "規則を追加または初期に戻し、端末に保存する",
+      "failureRecovery": "読めない見本は理由を表示し、規則を変えない",
+      "undo": "初期の規則に戻す",
+      "alternative": null,
+      "entity": null
+    },
+    {
+      "idPattern": "^calendar\\.shift\\.cancel$",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "event.create",
+      "risk": "dialog",
+      "onlineRequired": false,
+      "successObservation": "閉じる。貼り付けた文字があれば確認する",
+      "failureRecovery": "確認で残すと入力を保つ",
+      "undo": null,
+      "alternative": null,
+      "entity": "CalendarEvent"
+    },
+    {
+      "idPattern": "^calendar\\.shift\\.save$",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child"
+      ],
+      "capability": "event.create",
+      "risk": "mutation",
+      "onlineRequired": true,
+      "successObservation": "選んだ行を予定に保存する",
+      "failureRecovery": "保存できなかった行は理由とともに表に残す",
+      "undo": "予定を個別に削除する",
+      "alternative": null,
+      "entity": "CalendarEvent"
+    },
+    {
+      "idPattern": "^assistant\\.receipt\\.(open|file|cancel)$",
+      "routes": [
+        "/budget"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "assistant.use",
+      "risk": "dialog",
+      "onlineRequired": true,
+      "successObservation": "領収書の読み取りを開き、画像を選ぶ",
+      "failureRecovery": "形式と大きさが合わなければ理由を表示する",
+      "undo": null,
+      "alternative": "支出を手で入力する",
+      "entity": "Expense"
+    },
+    {
+      "idPattern": "^assistant\\.receipt\\.submit$",
+      "routes": [
+        "/budget"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "assistant.use|expense.create",
+      "risk": "mutation",
+      "onlineRequired": true,
+      "successObservation": "読み取った内容を支出の入力に入れて開く。保存はしない",
+      "failureRecovery": "読めないときは理由を表示し、記録は変えない",
+      "undo": null,
+      "alternative": "支出を手で入力する",
+      "entity": "Expense"
+    },
+    {
+      "idPattern": "^assistant\\.event\\.(open|source\\.|url|file|cancel)",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "assistant.use",
+      "risk": "dialog",
+      "onlineRequired": true,
+      "successObservation": "読み取るURLや画像を選ぶ",
+      "failureRecovery": "形が合わなければ理由を表示する",
+      "undo": null,
+      "alternative": "予定を手で入力する",
+      "entity": "CalendarEvent"
+    },
+    {
+      "idPattern": "^assistant\\.event\\.submit$",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "assistant.use|event.create",
+      "risk": "mutation",
+      "onlineRequired": true,
+      "successObservation": "予定の候補を一覧にする。保存はしない",
+      "failureRecovery": "読めないときは理由を表示し、記録は変えない",
+      "undo": null,
+      "alternative": "予定を手で入力する",
+      "entity": "CalendarEvent"
+    },
+    {
+      "idPattern": "^assistant\\.event\\.candidate\\.",
+      "routes": [
+        "/calendar"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "assistant.use|event.create",
+      "risk": "dialog",
+      "onlineRequired": true,
+      "successObservation": "候補を予定の入力に入れて開く。保存はしない",
+      "failureRecovery": "候補の一覧に戻れる",
+      "undo": null,
+      "alternative": "予定を手で入力する",
+      "entity": "CalendarEvent"
+    },
+    {
+      "idPattern": "^insights\\.review\\.scope\\.",
+      "routes": [
+        "/insights"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "insight.read",
+      "risk": "input",
+      "onlineRequired": false,
+      "successObservation": "数える記録が変わる",
+      "failureRecovery": "記録は変えない",
+      "undo": null,
+      "alternative": null,
+      "entity": null
+    },
+    {
+      "idPattern": "^insights\\.review\\.cite\\.",
+      "routes": [
+        "/insights"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "insight.read",
+      "risk": "navigation",
+      "onlineRequired": false,
+      "successObservation": "もとにした記録を開く",
+      "failureRecovery": "見えない記録は挙げない",
+      "undo": "ブラウザの戻る操作",
+      "alternative": null,
+      "entity": null
+    },
+    {
+      "idPattern": "^insights\\.review\\.draft\\.",
+      "routes": [
+        "/insights"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "insight.read",
+      "risk": "dialog",
+      "onlineRequired": false,
+      "successObservation": "下書きを入力に入れて開く。保存はしない",
+      "failureRecovery": "閉じると何も残らない",
+      "undo": null,
+      "alternative": "手で追加する",
+      "entity": null
+    },
+    {
+      "idPattern": "^chart\\.table\\.",
+      "routes": [
+        "/budget",
+        "/insights"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "expense.read|insight.read",
+      "risk": "display",
+      "onlineRequired": false,
+      "successObservation": "図表と同じ数値の表を開き、もう一度押すと閉じる",
+      "failureRecovery": "図表と直接のラベルはそのまま残る",
+      "undo": "もう一度押して表を閉じる",
+      "alternative": "図表の直接のラベル",
+      "entity": null
+    },
+    {
+      "idPattern": "^showcase\\.management\\.nav\\.",
+      "routes": [
+        "/showcase/management"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "navigation",
+      "onlineRequired": false,
+      "successObservation": "選んだ項目へ移る。見本の表示は残る",
+      "failureRecovery": "項目が見つからなければ概要へ戻るリンクを出す",
+      "undo": null,
+      "alternative": null,
+      "entity": "ManagementSample"
+    },
+    {
+      "idPattern": "^showcase\\.management\\.overview\\.",
+      "routes": [
+        "/showcase/management"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "navigation",
+      "onlineRequired": false,
+      "successObservation": "数字の元になる項目へ移る",
+      "failureRecovery": "一覧の見出しから移れる",
+      "undo": null,
+      "alternative": null,
+      "entity": "ManagementSample"
+    },
+    {
+      "idPattern": "^showcase\\.management\\.service\\.",
+      "routes": [
+        "/showcase/management/services"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "local-sample",
+      "onlineRequired": false,
+      "successObservation": "確認した時刻だけ画面の中で変わる",
+      "failureRecovery": "本物の接続先へは送らないので失敗しない。読み込み直すと戻る",
+      "undo": null,
+      "alternative": null,
+      "entity": "ManagementSample"
+    },
+    {
+      "idPattern": "^showcase\\.management\\.job\\.",
+      "routes": [
+        "/showcase/management/jobs"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "local-sample",
+      "onlineRequired": false,
+      "successObservation": "試算は履歴に足すだけ。実行は確認のあと画面の中の件数だけ変わる",
+      "failureRecovery": "読み込み直すと戻る",
+      "undo": null,
+      "alternative": "試算だけで確かめられる",
+      "entity": "ManagementSample"
+    },
+    {
+      "idPattern": "^showcase\\.management\\.backup\\.",
+      "routes": [
+        "/showcase/management/backups"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "local-sample",
+      "onlineRequired": false,
+      "successObservation": "一覧の見本が画面の中で変わる",
+      "failureRecovery": "読み込み直すと戻る",
+      "undo": null,
+      "alternative": null,
+      "entity": "ManagementSample"
+    },
+    {
+      "idPattern": "^showcase\\.management\\.audit\\.",
+      "routes": [
+        "/showcase/management/audit-log"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "filter",
+      "onlineRequired": false,
+      "successObservation": "条件に合う見本の記録だけを表示する",
+      "failureRecovery": "該当がなければその旨を表示する",
+      "undo": null,
+      "alternative": null,
+      "entity": "ManagementSample"
+    },
+    {
+      "idPattern": "^showcase\\.management\\.household\\.",
+      "routes": [
+        "/showcase/management/households"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "local-sample",
+      "onlineRequired": false,
+      "successObservation": "状態と期限が画面の中で変わる",
+      "failureRecovery": "読み込み直すと戻る",
+      "undo": null,
+      "alternative": "止めるときは確認を出す",
+      "entity": "ManagementSample"
+    },
+    {
+      "idPattern": "^showcase\\.management\\.record\\.",
+      "routes": [
+        "/showcase/management/records"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "filter",
+      "onlineRequired": false,
+      "successObservation": "条件に合う見本の記録だけを表示する。変更はできない",
+      "failureRecovery": "該当がなければその旨を表示する",
+      "undo": null,
+      "alternative": null,
+      "entity": "ManagementSample"
+    },
+    {
+      "idPattern": "^showcase\\.management\\.confirm\\.",
+      "routes": [
+        "/showcase/management/jobs",
+        "/showcase/management/households"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": null,
+      "risk": "dialog",
+      "onlineRequired": false,
+      "successObservation": "確定すると画面の中の状態だけ変わる",
+      "failureRecovery": "やめると何も変わらない",
+      "undo": "やめる",
+      "alternative": null,
+      "entity": "ManagementSample"
+    },
+    {
+      "idPattern": "^settings\\.audit\\.",
+      "routes": [
+        "/settings/audit",
+        "/settings/security"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "audit.read|settings.own",
+      "risk": "navigation",
+      "onlineRequired": true,
+      "successObservation": "変更の記録を人・種類・期間で絞って日付ごとに表示し、続きを読み込む。自分の操作の記録はどの人も見られる",
+      "failureRecovery": "読めなかった理由と「もう一度読み込む」を示し、読めた分は残す",
+      "undo": "絞り込みを「すべて」に戻す",
+      "alternative": "URLのクエリ（who・kind・period・view）",
+      "entity": "AuditEvent"
+    },
+    {
+      "idPattern": "^albums\\.sort\\.",
+      "routes": [
+        "/albums/*"
+      ],
+      "roles": [
+        "owner",
+        "adult",
+        "child",
+        "guest"
+      ],
+      "capability": "album.read",
+      "risk": "navigation",
+      "onlineRequired": false,
+      "successObservation": "アルバムの順か撮影日順に並べ替え、URLのsortに残す。撮影日時の分からない項目は最後",
+      "failureRecovery": "現在の並びを保つ",
+      "undo": "アルバムの順に戻す",
+      "alternative": "URLのクエリ（sort=taken）",
+      "entity": "AlbumItem"
+    }
   ]
 }

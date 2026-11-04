@@ -24,14 +24,24 @@ for (const contract of inventory.contracts) {
   }
 }
 
-for (const file of (await filesUnder(resolve('src'))).filter((candidate) => extname(candidate) === '.tsx')) {
+/**
+ * 操作の部品を包む共通の部品。中の要素は呼ぶ側から data-control-id を受け取るので、中の要素ではなく呼ぶ側の部品を数える。
+ * [包む部品の名前, ファイル, 理由]
+ */
+const forwardingControls = [
+  ['AmountInput', 'src/design-system/AmountInput.tsx', '金額の欄（3桁ごとの区切り）。呼ぶ側が data-control-id を必ず渡す'],
+];
+const forwardingFiles = new Set(forwardingControls.map(([, path]) => resolve(path)));
+const controlTags = ['button', 'a', 'input', 'select', 'textarea', ...forwardingControls.map(([name]) => name)];
+
+for (const file of (await filesUnder(resolve('src'))).filter((candidate) => extname(candidate) === '.tsx' && !forwardingFiles.has(candidate))) {
   const source = await readFile(file, 'utf8');
   const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const visit = (node) => {
     if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
       const opening = ts.isJsxElement(node) ? node.openingElement : node;
       const tag = opening.tagName.getText(ast);
-      if (['button', 'a', 'input', 'select', 'textarea'].includes(tag)) {
+      if (controlTags.includes(tag)) {
         count += 1;
         const attribute = opening.attributes.properties.find((property) => ts.isJsxAttribute(property) && property.name.getText(ast) === 'data-control-id');
         if (!attribute || !ts.isJsxAttribute(attribute) || !attribute.initializer) {

@@ -1,10 +1,11 @@
 import { readFile } from 'node:fs/promises';
 
-const [contract, adapter, gateway, domain] = await Promise.all([
+const [contract, adapter, gateway, domain, audited] = await Promise.all([
   readFile('contracts/family-hub.openapi.yaml', 'utf8'),
   readFile('src/data/httpGateway.ts', 'utf8'),
   readFile('src/data/gateway.ts', 'utf8'),
   readFile('src/domain/types.ts', 'utf8'),
+  readFile('src/data/gatewayOperations.ts', 'utf8'),
 ]);
 
 const failures = [];
@@ -15,7 +16,7 @@ if (duplicates.length) failures.push(`duplicate OpenAPI operationId: ${[...new S
 const requiredOperations = [
   'updateMembershipRole', 'listHouseholdInvites', 'revokeHouseholdInvite',
   'getPermissionOverrides', 'updatePermissionOverrides', 'resetPermissionOverrides',
-  'restoreEvent', 'restoreTodo', 'restoreMemo', 'reverseSettlement',
+  'restoreEvent', 'restoreTodo', 'restoreMemo', 'reverseSettlement', 'settleAll', 'reverseBatch',
   'resumeNotification', 'updateNotificationPreferences', 'getPrivacySettings',
 ];
 for (const operation of requiredOperations) {
@@ -33,7 +34,7 @@ for (const marker of requiredContractMarkers) {
 
 const adapterMarkers = [
   "credentials: 'include'", "'X-CSRF-Token'", "'Idempotency-Key'", "'If-Permission-Revision'",
-  'response.status === 204', '/permission-overrides', '/restore', '/reverse', '/resume',
+  'response.status === 204', '/permission-overrides', '/restore', '/reverse', '/resume', '/settlement-batches',
 ];
 for (const marker of adapterMarkers) {
   if (!adapter.includes(marker)) failures.push(`missing HTTP adapter boundary: ${marker}`);
@@ -41,7 +42,7 @@ for (const marker of adapterMarkers) {
 
 const gatewayMethods = [
   'updatePermissionOverrides', 'resetPermissionOverrides', 'revokeInvite',
-  'restoreEvent', 'restoreTodo', 'restoreMemo', 'reverseSettlement', 'resume', 'getPrivacySettings',
+  'restoreEvent', 'restoreTodo', 'restoreMemo', 'reverseSettlement', 'settleAll', 'reverseBatch', 'resume', 'getPrivacySettings',
 ];
 for (const method of gatewayMethods) {
   if (!gateway.includes(`${method}(`)) failures.push(`missing gateway method: ${method}`);
@@ -56,7 +57,7 @@ for (const reason of ['CAPABILITY_MISSING', 'SCOPE_DENIED', 'OWNER_REQUIRED', 'V
 const operationFor = {
   'auth.beginPasskey': 'beginPasskey', 'auth.finishPasskey': 'finishPasskey', 'auth.signInWithPassword': 'signInWithPassword', 'auth.signOut': 'signOut',
   'auth.getSecurityOverview': 'getSecurityOverview', 'auth.beginPasskeyRegistration': 'beginPasskeyRegistration', 'auth.finishPasskeyRegistration': 'finishPasskeyRegistration',
-  'auth.changePassword': 'changePassword', 'auth.revokeSession': 'revokeSession',
+  'auth.getSession': 'getSession', 'auth.getVersion': 'getVersion', 'family.transferOwnership': 'transferOwnership', 'family.setMemberStatus': 'setMemberStatus', 'family.removeMember': 'removeMember', 'family.leaveHousehold': 'leaveHousehold', 'family.createColorLabel': 'createColorLabel', 'family.updateColorLabel': 'updateColorLabel', 'family.deleteColorLabel': 'deleteColorLabel', 'links.createLink': 'createItemLink', 'links.deleteLink': 'deleteItemLink', 'trash.list': 'listRecentlyDeleted', 'memos.deleteAttachment': 'deleteAttachment', 'albums.listAlbums': 'listAlbums', 'albums.getAlbum': 'getAlbum', 'albums.createAlbum': 'createAlbum', 'albums.updateAlbum': 'updateAlbum', 'albums.deleteAlbum': 'deleteAlbum', 'albums.restoreAlbum': 'restoreAlbum', 'albums.reorderItems': 'reorderAlbumItems', 'albums.deleteItem': 'deleteAlbumItem', 'albums.restoreItem': 'restoreAlbumItem', 'albums.uploadItem': null, 'albums.cancelUpload': 'cancelUpload', 'albums.mediaUrl': null, 'auth.verifyTotp': 'verifyTotp', 'auth.signUp': 'signUp', 'auth.requestPasswordReset': 'requestPasswordReset', 'auth.confirmPasswordReset': 'confirmPasswordReset', 'auth.reauthenticate': 'reauthenticate', 'auth.getAccount': 'getAccount', 'auth.updateAccount': 'updateAccount', 'auth.changeEmail': 'changeEmail', 'auth.deleteAccount': 'deleteAccount', 'auth.beginTotpEnrollment': 'beginTotpEnrollment', 'auth.confirmTotpEnrollment': 'confirmTotpEnrollment', 'auth.disableTotp': 'disableTotp', 'household.createHousehold': 'createHousehold', 'auth.changePassword': 'changePassword', 'auth.revokeSession': 'revokeSession',
   'household.getSnapshot': 'getHouseholdSnapshot', 'household.acceptInvite': 'acceptInvite', 'household.updateProfile': 'updateHouseholdProfile',
   'household.updateMembershipRole': 'updateMembershipRole', 'household.createInvite': 'createHouseholdInvite', 'household.listInvites': 'listHouseholdInvites',
   'household.revokeInvite': 'revokeHouseholdInvite', 'household.getPermissionOverrides': 'getPermissionOverrides', 'household.updatePermissionOverrides': 'updatePermissionOverrides',
@@ -66,10 +67,12 @@ const operationFor = {
   'memos.createMemo': 'createMemo', 'memos.updateMemo': 'updateMemo', 'memos.uploadAttachment': 'uploadAttachment', 'memos.getAttachmentLink': 'getAttachmentLink',
   'memos.deleteMemo': 'deleteMemo', 'memos.restoreMemo': 'restoreMemo',
   'expenses.createExpense': 'createExpense', 'expenses.updateExpense': 'updateExpense', 'expenses.deleteExpense': 'deleteExpense', 'expenses.restoreExpense': 'restoreExpense',
-  'expenses.recordSettlement': 'recordSettlement', 'expenses.reverseSettlement': 'reverseSettlement',
+  'expenses.recordSettlement': 'recordSettlement', 'expenses.reverseSettlement': 'reverseSettlement', 'expenses.settleAll': 'settleAll', 'expenses.reverseBatch': 'reverseBatch',
   'resources.search': 'searchHousehold', 'insights.list': 'listInsights',
+  'assistant.getStatus': 'getAssistantStatus', 'assistant.readReceipt': 'readReceipt', 'assistant.readEventImage': 'readEventImage', 'assistant.readEventUrl': 'readEventUrl', 'assistant.getJob': 'getAssistantJob',
   'notifications.list': 'listNotifications', 'notifications.markRead': 'markNotificationRead', 'notifications.snooze': 'snoozeNotification', 'notifications.stop': 'stopNotification',
   'notifications.resume': 'resumeNotification', 'notifications.getPreferences': 'getNotificationPreferences', 'notifications.updatePreferences': 'updateNotificationPreferences',
+  'audit.list': 'listAuditEvents', 'audit.listMine': 'listAccountAuditEvents',
   'credentials.create': null, 'credentials.get': null,
 };
 const portOf = Object.fromEntries([...gateway.matchAll(/^\s+(\w+): (\w+Port|CredentialClient);$/gm)].map((match) => [match[2], match[1]]));
@@ -81,8 +84,17 @@ for (const method of declared) {
   if (!new RegExp(`\\b${name}(:|\\s*\\()`).test(adapter)) failures.push(`HTTP adapter does not implement: ${method}`);
 }
 for (const method of Object.keys(operationFor)) if (!declared.includes(method)) failures.push(`mapping refers to a gateway method that no longer exists: ${method}`);
+// 確認用の実装が変更の記録に使う対応表（src/data/gatewayOperations.ts）は、ここの対応と同じ operationId を使う。
+const auditedEntries = [...audited.matchAll(/^\s+'(\w+\.\w+)': (?:household|account)\('(\w+)'/gm)].map((match) => [match[1], match[2]]);
+if (auditedEntries.length === 0) failures.push('src/data/gatewayOperations.ts: no audited operations found');
+for (const [method, operationId] of auditedEntries) {
+  if (!(method in operationFor)) failures.push(`gatewayOperations.ts maps an unknown gateway method: ${method}`);
+  else if (operationFor[method] !== operationId) failures.push(`gatewayOperations.ts disagrees with operationFor: ${method} -> ${operationId} (expected ${operationFor[method]})`);
+}
 const mapped = new Set(Object.values(operationFor).filter(Boolean));
-for (const id of operationIds) if (!mapped.has(id)) failures.push(`OpenAPI operation is not used by any gateway method: ${id}`);
+// 運用の確認や CSRF の取得など、画面の Gateway を通らない操作は契約に x-gateway: none と書く。
+const exempt = new Set([...contract.matchAll(/operationId:\s*([A-Za-z0-9]+)\n\s+x-gateway: none/g)].map((match) => match[1]));
+for (const id of operationIds) if (!mapped.has(id) && !exempt.has(id)) failures.push(`OpenAPI operation is not used by any gateway method: ${id}`);
 
 if (failures.length) {
   console.error(failures.join('\n'));

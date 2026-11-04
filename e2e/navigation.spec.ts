@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 test('the mobile "more" menu is a dialog: focus, Escape, current page and closing on navigation', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -48,7 +48,7 @@ test('search finds expenses, places and memo text, and opens the detail', async 
   await page.getByRole('button', { name: /検索/ }).click();
   await page.getByRole('searchbox').fill('青葉書店');
   await expect(page.getByRole('link', { name: '場所「青葉書店」を開く' })).toBeVisible();
-  await page.getByRole('link', { name: '支出「学校教材」を開く' }).click();
+  await page.getByRole('link', { name: '家計「学校教材」を開く' }).click();
   await expect(page).toHaveURL(/\/budget\/expense-books$/);
   await expect(page.getByRole('dialog', { name: '学校教材' })).toBeVisible();
   await page.getByRole('button', { name: '閉じる' }).click();
@@ -60,12 +60,12 @@ test('search finds expenses, places and memo text, and opens the detail', async 
 });
 
 test('deleting a memo shows the restore option even after the data refreshes', async ({ page }) => {
-  await page.goto('/notes/memo-clinic');
+  await page.goto('/notes/memo-receipt');
   await page.getByRole('button', { name: 'メモを削除' }).click();
   await page.getByRole('dialog', { name: 'メモを削除しますか' }).getByRole('button', { name: '削除する' }).click();
-  await expect(page.getByText('「小児科の控え」を削除しました')).toBeVisible();
+  await expect(page.getByText('「教材費レシート」を削除しました')).toBeVisible();
   await page.getByRole('button', { name: '元に戻す' }).click();
-  await expect(page.getByRole('heading', { name: '小児科の控え' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '教材費レシート' })).toBeVisible();
 });
 
 test('privacy settings change sharing defaults and notification content; sign-out returns to the start', async ({ page }) => {
@@ -98,4 +98,14 @@ test('places list is sorted by recent use and links to its records; children can
   await expect(page).toHaveURL(/\/budget\/expense-books$/);
   await page.goto('/places?actor=member-hana');
   await expect(page.getByRole('heading', { name: 'このページは表示できません' })).toBeVisible();
+});
+
+test('Escape closes only the top dialog when one opens over a drawer', async ({ page }) => {
+  await page.goto('/notes/memo-receipt');
+  await page.getByRole('button', { name: 'メモを削除' }).click();
+  const confirm = page.getByRole('dialog', { name: 'メモを削除しますか' });
+  await expect(confirm).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(confirm).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: '教材費レシート' })).toBeVisible();
 });

@@ -1,9 +1,10 @@
 import type { FamilyHubGateway } from './gateway';
-import type { GatewayError, Result } from '../domain/types';
+import type { GatewayError, Id, Result } from '../domain/types';
 
 type RequestOptions = RequestInit & { csrf?: boolean; idempotencyKey?: string };
 
 const networkError: GatewayError = { code: 'OFFLINE', message: 'ネットワークに接続できません。', retryable: true };
+const responseFailure: GatewayError = { code: 'UPSTREAM_FAILURE', message: '応答を受け取れませんでした。少し待ってからお試しください。', retryable: true };
 const mutationHeaders = (context?: { idempotencyKey: string; expectedPermissionRevision: number }) => ({
   idempotencyKey: context?.idempotencyKey,
   headers: context ? { 'If-Permission-Revision': String(context.expectedPermissionRevision) } : undefined,
@@ -63,31 +64,77 @@ function serializeRegistration(credential: PublicKeyCredential) {
   };
 }
 
-export function createHttpGateway(baseUrl: string, getCsrfToken: () => string, getPermissionRevision: () => number | undefined): FamilyHubGateway {
-  if (!baseUrl || !baseUrl.startsWith('https://')) throw new Error('本番HTTPアダプタにはHTTPSのbaseUrlが必要です');
+const allowedBase = (value: string) => {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' || (url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname));
+  } catch {
+    return false;
+  }
+};
+
+type FetchLike = typeof fetch;
+/** 省いた条件を送らない検索の文字列。 */
+const queryOf = (query: object) => {
+  const params = new URLSearchParams(Object.entries(query).filter(([, value]) => value !== undefined && value !== '').map(([key, value]) => [key, String(value)]));
+  return params.size ? `?${params}` : '';
+};
+const UPLOAD_CHUNK_BYTES = 8 * 1024 * 1024;
+const UPLOAD_RETRIES = 6;
+
+/** token を取り直すときは true を受け取る。 */
+export type CsrfProvider = (refresh?: boolean) => string | Promise<string>;
+
+export function createHttpGateway(baseUrl: string, getCsrfToken: CsrfProvider, getPermissionRevision: () => number | undefined, fetchImplementation?: FetchLike): FamilyHubGateway {
+  if (!allowedBase(baseUrl)) throw new Error('本番HTTPアダプタにはHTTPSのbaseUrlが必要です');
   if (typeof getCsrfToken !== 'function') throw new Error('本番HTTPアダプタには実行時CSRF token providerが必要です');
   if (typeof getPermissionRevision !== 'function') throw new Error('本番HTTPアダプタには実行時の権限リビジョンproviderが必要です');
 
-  async function request<T>(path: string, options: RequestOptions = {}): Promise<Result<T>> {
+  /** 送り終えていないファイルの枠。送り直しで続きから送るために、File ごとに覚えておく。 */
+  const openUploads = new WeakMap<File, { albumId: Id; uploadId: string; itemId: Id }>();
+  /** 枠を手放す。接続できないときは枠の期限が切れるのを待つ。 */
+  async function cancelOpenUpload(file: File) {
+    const open = openUploads.get(file);
+    if (!open) return;
+    openUploads.delete(file);
+    await (fetchImplementation ?? fetch)(new URL(`/v1/uploads/${encodeURIComponent(open.uploadId)}`, baseUrl), { method: 'DELETE', credentials: 'include', headers: { 'X-CSRF-Token': await getCsrfToken(), 'Tus-Resumable': '1.0.0' } }).catch(() => undefined);
+  }
+
+  async function send<T>(path: string, options: RequestOptions, idempotencyKey: string | undefined, refreshCsrf: boolean): Promise<Result<T>> {
+    const isMutation = Boolean(options.method && !['GET', 'HEAD'].includes(options.method));
+    const permissionRevision = isMutation ? getPermissionRevision() : undefined;
+    const csrfToken = options.csrf ? await getCsrfToken(refreshCsrf) : undefined;
+    const response = await (fetchImplementation ?? fetch)(new URL(path, baseUrl), {
+      ...options,
+      credentials: 'include',
+      headers: {
+        Accept: 'application/json',
+        ...(typeof options.body === 'string' ? { 'Content-Type': 'application/json' } : {}),
+        ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+        ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
+        ...(isMutation && permissionRevision !== undefined ? { 'If-Permission-Revision': String(permissionRevision) } : {}),
+        ...options.headers,
+      },
+    });
+    if (response.status === 204 || response.headers.get('content-length') === '0') return response.ok ? { ok: true, value: undefined as T } : { ok: false, error: responseFailure };
+    let payload: T | GatewayError;
     try {
-      const isMutation = Boolean(options.method && !['GET', 'HEAD'].includes(options.method));
-      const permissionRevision = isMutation ? getPermissionRevision() : undefined;
-      const response = await fetch(new URL(path, baseUrl), {
-        ...options,
-        credentials: 'include',
-        headers: {
-          Accept: 'application/json',
-          ...(!(options.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
-          ...(options.csrf ? { 'X-CSRF-Token': getCsrfToken() } : {}),
-          ...(isMutation ? { 'Idempotency-Key': options.idempotencyKey ?? crypto.randomUUID() } : {}),
-          ...(isMutation && permissionRevision !== undefined ? { 'If-Permission-Revision': String(permissionRevision) } : {}),
-          ...options.headers,
-        },
-      });
-      const empty = response.status === 204 || response.headers.get('content-length') === '0';
-      const payload = empty ? undefined : await response.json() as T | GatewayError;
-      if (!response.ok) return { ok: false, error: payload as GatewayError };
-      return { ok: true, value: payload as T };
+      payload = await response.json() as T | GatewayError;
+    } catch {
+      // 中継の機器が返す本文のない失敗などは、オフラインの待ち行列へ回さない。
+      return { ok: false, error: responseFailure };
+    }
+    return response.ok ? { ok: true, value: payload as T } : { ok: false, error: payload as GatewayError };
+  }
+
+  async function request<T>(path: string, options: RequestOptions = {}): Promise<Result<T>> {
+    const isMutation = Boolean(options.method && !['GET', 'HEAD'].includes(options.method));
+    const idempotencyKey = isMutation ? options.idempotencyKey ?? crypto.randomUUID() : undefined;
+    try {
+      const result = await send<T>(path, options, idempotencyKey, false);
+      if (result.ok || result.error.reason !== 'CSRF') return result;
+      // token が古いときは取り直し、同じ冪等キーで一度だけ送り直す。
+      return await send<T>(path, options, idempotencyKey, true);
     } catch {
       return { ok: false, error: networkError };
     }
@@ -99,6 +146,20 @@ export function createHttpGateway(baseUrl: string, getCsrfToken: () => string, g
       finishPasskey: (challengeId, assertion) => request('/v1/auth/passkey/complete', { method: 'POST', body: JSON.stringify({ challengeId, assertion }), csrf: true }),
       signInWithPassword: (email, password) => request('/v1/auth/password', { method: 'POST', body: JSON.stringify({ email, password }), csrf: true }),
       signOut: () => request('/v1/auth/session', { method: 'DELETE', csrf: true }),
+      getSession: () => request('/v1/auth/session'),
+      getVersion: () => request('/v1/version'),
+      verifyTotp: (challengeId, code) => request('/v1/auth/totp/verify', { method: 'POST', body: JSON.stringify({ challengeId, code }), csrf: true }),
+      signUp: (input) => request('/v1/auth/sign-up', { method: 'POST', body: JSON.stringify(input), csrf: true }),
+      requestPasswordReset: (email) => request('/v1/auth/password-reset', { method: 'POST', body: JSON.stringify({ email }), csrf: true }),
+      confirmPasswordReset: (input) => request('/v1/auth/password-reset/confirm', { method: 'POST', body: JSON.stringify(input), csrf: true }),
+      reauthenticate: (password) => request('/v1/auth/reauthenticate', { method: 'POST', body: JSON.stringify({ password }), csrf: true }),
+      getAccount: () => request('/v1/account'),
+      updateAccount: (input) => request('/v1/account', { method: 'PATCH', body: JSON.stringify(input), csrf: true }),
+      changeEmail: (email) => request('/v1/account/email', { method: 'POST', body: JSON.stringify({ email }), csrf: true }),
+      deleteAccount: () => request('/v1/account', { method: 'DELETE', csrf: true }),
+      beginTotpEnrollment: () => request('/v1/account/totp', { method: 'POST', csrf: true }),
+      confirmTotpEnrollment: (code) => request('/v1/account/totp/confirm', { method: 'POST', body: JSON.stringify({ code }), csrf: true }),
+      disableTotp: () => request('/v1/account/totp', { method: 'DELETE', csrf: true }),
       getSecurityOverview: () => request('/v1/auth/security'),
       beginPasskeyRegistration: () => request('/v1/auth/passkeys/registration', { method: 'POST', csrf: true }),
       finishPasskeyRegistration: (challengeId, credential) => request('/v1/auth/passkeys/registration/complete', { method: 'POST', body: JSON.stringify({ challengeId, credential }), csrf: true }),
@@ -106,6 +167,7 @@ export function createHttpGateway(baseUrl: string, getCsrfToken: () => string, g
       revokeSession: (sessionId) => request(`/v1/auth/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE', csrf: true }),
     },
     household: {
+      createHousehold: (name) => request('/v1/households', { method: 'POST', body: JSON.stringify({ name }), csrf: true }),
       getSnapshot: () => request('/v1/households/current/snapshot'),
       acceptInvite: (code) => request('/v1/household-invites/accept', { method: 'POST', body: JSON.stringify({ code }), csrf: true }),
       updateProfile: (input) => request('/v1/households/current', { method: 'PATCH', body: JSON.stringify(input), csrf: true }),
@@ -123,11 +185,11 @@ export function createHttpGateway(baseUrl: string, getCsrfToken: () => string, g
       createEvent: (input, context) => request('/v1/events', { method: 'POST', body: JSON.stringify(input), csrf: true, ...mutationHeaders(context) }),
       updateEvent: (id, scope, input, expectedVersion, context, occurrenceDate) => request(`/v1/events/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ scope, input, expectedVersion, ...(occurrenceDate ? { occurrenceDate } : {}) }), csrf: true, ...mutationHeaders(context) }),
       deleteEvent: (id, scope, expectedVersion, occurrenceDate) => request(`/v1/events/${encodeURIComponent(id)}?${new URLSearchParams({ scope, expectedVersion: String(expectedVersion), ...(occurrenceDate ? { occurrenceDate } : {}) })}`, { method: 'DELETE', csrf: true }),
-      restoreEvent: (id) => request(`/v1/events/${encodeURIComponent(id)}/restore`, { method: 'POST', csrf: true }),
+      restoreEvent: (id, occurrenceDate) => request(`/v1/events/${encodeURIComponent(id)}/restore${occurrenceDate ? `?occurrenceDate=${occurrenceDate}` : ''}`, { method: 'POST', csrf: true }),
     },
     todos: {
       createTodo: (input, context) => request('/v1/todos', { method: 'POST', body: JSON.stringify(input), csrf: true, ...mutationHeaders(context) }),
-      updateTodoStatus: (id, status, expectedVersion) => request(`/v1/todos/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: JSON.stringify({ status, expectedVersion }), csrf: true }),
+      updateTodoStatus: (id, status, expectedVersion, note) => request(`/v1/todos/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: JSON.stringify({ status, expectedVersion, ...(note ? { note } : {}) }), csrf: true }),
       updateTodo: (id, scope, input, expectedVersion, context) => request(`/v1/todos/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ scope, input, expectedVersion }), csrf: true, ...mutationHeaders(context) }),
       deleteTodo: (id, expectedVersion, scope = 'series') => request(`/v1/todos/${encodeURIComponent(id)}?${new URLSearchParams({ scope, expectedVersion: String(expectedVersion) })}`, { method: 'DELETE', csrf: true }),
       restoreTodo: (id) => request(`/v1/todos/${encodeURIComponent(id)}/restore`, { method: 'POST', csrf: true }),
@@ -135,24 +197,115 @@ export function createHttpGateway(baseUrl: string, getCsrfToken: () => string, g
     memos: {
       createMemo: (input, context) => request('/v1/memos', { method: 'POST', body: JSON.stringify(input), csrf: true, ...mutationHeaders(context) }),
       updateMemo: (id, input, expectedVersion, context) => request(`/v1/memos/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ input, expectedVersion }), csrf: true, ...mutationHeaders(context) }),
-      uploadAttachment: async (memoId, file) => {
+      uploadAttachment: async (memoId, file, idempotencyKey) => {
         const form = new FormData(); form.set('file', file);
-        return request(`/v1/memos/${encodeURIComponent(memoId)}/attachments`, { method: 'POST', body: form, csrf: true });
+        return request(`/v1/memos/${encodeURIComponent(memoId)}/attachments`, { method: 'POST', body: form, csrf: true, idempotencyKey });
       },
-      getAttachmentLink: (memoId, attachmentId) => request(`/v1/memos/${encodeURIComponent(memoId)}/attachments/${encodeURIComponent(attachmentId)}/link`),
+      getAttachmentLink: (memoId, attachmentId, disposition = 'attachment') => request(`/v1/memos/${encodeURIComponent(memoId)}/attachments/${encodeURIComponent(attachmentId)}/link${disposition === 'attachment' ? '?download=1' : ''}`),
+      deleteAttachment: (memoId, attachmentId) => request(`/v1/memos/${encodeURIComponent(memoId)}/attachments/${encodeURIComponent(attachmentId)}`, { method: 'DELETE', csrf: true }),
       deleteMemo: (id) => request(`/v1/memos/${encodeURIComponent(id)}`, { method: 'DELETE', csrf: true }),
       restoreMemo: (id) => request(`/v1/memos/${encodeURIComponent(id)}/restore`, { method: 'POST', csrf: true }),
     },
     expenses: {
-      createExpense: (input) => request('/v1/expenses', { method: 'POST', body: JSON.stringify(input), csrf: true }),
+      createExpense: (input, idempotencyKey) => request('/v1/expenses', { method: 'POST', body: JSON.stringify(input), csrf: true, idempotencyKey }),
       updateExpense: (id, input, expectedVersion) => request(`/v1/expenses/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ input, expectedVersion }), csrf: true }),
       deleteExpense: (id, expectedVersion) => request(`/v1/expenses/${encodeURIComponent(id)}?expectedVersion=${expectedVersion}`, { method: 'DELETE', csrf: true }),
       restoreExpense: (id) => request(`/v1/expenses/${encodeURIComponent(id)}/restore`, { method: 'POST', csrf: true }),
       recordSettlement: (expenseId, fromMembershipId, amountJpy) => request(`/v1/expenses/${encodeURIComponent(expenseId)}/settlements`, { method: 'POST', body: JSON.stringify({ fromMembershipId, amountJpy }), csrf: true }),
       reverseSettlement: (expenseId, settlementId) => request(`/v1/expenses/${encodeURIComponent(expenseId)}/settlements/${encodeURIComponent(settlementId)}/reverse`, { method: 'POST', csrf: true }),
+      settleAll: (input, idempotencyKey) => request('/v1/settlement-batches', { method: 'POST', body: JSON.stringify(input), csrf: true, idempotencyKey }),
+      reverseBatch: (batchId, idempotencyKey) => request(`/v1/settlement-batches/${encodeURIComponent(batchId)}/reverse`, { method: 'POST', csrf: true, idempotencyKey }),
     },
+    albums: {
+      listAlbums: () => request('/v1/albums'),
+      getAlbum: (id) => request(`/v1/albums/${encodeURIComponent(id)}`),
+      createAlbum: (input) => request('/v1/albums', { method: 'POST', body: JSON.stringify(input), csrf: true }),
+      updateAlbum: (id, input, expectedVersion) => request(`/v1/albums/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ input, expectedVersion }), csrf: true }),
+      deleteAlbum: (id, expectedVersion) => request(`/v1/albums/${encodeURIComponent(id)}?expectedVersion=${expectedVersion}`, { method: 'DELETE', csrf: true }),
+      restoreAlbum: (id) => request(`/v1/albums/${encodeURIComponent(id)}/restore`, { method: 'POST', csrf: true }),
+      reorderItems: (albumId, itemIds, expectedVersion) => request(`/v1/albums/${encodeURIComponent(albumId)}/order`, { method: 'PUT', body: JSON.stringify({ itemIds, expectedVersion }), csrf: true }),
+      deleteItem: (albumId, itemId) => request(`/v1/albums/${encodeURIComponent(albumId)}/items/${encodeURIComponent(itemId)}`, { method: 'DELETE', csrf: true }),
+      restoreItem: (albumId, itemId) => request(`/v1/albums/${encodeURIComponent(albumId)}/items/${encodeURIComponent(itemId)}/restore`, { method: 'POST', csrf: true }),
+      uploadItem: async (albumId, file, options) => {
+        const client = fetchImplementation ?? fetch;
+        const authHeaders = async () => ({ 'X-CSRF-Token': await getCsrfToken(), 'Tus-Resumable': '1.0.0' });
+        const pathOf = (uploadId: string) => `/v1/uploads/${encodeURIComponent(uploadId)}`;
+        /** 受け取られた位置。枠がなくなっていれば null。 */
+        const receivedOffset = async (uploadId: string) => {
+          const response = await client(new URL(pathOf(uploadId), baseUrl), { method: 'HEAD', credentials: 'include', headers: await authHeaders() });
+          return response.ok ? Number(response.headers.get('Upload-Offset') ?? 0) : null;
+        };
+        // 前回の失敗で残っている枠があれば、続きから送る。枠を作り直すと、上限の3件を使い切ってしまう。
+        let open = openUploads.get(file);
+        let offset = 0;
+        if (open?.albumId === albumId) {
+          const received = await receivedOffset(open.uploadId).catch(() => 0);
+          if (received === null) open = undefined; else offset = received;
+        } else open = undefined;
+        if (!open) {
+          const created = await request<{ uploadId: string; itemId: string; offset: number }>('/v1/uploads', { method: 'POST', body: JSON.stringify({ albumId, name: file.name, mimeType: file.type, byteSize: file.size, keepLocation: options.keepLocation }), csrf: true });
+          if (!created.ok) return created;
+          open = { albumId, uploadId: created.value.uploadId, itemId: created.value.itemId };
+          openUploads.set(file, open);
+        }
+        const { uploadId, itemId } = open;
+        options.onReserved?.();
+        const cancelled = async (): Promise<Result<{ itemId: string }>> => {
+          await cancelOpenUpload(file);
+          return { ok: false, error: { code: 'OFFLINE', message: '送信を止めました。', retryable: true } };
+        };
+        let retries = 0;
+        while (offset < file.size) {
+          if (options.signal?.aborted) return cancelled();
+          const chunk = file.slice(offset, offset + UPLOAD_CHUNK_BYTES);
+          try {
+            const response = await client(new URL(pathOf(uploadId), baseUrl), { method: 'PATCH', credentials: 'include', body: chunk, signal: options.signal, headers: { ...(await authHeaders()), 'Content-Type': 'application/offset+octet-stream', 'Upload-Offset': String(offset) } });
+            if (response.status === 204) { offset = Number(response.headers.get('Upload-Offset') ?? offset + chunk.size); retries = 0; options.onProgress?.(offset, file.size); continue; }
+            if (response.status !== 409) {
+              const error = await response.json().catch(() => responseFailure) as GatewayError;
+              if (!error.retryable) await cancelOpenUpload(file);
+              return { ok: false, error };
+            }
+            offset = (await receivedOffset(uploadId)) ?? offset;
+          } catch {
+            if (options.signal?.aborted) return cancelled();
+            // 通信が切れたら、受け取られた位置を確かめて続きから送る。
+            retries += 1;
+            if (retries > UPLOAD_RETRIES) return { ok: false, error: networkError };
+            await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** retries));
+            try { offset = (await receivedOffset(uploadId)) ?? offset; } catch { /* 次の回でもう一度確かめる */ }
+          }
+        }
+        openUploads.delete(file);
+        if (options.thumbnail) await client(new URL(`/v1/albums/${encodeURIComponent(albumId)}/items/${encodeURIComponent(itemId)}/thumbnail`, baseUrl), { method: 'PUT', credentials: 'include', body: options.thumbnail, headers: { 'X-CSRF-Token': await getCsrfToken(), 'Content-Type': 'application/octet-stream' } }).catch(() => undefined);
+        return { ok: true, value: { itemId } };
+      },
+      cancelUpload: async (file) => { await cancelOpenUpload(file); return { ok: true, value: undefined }; },
+      mediaUrl: (item, variant) => `/v1/albums/${encodeURIComponent(item.albumId)}/items/${encodeURIComponent(item.id)}/${variant}`,
+    },
+    family: {
+      transferOwnership: (toMembershipId, expectedVersion) => request('/v1/households/current/ownership', { method: 'POST', body: JSON.stringify({ toMembershipId, expectedVersion }), csrf: true }),
+      setMemberStatus: (membershipId, status, expectedVersion) => request(`/v1/household-memberships/${encodeURIComponent(membershipId)}/status`, { method: 'PUT', body: JSON.stringify({ status, expectedVersion }), csrf: true }),
+      removeMember: (membershipId, expectedVersion) => request(`/v1/household-memberships/${encodeURIComponent(membershipId)}?expectedVersion=${expectedVersion}`, { method: 'DELETE', csrf: true }),
+      leaveHousehold: () => request('/v1/households/current/leave', { method: 'POST', csrf: true }),
+      createColorLabel: (input) => request('/v1/color-labels', { method: 'POST', body: JSON.stringify(input), csrf: true }),
+      updateColorLabel: (id, input) => request(`/v1/color-labels/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(input), csrf: true }),
+      deleteColorLabel: (id) => request(`/v1/color-labels/${encodeURIComponent(id)}`, { method: 'DELETE', csrf: true }),
+    },
+    links: {
+      createLink: (from, to) => request('/v1/item-links', { method: 'POST', body: JSON.stringify({ from, to }), csrf: true }),
+      deleteLink: (id) => request(`/v1/item-links/${encodeURIComponent(id)}`, { method: 'DELETE', csrf: true }),
+    },
+    trash: { list: () => request('/v1/recently-deleted') },
     resources: { search: (query) => request(`/v1/search?q=${encodeURIComponent(query)}`) },
     insights: { list: () => request('/v1/insights') },
+    assistant: {
+      getStatus: () => request('/v1/assistant/status'),
+      readReceipt: (file) => { const form = new FormData(); form.set('file', file); return request('/v1/assistant/receipt', { method: 'POST', body: form, csrf: true }); },
+      readEventImage: (file) => { const form = new FormData(); form.set('file', file); return request('/v1/assistant/event-image', { method: 'POST', body: form, csrf: true }); },
+      readEventUrl: (url) => request('/v1/assistant/event-url', { method: 'POST', body: JSON.stringify({ url }), csrf: true }),
+      getJob: (id) => request(`/v1/assistant/jobs/${encodeURIComponent(id)}`),
+    },
     notifications: {
       list: () => request('/v1/notifications'),
       markRead: (id) => request(`/v1/notifications/${encodeURIComponent(id)}/read`, { method: 'POST', csrf: true }),
@@ -161,6 +314,10 @@ export function createHttpGateway(baseUrl: string, getCsrfToken: () => string, g
       resume: (id) => request(`/v1/notifications/${encodeURIComponent(id)}/resume`, { method: 'POST', csrf: true }),
       getPreferences: () => request('/v1/notification-preferences'),
       updatePreferences: (input) => request('/v1/notification-preferences', { method: 'PATCH', body: JSON.stringify(input), csrf: true }),
+    },
+    audit: {
+      list: (query = {}) => request(`/v1/audit-events${queryOf(query)}`),
+      listMine: (query = {}) => request(`/v1/account/audit-events${queryOf(query)}`),
     },
     credentials: {
       async create(options) {

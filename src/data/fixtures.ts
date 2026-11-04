@@ -1,8 +1,16 @@
+import type { EventCandidate, ReceiptProposal } from '../domain/assistant';
 import { capabilitiesFor } from '../authz/policy';
-import type { HouseholdInvite, HouseholdNotification, HouseholdSnapshot, NotificationPreferences, PrivacySettings, SecurityOverview, VisibilityPolicy } from '../domain/types';
+import type { Album, AlbumItem, Expense, HouseholdInvite, HouseholdNotification, HouseholdSnapshot, NotificationPreferences, PrivacySettings, SecurityOverview, VisibilityPolicy } from '../domain/types';
 
 export const fixedNow = '2026-09-30T07:30:00+09:00';
 const visibleTo = (creatorMembershipId: string, audience: VisibilityPolicy['audience'] = 'household', selectedMembershipIds: string[] = []): VisibilityPolicy => ({ audience, creatorMembershipId, selectedMembershipIds });
+
+/** 確認用の読み取りが返す見本。実際の画像やページは読まない。 */
+export const sampleReceipt: ReceiptProposal = { amountJpy: 2480, date: '2026-09-29', merchant: '見本スーパー 青葉店', category: 'food' };
+export const sampleEventCandidates: EventCandidate[] = [
+  { title: '見本の区民まつり', date: '2026-10-27', startTime: '10:00', endTime: '15:30', allDay: false, location: '中央公園' },
+  { title: '見本の区民まつり（予備日）', date: '2026-11-03', startTime: null, endTime: null, allDay: true, location: null },
+];
 
 export const baseSnapshot: HouseholdSnapshot = {
   viewer: { userId: 'user-aoi', membershipId: 'member-aoi', role: 'owner', status: 'active', capabilities: capabilitiesFor('owner'), permissionRevision: 1 },
@@ -32,17 +40,28 @@ export const baseSnapshot: HouseholdSnapshot = {
   memos: [
     { id: 'memo-school', householdId: 'house-mori', title: '学校公開のお知らせ', body: '受付 9:15〜。来校証を着用。撮影は教室外のみ。', updatedAt: '2026-09-29T21:10:00+09:00', authorMembershipId: 'member-aoi', tags: ['学校', '今週'], attachments: [{ id: 'attachment-school', memoId: 'memo-school', originalName: '学校公開.pdf', mimeType: 'application/pdf', byteSize: 842310, status: 'clean', statusMessage: '確認が終わり、開ける状態です' }], ocrText: '令和8年度 学校公開のお知らせ…', place: { name: '青葉小学校 体育館', capturedVia: 'manual', selectedAt: '2026-09-29T21:10:00+09:00' }, visibility: visibleTo('member-aoi', 'selected', ['member-aoi','member-ren','member-hana']), version: 1 },
     { id: 'memo-clinic', householdId: 'house-mori', title: '小児科の控え', body: '次回は10月14日。保険証を持参。', updatedAt: '2026-09-28T18:40:00+09:00', authorMembershipId: 'member-ren', tags: ['控え'], attachments: [], visibility: visibleTo('member-ren', 'adults'), version: 1 },
-    { id: 'memo-receipt', householdId: 'house-mori', title: '教材費レシート', body: '家計への登録待ち。', updatedAt: '2026-09-30T06:50:00+09:00', authorMembershipId: 'member-aoi', tags: ['家計'], attachments: [{ id: 'attachment-receipt', memoId: 'memo-receipt', originalName: 'receipt.jpg', mimeType: 'image/jpeg', byteSize: 1284300, status: 'quarantined', statusMessage: 'ファイルを確認しています。完了するまで開けません' }], ocrText: '青葉書店　教材 2,860円', visibility: visibleTo('member-aoi', 'adults'), version: 1 },
+    { id: 'memo-receipt', householdId: 'house-mori', title: '教材費レシート', body: '家計への登録待ち。', updatedAt: '2026-09-30T06:50:00+09:00', authorMembershipId: 'member-aoi', tags: ['家計'], attachments: [{ id: 'attachment-receipt', memoId: 'memo-receipt', originalName: 'receipt.jpg', mimeType: 'image/jpeg', byteSize: 1284300, status: 'quarantined', statusMessage: 'ファイルを確認しています。完了するまで開けません' }, { id: 'attachment-receipt-photo', memoId: 'memo-receipt', originalName: '教材の写真.jpg', mimeType: 'image/jpeg', byteSize: 2259, status: 'clean', statusMessage: '確認が終わり、開ける状態です' }, { id: 'attachment-receipt-clip', memoId: 'memo-receipt', originalName: '教材の使い方.mp4', mimeType: 'video/mp4', byteSize: 2836, status: 'clean', statusMessage: '確認が終わり、開ける状態です' }], ocrText: '青葉書店　教材 2,860円', visibility: visibleTo('member-aoi', 'adults'), version: 1 },
   ],
   expenses: [
-    { id: 'expense-books', householdId: 'house-mori', title: '学校教材', amountJpy: 2860, incurredOn: '2026-09-29', payerMembershipId: 'member-aoi', category: 'education', shares: [{ membershipId: 'member-aoi', amountJpy: 1430, settledJpy: 1430 }, { membershipId: 'member-ren', amountJpy: 1430, settledJpy: 0 }], settlements: [], note: '花の図工・理科教材', place: { name: '青葉書店', address: '東京都世田谷区', capturedVia: 'manual', selectedAt: '2026-09-29T18:20:00+09:00' }, version: 1 },
-    { id: 'expense-train', householdId: 'house-mori', title: '家族のおでかけ交通費', amountJpy: 3360, incurredOn: '2026-09-27', payerMembershipId: 'member-ren', category: 'transport', shares: [{ membershipId: 'member-aoi', amountJpy: 1680, settledJpy: 0 }, { membershipId: 'member-ren', amountJpy: 1680, settledJpy: 1680 }], settlements: [], version: 1 },
-    { id: 'expense-groceries', householdId: 'house-mori', title: '週末の食材', amountJpy: 5840, incurredOn: '2026-09-26', payerMembershipId: 'member-aoi', category: 'food', shares: [{ membershipId: 'member-aoi', amountJpy: 2920, settledJpy: 2920 }, { membershipId: 'member-ren', amountJpy: 2920, settledJpy: 2920 }], settlements: [{ id: 'settlement-1', amountJpy: 2920, fromMembershipId: 'member-ren', toMembershipId: 'member-aoi', recordedAt: '2026-09-28T20:00:00+09:00' }], version: 1 },
+    { id: 'expense-books', householdId: 'house-mori', kind: 'expense', creatorMembershipId: 'member-aoi', visibility: visibleTo('member-aoi'), title: '学校教材', amountJpy: 2860, incurredOn: '2026-09-29', payerMembershipId: 'member-aoi', category: 'education', shares: [{ membershipId: 'member-aoi', amountJpy: 1430, settledJpy: 1430 }, { membershipId: 'member-ren', amountJpy: 1430, settledJpy: 0 }], settlements: [], note: '花の図工・理科教材', place: { name: '青葉書店', address: '東京都世田谷区', capturedVia: 'manual', selectedAt: '2026-09-29T18:20:00+09:00' }, version: 1 },
+    { id: 'expense-train', householdId: 'house-mori', kind: 'expense', creatorMembershipId: 'member-aoi', visibility: visibleTo('member-aoi'), title: '家族のおでかけ交通費', amountJpy: 3360, incurredOn: '2026-09-27', payerMembershipId: 'member-ren', category: 'transport', shares: [{ membershipId: 'member-aoi', amountJpy: 1680, settledJpy: 0 }, { membershipId: 'member-ren', amountJpy: 1680, settledJpy: 1680 }], settlements: [], version: 1 },
+    { id: 'expense-groceries', householdId: 'house-mori', kind: 'expense', creatorMembershipId: 'member-aoi', visibility: visibleTo('member-aoi'), title: '週末の食材', amountJpy: 5840, incurredOn: '2026-09-26', payerMembershipId: 'member-aoi', category: 'food', shares: [{ membershipId: 'member-aoi', amountJpy: 2920, settledJpy: 2920 }, { membershipId: 'member-ren', amountJpy: 2920, settledJpy: 2920 }], settlements: [{ id: 'settlement-1', amountJpy: 2920, fromMembershipId: 'member-ren', toMembershipId: 'member-aoi', recordedAt: '2026-09-28T20:00:00+09:00' }], version: 1 },
+    { id: 'income-salary', householdId: 'house-mori', kind: 'income', creatorMembershipId: 'member-aoi', visibility: visibleTo('member-aoi'), title: '9月の給与', amountJpy: 320000, incurredOn: '2026-09-25', payerMembershipId: 'member-aoi', category: 'income_salary', shares: [], settlements: [], version: 1 },
+    { id: 'expense-august-utilities', householdId: 'house-mori', kind: 'expense', creatorMembershipId: 'member-ren', visibility: visibleTo('member-ren'), title: '8月の電気代', amountJpy: 9800, incurredOn: '2026-08-20', payerMembershipId: 'member-ren', category: 'utilities', shares: [{ membershipId: 'member-ren', amountJpy: 9800, settledJpy: 9800 }], settlements: [], version: 1 },
   ],
+  settlementBatches: [],
   resources: [
     { id: 'resource-school', householdId: 'house-mori', label: '青葉小学校の保護者向けページ', url: 'https://example.com/family-hub/school', kind: 'school', relatedEntityId: 'event-school', visibility: visibleTo('member-aoi', 'selected', ['member-aoi','member-ren','member-hana','member-yui']) },
     { id: 'resource-city', householdId: 'house-mori', label: '世田谷区の子育て手続き', url: 'https://example.com/family-hub/city', kind: 'municipality', visibility: visibleTo('member-aoi') },
     { id: 'resource-guide', householdId: 'house-mori', label: '家族の連絡ルール', url: 'https://example.com/family-hub/guide', kind: 'document', visibility: visibleTo('member-aoi', 'selected', ['member-aoi','member-ren','member-hana','member-sora','member-yui']) },
+  ],
+  links: [
+    { id: 'link-school', householdId: 'house-mori', from: { kind: 'event', id: 'event-school' }, to: { kind: 'memo', id: 'memo-school' }, createdByMembershipId: 'member-aoi', createdAt: '2026-09-29T21:12:00+09:00' },
+  ],
+  colorLabels: [
+    { id: 'label-school', householdId: 'house-mori', name: '学校', color: '#315c80' },
+    { id: 'label-home', householdId: 'house-mori', name: '家のこと', color: '#6f7552' },
+    { id: 'label-lesson', householdId: 'house-mori', name: '習いごと', color: '#a94f38' },
   ],
   context: {
     asOf: fixedNow,
@@ -52,6 +71,21 @@ export const baseSnapshot: HouseholdSnapshot = {
     sync: { state: 'synced', lastSyncedAt: '2026-09-30T07:29:00+09:00' },
   },
 };
+
+/**
+ * 蓮さんだけが見られる支出。碧さんは負担する人や支払った人に入っていても、見ることも変えることもできない。
+ * 確認用データと試験の家族にだけ入れる。集計の試験は baseSnapshot の支出だけを使う。
+ */
+export const restrictedExpenses: Expense[] = [
+  { id: 'expense-ren-private', householdId: 'house-mori', kind: 'expense', creatorMembershipId: 'member-ren', visibility: visibleTo('member-ren', 'creator'), title: '贈り物の下見', amountJpy: 3000, incurredOn: '2026-09-28', payerMembershipId: 'member-ren', category: 'other', shares: [{ membershipId: 'member-aoi', amountJpy: 1500, settledJpy: 500 }, { membershipId: 'member-ren', amountJpy: 1500, settledJpy: 1500 }], settlements: [{ id: 'settlement-private', amountJpy: 500, fromMembershipId: 'member-aoi', toMembershipId: 'member-ren', recordedAt: '2026-09-29T08:00:00+09:00' }], version: 1 },
+  { id: 'expense-ren-deleted', householdId: 'house-mori', kind: 'expense', creatorMembershipId: 'member-ren', visibility: visibleTo('member-ren', 'creator'), title: '取り消した下見', amountJpy: 800, incurredOn: '2026-09-28', payerMembershipId: 'member-aoi', category: 'other', shares: [{ membershipId: 'member-aoi', amountJpy: 800, settledJpy: 800 }], settlements: [], deletedAt: '2026-09-29T20:00:00+09:00', version: 2 },
+];
+
+/** 成人を申告した利用者。管理者にできるのはこの人たちだけ。試験の家族（server/testing/seed.ts）も同じ一覧を使う。 */
+export const adultDeclaredUsers: readonly string[] = ['user-aoi', 'user-ren'];
+
+/** 確認用データと試験の家族に入れる記録の全体。 */
+export const seededSnapshot = (): HouseholdSnapshot => ({ ...structuredClone(baseSnapshot), expenses: structuredClone([...baseSnapshot.expenses, ...restrictedExpenses]) });
 
 export const baseSecurityOverview: SecurityOverview = {
   authenticators: [{ id: 'authenticator-macbook', label: 'MacBook', createdAt: '2026-09-28T18:00:00+09:00', kind: 'passkey', demo: true }],
@@ -73,3 +107,64 @@ export const baseInvites: HouseholdInvite[] = [
 
 export const baseNotificationPreferences: NotificationPreferences = { todoDue: true, eventDeparture: true, quietHours: true };
 export const basePrivacySettings: PrivacySettings = { defaultAudience: 'household', hideNotificationContent: true, placeLookupConsent: null };
+
+export const baseAlbums: Album[] = [
+  { id: 'album-sports', householdId: 'house-mori', title: '運動会', description: '花の徒競走とお弁当', coverItemId: 'item-sports-1', place: { name: '青葉小学校 校庭', capturedVia: 'manual', selectedAt: '2026-09-20T17:00:00+09:00' }, bgmPreset: 'bright', creatorMembershipId: 'member-aoi', visibility: visibleTo('member-aoi', 'selected', ['member-aoi', 'member-ren', 'member-hana', 'member-sora']), createdAt: '2026-09-20T17:00:00+09:00', version: 1 },
+  { id: 'album-park', householdId: 'house-mori', title: '週末の公園', creatorMembershipId: 'member-ren', visibility: visibleTo('member-ren', 'adults'), createdAt: '2026-09-13T12:00:00+09:00', version: 1 },
+];
+
+/** 撮影日時は、時差つきの EXIF（exif-offset）と、時差のない EXIF を家族の時間帯で読んだもの（exif-local）を混ぜる。 */
+const fixtureItem = (id: string, albumId: string, position: number, uploaderMembershipId: string, takenAt: string, takenAtSource: AlbumItem['takenAtSource']): AlbumItem => ({ id, albumId, householdId: 'house-mori', kind: 'photo', originalName: `${id}.jpg`, mimeType: 'image/jpeg', byteSize: 2_400_000 + position * 1000, width: 1600, height: 1200, takenAt, takenAtSource, status: 'ready', locationKept: false, hasThumbnail: true, uploaderMembershipId, position, createdAt: '2026-09-20T17:00:00+09:00' });
+
+export const baseAlbumItems: AlbumItem[] = [
+  fixtureItem('item-sports-1', 'album-sports', 0, 'member-aoi', '2026-09-20T09:12:30+09:00', 'exif-offset'),
+  fixtureItem('item-sports-2', 'album-sports', 1, 'member-aoi', '2026-09-20T10:05:00+09:00', 'exif-local'),
+  fixtureItem('item-sports-3', 'album-sports', 2, 'member-ren', '2026-09-20T11:40:12+09:00', 'exif-offset'),
+  fixtureItem('item-park-1', 'album-park', 0, 'member-ren', '2026-09-13T10:20:00+09:00', 'exif-offset'),
+];
+
+/**
+ * 見本の家族で、管理者を2人にする（A12-1 の退出の確認用）。蓮さんも管理者になる。
+ * 内部監査のビルドで ?household=two-owners を付けたときだけ使う（src/app/runtime.mock.ts）。
+ */
+export function withCoOwner(snapshot: HouseholdSnapshot): HouseholdSnapshot {
+  snapshot.memberships = snapshot.memberships.map((member) => (member.id === 'member-ren' ? { ...member, role: 'owner' } : member));
+  return snapshot;
+}
+
+/**
+ * 見本の家族の、これまでの変更の記録（A5-8 の画面の見本）。記録の時刻は見本の時計（9月30日 7:45）より前。
+ * 確認用の画面だけが使い、同等性の試験の家族には入れない（試験は空の記録から始める）。
+ * 碧さんには見えない蓮さんの支出（expense-ren-private・expense-ren-deleted）を指す行は、画面では「見られない記録」になる。
+ */
+const auditRow = (at: string, actor: string | null, action: string, target: string | null, fields?: string[], household = true) => ({ at: `2026-09-${at}:00+09:00`, actor_user_id: actor, action, target, detail: fields ? JSON.stringify({ fields }) : null, household_id: household ? 'house-mori' : null });
+export const seedAuditHistory = [
+  auditRow('24T19:02', 'user-ren', 'createEvent', 'event-park'),
+  auditRow('24T21:15', 'user-aoi', 'updateRecurringEvent', 'event-clean', ['startsAt', 'endsAt']),
+  auditRow('25T08:30', 'user-aoi', 'createExpense', 'income-salary'),
+  auditRow('25T20:40', 'user-ren', 'createTodo', 'todo-library'),
+  auditRow('26T10:12', 'user-aoi', 'createExpense', 'expense-groceries'),
+  auditRow('26T18:05', 'user-ren', 'updateTodoStatus', 'todo-done'),
+  auditRow('27T03:00', 'operator', 'operator.grant', null),
+  auditRow('27T09:00', 'user-ren', 'createExpense', 'expense-train'),
+  auditRow('27T16:20', 'user-aoi', 'uploadAttachment', 'memo-school'),
+  auditRow('28T07:00', 'user-aoi', 'signInWithPassword', null, undefined, false),
+  auditRow('28T08:10', 'user-ren', 'createExpense', 'expense-ren-private'),
+  auditRow('28T18:40', 'user-ren', 'createMemo', 'memo-clinic'),
+  auditRow('28T20:00', 'user-ren', 'recordSettlement', 'expense-groceries'),
+  auditRow('29T08:00', 'user-aoi', 'recordSettlement', 'expense-ren-private'),
+  auditRow('29T09:30', 'user-aoi', 'createExpense', 'expense-books'),
+  auditRow('29T12:00', 'user-hana', 'updateTodoStatus', 'todo-practice'),
+  auditRow('29T20:00', 'user-ren', 'deleteExpense', 'expense-ren-deleted'),
+  auditRow('29T21:10', 'user-aoi', 'updateMemo', 'memo-school', ['body', 'tags']),
+  auditRow('29T21:12', 'user-aoi', 'createItemLink', 'link-school'),
+  auditRow('29T22:00', 'user-aoi', 'updateHouseholdProfile', null),
+  auditRow('29T23:10', 'user-aoi', 'finishPasskeyRegistration', null, undefined, false),
+  auditRow('30T06:50', 'user-aoi', 'createMemo', 'memo-receipt'),
+  auditRow('30T06:55', 'user-aoi', 'uploadAttachment', 'memo-receipt'),
+  auditRow('30T07:05', 'user-ren', 'updateTodo', 'todo-garbage', ['dueAt']),
+  auditRow('30T07:10', 'user-aoi', 'updateExpense', 'expense-books', ['note', 'title']),
+  auditRow('30T07:18', 'user-aoi', 'finishPasskey', null, undefined, false),
+  auditRow('30T07:20', 'user-aoi', 'createHouseholdInvite', 'invite-demo'),
+  auditRow('30T07:25', 'user-ren', 'updateAlbum', 'album-park', ['title']),
+];

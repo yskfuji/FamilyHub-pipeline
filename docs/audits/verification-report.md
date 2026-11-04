@@ -1,26 +1,40 @@
 # 検証結果
 
-実測日: 2026-10-03。固定ロケール `ja-JP`、`Asia/Tokyo`、固定fixtureで実行。未実行の項目を合格とは記載しない。
+実測日: 2026-11-02（段階16、ブランチ `feat/full-parity`）。固定ロケール `ja-JP`、`Asia/Tokyo`、固定fixtureで実行。未実行の項目を合格とは記載しない。合否は各命令の終了コードで判定した。自動試験の成功は本番での安全性を意味しない。
 
 | 区分 | 状態 | 証拠 |
 |---|---|---|
-| lint / TypeScript / unit | pass | ESLint 0 warnings、TypeScript 0 errors、Vitest 107/107（14ファイル）。従来の日付・URL・場所・EXIF・秘匿に加え、家計の計算（月の合計、費目の割合の最大剰余法、誰から誰へ、支払った人の負担を精算済みとして1円が残らないこと、精算の取り消しの対応付け）、場所の集計と並べ替え、ヒントの導出、繰り返し（毎日・毎週曜日・毎月・間隔・UNTIL・COUNT・除外・月末・範囲の分割）、mockの支出編集・削除・復元の規則、招待の検証、権限、パスキーの完了を含む |
-| 静的ビルド | pass | Vite 8.3.1、126 modules、consumer `dist/`生成。showcase、監査切替、source mapなし。JS gzip 139.4KB、CSS gzip 42.2KB（場所一覧・支出の詳細・繰り返し・プライバシー設定の追加分を含む） |
-| OpenAPI / HTTP adapter | pass | 51 operationIdが一意で、Gatewayのメソッドと1対1に対応することを機械照合（`scripts/audit-contract.mjs`）。追加：`finishPasskey`、`updateHouseholdProfile`、`getAttachmentLink`、`updateExpense`／`deleteExpense`／`restoreExpense`、`listInsights`。削除：`getContext`。すべての2xx応答に本文スキーマ、IDは形式を固定しない文字列。CSRF・冪等キー・権限revision・204応答・復元操作も静的に確認 |
-| Chromium / WebKit / Firefox E2E | pass | 62件×3ブラウザ=186/186。従来の主要フロー・4ロール・権限拒否・オフライン再送・場所の外部送信に加え、家計（計算値、支出の詳細→精算→履歴→取り消し、精算後の編集の制限と削除の禁止、削除と復元、不明なID）、繰り返し（毎週の展開、この回だけの削除と元に戻す、これ以降の分割、タスクの次の回）、ナビ（「その他」のダイアログ・Escape・フォーカス復帰・表示中の表示、404、`/settings`の振り分け、子どもの迂回禁止、検索結果から詳細とアンカー）、メモ削除後の復元案内、プライバシー設定と通知内容の秘匿、サインアウト、場所一覧と子どもの禁止を含む。円記号はChromium「￥」とWebKit「¥」の両方を許容 |
-| 日本語コンテンツ監査 | pass + evidence-pending | 通常・内部監査画面、fixture、成功・失敗文、入力検証文を走査。既知の未翻訳語・内部値・実装語0件。母語話者2名レビューは未実施 |
-| axe serious/critical / keyboard | pass | 30件×3ブラウザ=90/90。全設定タブ、ドロワー、ダイアログ、404、権限なしの案内、場所一覧と詳細、支出の詳細を含みserious/critical 0。44px監査はボタンに加えてボタン状のリンクも対象。画面左上のロゴだけのリンクに名前がなかった問題を修正 |
-| 320〜1920px水平オーバーフロー | pass | 主要ルート×6幅×3ブラウザ、document/body/main差分0 |
-| 全主要画面スクリーン | pass + human reviewed | DPR 2 PNG 126枚、390/834/1440px、明暗・異常状態・4ロール・通知/編集/権限/パスワードに、場所一覧と詳細、支出の詳細、繰り返しの回、プライバシー設定、モバイルの「その他」とすぐに追加を追加。目視で見つけて直したもの：「その他」のリンクが左レール用の縮小規則で1文字ずつ縦に潰れる、設定タブの語の途中での改行（パソコンはタブ単位で折り返し、モバイルは横スクロールし表示中のタブを中央へ）、子どもの今日の画面で見出し番号が04を飛ばす、影響する予定がないのに「先に確認すること」に天気を出す。`artifacts/screens/gallery.html` |
-| Lighthouse Today desktop | target met | Performance 100、Accessibility 100、Best Practices 100、LCP 646ms、CLS 0.00047、TBT 0ms（機能追加後に再測定） |
-| 操作ID・ユースケース | pass | 明示的な操作237件・26系統（存在しない能力名と、どの操作にも当たらない系統を検出）。ユースケース65件、重複・欠落なし |
-| 場所検索の実データ測定 | pass（1日・28地点） | `docs/audits/place-lookup-probe.md`。小数第3位の丸め＋端末内の並べ直しで上位10件の再現率 平均0.961、完全一致25/28。再測定は `npm run probe:openpoi` |
-| 配信ヘッダー | static pass + evidence-pending | `_headers`と`nginx.conf`の一致、`connect-src`、`geolocation=(self)`を静的検査。`vite preview`はヘッダーを適用しないため配備先で要確認 |
-| npm runtime audit | pass | `npm audit --omit=dev` は0 vulnerabilities。Vite 8.3.1 |
-| npm full audit | residual risk | 開発時だけ使うMermaid CLI→Puppeteerの推移依存にhigh 8件。Node 20で利用できる固定版24.34.0には上流修正版がなく、`npm install --ignore-scripts`と既存Chrome指定でダウンロード／展開経路を使わない。consumer buildには含まれない。強制修正による旧版化は採用しない |
-| VoiceOver + Safari実機 | evidence-pending | 人手記録なし |
-| iOS Safari / Android実機の位置情報 | evidence-pending | 現在地の許可プロンプト、正確な位置情報オフ時の誤差、写真選択の「オプション」の既定値、Androidでの写真の位置情報除去は実機記録なし |
-| 家庭ユーザー試験 | evidence-pending | 6世帯12名未実施 |
+| TypeScript / ESLint | pass | `npx tsc -b --pretty false`、`npx eslint . --max-warnings 0` とも終了コード0。`server/` の読み込みの制限を `no-restricted-imports` で検査 |
+| 単体・同等性 | pass | `npx vitest run`: 58ファイル、1056件。同じ試験集合をモック（`src/data/gateway.test.ts`）と実サーバー（`server/test/gateway.parity.test.ts`）へ流す。HTTP の応答は ajv で OpenAPI の形と照合 |
+| 経路と契約 | pass | `npm run audit:routes`: 3件。Fastify の全経路と OpenAPI を双方向で照合。`scripts/audit-contract.mjs`: 102操作が Gateway のメソッドと1対1 |
+| ビルド | pass | `npm run build`、`npm run build:http`、`npm run build:server`、`npm run build:audit` とも0 |
+| ビルドの境界 | pass | `dist/` と `dist-http/` に `/showcase`、内部監査の文言、管理コンソールの見本の印、source map がない。`dist-http/` に確認用データ（森さんち）がない。`dist-server/` に代役がない。`dist-server/` と `dist-http/` の版の印が同じ（`npm run audit:ui`、`npm run audit:security`） |
+| セキュリティの静的検査 | pass | ヘッダーの一致、`connect-src` と `media-src` の完全一致、nginx の `/v1` 転送、外部接続は `server/adapters` だけ、SQL の文字列の組み立ての禁止、`Set-Cookie` は1ファイルだけ、`server/` の読み込みの制限、`server/` の本体に日本語の文字列がないこと。各検査は、わざと違反を入れて失敗することを確かめた（23件の違反をすべて検出） |
+| 日本語コンテンツ監査 | pass + evidence-pending | 122ファイルを走査。既知の未翻訳語・内部値・実装語0件。比較元の名前の検査は350ファイル。母語話者2名レビューは未実施 |
+| 操作ID・ユースケース | pass | 明示的な操作468件・108系統。ユースケース96件、能力名はすべて実在 |
+| Chromium モック E2E + axe | pass | `e2e/` の一覧と `e2e/accessibility.spec.ts` で305件 |
+| WebKit モック E2E | pass（環境由来の時間切れを除く） | `npm run test:e2e` の一覧を Chromium と WebKit で実行し、491件が通過、3件が skip、失敗は WebKit の2件。2件とも `page.goto` の読み込み待ちの時間切れで、単独の再実行では3回とも通った。WebKit で静的ファイル（`/favicon.svg`）だけを300回開いても2回同じように止まり、アプリの画面（`/today`）は300回で0回だったため、この環境の WebKit の問題と判断した。以前の4件は直した: 密度「コンパクト」で Safari がセレクトの `min-height` を無視して30pxになっていた（`.select` の標準の見た目を外して矢印を描く）、Safari ではクリックしたボタンに焦点が移らず、重ね表示を閉じたあと焦点が `main` に戻っていた（`focusReturnTarget`、単体試験あり）、デスクトップの WebKit に `Touch` がない（試験の書き方を変更）、Safari の既定の Tab はリンクを飛ばす（WebKit では Option+Tab で確かめる） |
+| Firefox モック E2E | 未実施 | この環境では Firefox が起動の段階で止まり（macOS の sandbox の `Operation not permitted`）、試験へ進めない。Firefox 自身の sandbox を切っても同じだった。アプリの結果ではない |
+| `npm run verify` の全体 | 未達 | Firefox が起動できないため、この環境では終了コード0にならない。全体の命令としては実行していない。構成する命令は個別に実行した |
+| 実スタック E2E | pass（Chromium だけ） | `playwright.real.config.ts`: 40件。実際の API と SQLite、配信と同じ CSP の下で動かす。パスキーは仮想認証器、LLM は代役 |
+| 管理コンソールの見本 | pass | 7項目すべてで見本の表示を確認。外への要求がないこと、通常のビルドでは見つからないページになることを `e2e/management.spec.ts` で確認。390px と 1440px の撮影を目視し、水平のはみ出しは0 |
+| API の起動 | pass | `dist-server/main.js` を一時的なデータベースで起動し、`/health` は200、`/ready` は200、`/v1/version` は `dist-server/build-id.txt` と同じ値。`NODE_ENV=production` で clamd に届かないときは `/health` が200、`/ready` が503。clamd の設定がなければ起動しない。`dist-server/cli.js` は動作を確認 |
+| ER 図 | pass | `npm run render:er` は既存の Chrome で実行できた。`docs/er.svg.sha256` は実際の生成の結果。図の表と文書の種類は `server/db/migrations.ts`（14表）と `server/db/aggregateStore.ts`（15種）から照合 |
+| 配布の一覧 | pass | `bash scripts/package.sh --dry-run`: 497件。データベース、アップロード、メディア、`.env`、ビルド、試験の結果を含まない。`src/data/` と `server/media/` は含む |
+| Lighthouse Today desktop | pass（ローカルの静的 preview） | Performance 99、Accessibility 100、Best Practices 100、LCP 767ms、CLS 0.00048、TBT 0ms |
+| 場所検索の実データ測定 | 前回の結果 | 2026-10-03 の測定のまま（`docs/audits/place-lookup-probe.md`）。今回は再測定していない |
+| npm runtime audit | pass | zod を 4.6.7 に上げ（GHSA-mrhx-c7xc-m3w5 の修正版）、`npm audit --omit=dev` は0件 |
+| npm full audit | residual risk | 全依存で32件（critical 1、high 12、moderate 14、low 5）。大半は開発用の推移依存。強制修正は行っていない |
+| 実機の VoiceOver + Safari | evidence-pending | 人手記録なし |
+| iOS Safari / Android実機の位置情報 | evidence-pending | 実機記録なし |
+| 外部の侵入試験 | evidence-pending | 未実施 |
+| 実利用者の評価 | evidence-pending | 6世帯12名未実施 |
+| 法務の確認 | evidence-pending | 規約とプライバシーポリシーは草案。運営者名と問い合わせ先は空欄 |
+| 実物の clamd、SMTP、LLM | evidence-pending | 代役だけで確認 |
+| URL の取得の TLS の経路 | evidence-pending | 試験は http の代役 |
+| H.264 の再生、ピクチャーインピクチャー | evidence-pending | 自動試験で確かめていない |
+| 実スタックの Firefox と WebKit | evidence-pending | 実スタックの E2E は Chromium だけ |
+| nginx、systemd の例 | evidence-pending | この環境に nginx と docker がなく、動かしていない。TLS証明書の設定も含まない |
 | INP | evidence-pending | labではTBT 0ms。INPは実ユーザーのfield interaction dataが必要 |
 
 Lighthouseの生データは `lighthouse-today.report.json` / `.html`、要約は `lighthouse-summary.json`。測定はローカル静的previewであり、実配信CDNや実端末のCore Web Vitalsを保証しない。自動テストの成功は日本語の自然さや実利用者満足を証明しない。

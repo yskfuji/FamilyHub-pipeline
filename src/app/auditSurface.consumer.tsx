@@ -1,6 +1,4 @@
 export const auditSurface = false;
 export const auditPath = '';
 
-export function AuditPage() {
-  return null;
-}
+export const AuditPage: (props: { path: string }) => null = () => null;

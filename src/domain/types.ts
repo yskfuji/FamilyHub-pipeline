@@ -1,8 +1,10 @@
+import type { TakenAtSource } from './captureTime';
 export type Id = string;
 export type IsoDate = `${number}-${number}-${number}`;
 export type Rfc3339 = string;
-export type Theme = 'light' | 'dusk';
-export type Scenario = 'normal' | 'empty' | 'loading' | 'offline' | 'conflict' | 'expired-invite' | 'expired-session' | 'quarantined' | 'weather';
+/** data-theme の値。light と dusk が既定の組で、残りは昼と夜の組（-night が夜）。 */
+export type Theme = 'light' | 'dusk' | 'warm' | 'warm-night' | 'modern' | 'modern-night' | 'matcha' | 'matcha-night' | 'sakura' | 'sakura-night';
+export type Scenario = 'normal' | 'empty' | 'all-done' | 'loading' | 'offline' | 'conflict' | 'expired-invite' | 'expired-session' | 'quarantined' | 'weather';
 
 export type Result<T> =
   | { ok: true; value: T }
@@ -25,7 +27,7 @@ export interface GatewayError {
   message: string;
   retryable: boolean;
   fieldErrors?: Record<string, string>;
-  reason?: 'CAPABILITY_MISSING' | 'SCOPE_DENIED' | 'MEMBERSHIP_INACTIVE' | 'OWNER_REQUIRED' | 'VERSION' | 'PERMISSION_REVISION' | 'IDEMPOTENCY';
+  reason?: 'CAPABILITY_MISSING' | 'SCOPE_DENIED' | 'MEMBERSHIP_INACTIVE' | 'OWNER_REQUIRED' | 'VERSION' | 'PERMISSION_REVISION' | 'IDEMPOTENCY' | 'CSRF' | 'REAUTH_FAILED' | 'SESSION_EXPIRED';
 }
 
 export interface User {
@@ -39,6 +41,8 @@ export interface Household {
   id: Id;
   name: string;
   timezone: 'Asia/Tokyo';
+  /** 直近の名前の変更の時刻。1日の回数の上限に使う。 */
+  nameChanges?: Rfc3339[];
 }
 
 export type MembershipRole = 'owner' | 'adult' | 'child' | 'guest';
@@ -47,9 +51,12 @@ export type Capability =
   | 'event.read' | 'event.create' | 'event.update' | 'event.delete'
   | 'task.read' | 'task.create' | 'task.update' | 'task.delete' | 'task.transition'
   | 'memo.read' | 'memo.create' | 'memo.update' | 'memo.delete' | 'memo.attach'
-  | 'expense.read' | 'expense.create' | 'expense.settle'
+  | 'expense.read' | 'expense.create' | 'expense.update' | 'expense.delete' | 'expense.settle'
+  | 'album.read' | 'album.create' | 'album.update' | 'album.delete'
+  | 'link.manage' | 'assistant.use'
   | 'place.read'
-  | 'insight.read' | 'resource.read' | 'settings.own' | 'notification.manage';
+  | 'insight.read' | 'resource.read' | 'settings.own' | 'notification.manage'
+  | 'audit.read';
 export interface PermissionOverride { membershipId: Id; capability: Capability; effect: 'allow' | 'deny'; }
 export interface ViewerContext {
   userId: Id;
@@ -72,7 +79,7 @@ export interface HouseholdMembership {
   userId: Id;
   displayName: string;
   role: MembershipRole;
-  status: 'active' | 'invited' | 'suspended';
+  status: 'active' | 'invited' | 'suspended' | 'left';
   color: string;
   version: number;
 }
@@ -93,6 +100,9 @@ export interface CalendarEvent {
   endsAt: Rfc3339;
   timezone: string;
   allDay?: boolean;
+  colorLabelId?: Id;
+  /** 開始の何分前に知らせるか。 */
+  reminderMinutesBefore?: number;
   ownerMembershipId: Id;
   participantMembershipIds: Id[];
   location?: string;
@@ -105,13 +115,22 @@ export interface CalendarEvent {
   deletedAt?: Rfc3339;
 }
 
-export type TodoStatus = 'open' | 'doing' | 'review' | 'done';
+export type TodoStatus = 'open' | 'doing' | 'review' | 'waiting' | 'done';
+export type TodoPriority = 'low' | 'normal' | 'high';
 export interface Todo {
   id: Id;
   householdId: Id;
   title: string;
   dueAt?: Rfc3339;
+  /** 期間で管理するタスクの開始。dueAt を終わりとして扱う。 */
+  dueStartAt?: Rfc3339;
   status: TodoStatus;
+  priority?: TodoPriority;
+  colorLabelId?: Id;
+  /** 次の人へ渡すときの一言。 */
+  handoffNote?: string;
+  /** 完了したときの一言。 */
+  completionNote?: string;
   assigneeMembershipId: Id;
   reviewerMembershipId?: Id;
   creatorMembershipId: Id;
@@ -157,6 +176,8 @@ export interface Memo {
   title: string;
   body: string;
   updatedAt: Rfc3339;
+  /** メモが指す日。作った日と分けて持つ。 */
+  memoDate?: IsoDate;
   authorMembershipId: Id;
   tags: string[];
   attachments: Attachment[];
@@ -165,6 +186,54 @@ export interface Memo {
   visibility: VisibilityPolicy;
   deletedAt?: Rfc3339;
   version: number;
+}
+
+export type BgmPreset = 'calm' | 'bright' | 'gentle';
+export interface Album {
+  id: Id;
+  householdId: Id;
+  title: string;
+  description?: string;
+  coverItemId?: Id;
+  place?: PlaceRef;
+  bgmPreset?: BgmPreset;
+  creatorMembershipId: Id;
+  visibility: VisibilityPolicy;
+  createdAt: Rfc3339;
+  version: number;
+  deletedAt?: Rfc3339;
+}
+
+export type AlbumItemStatus = 'uploading' | 'processing' | 'ready' | 'rejected';
+export interface AlbumItem {
+  id: Id;
+  albumId: Id;
+  householdId: Id;
+  kind: 'photo' | 'video';
+  originalName: string;
+  mimeType: string;
+  byteSize: number;
+  width?: number;
+  height?: number;
+  /** 撮影日時（A15）。メタデータを消す前に読む。読めなければない。 */
+  takenAt?: Rfc3339;
+  /** takenAt をどこから読んだか。exif-local は時差がなく、家族の時間帯とみなしたもの。 */
+  takenAtSource?: TakenAtSource;
+  sha256?: string;
+  status: AlbumItemStatus;
+  statusMessage?: string;
+  /** 撮影場所の情報を残しているか。既定では取り除く。 */
+  locationKept: boolean;
+  hasThumbnail: boolean;
+  uploaderMembershipId: Id;
+  position: number;
+  createdAt: Rfc3339;
+  deletedAt?: Rfc3339;
+}
+
+export interface AlbumSummary extends Album {
+  itemCount: number;
+  coverUrl?: string;
 }
 
 export interface ExpenseShare {
@@ -181,20 +250,51 @@ export interface SettlementRecord {
   recordedAt: Rfc3339;
   reversedAt?: Rfc3339;
   reversalOfSettlementId?: Id;
+  /** まとめた精算（settleAll）で記録したとき、そのまとめの ID。取り消しの記録にも付ける。 */
+  batchId?: Id;
 }
+
+/** 実際に渡した送金。from が to へ amountJpy 円を渡す。 */
+export interface SettlementTransfer { from: Id; to: Id; amountJpy: number }
+/** まとめた精算に含めた負担。settlementId はその負担に付けた精算の記録。 */
+export interface SettlementBatchItem { expenseId: Id; membershipId: Id; amountJpy: number; settlementId: Id }
+
+/** まとめた精算（A4）。画面に示した負担をすべて精算済みにし、実際に渡した送金の一覧を残す。取り消しはまとめの単位で行う。 */
+export interface SettlementBatch {
+  id: Id;
+  householdId: Id;
+  recordedAt: Rfc3339;
+  recordedByMembershipId: Id;
+  transfers: SettlementTransfer[];
+  items: SettlementBatchItem[];
+  reversedAt?: Rfc3339;
+}
+
+/** まとめた精算の要求。shares は画面に示した負担と残りの額、transfers は画面に示した送金の案。 */
+export interface SettleAllInput {
+  shares: Array<{ expenseId: Id; membershipId: Id; remainingJpy: number }>;
+  transfers: SettlementTransfer[];
+}
+
+export type SpendingCategory = 'food' | 'dining' | 'transport' | 'utilities' | 'home' | 'education' | 'health' | 'entertainment' | 'shopping' | 'savings' | 'other';
+export type IncomeCategory = 'income_salary' | 'income_bonus' | 'income_side' | 'income_investment' | 'income_gift' | 'income_other';
 
 export interface Expense {
   id: Id;
   householdId: Id;
+  /** expense は支出、income は収入。収入には負担と精算がない。 */
+  kind: 'expense' | 'income';
   title: string;
   amountJpy: number;
   incurredOn: IsoDate;
   payerMembershipId: Id;
-  category: 'food' | 'transport' | 'education' | 'home' | 'other';
+  creatorMembershipId: Id;
+  category: SpendingCategory | IncomeCategory;
   shares: ExpenseShare[];
   settlements: SettlementRecord[];
   note?: string;
   place?: PlaceRef;
+  visibility: VisibilityPolicy;
   version: number;
   deletedAt?: Rfc3339;
 }
@@ -209,6 +309,26 @@ export interface ResourceLink {
   visibility: VisibilityPolicy;
 }
 
+export type LinkedItemKind = 'event' | 'task' | 'memo' | 'expense';
+export interface LinkedItemRef { kind: LinkedItemKind; id: Id }
+/** 予定・タスク・メモ・支出のあいだの関連づけ。外部の URL を指す ResourceLink とは別のもの。 */
+export interface ItemLink {
+  id: Id;
+  householdId: Id;
+  from: LinkedItemRef;
+  to: LinkedItemRef;
+  createdByMembershipId: Id;
+  createdAt: Rfc3339;
+}
+
+/** 色に名前を付けたリスト。予定とタスクの分類に使う。 */
+export interface ColorLabel {
+  id: Id;
+  householdId: Id;
+  name: string;
+  color: string;
+}
+
 export interface ContextSnapshot {
   asOf: Rfc3339;
   timezone: string;
@@ -219,6 +339,8 @@ export interface ContextSnapshot {
     temperatureC: number;
     precipitationPercent: number;
     alert?: string;
+    /** 天気を取得できていないとき。表示を空にする。 */
+    unavailable?: boolean;
   };
   holidays: Array<{ date: IsoDate; name: string }>;
   sync: { state: 'synced' | 'offline' | 'syncing'; lastSyncedAt: Rfc3339 };
@@ -234,7 +356,11 @@ export interface HouseholdSnapshot {
   todos: Todo[];
   memos: Memo[];
   expenses: Expense[];
+  /** まとめた精算。含めた支出がすべて閲覧者に見えるものだけを返す。 */
+  settlementBatches: SettlementBatch[];
   resources: ResourceLink[];
+  links: ItemLink[];
+  colorLabels: ColorLabel[];
   context: ContextSnapshot;
 }
 
@@ -309,6 +435,41 @@ export interface HouseholdNotification {
   read: boolean;
   status: 'active' | 'snoozed' | 'stopped';
 }
+
+export type SessionStage = 'signed-out' | 'household-setup' | 'suspended' | 'paywall' | 'active';
+/** サインインの状態と、本編に入れるかどうか。 */
+export interface SessionInfo {
+  stage: SessionStage;
+  userId?: Id;
+  /** 操作がないときにサインアウトするまでの分数。 */
+  idleTimeoutMinutes: number;
+}
+
+export interface AccountProfile {
+  displayName: string;
+  email: string;
+  avatar: { kind: 'initial' } | { kind: 'preset'; preset: string } | { kind: 'image'; dataUrl: string };
+  idleTimeoutMinutes: number;
+  birthdateDeclared: boolean;
+  adultDeclared: boolean;
+  totpEnabled: boolean;
+  /** 確認コードを設定済みだが、鍵がなくて今は確かめられない。回復コードかパスキーでサインインし、設定し直す。 */
+  totpUnavailable: boolean;
+}
+
+export type TrashKind = 'event' | 'task' | 'memo' | 'expense' | 'album' | 'photo' | 'occurrence';
+/** 最近削除した記録。7日のあいだ元に戻せる。 */
+export interface TrashItem {
+  kind: TrashKind;
+  id: Id;
+  /** 写真のアルバムの ID。 */
+  parentId?: Id;
+  occurrenceDate?: IsoDate;
+  title: string;
+  deletedAt: Rfc3339;
+}
+
+export interface OccurrenceDeletion { eventId: Id; occurrenceDate: IsoDate; deletedAt: Rfc3339; title: string }
 
 export interface MutationContext {
   idempotencyKey: string;

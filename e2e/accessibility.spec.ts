@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
-for (const route of ['/welcome','/auth','/onboarding','/today','/calendar','/calendar/event-clean','/tasks','/tasks/todo-form','/notes','/notes/memo-school','/budget','/budget/expense-books','/places','/places/00000000','/insights','/settings/household','/settings/security','/settings/privacy','/settings/notifications','/settings/accessibility','/settings/resources','/settings/location','/showcase','/todayx','/budget?actor=member-hana']) {
+for (const route of ['/welcome','/auth','/onboarding','/today','/calendar','/calendar?view=week','/calendar?view=day','/calendar?view=list','/calendar/event-clean','/tasks','/tasks?filter=done','/tasks?filter=review','/tasks/todo-form','/notes','/notes?sort=oldest','/notes/memo-school','/notes/memo-receipt','/budget','/budget?view=list','/budget?view=list&period=custom','/budget?view=members','/budget?view=settlements','/budget?month=2026-07','/budget/expense-books','/albums','/albums/album-sports','/albums/album-sports?filter=videos','/albums/unknown-album','/places','/places/00000000','/insights','/settings/household','/settings/security','/settings/privacy','/settings/notifications','/settings/accessibility','/settings/resources','/settings/recently-deleted','/settings/help','/settings/help?q=写真&category=records&item=album-formats','/settings/legal','/settings/location','/showcase','/showcase/management','/showcase/management/services','/showcase/management/jobs','/showcase/management/backups','/showcase/management/audit-log','/showcase/management/households','/showcase/management/records','/todayx','/budget?actor=member-hana']) {
   test(`axe serious and critical: ${route}`, async ({ page }) => {
     await page.goto(route);
     await page.waitForLoadState('networkidle');
@@ -13,6 +13,8 @@ for (const route of ['/welcome','/auth','/onboarding','/today','/calendar','/cal
 
 test('keyboard reaches navigation, search, and quick create', async ({ page, browserName }) => {
   await page.goto('/today');
+  // 描画の前に Tab を押すと、移る先がまだないので焦点が失われる。
+  await expect(page.getByRole('link', { name: '本文へ移動' })).toBeAttached();
   if (browserName === 'webkit') await page.getByRole('link', { name: '本文へ移動' }).focus();
   else await page.keyboard.press('Tab');
   await expect(page.getByRole('link', { name: '本文へ移動' })).toBeFocused();
@@ -26,6 +28,8 @@ test('keyboard reaches navigation, search, and quick create', async ({ page, bro
 
 test('keyboard shortcut, modal trap, Escape, inert background, and focus restoration work', async ({ page }) => {
   await page.goto('/today');
+  // キーの受け付けは画面の表示のあとに始まる。表示を待たないと、押したキーが失われることがある。
+  await expect(page.getByRole('button', { name: /検索/ })).toBeVisible();
   await page.keyboard.press('Control+K');
   await expect(page.getByRole('searchbox')).toBeFocused();
   await expect(page.locator('#root')).toHaveAttribute('inert', '');
@@ -58,13 +62,15 @@ test('manual Reduced Motion switch removes effective transitions', async ({ page
 
 test('all visible buttons and button-like links meet the 44 by 44 CSS pixel target at mobile width', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const route of ['/welcome','/auth','/onboarding','/today','/calendar','/calendar/event-clean','/tasks','/notes','/notes/memo-school','/budget','/budget/expense-books','/places','/insights','/settings/household','/settings/security','/settings/privacy','/settings/notifications','/settings/accessibility','/settings/resources','/settings/location','/showcase']) {
+  for (const route of ['/welcome','/auth','/onboarding','/today','/calendar','/calendar?view=week','/calendar?view=day','/calendar?view=list','/calendar/event-clean','/tasks','/tasks?filter=done','/tasks/todo-form','/notes','/notes?sort=oldest','/notes/memo-school','/notes/memo-receipt','/budget','/budget?view=list','/budget?view=list&period=custom','/budget?view=members','/budget?view=settlements','/budget?month=2026-07','/budget/expense-books','/albums','/albums/album-sports','/places','/insights','/settings/household','/settings/security','/settings/privacy','/settings/notifications','/settings/accessibility','/settings/resources','/settings/recently-deleted','/settings/help','/settings/help?q=写真&category=records&item=album-formats','/settings/legal','/settings/location','/showcase','/showcase/management','/showcase/management/services','/showcase/management/jobs','/showcase/management/backups','/showcase/management/audit-log','/showcase/management/households','/showcase/management/records']) {
     await page.goto(route);
+    // 開く途中のドロワーは transform で縮んで見えるので、動きが終わってから測る。差 0.01px 未満は浮動小数の誤差として扱う。
+    await page.evaluate(() => Promise.all(document.getAnimations().filter((animation) => animation.effect?.getComputedTiming().endTime !== Infinity).map((animation) => animation.finished.catch(() => undefined))));
     // 文中のリンク（WCAG 2.5.8 の例外）以外の、ボタンとして振る舞うリンクも測る。
-    const undersized = await page.locator('button:visible, a.button:visible, .mobile-nav a:visible, a.nav-link:visible, a.place-card:visible, a.task-card:visible').evaluateAll((buttons) => buttons.map((button) => {
+    const undersized = await page.locator('button:visible, a.button:visible, .mobile-nav a:visible, a.nav-link:visible, a.place-card:visible, a.task-card-link:visible').evaluateAll((buttons) => buttons.map((button) => {
       const rect = button.getBoundingClientRect();
       return { label: button.getAttribute('aria-label') || button.textContent?.trim(), width: rect.width, height: rect.height };
-    }).filter((item) => item.width < 44 || item.height < 44));
+    }).filter((item) => item.width < 43.99 || item.height < 43.99));
     expect(undersized, `${route}: ${JSON.stringify(undersized)}`).toEqual([]);
   }
 });

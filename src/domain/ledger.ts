@@ -1,14 +1,16 @@
-import type { Expense, Id, SettlementRecord } from './types';
+import type { Expense, Id, IncomeCategory, Rfc3339, SettleAllInput, SettlementBatch, SettlementRecord, SettlementTransfer, SpendingCategory } from './types';
 
 /**
  * 家計の集計。画面・ヒント・今日の画面が同じ計算を使い、表示が食い違わないようにする。
  * 入力は閲覧者に見えている支出（削除済みを除く）とする。
  */
 
-export type ExpenseCategory = Expense['category'];
-export const expenseCategories: readonly ExpenseCategory[] = ['food', 'transport', 'education', 'home', 'other'];
+export type ExpenseCategory = SpendingCategory;
+export const expenseCategories: readonly SpendingCategory[] = ['food', 'dining', 'transport', 'utilities', 'home', 'education', 'health', 'entertainment', 'shopping', 'savings', 'other'];
+export const incomeCategories: readonly IncomeCategory[] = ['income_salary', 'income_bonus', 'income_side', 'income_investment', 'income_gift', 'income_other'];
 
 const live = (expenses: Expense[]) => expenses.filter((expense) => !expense.deletedAt);
+const spending = (expenses: Expense[]) => live(expenses).filter((expense) => expense.kind !== 'income');
 
 /** 支払った人以外の負担のうち、まだ精算されていない額。 */
 export function remainingOf(expense: Expense): Array<{ membershipId: Id; amountJpy: number }> {
@@ -31,12 +33,18 @@ export function settledNet(expenses: Expense[]): number {
 }
 
 export function monthSummary(expenses: Expense[], monthKey: string) {
-  const inMonth = live(expenses).filter((expense) => expense.incurredOn.startsWith(`${monthKey}-`));
+  const inMonth = spending(expenses).filter((expense) => expense.incurredOn.startsWith(`${monthKey}-`));
+  return { totalJpy: inMonth.reduce((sum, expense) => sum + expense.amountJpy, 0), count: inMonth.length };
+}
+
+/** 月の収入の合計。支出の集計には含めない。 */
+export function monthIncome(expenses: Expense[], monthKey: string) {
+  const inMonth = live(expenses).filter((expense) => expense.kind === 'income' && expense.incurredOn.startsWith(`${monthKey}-`));
   return { totalJpy: inMonth.reduce((sum, expense) => sum + expense.amountJpy, 0), count: inMonth.length };
 }
 
 /** 端数を最大剰余法で配り、表示する割合の合計を必ず100にする。 */
-function percentages(values: number[]): number[] {
+export function percentages(values: number[]): number[] {
   const total = values.reduce((sum, value) => sum + value, 0);
   if (total === 0) return values.map(() => 0);
   const raw = values.map((value) => (value / total) * 100);
@@ -49,7 +57,7 @@ function percentages(values: number[]): number[] {
 
 /** 費目別の合計（多い順）。0円の費目は出さない。 */
 export function categoryBreakdown(expenses: Expense[], monthKey: string) {
-  const inMonth = live(expenses).filter((expense) => expense.incurredOn.startsWith(`${monthKey}-`));
+  const inMonth = spending(expenses).filter((expense) => expense.incurredOn.startsWith(`${monthKey}-`));
   const totals = expenseCategories
     .map((category) => ({ category, totalJpy: inMonth.filter((expense) => expense.category === category).reduce((sum, expense) => sum + expense.amountJpy, 0) }))
     .filter((item) => item.totalJpy > 0)
@@ -58,23 +66,74 @@ export function categoryBreakdown(expenses: Expense[], monthKey: string) {
   return totals.map((item, index) => ({ ...item, percent: shares[index] }));
 }
 
-/** 誰が誰にいくら払うか。同じ2人の間の貸し借りは相殺し、残った向きだけを返す。 */
-export function whoOwesWhom(expenses: Expense[]) {
-  const balance = new Map<string, { from: Id; to: Id; amountJpy: number; expenseIds: Id[] }>();
-  for (const expense of live(expenses)) {
-    for (const share of remainingOf(expense)) {
-      const [a, b] = [share.membershipId, expense.payerMembershipId].sort();
-      const key = `${a}|${b}`;
-      const entry = balance.get(key) ?? { from: a, to: b, amountJpy: 0, expenseIds: [] };
-      entry.amountJpy += share.membershipId === a ? share.amountJpy : -share.amountJpy;
-      entry.expenseIds.push(expense.id);
-      balance.set(key, entry);
-    }
+/** 支払った人以外の負担のうち、まだ残りがあるもの。まとめた精算（A4）はこの単位で記録する。 */
+export interface OpenShare { expenseId: Id; membershipId: Id; payerMembershipId: Id; remainingJpy: number }
+
+export function openShares(expenses: Expense[]): OpenShare[] {
+  return live(expenses).flatMap((expense) => remainingOf(expense).map((share) => ({ expenseId: expense.id, membershipId: share.membershipId, payerMembershipId: expense.payerMembershipId, remainingJpy: share.amountJpy })));
+}
+
+/** 人ごとの正味。正は受け取る額、負は渡す額。合計は必ず0になる。 */
+export function netBalances(shares: ReadonlyArray<Pick<OpenShare, 'membershipId' | 'payerMembershipId' | 'remainingJpy'>>): Map<Id, number> {
+  const net = new Map<Id, number>();
+  for (const share of shares) {
+    net.set(share.membershipId, (net.get(share.membershipId) ?? 0) - share.remainingJpy);
+    net.set(share.payerMembershipId, (net.get(share.payerMembershipId) ?? 0) + share.remainingJpy);
   }
-  return [...balance.values()]
-    .filter((entry) => entry.amountJpy !== 0)
-    .map((entry) => (entry.amountJpy > 0 ? entry : { ...entry, from: entry.to, to: entry.from, amountJpy: -entry.amountJpy }))
-    .sort((a, b) => b.amountJpy - a.amountJpy);
+  return net;
+}
+
+/**
+ * 正味を、最大の貸し手と最大の借り手を組んで受け渡しにする（貪欲法）。1回ごとに少なくとも1人の正味が0になるので、
+ * 受け渡しの数は、正味が0でない人の数から1を引いた数以下になる。最小の数にする問題は強 NP 困難（evidence.md §15）。
+ */
+export function transfersFor(balances: ReadonlyMap<Id, number>): SettlementTransfer[] {
+  const largestFirst = (a: { amountJpy: number; id: Id }, b: { amountJpy: number; id: Id }) => b.amountJpy - a.amountJpy || a.id.localeCompare(b.id);
+  const entries = [...balances].map(([id, amountJpy]) => ({ id, amountJpy }));
+  const debtors = entries.filter((item) => item.amountJpy < 0).map((item) => ({ id: item.id, amountJpy: -item.amountJpy })).sort(largestFirst);
+  const creditors = entries.filter((item) => item.amountJpy > 0).sort(largestFirst);
+  const transfers: SettlementTransfer[] = [];
+  let debtor = 0;
+  let creditor = 0;
+  while (debtor < debtors.length && creditor < creditors.length) {
+    const amountJpy = Math.min(debtors[debtor].amountJpy, creditors[creditor].amountJpy);
+    transfers.push({ from: debtors[debtor].id, to: creditors[creditor].id, amountJpy });
+    debtors[debtor].amountJpy -= amountJpy;
+    creditors[creditor].amountJpy -= amountJpy;
+    if (debtors[debtor].amountJpy === 0) debtor += 1;
+    if (creditors[creditor].amountJpy === 0) creditor += 1;
+  }
+  return transfers;
+}
+
+/** 受け渡しが、正味をちょうど0にするか。人ごとに、受け取る額から渡す額を引いたものが正味と一致すること。 */
+export function transfersSettle(balances: ReadonlyMap<Id, number>, transfers: readonly SettlementTransfer[]): boolean {
+  const left = new Map(balances);
+  for (const transfer of transfers) {
+    left.set(transfer.from, (left.get(transfer.from) ?? 0) + transfer.amountJpy);
+    left.set(transfer.to, (left.get(transfer.to) ?? 0) - transfer.amountJpy);
+  }
+  return [...left.values()].every((value) => value === 0);
+}
+
+/**
+ * 残りのある記録をすべて相殺したうえで、誰が誰にいくら渡せば済むか。金額の大きい順。
+ * 3人以上では、記録にない組み合わせの受け渡しになることがある。まとめて記録するときは settleAllRequest を使う。
+ */
+export function simplifiedTransfers(expenses: Expense[]) {
+  return transfersFor(netBalances(openShares(expenses)));
+}
+
+/**
+ * 画面に示した内容から、まとめた精算（settleAll）の要求を作る。expenses は閲覧者に見えている支出。
+ * 人で絞って表示しているとき（「すべて」以外）は、示した一覧が家計の全体ではないので null（ボタンを出さない）。
+ * 精算するものがなければ null。
+ */
+export function settleAllRequest(expenses: Expense[], options: { memberFilterActive: boolean }): SettleAllInput | null {
+  if (options.memberFilterActive) return null;
+  const shares = openShares(expenses);
+  if (!shares.length) return null;
+  return { shares: shares.map(({ expenseId, membershipId, remainingJpy }) => ({ expenseId, membershipId, remainingJpy })), transfers: transfersFor(netBalances(shares)) };
 }
 
 export interface SettlementHistoryEntry {
@@ -95,6 +154,58 @@ export function settlementHistory(expenses: Expense[]): SettlementHistoryEntry[]
     const reversedBy = expense.settlements.find((item) => item.reversalOfSettlementId === record.id);
     return { expenseId: expense.id, expenseTitle: expense.title, record, reverses, reversedBy, canReverse: record.amountJpy > 0 && !record.reversedAt };
   })).sort((a, b) => b.record.recordedAt.localeCompare(a.record.recordedAt) || b.record.id.localeCompare(a.record.id));
+}
+
+/** まとめた精算（A4-4）を1件にまとめた履歴の行。取り消しのまとめも1件になる。 */
+export interface SettlementBatchRow {
+  kind: 'batch';
+  batchId: Id;
+  /** まとめの取り消しの行か。 */
+  reversal: boolean;
+  recordedAt: Rfc3339;
+  /** 実際に渡した送金。 */
+  transfers: SettlementTransfer[];
+  /** まとめに含めた記録ごとの精算（または取り消し）。 */
+  entries: SettlementHistoryEntry[];
+  /** 含めた額の合計（取り消しも正の額で持つ）。 */
+  totalJpy: number;
+  /** まとめごと取り消せるか。取り消し済み、または一部を個別に取り消していれば false。 */
+  canReverse: boolean;
+  /** 一部をすでに個別に取り消している。 */
+  partlyReversed: boolean;
+  /** まとめごと取り消した。 */
+  reversed: boolean;
+}
+export type SettlementHistoryRow = { kind: 'single'; entry: SettlementHistoryEntry } | SettlementBatchRow;
+
+/**
+ * 精算の履歴を、まとめた精算ごとに1件にまとめる（新しい順）。まとめの記録が見えない（含めた支出の一部が見えない）ときは、
+ * 記録ごとの行のまま出す。batches は閲覧者に見えるまとめ（snapshot.settlementBatches）。
+ */
+export function groupedSettlementHistory(expenses: Expense[], batches: readonly SettlementBatch[]): SettlementHistoryRow[] {
+  const rows: SettlementHistoryRow[] = [];
+  const groups = new Map<string, SettlementBatchRow>();
+  for (const entry of settlementHistory(expenses)) {
+    const batch = entry.record.batchId ? batches.find((item) => item.id === entry.record.batchId) : undefined;
+    if (!batch) { rows.push({ kind: 'single', entry }); continue; }
+    const reversal = Boolean(entry.reverses);
+    const key = `${batch.id}:${reversal ? 'reversal' : 'batch'}`;
+    let row = groups.get(key);
+    if (!row) {
+      row = { kind: 'batch', batchId: batch.id, reversal, recordedAt: entry.record.recordedAt, transfers: batch.transfers, entries: [], totalJpy: 0, canReverse: false, partlyReversed: false, reversed: Boolean(batch.reversedAt) };
+      groups.set(key, row);
+      rows.push(row);
+    }
+    row.entries.push(entry);
+    row.totalJpy += Math.abs(entry.record.amountJpy);
+  }
+  for (const row of groups.values()) {
+    if (row.reversal) continue;
+    // まとめの取り消しの記録は reversedAt と batchId を持つ。個別の取り消しは batchId を持たない。
+    row.partlyReversed = !row.reversed && row.entries.some((entry) => entry.reversedBy && !entry.reversedBy.batchId);
+    row.canReverse = !row.reversed && !row.partlyReversed && row.entries.every((entry) => entry.canReverse);
+  }
+  return rows;
 }
 
 /** 金額・支払った人・負担を変えてよいか。精算が1件でも生きていれば、記録の整合のため変えられない。 */

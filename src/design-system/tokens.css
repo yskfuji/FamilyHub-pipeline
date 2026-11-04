@@ -1,5 +1,11 @@
 @layer reset, tokens, base, components, utilities, responsive;
 
+/*
+ * 見た目の土台のトークン。色は16進数で持ち、導いた過程（OKLCH）は docs/design/tokens.md に記録する。
+ * :root は既定の昼（標準）。dusk は標準の夜。ほかの8つは themes.css。
+ * 文字と面の組の濃さは src/design-system/themes.test.ts、実際の画面の濃さは e2e/contrast.spec.ts で確かめる。
+ * 大きさ・余白・時間は scripts/audit-css.mjs が、トークンだけを使っていることを確かめる。
+ */
 @layer tokens {
   :root {
     color-scheme: light;
@@ -8,28 +14,66 @@
     --sheet: #fffdf8;
     --sheet-raised: #ffffff;
     --ink: #202b33;
-    --ink-soft: #52616a;
-    --ink-faint: #6f7c82;
+    --ink-soft: #516069;
+    --ink-faint: #5a676c;
     --line: #d7cdbc;
-    --line-strong: #a99c88;
-    --indigo: #254e70;
-    --indigo-strong: #173951;
-    --persimmon: #a8462f;
-    --persimmon-soft: #f1d5c5;
-    --moss: #5a6744;
-    --moss-soft: #dce2cf;
-    --plum: #76546c;
-    --gold: #9a691c;
+    --line-strong: #8c806c;
+    --accent: #254e70;
+    --accent-strong: #173951;
+    --on-accent: #ffffff;
+    --brand: #a8462f;
+    --brand-soft: #f1d5c5;
+    --on-brand: #ffffff;
+    /* 柿の印（ブランドの印と挿絵の柿の実）。テーマの --brand（モダンでは青）に従わず、どのテーマでも柿の色にする（段階12）。 */
+    --kaki: #a8462f;
+    --kaki-soft: #f1d5c5;
+    --kaki-stem: #173951;
+    --attention: #863f30;
+    --attention-soft: #f1d5c5;
+    --info: #254e70;
+    --info-soft: #e9ecea;
     --danger: #982f2f;
     --danger-soft: #f4d9d5;
     --success: #356245;
     --success-soft: #d7e8dc;
+    --moss: #596643;
+    --moss-soft: #dce2cf;
+    --gold: #8b5b02;
+    /* 挿絵の地。昼は一段濃い地、夜は地より明るい案内の地（暗い穴に見えないように）。 */
+    --art-ground: var(--paper-deep);
     --focus: #ad4c22;
-    --shadow: 0 18px 48px rgb(47 39 28 / 10%);
-    --shadow-soft: 0 8px 24px rgb(47 39 28 / 7%);
-    --radius-sm: 10px;
-    --radius-md: 18px;
-    --radius-lg: 28px;
+    --chart-1: #ab7714;
+    --chart-2: #2489bc;
+    --chart-3: #18926c;
+    --chart-4: #0072b2;
+    --chart-5: #d16015;
+    --chart-6: #b86795;
+    --shadow-1: 0 1px 2px rgb(47 39 28 / 6%), 0 4px 12px rgb(47 39 28 / 6%);
+    --shadow-2: 0 2px 6px rgb(47 39 28 / 7%), 0 12px 32px rgb(47 39 28 / 10%);
+    --shadow-3: 0 4px 10px rgb(47 39 28 / 8%), 0 24px 60px rgb(47 39 28 / 16%);
+    --scrim: rgb(12 22 29 / 58%);
+    --scrim-soft: rgb(18 27 34 / 24%);
+    --media-backdrop: #0a1016;
+
+    /* 文字の大きさ（16px を 1rem として 12/14/16/18/22/28/36/44px）と行間。 */
+    --text-xs: .75rem;
+    --text-sm: .875rem;
+    --text-md: 1rem;
+    --text-lg: 1.125rem;
+    --text-xl: 1.375rem;
+    --text-2xl: 1.75rem;
+    --text-3xl: 2.25rem;
+    --text-4xl: 2.75rem;
+    --leading-body: 1.75;
+    --leading-ui: 1.5;
+    --leading-heading: 1.3;
+    --leading-compact: 1.25;
+    --weight-regular: 400;
+    --weight-medium: 600;
+    --weight-bold: 700;
+    --weight-heavy: 800;
+
+    /* 余白（4/8/12/16/24/32/48/64px）。 */
     --space-1: .25rem;
     --space-2: .5rem;
     --space-3: .75rem;
@@ -37,16 +81,65 @@
     --space-5: 1.5rem;
     --space-6: 2rem;
     --space-7: 3rem;
-    --duration-fast: 120ms;
-    --duration-base: 180ms;
-    --duration-slow: 260ms;
-    --ease: cubic-bezier(.2,.75,.25,1);
-    --font-sans: 'Noto Sans JP Variable', 'Hiragino Sans', sans-serif;
-    --font-serif: 'Noto Serif JP Variable', 'Yu Mincho', serif;
+    --space-8: 4rem;
+    /* 下のナビとすぐに追加のボタンに隠れないよう、ページの最後に空ける高さ。 */
+    --layout-page-end: 7.5rem;
+    /* 固定の部品の高さ。焦点を動かしてスクロールするとき、これらに隠れないよう scroll-padding に使う（WCAG 2.4.11）。 */
+    --layout-topbar: 5.25rem;
+    --layout-topbar-compact: 4.4rem;
+    --layout-bottom-nav: 4.6rem;
+    --layout-fab: 3.25rem;
+    --layout-fab-bottom: 5.5rem;
+    /* 操作の大きさ（段階12）。タッチの配置（narrow と medium）では 44px 以上、主な操作は 48px 以上（WCAG 2.5.5、Apple・Material）。 */
+    --layout-target: 2.75rem;
+    --layout-target-primary: 3rem;
+    /* 狭い幅の今日の見出しの季節の場面の幅。小さな見出しの文字は、この幅だけ右を空ける。 */
+    --layout-season-narrow: 4.75rem;
+    /* 図表（段階11）。棒の先に書く値の幅（金額と割合・金額・件数）と、行の名前の列の幅。文字は縮めないので、この幅を棒から空ける。 */
+    --layout-chart-share: 8rem;
+    --layout-chart-yen: 5rem;
+    --layout-chart-count: 3rem;
+    --layout-chart-name: 3rem;
+    --layout-chart-name-wide: 5.5rem;
+    --layout-chart-series: 2.75rem;
+
+    --radius-xs: 6px;
+    --radius-sm: 10px;
+    --radius-md: 18px;
+    --radius-lg: 28px;
+    --radius-pill: 999px;
+
+    /* 動き（100〜300ms）。 */
+    --duration-1: 100ms;
+    --duration-2: 150ms;
+    --duration-3: 200ms;
+    --duration-4: 250ms;
+    --duration-5: 300ms;
+    --ease-standard: cubic-bezier(.2, .75, .25, 1);
+    --ease-enter: cubic-bezier(0, 0, .2, 1);
+    --ease-exit: cubic-bezier(.4, 0, 1, 1);
+
+    /* 重なりの順。 */
+    --z-raised: 1;
+    --z-overlap: 2;
+    --z-sticky: 5;
+    --z-topbar: 15;
+    --z-rail: 20;
+    --z-fab: 25;
+    --z-nav: 50;
+    --z-backdrop: 55;
+    --z-drawer: 60;
+    --z-dialog: 100;
+    --z-overlay: 110;
+    --z-toast: 200;
+    --z-skip: 1000;
+
+    /* 日本語の本文は端末の書体。明朝はシステムの明朝（ブランドの名前は SVG）。docs/design/tokens.md を参照。 */
+    --font-sans: 'Noto Sans JP Variable', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic UI', 'Yu Gothic', Meiryo, system-ui, sans-serif;
+    --font-serif: 'Hiragino Mincho ProN', 'Yu Mincho', YuMincho, 'Noto Serif JP', 'Noto Serif CJK JP', serif;
   }
 
   [data-theme='dusk'] {
-    color-scheme: dark;
     --paper: #101e2b;
     --paper-deep: #0b1721;
     --sheet: #172a39;
@@ -56,20 +149,49 @@
     --ink-faint: #aab9c1;
     --line: #405869;
     --line-strong: #718594;
-    --indigo: #9fc8e1;
-    --indigo-strong: #d3e9f6;
-    --persimmon: #ed9e7b;
-    --persimmon-soft: #543329;
-    --moss: #bdcb9a;
-    --moss-soft: #344235;
-    --plum: #deb4d1;
-    --gold: #edc67e;
+    --accent: #9fc8e1;
+    --accent-strong: #d3e9f6;
+    --on-accent: #102433;
+    --brand: #ed9e7b;
+    --brand-soft: #543329;
+    --on-brand: #102433;
+    --attention: #f0b396;
+    --attention-soft: #543329;
+    --info: #9fc8e1;
+    --info-soft: #273d4d;
     --danger: #ffb0a7;
     --danger-soft: #532d2e;
     --success: #a5d7b1;
     --success-soft: #284236;
+    --moss: #bdcb9a;
+    --moss-soft: #344235;
+    --gold: #edc67e;
     --focus: #ffb982;
-    --shadow: 0 18px 48px rgb(0 0 0 / 24%);
-    --shadow-soft: 0 8px 24px rgb(0 0 0 / 18%);
+    --chart-1: #e69f00;
+    --chart-2: #56b4e9;
+    --chart-3: #009e73;
+    --chart-4: #1d7fc0;
+    --chart-5: #d55e00;
+    --chart-6: #cc79a7;
+  }
+
+  /* 下のナビがある幅では、すぐに追加のボタンが右下に浮かぶ。最後の欄がボタンの下に入らないよう、ボタンの上端まで空ける（段階10で測って直した）。 */
+  @media (width < 42.7rem) {
+    :root { --layout-page-end: calc(var(--layout-fab-bottom) + var(--layout-fab) + var(--space-4)); }
+  }
+
+  /* 夜の配色に共通する値。影は暗い面では見えにくいので、細い明るい縁を足す。 */
+  [data-theme='dusk'], [data-theme$='-night'] {
+    color-scheme: dark;
+    --shadow-1: 0 0 0 1px rgb(255 255 255 / 5%), 0 2px 8px rgb(0 0 0 / 36%);
+    --shadow-2: 0 0 0 1px rgb(255 255 255 / 7%), 0 10px 28px rgb(0 0 0 / 46%);
+    --shadow-3: 0 0 0 1px rgb(255 255 255 / 9%), 0 24px 60px rgb(0 0 0 / 58%);
+    --scrim: rgb(2 6 10 / 70%);
+    --scrim-soft: rgb(2 6 10 / 40%);
+    --art-ground: var(--info-soft);
+    /* 夜の柿の印は標準の夜（dusk）の色にそろえる。 */
+    --kaki: #ed9e7b;
+    --kaki-soft: #543329;
+    --kaki-stem: #d3e9f6;
   }
 }

@@ -30,3 +30,13 @@ export const FileIcon = (p: IconProps) => <svg {...base} {...p}><path d="M6 2h8l
 export const MapPinIcon = (p: IconProps) => <svg {...base} {...p}><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg>;
 export const LocateIcon = (p: IconProps) => <svg {...base} {...p}><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>;
 export const ImageIcon = (p: IconProps) => <svg {...base} {...p}><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-9 9"/></svg>;
+export const ChevronLeftIcon = (p: IconProps) => <svg {...base} {...p}><path d="m15 5-7 7 7 7"/></svg>;
+export const ChevronRightIcon = (p: IconProps) => <svg {...base} {...p}><path d="m9 5 7 7-7 7"/></svg>;
+export const PlayIcon = (p: IconProps) => <svg {...base} {...p}><path d="M7 4.5v15l12-7.5z"/></svg>;
+export const PauseIcon = (p: IconProps) => <svg {...base} {...p}><path d="M8 5v14M16 5v14"/></svg>;
+export const InfoIcon = (p: IconProps) => <svg {...base} {...p}><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/></svg>;
+export const DownloadIcon = (p: IconProps) => <svg {...base} {...p}><path d="M12 4v12M7 11l5 5 5-5M4 20h16"/></svg>;
+export const TrashIcon = (p: IconProps) => <svg {...base} {...p}><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>;
+export const PipIcon = (p: IconProps) => <svg {...base} {...p}><rect x="3" y="5" width="18" height="14" rx="2"/><rect x="12" y="11.5" width="6.5" height="5" rx="1"/></svg>;
+export const MusicIcon = (p: IconProps) => <svg {...base} {...p}><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg>;
+export const VideoIcon = (p: IconProps) => <svg {...base} {...p}><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 11 5-3v8l-5-3"/></svg>;

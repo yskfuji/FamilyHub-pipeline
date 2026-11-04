@@ -1,38 +1,41 @@
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { readableTextOn } from '../../domain/readableText';
 import { useApp } from '../../app/AppContext';
+import { setDevicePreferences, useDevicePreferences, type Density } from '../../app/devicePreferences';
+import { densityLabels } from '../../app/paletteCommands';
 import { capabilityCeilingFor, defaultCapabilitiesFor } from '../../authz/policy';
+import { auditCopy } from '../../content/auditLabels';
 import { externalLinkLabel, ja, membershipStatusLabels, roleLabels } from '../../content/ja';
-import { Dialog, PageHeader, StatusBadge, formatDate, formatRelative, formatTime } from '../../design-system/components';
+import { settingsTabFor, settingsTabs } from './settingsTabs';
+import { closeGuarded, useUnsavedGuard } from '../../design-system/unsavedGuard';
+import { Dialog, GuardedForm, PageHeader, StatusBadge, formatDate, formatRelative, formatTime } from '../../design-system/components';
 import { navigate } from '../../app/router';
 import { ArrowIcon, LinkIcon, LockIcon, PeopleIcon, ShieldIcon } from '../../design-system/icons';
+import { MAX_HOUSEHOLD_MEMBERS, MAX_NAME_CHANGES_PER_DAY, activeMemberCount, nameChangesLeft } from '../../domain/householdLimits';
+import { checkNewPassword } from '../../domain/passwordPolicy';
 import { passwordSchema, safeHttpsUrlSchema } from '../../domain/schemas';
+import { colorModes, themePalettes } from '../../domain/theme';
 import { usePlaceLookupConsent } from '../place/PlaceField';
 import { OPENPOI_ATTRIBUTION_URL, OPENPOI_TERMS_URL } from '../place/openPoi';
 import type { Capability, HouseholdInvite, HouseholdMembership, MembershipRole, NotificationPreferences, PermissionOverride, SecurityOverview } from '../../domain/types';
 
-/** 設定のタブと、その表示に必要な能力。経路の許可（App.tsx）とタブの表示はこの表だけを参照する。 */
-export const settingsTabs: ReadonlyArray<{ href: string; label: string; capability: Capability }> = [
-  { href: '/settings/household', label: '家族', capability: 'household.members.read' },
-  { href: '/settings/security', label: 'サインインとセキュリティ', capability: 'settings.own' },
-  { href: '/settings/privacy', label: '共有とプライバシー', capability: 'settings.own' },
-  { href: '/settings/notifications', label: '通知', capability: 'notification.manage' },
-  { href: '/settings/location', label: ja.place.settings.tab, capability: 'place.read' },
-  { href: '/settings/accessibility', label: '表示・操作', capability: 'settings.own' },
-  { href: '/settings/resources', label: '関連リンク', capability: 'resource.read' },
-];
-export const settingsTabFor = (path: string) => settingsTabs.find((tab) => path === tab.href || path.startsWith(`${tab.href}/`));
+import { SyncStatus } from '../shared/SyncStatus';
+import { AccountSection } from './AccountSection';
+import { ColorLists } from './ColorLists';
+import { LeaveHousehold, MemberActions } from './MemberActions';
+import { RecentlyDeleted } from './RecentlyDeleted';
+
+const HelpSection = lazy(() => import('./HelpSection'));
+const LegalSection = lazy(() => import('./LegalSection'));
+const AuditLog = lazy(() => import('./AuditLog'));
+const AccountActivity = lazy(async () => ({ default: (await import('./AuditLog')).AccountActivity }));
+
 const inviteRoles: Array<Exclude<MembershipRole, 'owner'>> = ['adult', 'child', 'guest'];
 
 export function SettingsPage({ path }: { path: string }) {
-  const { theme, setTheme, can } = useApp();
-  const current = settingsTabFor(path)?.label ?? '';
-  const [reduced, setReducedState] = useState(() => localStorage.getItem('family-hub-reduced-motion') === 'true');
-  const setReduced = (value: boolean) => {
-    setReducedState(value);
-    document.documentElement.dataset.reduceMotion = String(value);
-    localStorage.setItem('family-hub-reduced-motion', String(value));
-  };
-  useEffect(() => { document.documentElement.dataset.reduceMotion = String(reduced); }, [reduced]);
+  const { can } = useApp();
+  const tab = settingsTabFor(path);
+  const current = tab?.label ?? '';
   // 狭い画面ではタブが横にスクロールするため、表示中のタブが隠れないよう横方向だけ寄せる（縦には動かさない）。
   const tabsRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -43,18 +46,23 @@ export function SettingsPage({ path }: { path: string }) {
   }, [path]);
 
   return <div className="page">
-    <PageHeader eyebrow="設定" title={current} description="家族との共有範囲や、表示・通知・サインイン方法を変更できます。"/>
+    <PageHeader eyebrow="設定" title={current} description={tab?.description ?? ''}/>
     <nav ref={tabsRef} className="segmented settings-tabs" aria-label="設定項目">
-      {settingsTabs.filter((tab) => can(tab.capability)).map(({ href, label }) => <a data-control-id={`settings.section.${href.split("/").at(-1)}`} key={href} className="button" href={href} data-link aria-current={path.startsWith(href) ? 'page' : undefined}>{label}</a>)}
+      {settingsTabs.filter((tab) => can(tab.capability)).map(({ href, label }) => <a data-control-id={`settings.section.${href.split("/").at(-1)}`} key={href} className="button" href={href} data-link aria-current={tab?.href === href ? 'page' : undefined}>{label}</a>)}
     </nav>
-    {path.startsWith('/settings/security') ? <Security/>
+    {path.startsWith('/settings/account') ? <AccountSection/>
+      : path.startsWith('/settings/security') ? <Security/>
       : path.startsWith('/settings/privacy') ? <Privacy/>
       : path.startsWith('/settings/notifications') ? <Notifications/>
         : path.startsWith('/settings/location') ? <LocationPrivacy/>
-        : path.startsWith('/settings/accessibility') ? <Accessibility theme={theme} setTheme={setTheme} reduced={reduced} setReduced={setReduced}/>
+        : path.startsWith('/settings/accessibility') ? <Accessibility/>
           : path.startsWith('/settings/resources') ? <Resources/>
             : path.startsWith('/settings/household') ? <Household/>
-              : null}
+              : path.startsWith('/settings/recently-deleted') ? <RecentlyDeleted/>
+                : path.startsWith('/settings/audit') ? <Suspense fallback={<div className="skeleton"/>}><AuditLog/></Suspense>
+                : path.startsWith('/settings/help') ? <Suspense fallback={<div className="skeleton"/>}><HelpSection/></Suspense>
+                  : path.startsWith('/settings/legal') ? <Suspense fallback={<div className="skeleton"/>}><LegalSection/></Suspense>
+                    : null}
   </div>;
 }
 
@@ -64,12 +72,18 @@ function Household() {
   const [role, setRole] = useState<MembershipRole>('adult');
   const [roleError, setRoleError] = useState('');
   const [overrides, setOverrides] = useState<PermissionOverride[]>([]);
+  // 権限の画面で読み込んだときの値。役割か個別設定を変えたまま閉じようとしたら確かめる（段階12で設定の重ね表示に広げた）。
+  const [loadedOverrides, setLoadedOverrides] = useState<PermissionOverride[]>([]);
   const [saving, setSaving] = useState(false);
   const [inviteRole, setInviteRole] = useState<Exclude<MembershipRole, 'owner'>>('adult');
   const [invite, setInvite] = useState<HouseholdInvite | null>(null);
   const [invites, setInvites] = useState<HouseholdInvite[]>([]);
   const canManage = can('household.members.manage');
   const canInvite = can('household.invites.manage');
+  const people = snapshot.memberships.filter((item) => item.status !== 'left');
+  const activeCount = activeMemberCount(snapshot.memberships);
+  const atCapacity = activeCount >= MAX_HOUSEHOLD_MEMBERS;
+  const renamesLeft = nameChangesLeft(snapshot.household.nameChanges, snapshot.context.asOf);
 
   const loadInvites = async () => {
     if (!canInvite) return;
@@ -88,10 +102,10 @@ function Household() {
   }, [canInvite, gateway, announce]);
 
   const openPermissions = async (item: HouseholdMembership) => {
-    setMember(item); setRole(item.role); setRoleError(''); setOverrides([]);
+    setMember(item); setRole(item.role); setRoleError(''); setOverrides([]); setLoadedOverrides([]);
     if (!canManage) return;
     const result = await gateway.household.getPermissionOverrides(item.id);
-    if (result.ok) setOverrides(result.value);
+    if (result.ok) { setOverrides(result.value); setLoadedOverrides(result.value); }
     else setRoleError(result.error.message);
   };
   const saveRole = async () => {
@@ -138,6 +152,8 @@ function Household() {
     ...(effect === 'default' || !member ? [] : [{ membershipId: member.id, capability, effect }]),
   ]);
 
+  const permissionsChanged = Boolean(member) && (role !== member?.role || JSON.stringify(overrides) !== JSON.stringify(loadedOverrides));
+  const permissionGuard = useUnsavedGuard(permissionsChanged, saving);
   const renameHousehold = async (form: HTMLFormElement) => {
     const name = String(new FormData(form).get('householdName') ?? '');
     const result = await gateway.household.updateProfile({ name });
@@ -145,12 +161,12 @@ function Household() {
     await refresh(); announce(`家族グループの名前を「${result.value.name}」にしました。`);
   };
   return <>
-    {canManage && <section className="card household-profile"><h2>家族グループの名前</h2><form className="inline-form" onSubmit={(event) => { event.preventDefault(); void renameHousehold(event.currentTarget); }}><label className="field"><span>名前</span><input data-control-id="settings.household.name" className="input" name="householdName" required maxLength={40} defaultValue={snapshot.household.name} key={snapshot.household.name}/></label><button data-control-id="settings.household.name-save" className="button" type="submit">名前を保存</button></form><p className="small muted mb-0">日時は日本時間で表示します。</p></section>}
+    {canManage && <section className="card household-profile"><h2>家族グループの名前</h2><GuardedForm className="inline-form" onSubmit={(event) => { event.preventDefault(); void renameHousehold(event.currentTarget); }}><label className="field"><span>名前</span><input data-control-id="settings.household.name" className="input" name="householdName" required maxLength={40} defaultValue={snapshot.household.name} key={snapshot.household.name}/></label><button data-control-id="settings.household.name-save" className="button" type="submit" disabled={renamesLeft === 0}>名前を保存</button></GuardedForm><p className="small muted mb-0">{renamesLeft > 0 ? `あと${renamesLeft}回変更できます（24時間で${MAX_NAME_CHANGES_PER_DAY}回まで）。` : `名前の変更は24時間で${MAX_NAME_CHANGES_PER_DAY}回までです。時間をおいてお試しください。`} 日時は日本時間で表示します。</p></section>}
     <div className="grid two">
-      <section className="card">
-        <p className="eyebrow">家族</p><h2>{snapshot.household.name}</h2><p className="muted">日時の表示 · 日本時間</p>
-        <ul className="list">{snapshot.memberships.map((item) => <li className="list-row" key={item.id}>
-          <span className="avatar" style={{ background: item.color }} aria-hidden="true">{item.displayName.slice(0, 1)}</span>
+      <section className="card" id="household-members" tabIndex={-1}>
+        <p className="eyebrow">家族</p><h2>{snapshot.household.name}</h2><p className="muted">利用中 {activeCount}人 / {MAX_HOUSEHOLD_MEMBERS}人まで · 日時の表示 · 日本時間</p>
+        <ul className="list">{people.map((item) => <li className="list-row" key={item.id}>
+          <span className="avatar" style={{ background: item.color, color: readableTextOn(item.color) }} aria-hidden="true">{item.displayName.slice(0, 1)}</span>
           <div className="row-main"><strong>{item.displayName}</strong><span className="meta">{roleLabels[item.role]} · {membershipStatusLabels[item.status]}</span></div>
           {canManage ? <button data-control-id={`settings.member.permissions.${item.id}`} className="button" type="button" aria-label={`${item.displayName}さんの権限を設定`} onClick={() => void openPermissions(item)}>権限を設定</button> : <StatusBadge>{roleLabels[item.role]}</StatusBadge>}
         </li>)}</ul>
@@ -159,8 +175,9 @@ function Household() {
       {canInvite && <section className="card">
         <p className="eyebrow">招待</p><h2>家族を招待</h2>
         <p>招待コードは24時間以内に1回だけ使えます。招待された人は、サインイン後に共有された情報を表示できます。</p>
+        {atCapacity && <p className="notice error">家族グループは{MAX_HOUSEHOLD_MEMBERS}人までです。招待するには、先にメンバーを一時停止するか外してください。</p>}
         <div className="field"><label htmlFor="invite-role">役割</label><select data-control-id="settings.invite.role" className="select" id="invite-role" value={inviteRole} onChange={(event) => setInviteRole(event.target.value as Exclude<MembershipRole, 'owner'>)}>{inviteRoles.map((value) => <option key={value} value={value}>{roleLabels[value]}</option>)}</select></div>
-        <button data-control-id="settings.invite.create" className="button primary full mt-1" type="button" onClick={() => void createInvite()}><PeopleIcon width="18"/>招待コードを作成</button>
+        <button data-control-id="settings.invite.create" className="button primary full mt-1" type="button" disabled={atCapacity} onClick={() => void createInvite()}><PeopleIcon width="18"/>招待コードを作成</button>
         <p className="small muted mt-1">有効期間：24時間 · 使用回数：1回 · 管理者はいつでも無効にできます</p>
         {invite && <div className="notice invite-result" role="status"><strong>この画面でのみ表示する招待コード</strong><code>{invite.token}</code><span className="small">有効期限：{formatDate(invite.expiresAt)} {formatTime(invite.expiresAt)} · 残り{invite.remainingUses}回</span><button data-control-id="settings.invite.copy" className="button" type="button" onClick={() => void copyInvite()}>招待コードをコピー</button></div>}
         <h3 className="mt-1">作成した招待</h3>
@@ -171,23 +188,26 @@ function Household() {
         }}>無効にする</button>}</li>)}</ul>}
       </section>}
     </div>
+    <ColorLists/>
+    <LeaveHousehold/>
     {member && <Dialog title={`${member.displayName}さんの権限`} description="役割の標準設定を基準に、必要な項目だけを個別に変更できます。" onClose={() => { if (!saving) setMember(null); }}>
-      <div className="stack">
+      <div className="stack" {...permissionGuard.formProps}>
         <label className="field" htmlFor="member-role"><span>メンバーの役割</span></label><select data-control-id={`settings.member.role.${member.id}`} className="select" id="member-role" value={role} disabled={saving} onChange={(event) => { setRole(event.target.value as MembershipRole); setOverrides([]); }}>{(Object.keys(roleLabels) as MembershipRole[]).map((value) => <option key={value} value={value}>{roleLabels[value]}</option>)}</select>
         {role !== member.role && <div className="notice"><strong>役割を変更すると、個別設定の確認が必要です。</strong><p className="small mb-0">まず役割を保存し、もう一度この画面を開いて個別設定を確認してください。</p></div>}
         <fieldset className="fieldset" disabled={role !== member.role || saving}><legend>個別設定</legend><div className="stack">{editableCapabilities.map((capability) => <label className="setting-row" key={capability}><span><strong>{permissionLabels[capability]}</strong><span className="small muted">標準：{defaultCapabilitiesFor(role).includes(capability) ? '利用できる' : '利用できない'}</span></span><select data-control-id={`settings.member.permission.${member.id}.${capability}`} className="select permission-select" aria-label={`${permissionLabels[capability]}の個別設定`} value={overrideValue(capability)} onChange={(event) => changeOverride(capability, event.target.value as 'default' | 'allow' | 'deny')}><option value="default">役割の標準</option><option value="allow">利用を許可</option><option value="deny">利用を制限</option></select></label>)}</div></fieldset>
+        <MemberActions member={member} onDone={() => setMember(null)}/>
         {roleError && <p className="field-error" role="alert">{roleError}</p>}
-        <div className="dialog-actions"><button data-control-id={`settings.member.cancel.${member.id}`} className="button" type="button" disabled={saving} onClick={() => setMember(null)}>{ja.actions.cancel}</button>{role === member.role ? <><button data-control-id={`settings.member.reset.${member.id}`} className="button" type="button" disabled={saving || overrides.length === 0} onClick={() => void resetOverrides()}>標準に戻す</button><button data-control-id={`settings.member.save-overrides.${member.id}`} className="button primary" type="button" disabled={saving} onClick={() => void saveOverrides()}>{saving ? ja.actions.saving : '個別設定を保存'}</button></> : <button data-control-id={`settings.member.save-role.${member.id}`} className="button primary" type="button" disabled={saving} onClick={() => void saveRole()}>{saving ? ja.actions.saving : '役割を保存'}</button>}</div>
+        <div className="dialog-actions"><button data-control-id={`settings.member.cancel.${member.id}`} className="button" type="button" disabled={saving} onClick={() => permissionGuard.leave(() => setMember(null))}>{ja.actions.cancel}</button>{role === member.role ? <><button data-control-id={`settings.member.reset.${member.id}`} className="button" type="button" disabled={saving || overrides.length === 0} onClick={() => void resetOverrides()}>標準に戻す</button><button data-control-id={`settings.member.save-overrides.${member.id}`} className="button primary" type="button" disabled={saving} onClick={() => void saveOverrides()}>{saving ? ja.actions.saving : '個別設定を保存'}</button></> : <button data-control-id={`settings.member.save-role.${member.id}`} className="button primary" type="button" disabled={saving} onClick={() => void saveRole()}>{saving ? ja.actions.saving : '役割を保存'}</button>}</div>
       </div>
     </Dialog>}
   </>;
 }
 
 function Security() {
-  const { gateway, announce, snapshot } = useApp();
+  const { gateway, announce, snapshot, endSession, runtimeMode } = useApp();
   const [signingOut, setSigningOut] = useState(false);
   const signOut = async () => {
-    const result = await gateway.auth.signOut();
+    const result = await endSession();
     if (!result.ok) { announce(result.error.message); return; }
     setSigningOut(false); navigate('/welcome'); announce('この端末からサインアウトしました。');
   };
@@ -225,6 +245,8 @@ function Security() {
     if (next !== confirm) { setPasswordError('新しいパスワードと確認用の入力が一致しません。'); return; }
     const parsed = passwordSchema.safeParse(next);
     if (!parsed.success) { setPasswordError(parsed.error.issues[0]?.message ?? '新しいパスワードを確認してください。'); return; }
+    const problem = await checkNewPassword(next, { email: snapshot.user.email, displayName: snapshot.memberships.find((member) => member.id === snapshot.viewer.membershipId)?.displayName, householdName: snapshot.household.name });
+    if (problem) { setPasswordError(problem); return; }
     const result = await gateway.auth.changePassword(current, next);
     if (!result.ok) { setPasswordError(result.error.message); return; }
     form.reset(); setPasswordOpen(false); announce('パスワードを変更しました。入力内容は残していません。');
@@ -238,12 +260,13 @@ function Security() {
 
   return <>
     <div className="grid two">
-      <section className="card accent"><ShieldIcon width="30"/><p className="eyebrow">おすすめ</p><h2>パスキー</h2><p>端末の画面ロックを使って本人確認します。パスワードのみを使うより、偽のサインイン画面に情報を入力するリスクを減らせます。</p>{overview?.authenticators.map((item) => <div className="setting-row" key={item.id}><div><strong>{item.label}</strong><p className="small muted mb-0">{item.demo ? 'デモ登録' : '登録済み'}</p></div><StatusBadge tone="success">利用中</StatusBadge></div>)}<button data-control-id="settings.passkey.add" className="button full" type="button" onClick={() => void addPasskey()}>別のパスキーを追加</button><p className="small muted mt-1">このデモでは実際のパスキーは登録されません。実際の利用時は、ブラウザの本人確認画面が開きます。</p></section>
+      <section className="card accent"><ShieldIcon width="30"/><p className="eyebrow">おすすめ</p><h2>パスキー</h2><p>端末の画面ロックを使って本人確認します。パスワードのみを使うより、偽のサインイン画面に情報を入力するリスクを減らせます。</p>{overview?.authenticators.map((item) => <div className="setting-row" key={item.id}><div><strong>{item.label}</strong><p className="small muted mb-0">{item.demo ? 'デモ登録' : '登録済み'}</p></div><StatusBadge tone="success">利用中</StatusBadge></div>)}<button data-control-id="settings.passkey.add" className="button full" type="button" onClick={() => void addPasskey()}>別のパスキーを追加</button>{runtimeMode === 'mock' && <p className="small muted mt-1">このデモでは実際のパスキーは登録されません。実際の利用時は、ブラウザの本人確認画面が開きます。</p>}</section>
       <section className="card"><LockIcon width="30"/><p className="eyebrow">別の方法</p><h2>パスワード</h2><p>15文字以上64文字以内で設定します。数字や記号を必ず混ぜる必要はありません。安全性が低いと判断されたパスワードは使用できません。</p><button data-control-id="settings.password.open" className="button full" type="button" onClick={() => setPasswordOpen(true)}>パスワードを変更</button></section>
       <section className="card"><h2>サインイン中の端末</h2><ul className="list">{overview?.sessions.map((session) => <li className="list-row" key={session.id}><span className="status-dot" style={{ color: session.current ? 'var(--success)' : undefined }}/><div className="row-main"><strong>{session.label}</strong><span className="meta">{session.location} · {session.current ? 'この端末' : `最終利用：${formatRelative(session.lastSeenAt, snapshot.context.asOf)}`}</span></div>{session.current ? <StatusBadge tone="success">利用中</StatusBadge> : <button data-control-id={`settings.session.revoke-open.${session.id}`} className="button danger" type="button" onClick={() => setRevoke(session.id)}>サインアウト</button>}</li>)}</ul></section>
       <section className="card"><h2>この端末からサインアウト</h2><p>共用の端末や、しばらく使わない端末では、使い終わったらサインアウトしてください。次回の利用時には、もう一度本人確認が必要です。</p><button data-control-id="settings.session.sign-out-current" className="button full" type="button" onClick={() => setSigningOut(true)}>この端末からサインアウト</button><p className="small muted mt-1 mb-0">紛失した端末は、左の一覧から個別にサインアウトできます。</p></section>
     </div>
-    {passwordOpen && <Dialog title="パスワードを変更" description="この画面を閉じると、入力中のパスワードは消去されます。" onClose={() => { setPasswordOpen(false); setPasswordError(''); }}><form className="stack" onSubmit={(event) => { event.preventDefault(); void changePassword(event.currentTarget); }}><label className="field"><span>現在のパスワード</span><input data-control-id="settings.password.current" className="input" name="current" type="password" autoComplete="current-password" minLength={15} maxLength={64} required/></label><label className="field"><span>新しいパスワード</span><input data-control-id="settings.password.new" className="input" name="next" type="password" autoComplete="new-password" minLength={15} maxLength={64} required/></label><label className="field"><span>新しいパスワード（確認）</span><input data-control-id="settings.password.confirm" className="input" name="confirm" type="password" autoComplete="new-password" minLength={15} maxLength={64} required/></label>{passwordError && <p className="field-error" role="alert">{passwordError}</p>}<div className="dialog-actions"><button data-control-id="settings.password.cancel" className="button" type="button" onClick={() => setPasswordOpen(false)}>{ja.actions.cancel}</button><button data-control-id="settings.password.submit" className="button primary" type="submit">変更する</button></div></form></Dialog>}
+    <section className="card mt-1" aria-labelledby="account-activity-title"><h2 id="account-activity-title">{auditCopy.mineHeading}</h2><p className="small muted">{auditCopy.mineDescription}</p><Suspense fallback={<div className="skeleton"/>}><AccountActivity/></Suspense></section>
+    {passwordOpen && <Dialog title="パスワードを変更" description="この画面を閉じると、入力中のパスワードは消去されます。" onClose={() => { setPasswordOpen(false); setPasswordError(''); }}><GuardedForm className="stack" onSubmit={(event) => { event.preventDefault(); void changePassword(event.currentTarget); }}><label className="field"><span>現在のパスワード</span><input data-control-id="settings.password.current" className="input" name="current" type="password" autoComplete="current-password" minLength={15} maxLength={64} required/></label><label className="field"><span>新しいパスワード</span><input data-control-id="settings.password.new" className="input" name="next" type="password" autoComplete="new-password" minLength={15} maxLength={64} required/></label><label className="field"><span>新しいパスワード（確認）</span><input data-control-id="settings.password.confirm" className="input" name="confirm" type="password" autoComplete="new-password" minLength={15} maxLength={64} required/></label>{passwordError && <p className="field-error" role="alert">{passwordError}</p>}<div className="dialog-actions"><button data-control-id="settings.password.cancel" className="button" type="button" onClick={(event) => closeGuarded(event.currentTarget.closest('[data-modal-root]'), () => setPasswordOpen(false))}>{ja.actions.cancel}</button><button data-control-id="settings.password.submit" className="button primary" type="submit">変更する</button></div></GuardedForm></Dialog>}
     {signingOut && <Dialog title="この端末からサインアウトしますか" description="未送信の変更があれば、この端末に残ります。もう一度サインインすると送信できます。" onClose={() => setSigningOut(false)} actions={<><button data-control-id="settings.session.sign-out-cancel" className="button" type="button" onClick={() => setSigningOut(false)}>{ja.actions.cancel}</button><button data-control-id="settings.session.sign-out-confirm" className="button danger" type="button" onClick={() => void signOut()}>サインアウト</button></>}/>}
     {revoke && <Dialog title="この端末からサインアウトしますか" description="現在使用中の端末はサインアウトされません。" onClose={() => setRevoke(null)} actions={<><button data-control-id="settings.session.revoke-cancel" className="button" type="button" onClick={() => setRevoke(null)}>{ja.actions.cancel}</button><button data-control-id="settings.session.revoke-confirm" className="button danger" type="button" onClick={() => void revokeSession()}>サインアウト</button></>}/>}
   </>;
@@ -268,8 +291,8 @@ function LocationPrivacy() {
     <section className="card"><h2>{ja.place.settings.consentLabel}</h2>
       <div className="setting-row"><div><strong>{granted ? ja.place.settings.consentOn : ja.place.settings.consentOff}</strong><p className="small muted mb-0">{ja.place.settings.revokeNote}</p></div><button data-control-id="settings.location.lookup-consent" type="button" className="toggle" aria-label={ja.place.settings.consentLabel} aria-pressed={granted} disabled={saving || consent.status === 'loading' || consent.status === 'unavailable'} onClick={() => void toggle()}/></div>
       <ul className="list">
-        <li className="list-row"><LinkIcon width="20"/><div className="row-main"><a data-control-id="settings.location.terms" href={OPENPOI_TERMS_URL} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" aria-label={externalLinkLabel(ja.place.settings.terms)}>{ja.place.settings.terms}</a></div></li>
-        <li className="list-row"><LinkIcon width="20"/><div className="row-main"><a data-control-id="settings.location.attribution" href={OPENPOI_ATTRIBUTION_URL} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" aria-label={externalLinkLabel(ja.place.settings.attribution)}>{ja.place.settings.attribution}</a></div></li>
+        <li className="list-row"><LinkIcon width="20"/><div className="row-main"><a data-control-id="settings.location.terms" className="standalone-link" href={OPENPOI_TERMS_URL} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" aria-label={externalLinkLabel(ja.place.settings.terms)}>{ja.place.settings.terms}</a></div></li>
+        <li className="list-row"><LinkIcon width="20"/><div className="row-main"><a data-control-id="settings.location.attribution" className="standalone-link" href={OPENPOI_ATTRIBUTION_URL} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" aria-label={externalLinkLabel(ja.place.settings.attribution)}>{ja.place.settings.attribution}</a></div></li>
       </ul>
     </section>
   </div>;
@@ -304,6 +327,7 @@ function Notifications() {
 /** 共有の初期値と、通知に内容を表示するかどうか。保存は AppContext 経由で、別の画面の変更を上書きしない。 */
 function Privacy() {
   const { privacy: saved, updatePrivacy, announce } = useApp();
+  const { privacyBlur, keepPhotoLocation } = useDevicePreferences();
   const [saving, setSaving] = useState(false);
   // 操作をすぐ画面に反映し、保存に失敗したら保存済みの値へ戻す。
   const [draft, setDraft] = useState<Partial<NonNullable<typeof saved>>>({});
@@ -320,17 +344,31 @@ function Privacy() {
   return <div className="grid two">
     <section className="card"><h2>新しく作る予定・タスク・メモの共有範囲</h2><p className="muted">あとから作るものに使う初期値です。作成済みのものは変わりません。</p>
       <fieldset className="fieldset" disabled={saving}><legend>共有範囲の初期値</legend>
-        {(['household', 'creator'] as const).map((value) => <label className="check-row" key={value}><input data-control-id={`settings.privacy.audience.${value}`} type="radio" name="defaultAudience" value={value} checked={privacy.defaultAudience === value} onChange={() => void save({ defaultAudience: value }, `共有範囲の初期値を「${value === 'household' ? '家族全員' : '作成した本人だけ'}」にしました。`)}/>{value === 'household' ? '家族全員（子どもメンバーには、本人に関係するものだけ）' : '作成した本人だけ'}</label>)}
+        {(['household', 'creator'] as const).map((value) => <label className="check-row" key={value}><input data-control-id={`settings.privacy.audience.${value}`} type="radio" name="defaultAudience" value={value} checked={privacy.defaultAudience === value} onChange={() => void save({ defaultAudience: value }, `共有範囲の初期値を「${value === 'household' ? ja.visibility.household : '作成した本人だけ'}」にしました。`)}/>{value === 'household' ? `${ja.visibility.household}（子どもメンバーとゲストには、本人に関係するものだけ）` : '作成した本人だけ'}</label>)}
       </fieldset>
     </section>
     <section className="card"><h2>通知の内容</h2><div className="setting-row"><div><strong>通知の題名と内容を表示しない</strong><p className="small muted mb-0">ほかの人に画面を見られても、予定やタスクの中身が分からないようにします。開いたときだけ表示します。</p></div><button data-control-id="settings.privacy.hide-notification-content" type="button" className="toggle" aria-label="通知の題名と内容を表示しない" aria-pressed={privacy.hideNotificationContent} disabled={saving} onClick={() => void save({ hideNotificationContent: !privacy.hideNotificationContent }, privacy.hideNotificationContent ? '通知の題名と内容を表示するようにしました。' : '通知の題名と内容を表示しないようにしました。')}/></div></section>
+    <section className="card"><h2>この端末での扱い</h2><p className="muted">この端末だけの設定です。別の端末には反映されません。</p>
+      <div className="setting-row"><div><strong>隠れている間は画面をぼかす</strong><p className="small muted mb-0">別のタブへ移ったり、ウィンドウを最小化したりしている間、画面の内容をぼかします。戻るとすぐ元に戻ります。アプリの切り替え画面に映る内容まで隠せるとは限りません。</p></div><button data-control-id="settings.privacy.blur-hidden" type="button" className="toggle" aria-label="隠れている間は画面をぼかす" aria-pressed={privacyBlur} onClick={() => { setDevicePreferences({ privacyBlur: !privacyBlur }); announce(privacyBlur ? '画面をぼかさないようにしました。' : '隠れている間は画面をぼかすようにしました。'); }}/></div>
+      <div className="setting-row"><div><strong>写真の撮影場所を残す</strong><p className="small muted mb-0">アルバムに追加するときの初期値です。オフなら撮影場所を取り除いて保存します。追加の画面で1回ごとに変えられます。</p></div><button data-control-id="settings.privacy.keep-photo-location" type="button" className="toggle" aria-label="写真の撮影場所を残す" aria-pressed={keepPhotoLocation} onClick={() => { setDevicePreferences({ keepPhotoLocation: !keepPhotoLocation }); announce(keepPhotoLocation ? '写真の撮影場所を取り除くようにしました。' : '写真の撮影場所を残すようにしました。'); }}/></div>
+    </section>
   </div>;
 }
 
-function Accessibility({ theme, setTheme, reduced, setReduced }: { theme: 'light' | 'dusk'; setTheme: (value: 'light' | 'dusk') => void; reduced: boolean; setReduced: (value: boolean) => void }) {
+function Accessibility() {
+  const { announce } = useApp();
+  const { palette, colorMode, density, reducedMotion } = useDevicePreferences();
   return <div className="grid two">
-    <section className="card"><h2>表示テーマ</h2><div className="segmented"><button data-control-id="settings.theme.light" type="button" aria-pressed={theme === 'light'} onClick={() => setTheme('light')}>明るいテーマ</button><button data-control-id="settings.theme.dusk" type="button" aria-pressed={theme === 'dusk'} onClick={() => setTheme('dusk')}>暗いテーマ</button></div><div className="setting-row"><div><strong>動きを減らす</strong><p className="small muted mb-0">端末の設定で動きを減らしている場合にも適用されます。</p></div><button data-control-id="settings.motion.reduce" type="button" className="toggle" aria-label="動きを減らす" aria-pressed={reduced} onClick={() => setReduced(!reduced)}/></div></section>
-    <section className="card"><h2>操作と読みやすさ</h2><p>文字を大きくした場合も、項目が重なったり、操作ボタンが隠れたりしないように調整しています。</p><p className="small muted">色だけで状態を区別せず、キーボードで操作中の場所も画面に表示します。</p></section>
+    <section className="card"><h2>表示テーマ</h2><p className="muted">この端末だけの設定です。</p>
+      <fieldset className="fieldset"><legend>テーマ</legend><div className="theme-grid">{themePalettes.map(({ value, label }) => <label className="theme-choice" key={value}><input data-control-id={`settings.theme.palette.${value}`} type="radio" name="theme-palette" value={value} checked={palette === value} onChange={() => setDevicePreferences({ palette: value })}/><span className="theme-swatch" data-swatch={value} aria-hidden="true"/>{label}</label>)}</div></fieldset>
+      <fieldset className="fieldset mt-1"><legend>昼と夜</legend><div className="choice-grid mode-grid">{colorModes.map(({ value, label }) => <label key={value}><input data-control-id={`settings.theme.mode.${value}`} type="radio" name="theme-mode" value={value} checked={colorMode === value} onChange={() => setDevicePreferences({ colorMode: value })}/>{label}</label>)}</div></fieldset>
+      <fieldset className="fieldset mt-1"><legend>表示の密度</legend><div className="choice-grid">{(Object.keys(densityLabels) as Density[]).map((value) => <label key={value}><input data-control-id={`settings.density.${value}`} type="radio" name="density" value={value} checked={density === value} onChange={() => { setDevicePreferences({ density: value }); announce(`表示の密度を「${densityLabels[value]}」にしました。`); }}/>{densityLabels[value]}</label>)}</div></fieldset>
+      <div className="setting-row"><div><strong>動きを減らす</strong><p className="small muted mb-0">端末の設定で動きを減らしている場合にも適用されます。</p></div><button data-control-id="settings.motion.reduce" type="button" className="toggle" aria-label="動きを減らす" aria-pressed={reducedMotion} onClick={() => setDevicePreferences({ reducedMotion: !reducedMotion })}/></div>
+    </section>
+    <div className="stack">
+      <section className="card"><h2>データの更新</h2><p className="muted">別の端末で変えた内容を、すぐに確かめたいときに使います。</p><SyncStatus/></section>
+      <section className="card"><h2>操作と読みやすさ</h2><p>文字を大きくした場合も、項目が重なったり、操作ボタンが隠れたりしないように調整しています。</p><p className="small muted">色だけで状態を区別せず、キーボードで操作中の場所も画面に表示します。</p></section>
+    </div>
   </div>;
 }
 

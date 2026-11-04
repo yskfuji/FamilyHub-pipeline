@@ -2,7 +2,7 @@ import { addDateKeyDays } from './calendarDate';
 import type { IsoDate, RecurrenceRule } from './types';
 
 /**
- * 繰り返し規則（RFC 5545 RRULE の一部: FREQ=DAILY/WEEKLY/MONTHLY, INTERVAL, BYDAY, UNTIL, COUNT）を、表示する範囲の分だけ日付に展開する。
+ * 繰り返し規則（RFC 5545 RRULE の一部: FREQ=DAILY/WEEKLY/MONTHLY, INTERVAL, BYDAY, BYMONTHDAY, BYSETPOS, UNTIL, COUNT）を、表示する範囲の分だけ日付に展開する。
  * 対応しない規則は null を返し、呼び出し側は最初の1回だけを扱う（推測で展開しない）。
  */
 
@@ -10,43 +10,54 @@ export interface ParsedRule {
   freq: 'DAILY' | 'WEEKLY' | 'MONTHLY';
   interval: number;
   byDay: number[];
+  byMonthDay: number[];
+  bySetPos?: number;
   until?: string;
   count?: number;
 }
 
 const DAY_CODES = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'] as const;
 const DAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'] as const;
-const MAX_ITERATIONS = 3660;
+const MAX_DAILY_STEPS = 40_000;
+const MAX_MONTH_STEPS = 2_400;
+
+/** 毎月の末日。31日がない月は月の最後の日になり、翌月以降へずれない。 */
+export const LAST_DAY_OF_MONTH_RULE = 'FREQ=MONTHLY;BYMONTHDAY=28,29,30,31;BYSETPOS=-1';
 
 export function parseRRule(rrule: string): ParsedRule | null {
   const parts = new Map(rrule.split(';').map((part) => part.split('=') as [string, string]));
   const freq = parts.get('FREQ');
   if (freq !== 'DAILY' && freq !== 'WEEKLY' && freq !== 'MONTHLY') return null;
-  for (const key of parts.keys()) if (!['FREQ', 'INTERVAL', 'BYDAY', 'UNTIL', 'COUNT'].includes(key)) return null;
+  for (const key of parts.keys()) if (!['FREQ', 'INTERVAL', 'BYDAY', 'BYMONTHDAY', 'BYSETPOS', 'UNTIL', 'COUNT'].includes(key)) return null;
   const interval = Number(parts.get('INTERVAL') ?? '1');
-  if (!Number.isInteger(interval) || interval < 1 || interval > 99) return null;
+  if (!Number.isInteger(interval) || interval < 1 || interval > 366) return null;
   const byDayRaw = parts.get('BYDAY');
   const byDay = byDayRaw ? byDayRaw.split(',').map((code) => DAY_CODES.indexOf(code as typeof DAY_CODES[number])) : [];
   if (byDay.some((value) => value < 0) || (byDay.length && freq !== 'WEEKLY')) return null;
+  const byMonthDayRaw = parts.get('BYMONTHDAY');
+  const byMonthDay = byMonthDayRaw ? byMonthDayRaw.split(',').map(Number) : [];
+  if (byMonthDay.some((value) => !Number.isInteger(value) || value < 1 || value > 31) || (byMonthDay.length && freq !== 'MONTHLY')) return null;
+  const bySetPos = parts.has('BYSETPOS') ? Number(parts.get('BYSETPOS')) : undefined;
+  if (bySetPos !== undefined && ((bySetPos !== 1 && bySetPos !== -1) || !byMonthDay.length)) return null;
   const untilRaw = parts.get('UNTIL');
   const until = untilRaw ? untilRaw.match(/^(\d{4})(\d{2})(\d{2})/)?.slice(1).join('-') : undefined;
   if (untilRaw && !until) return null;
   const count = parts.has('COUNT') ? Number(parts.get('COUNT')) : undefined;
   if (count !== undefined && (!Number.isInteger(count) || count < 1)) return null;
-  return { freq, interval, byDay: [...new Set(byDay)].sort(), until, count };
+  return { freq, interval, byDay: [...new Set(byDay)].sort(), byMonthDay: [...new Set(byMonthDay)].sort((a, b) => a - b), bySetPos, until, count };
 }
 
 const weekday = (dateKey: string) => new Date(`${dateKey}T00:00:00Z`).getUTCDay();
 
 function* candidates(startKey: string, rule: ParsedRule): Generator<string> {
   if (rule.freq === 'DAILY') {
-    for (let i = 0; i < MAX_ITERATIONS; i += 1) yield addDateKeyDays(startKey, i * rule.interval);
+    for (let i = 0; i < MAX_DAILY_STEPS; i += 1) yield addDateKeyDays(startKey, i * rule.interval);
     return;
   }
   if (rule.freq === 'WEEKLY') {
     const days = rule.byDay.length ? rule.byDay : [weekday(startKey)];
     const weekStart = addDateKeyDays(startKey, -weekday(startKey));
-    for (let week = 0; week < MAX_ITERATIONS; week += rule.interval) {
+    for (let week = 0; week < MAX_DAILY_STEPS; week += rule.interval) {
       for (const day of days) {
         const date = addDateKeyDays(weekStart, week * 7 + day);
         if (date >= startKey) yield date;
@@ -55,7 +66,18 @@ function* candidates(startKey: string, rule: ParsedRule): Generator<string> {
     return;
   }
   const [year, month, day] = startKey.split('-').map(Number);
-  for (let i = 0; i < MAX_ITERATIONS / 10; i += 1) {
+  for (let i = 0; i < MAX_MONTH_STEPS; i += 1) {
+    if (rule.byMonthDay.length) {
+      const first = new Date(Date.UTC(year, month - 1 + i * rule.interval, 1));
+      const length = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
+      const days = rule.byMonthDay.filter((value) => value <= length);
+      const picked = rule.bySetPos === undefined ? days : days.slice(rule.bySetPos === 1 ? 0 : -1, rule.bySetPos === 1 ? 1 : undefined);
+      for (const value of picked) {
+        const date = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), value)).toISOString().slice(0, 10);
+        if (date >= startKey) yield date;
+      }
+      continue;
+    }
     const shifted = new Date(Date.UTC(year, month - 1 + i * rule.interval, day));
     if (shifted.getUTCDate() !== day) continue; // 31日などがない月は飛ばす（RFC 5545 と同じ扱い）
     yield shifted.toISOString().slice(0, 10);
@@ -110,7 +132,7 @@ export function describeRule(startKey: string, recurrence: RecurrenceRule): stri
   const days = (rule.byDay.length ? rule.byDay : [weekday(startKey)]).map((day) => DAY_LABELS[day]).join('・');
   const base = rule.freq === 'DAILY' ? (rule.interval === 1 ? '毎日' : `${rule.interval}日ごと`)
     : rule.freq === 'WEEKLY' ? (rule.interval === 1 ? `毎週${days}曜` : `${rule.interval}週間ごと（${days}曜）`)
-      : `${rule.interval === 1 ? '毎月' : `${rule.interval}か月ごと`}${Number(startKey.slice(8, 10))}日`;
+      : `${rule.interval === 1 ? '毎月' : `${rule.interval}か月ごと`}${rule.byMonthDay.length ? (rule.bySetPos === -1 ? '末日' : `${rule.byMonthDay.join('・')}日`) : `${Number(startKey.slice(8, 10))}日`}`;
   if (rule.until) return `${base}・${Number(rule.until.slice(5, 7))}月${Number(rule.until.slice(8, 10))}日まで`;
   if (rule.count) return `${base}・${rule.count}回`;
   return base;
