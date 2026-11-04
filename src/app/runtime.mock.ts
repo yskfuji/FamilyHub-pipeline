@@ -15,6 +15,11 @@ function queryCoOwner() {
   return import.meta.env.VITE_INCLUDE_AUDIT_SURFACE === 'true' && new URLSearchParams(window.location.search).get('household') === 'two-owners';
 }
 
+/** 内部監査のビルドで ?stage=unreachable を付けると、最初から「接続できません」の画面を出す（オフラインの空の状態の確認用）。 */
+function queryUnreachable() {
+  return import.meta.env.VITE_INCLUDE_AUDIT_SURFACE === 'true' && new URLSearchParams(window.location.search).get('stage') === 'unreachable';
+}
+
 function initialSnapshot(actorId: string, coOwner: boolean): HouseholdSnapshot {
   let snapshot = coOwner ? withCoOwner(seededSnapshot()) : seededSnapshot();
   const member = snapshot.memberships.find((item) => item.id === actorId) ?? snapshot.memberships[0];
@@ -27,5 +32,5 @@ function initialSnapshot(actorId: string, coOwner: boolean): HouseholdSnapshot {
 export function createMockRuntime(): AppRuntime {
   const actorId = queryActor();
   const coOwner = queryCoOwner();
-  return { mode: 'mock', actorId, gateway: createMockGateway(actorId, { coOwner, auditHistory: true }), initialSnapshot: initialSnapshot(actorId, coOwner), initialSession: { stage: 'active', idleTimeoutMinutes: 30 }, setPermissionRevision: () => undefined };
+  return { mode: 'mock', actorId, gateway: createMockGateway(actorId, { coOwner, auditHistory: true }), initialSnapshot: initialSnapshot(actorId, coOwner), initialSession: { stage: 'active', idleTimeoutMinutes: 30 }, initialUnreachable: queryUnreachable(), setPermissionRevision: () => undefined };
 }

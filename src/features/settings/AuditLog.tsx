@@ -3,6 +3,7 @@ import { useApp } from '../../app/AppContext';
 import { navigate, useSearch } from '../../app/router';
 import { auditActionLabel, auditCopy, auditFieldsText, auditGroupLabels, auditTargetLabels } from '../../content/auditLabels';
 import { EmptyState, StatusBadge, formatDate, formatTime } from '../../design-system/components';
+import { EmptySearch } from '../../design-system/illustrations/EmptySearch';
 import { ShieldIcon } from '../../design-system/icons';
 import { auditGroups } from '../../domain/auditLog';
 import type { AccountAuditEntry, AuditChainStatus, AuditEntry } from '../../domain/auditLog';
@@ -102,7 +103,7 @@ function HouseholdRecord({ filters }: { filters: AuditFilters }) {
     <section className="card mt-1" aria-labelledby="audit-list-title">
       <h2 className="sr-only" id="audit-list-title">{auditCopy.views.household}</h2>
       {state.items.length === 0
-        ? <EmptyState title={filtered ? auditCopy.emptyFiltered : auditCopy.empty}>{filtered ? auditCopy.emptyFilteredBody : auditCopy.emptyBody}</EmptyState>
+        ? <EmptyState title={filtered ? auditCopy.emptyFiltered : auditCopy.empty} illustration={filtered ? <EmptySearch/> : undefined}>{filtered ? auditCopy.emptyFilteredBody : auditCopy.emptyBody}</EmptyState>
         : <Timeline items={state.items} row={(entry) => <>
           <strong>{auditActionLabel(entry.action)}</strong>
           <span className="meta audit-meta"><span>{actorText(entry)}</span>{entry.group !== 'operator' && <span>{auditGroupLabels[entry.group]}</span>}<Target entry={entry}/></span>

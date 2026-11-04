@@ -22,7 +22,7 @@
     "lint": "eslint . --max-warnings 0",
     "test:unit": "vitest run",
     "audit:routes": "vitest run --project server server/test/contract.test.ts",
-    "test:e2e": "npm run build && npm run build:audit && PLAYWRIGHT_AUDIT=true playwright test e2e/core.spec.ts e2e/interactions.spec.ts e2e/authorization.spec.ts e2e/places.spec.ts e2e/budget.spec.ts e2e/recurrence.spec.ts e2e/calendar.spec.ts e2e/navigation.spec.ts e2e/tasks-notes.spec.ts e2e/albums.spec.ts e2e/shell.spec.ts e2e/assistant.spec.ts e2e/management.spec.ts e2e/features.spec.ts",
+    "test:e2e": "npm run build && npm run build:audit && PLAYWRIGHT_AUDIT=true playwright test e2e/core.spec.ts e2e/interactions.spec.ts e2e/authorization.spec.ts e2e/places.spec.ts e2e/budget.spec.ts e2e/recurrence.spec.ts e2e/calendar.spec.ts e2e/navigation.spec.ts e2e/tasks-notes.spec.ts e2e/albums.spec.ts e2e/shell.spec.ts e2e/assistant.spec.ts e2e/management.spec.ts e2e/features.spec.ts e2e/illustrations.spec.ts",
     "test:real": "VITE_GATEWAY=http npm run build:http && VITE_GATEWAY=http playwright test --config playwright.real.config.ts",
     "audit:a11y": "npm run build:audit && PLAYWRIGHT_AUDIT=true playwright test e2e/accessibility.spec.ts --workers=1",
     "audit:visual": "npm run build:audit && PLAYWRIGHT_AUDIT=true playwright test e2e/capture.spec.ts --project=chromium && node scripts/build-gallery.mjs",
@@ -30,6 +30,7 @@
     "audit:security": "node scripts/security-check.mjs",
     "audit:ui": "node scripts/audit-ui.mjs",
     "audit:css": "node scripts/audit-css.mjs",
+    "audit:illustrations": "node scripts/audit-illustrations.mjs",
     "audit:contrast": "npm run build:audit && PLAYWRIGHT_AUDIT=true playwright test e2e/contrast.spec.ts --project=chromium",
     "audit:controls": "node scripts/check-control-contracts.mjs",
     "audit:contract": "node scripts/audit-contract.mjs",
@@ -37,7 +38,7 @@
     "render:er": "node scripts/render-er.mjs",
     "probe:openpoi": "node scripts/probe-openpoi.mjs",
     "build:gallery": "node scripts/build-gallery.mjs",
-    "verify": "npm run lint && npm run typecheck && npm run test:unit && npm run build && npm run build:http && npm run build:server && npm run audit:security && npm run audit:ui && npm run audit:css && npm run audit:controls && npm run audit:contract && npm run audit:routes && npm run audit:use-cases && npm run audit:lighthouse && npm run test:e2e && npm run audit:a11y && npm run audit:contrast && npm run test:real",
+    "verify": "npm run lint && npm run typecheck && npm run test:unit && npm run build && npm run build:http && npm run build:server && npm run audit:security && npm run audit:ui && npm run audit:css && npm run audit:illustrations && npm run audit:controls && npm run audit:contract && npm run audit:routes && npm run audit:use-cases && npm run audit:lighthouse && npm run test:e2e && npm run audit:a11y && npm run audit:contrast && npm run test:real",
     "package": "npm run verify && npm run render:er && npm run audit:visual && bash scripts/package.sh"
   },
   "dependencies": {

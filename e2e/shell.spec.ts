@@ -192,8 +192,9 @@ test('the app reduced-motion setting applies right after a reload', async ({ pag
 
 test('season marks are decorative and follow the date', async ({ page }) => {
   await page.goto('/today');
-  await expect(page.locator('.page-head .season-mark')).toHaveAttribute('aria-hidden', 'true');
-  await expect(page.locator('.page-head .season-mark')).toHaveAttribute('data-season', 'autumn');
+  // 今日の画面は、小さな印の代わりに季節の場面（段階10）。同じ seasonOf で決まり、読み上げない。
+  await expect(page.locator('.page-head .season-scene')).toHaveAttribute('aria-hidden', 'true');
+  await expect(page.locator('.page-head .season-scene')).toHaveAttribute('data-season', 'autumn');
   await page.goto('/calendar?month=2027-01');
   await expect(page.locator('.calendar-month-heading .season-mark')).toHaveAttribute('data-season', 'winter');
   await page.setViewportSize({ width: 390, height: 844 });

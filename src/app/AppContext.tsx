@@ -42,7 +42,7 @@ const AppContext = createContext<AppState | null>(null);
 
 function queryScenario(): Scenario {
   const value = new URLSearchParams(window.location.search).get('scenario');
-  const allowed: Scenario[] = ['normal','empty','loading','offline','conflict','expired-invite','expired-session','quarantined','weather'];
+  const allowed: Scenario[] = ['normal','empty','all-done','loading','offline','conflict','expired-invite','expired-session','quarantined','weather'];
   return allowed.includes(value as Scenario) ? value as Scenario : 'normal';
 }
 
@@ -57,7 +57,7 @@ export function AppProvider({ runtime, children }: PropsWithChildren<{ runtime: 
   const { pending: reauthPending, setPending: setReauthPending, ask: askReauth } = useReauthPrompt();
   const gateway = useMemo(() => withReauthentication(runtime.gateway, askReauth), [askReauth, runtime.gateway]);
   const [session, setSession] = useState<SessionInfo | null>(runtime.initialSession);
-  const [unreachable, setUnreachable] = useState(false);
+  const [unreachable, setUnreachable] = useState(runtime.initialUnreachable ?? false);
   const [queue] = useState(() => new EncryptedOfflineQueue(new IndexedDbQueuePersistence()));
   const [snapshot, setSnapshot] = useState<HouseholdSnapshot>(runtime.initialSnapshot);
   const [loading, setLoading] = useState(true);

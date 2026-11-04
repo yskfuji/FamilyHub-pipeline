@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { navigate, useSearch, withQueryParam } from '../../app/router';
 import { filterHelpItems, helpCategories, helpItems, parseHelpCategory, type HelpCategory } from '../../content/help';
 import { EmptyState } from '../../design-system/components';
+import { EmptySearch } from '../../design-system/illustrations/EmptySearch';
 
 /** 検索語、分類、開いている質問はすべて URL に持つ。そのままリンクとして渡せる。 */
 export default function HelpSection() {
@@ -25,7 +26,7 @@ export default function HelpSection() {
     </div>
     <p className="meta mb-0" role="status">{results.length}件の質問</p>
     {results.length === 0
-      ? <EmptyState title="一致する質問はありません" action={<button data-control-id="settings.help.clear" className="button" type="button" onClick={() => navigate(window.location.pathname, true, true)}>条件を消す</button>}>語を短くするか、分類を「すべて」に戻してください。</EmptyState>
+      ? <EmptyState title="一致する質問はありません" illustration={<EmptySearch/>} action={<button data-control-id="settings.help.clear" className="button" type="button" onClick={() => navigate(window.location.pathname, true, true)}>条件を消す</button>}>語を短くするか、分類を「すべて」に戻してください。</EmptyState>
       : <div className="stack help-list">{results.map((item) => <details className="card flat help-item" key={item.id} id={`help-${item.id}`} ref={item.id === itemId ? opened : undefined} open={item.id === itemId} onToggle={(event) => {
         const open = event.currentTarget.open;
         if (open !== (item.id === new URLSearchParams(window.location.search).get('item'))) { if (open) setParam('item', item.id); else if (item.id === new URLSearchParams(window.location.search).get('item')) setParam('item', null); }

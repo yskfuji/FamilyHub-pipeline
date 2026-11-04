@@ -80,6 +80,8 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi', options:
   const aggregate = initialAggregate(options);
   const security: SecurityOverview = structuredClone(baseSecurityOverview);
   let offline = false;
+  /** 「データなし」の見本を読んだあとは、アルバムの一覧も空にする（アルバムの空の状態の確認用）。 */
+  let emptied = false;
   let sequence = 0;
   const nextId = (prefix: string) => `${prefix}-mock-${++sequence}`;
   // 確認用データの時計。操作のたびに1分進め、記録の前後関係（履歴の並び）を再現できるようにする。
@@ -220,11 +222,17 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi', options:
       async getSnapshot(scenario): Promise<Result<HouseholdSnapshot>> {
         await delay(scenario === 'loading' ? 700 : 80);
         offline = scenario === 'offline';
+        emptied = scenario === 'empty';
         const error = scenarioError(scenario);
         if (error) return fail(error);
         const snapshot = project();
         if (scenario === 'empty') {
           snapshot.events = []; snapshot.todos = []; snapshot.memos = []; snapshot.expenses = []; snapshot.settlementBatches = [];
+        }
+        if (scenario === 'all-done') {
+          // 夜になって、今日の予定が終わり、タスクも全部済んだ日（「全部済んだ」の空の状態の確認用）。
+          snapshot.todos = snapshot.todos.map((todo) => ({ ...todo, status: 'done' }));
+          snapshot.context.asOf = '2026-09-30T21:30:00+09:00';
         }
         if (scenario === 'quarantined') {
           snapshot.memos[0].attachments[0].status = 'quarantined';
@@ -263,6 +271,7 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi', options:
     trash: delayed(rules.trash),
     albums: {
       ...delayed(rules.albums),
+      async listAlbums() { await delay(); return emptied ? ok([]) : rules.albums.listAlbums(); },
       async uploadItem(albumId, file, options) {
         await delay(120);
         const reserved = rules.albums.reserveItem(albumId, { kind: file.type.startsWith('video/') ? 'video' : 'photo', originalName: file.name, mimeType: file.type, byteSize: file.size, keepLocation: options.keepLocation });

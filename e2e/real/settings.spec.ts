@@ -38,6 +38,8 @@ async function createFamily(page: Page, name: string, email: string, family: str
 async function invite(page: Page) {
   await page.goto('/settings/household');
   await page.getByRole('button', { name: '招待コードを作成' }).click();
+  // 本人確認の猶予（試験では1秒）を過ぎていれば、確認を求められる。機械が遅いときだけ失敗しないよう、求められたら答える。
+  await passReauth(page);
   const code = await page.locator('.invite-result code').textContent();
   expect(code).toBeTruthy();
   return code!;

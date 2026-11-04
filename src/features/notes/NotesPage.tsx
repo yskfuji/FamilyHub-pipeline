@@ -4,6 +4,8 @@ import { useMemberScope } from '../../app/useMemberScope';
 import { detailId, navigate, useSearch, withQueryParam } from '../../app/router';
 import { ja } from '../../content/ja';
 import { DetailNotFound, Dialog, EmptyState, PageHeader, StatusBadge } from '../../design-system/components';
+import { EmptyMemos } from '../../design-system/illustrations/EmptyMemos';
+import { EmptySearch } from '../../design-system/illustrations/EmptySearch';
 import { useContentWide } from '../../design-system/DetailSurface';
 import { LockIcon, MapPinIcon, NoteIcon } from '../../design-system/icons';
 import { dateKeyFromRfc3339 } from '../../domain/calendarDate';
@@ -83,7 +85,9 @@ export function NotesPage({ path }: { path: string }) {
       <div className="segmented" role="group" aria-label="メモの並び順">{memoSorts.map((value) => <button data-control-id={`notes.sort.${value}`} key={value} type="button" aria-pressed={sort === value} onClick={() => navigate(withQueryParam('sort', value === 'newest' ? null : value), true, true)}>{ja.memoSort[value]}</button>)}</div>
     </div>
     {memos.length === 0
-      ? <EmptyState title="条件に合うメモはありません">{memberId ? <ScopeNote/> : '検索語を短くするか、新しいメモを追加してください。'}</EmptyState>
+      ? scoped.length === 0 && !memberId
+        ? <EmptyState title="まだメモはありません" illustration={<EmptyMemos/>} action={can('memo.create') ? <button data-control-id="notes.empty.create" className="button primary" type="button" onClick={() => { setFormError(''); setCreating(true); }}>最初のメモを書く</button> : undefined}>{can('memo.create') ? '学校からの連絡や控えをメモにすると、家族で同じものを確認できます。' : '共有されたメモが追加されると、ここに表示します。'}</EmptyState>
+        : <EmptyState title="条件に合うメモはありません" illustration={memberId ? <EmptyMemos/> : <EmptySearch/>}>{memberId ? <ScopeNote/> : '検索語を短くするか、新しいメモを追加してください。'}</EmptyState>
       : <div className="grid three">{memos.map((memo) => <a data-control-id={`notes.open.${memo.id}`} className="card memo-card" href={`/notes/${memo.id}${search}`} data-link data-keep-scroll key={memo.id}>
         <div className="split"><NoteIcon width="24"/><span className="meta">{dayLabel(memoDateKey(memo))}</span></div>
         <h2 data-transition-title>{memo.title}</h2>

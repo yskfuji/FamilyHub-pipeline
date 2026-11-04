@@ -1,5 +1,6 @@
 import { Component, lazy, useEffect, useLayoutEffect, useState, type ComponentType, type ErrorInfo, type LazyExoticComponent, type ReactNode } from 'react';
 import { EmptyState } from '../design-system/components';
+import { EmptyError } from '../design-system/illustrations/EmptyError';
 
 /**
  * 画面の部品の読み込みと失敗の扱い。
@@ -143,7 +144,7 @@ export class RouteErrorBoundary extends Component<BoundaryProps, BoundaryState> 
 function RouteErrorView({ loadFailed, onRetry }: { loadFailed: boolean; onRetry: () => void }) {
   useLayoutEffect(() => { markReady(window.location.pathname); }, []);
   return <div className="page route-error" role="alert" data-route-error={loadFailed ? 'load' : 'render'}>
-    <EmptyState title={loadFailed ? 'この画面を読み込めませんでした' : 'この画面を表示できませんでした'} action={<div className="route-error-actions">
+    <EmptyState title={loadFailed ? 'この画面を読み込めませんでした' : 'この画面を表示できませんでした'} illustration={<EmptyError/>} action={<div className="route-error-actions">
       <button data-control-id="route.error.retry" className="button primary" type="button" onClick={onRetry}>もう一度読み込む</button>
       <a data-control-id="route.error.today" className="button" href="/today" data-link>今日へ戻る</a>
     </div>}>

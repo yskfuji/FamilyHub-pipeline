@@ -1,5 +1,6 @@
 import { memberName, useApp } from '../../app/AppContext';
 import { EmptyState, formatSignedYen, formatYen } from '../../design-system/components';
+import { EmptyBudget } from '../../design-system/illustrations/EmptyBudget';
 import { memberTotals } from '../../domain/budgetSummary';
 import type { Expense } from '../../domain/types';
 import { monthLabel } from './BudgetNav';
@@ -8,7 +9,7 @@ import { monthLabel } from './BudgetNav';
 export function BudgetMembers({ expenses, month }: { expenses: Expense[]; month: string }) {
   const { snapshot } = useApp();
   const rows = memberTotals(expenses, month, snapshot.memberships);
-  if (rows.length === 0) return <div className="mt-1"><EmptyState title="この月の支出はありません">支出を記録すると、人ごとの支払いと負担をここに表示します。</EmptyState></div>;
+  if (rows.length === 0) return <div className="mt-1"><EmptyState title="この月の支出はありません" illustration={<EmptyBudget/>}>支出を記録すると、人ごとの支払いと負担をここに表示します。</EmptyState></div>;
   const total = (pick: (row: typeof rows[number]) => number) => rows.reduce((sum, row) => sum + pick(row), 0);
   return <section className="card mt-1" aria-labelledby="members-title">
     <p className="eyebrow">{monthLabel(month)}</p>

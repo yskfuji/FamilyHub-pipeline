@@ -1,6 +1,7 @@
 import { memberName, useApp } from '../../app/AppContext';
 import { ja } from '../../content/ja';
 import { EmptyState, formatSignedYen, formatYen } from '../../design-system/components';
+import { EmptyBudget } from '../../design-system/illustrations/EmptyBudget';
 import { YenIcon } from '../../design-system/icons';
 import { balanceOf, incomeBreakdown, monthComparison, monthOverview } from '../../domain/budgetSummary';
 import { sortLedger, type BudgetCategory, type BudgetLocation } from '../../domain/budgetView';
@@ -83,7 +84,7 @@ export function BudgetOverview({ expenses, location, search, href }: Props) {
   const categoryHref = (category: BudgetCategory) => href({ view: 'list', category });
   const unsettled = <UnsettledCard expenses={expenses} settlementsHref={href({ view: 'settlements' })}/>;
   if (overview.count === 0) return <div className="stack">
-    <EmptyState title={`${monthLabel(month)}の記録はありません`}>別の月を選ぶか、支出や収入を追加してください。</EmptyState>
+    <EmptyState title={`${monthLabel(month)}の記録はありません`} illustration={<EmptyBudget/>}>別の月を選ぶか、支出や収入を追加してください。</EmptyState>
     {unsettled}
   </div>;
   return <>

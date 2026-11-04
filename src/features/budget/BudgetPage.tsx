@@ -3,6 +3,7 @@ import { useApp } from '../../app/AppContext';
 import { useMemberScope } from '../../app/useMemberScope';
 import { detailId, navigate, useSearch } from '../../app/router';
 import { DetailNotFound, EmptyState, PageHeader, formatYen } from '../../design-system/components';
+import { EmptyBudget } from '../../design-system/illustrations/EmptyBudget';
 import { useContentWide } from '../../design-system/DetailSurface';
 import { CheckIcon, YenIcon } from '../../design-system/icons';
 import { ja, settleAllCopy } from '../../content/ja';
@@ -53,7 +54,7 @@ export function BudgetPage({ path }: { path: string }) {
     <BudgetTabs view={location.view} onView={(view) => go({ view })}/>
     {location.view !== 'settlements' && <BudgetMonthNav month={location.month} currentMonth={currentMonth} latestMonth={latestMonth} onMonth={(month) => go(monthChange(month))}/>}
     {expenses.length === 0
-      ? <div className="mt-1"><EmptyState title={memberId ? '該当する記録はありません' : 'まだ記録がありません'}>{memberId ? <ScopeNote/> : '「支出を追加」や「収入を追加」から記録すると、ここに集計と精算の状態を表示します。'}</EmptyState></div>
+      ? <div className="mt-1"><EmptyState title={memberId ? '該当する記録はありません' : 'まだ記録がありません'} illustration={<EmptyBudget/>} action={!memberId && canCreate ? <button data-control-id="budget.empty.create" className="button primary" type="button" onClick={() => requestQuickCreate('expense')}>最初の支出を記録</button> : undefined}>{memberId ? <ScopeNote/> : '「支出を追加」や「収入を追加」から記録すると、ここに集計と精算の状態を表示します。'}</EmptyState></div>
       : <>
         {location.view === 'overview' && <BudgetOverview expenses={expenses} location={location} search={search} href={href}/>}
         {location.view === 'list' && <BudgetList expenses={expenses} location={location} currentMonth={currentMonth} search={search} onChange={filter}/>}

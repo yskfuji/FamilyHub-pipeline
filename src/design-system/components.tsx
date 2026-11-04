@@ -17,12 +17,18 @@ export function Brand({ compact = false }: { compact?: boolean }) {
   return <a data-control-id="brand.home" href="/today" className="brand" data-link aria-label={compact ? `${ja.brand.name}（今日の画面へ）` : undefined}><BrandMark />{!compact && <span className="brand-copy"><svg className="brand-wordmark" viewBox={`0 0 ${wordmark.width} ${wordmark.height}`} role="img" aria-label={ja.brand.name}><path d={wordmark.path}/></svg><span className="brand-kicker">{ja.brand.tagline}</span></span>}</a>;
 }
 
-export function PageHeader({ eyebrow, title, description, action, mark }: { eyebrow: string; title: string; description: string; action?: ReactNode; mark?: ReactNode }) {
-  return <header className="page-head"><div><p className="eyebrow">{eyebrow}{mark}</p><h1>{title}</h1><p className="lede">{description}</p></div>{action}</header>;
+/** art は見出しの右に浮かべる小さな飾り（今日の画面の季節の場面）。見出しの高さを増やさない大きさにする。 */
+export function PageHeader({ eyebrow, title, description, action, mark, art }: { eyebrow: string; title: string; description: string; action?: ReactNode; mark?: ReactNode; art?: ReactNode }) {
+  return <header className="page-head"><div className={art ? 'page-head-copy has-art' : undefined}>{art}<p className="eyebrow">{eyebrow}{mark}</p><h1>{title}</h1><p className="lede">{description}</p></div>{action}</header>;
 }
 
-export function EmptyState({ title, children, action }: PropsWithChildren<{ title: string; action?: ReactNode }>) {
-  return <div className="empty"><div className="empty-mark"><FileIcon /></div><h2>{title}</h2><p className="muted">{children}</p>{action}</div>;
+/**
+ * 空の状態。illustration には src/design-system/illustrations/ の挿絵を渡す（飾りなので読み上げない。意味は見出しと文が伝える）。
+ * 挿絵は画面ごとに読み込む部品から渡し、最初に読む JS に入れない。compact は重ね表示や欄の中の小さな空の状態。
+ */
+export function EmptyState({ title, children, action, illustration, compact = false, headingLevel = 2 }: PropsWithChildren<{ title: string; action?: ReactNode; illustration?: ReactNode; compact?: boolean; headingLevel?: 2 | 3 }>) {
+  const Heading = headingLevel === 3 ? 'h3' : 'h2';
+  return <div className={compact ? 'empty compact' : 'empty'} data-illustrated={illustration ? 'true' : undefined}>{illustration ? <div className="empty-art">{illustration}</div> : <div className="empty-mark"><FileIcon /></div>}<Heading>{title}</Heading><p className="muted">{children}</p>{action}</div>;
 }
 
 const focusable = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';

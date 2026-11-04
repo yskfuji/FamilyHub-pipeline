@@ -35,6 +35,8 @@
     --moss: #596643;
     --moss-soft: #dce2cf;
     --gold: #8b5b02;
+    /* 挿絵の地。昼は一段濃い地、夜は地より明るい案内の地（暗い穴に見えないように）。 */
+    --art-ground: var(--paper-deep);
     --focus: #ad4c22;
     --chart-1: #ab7714;
     --chart-2: #2489bc;
@@ -157,6 +159,11 @@
     --chart-6: #cc79a7;
   }
 
+  /* 下のナビがある幅では、すぐに追加のボタンが右下に浮かぶ。最後の欄がボタンの下に入らないよう、ボタンの上端まで空ける（段階10で測って直した）。 */
+  @media (max-width: 760px) {
+    :root { --layout-page-end: calc(var(--layout-fab-bottom) + var(--layout-fab) + var(--space-4)); }
+  }
+
   /* 夜の配色に共通する値。影は暗い面では見えにくいので、細い明るい縁を足す。 */
   [data-theme='dusk'], [data-theme$='-night'] {
     color-scheme: dark;
@@ -165,5 +172,6 @@
     --shadow-3: 0 0 0 1px rgb(255 255 255 / 9%), 0 24px 60px rgb(0 0 0 / 58%);
     --scrim: rgb(2 6 10 / 70%);
     --scrim-soft: rgb(2 6 10 / 40%);
+    --art-ground: var(--info-soft);
   }
 }

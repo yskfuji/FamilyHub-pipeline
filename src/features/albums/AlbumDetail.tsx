@@ -3,6 +3,7 @@ import { memberName, useApp } from '../../app/AppContext';
 import { navigate, useSearch, withQueryParam } from '../../app/router';
 import { audienceLabel, captureTimeCopy, ja } from '../../content/ja';
 import { DetailNotFound, Dialog, EmptyState, PageHeader, StatusBadge } from '../../design-system/components';
+import { EmptyAlbums } from '../../design-system/illustrations/EmptyAlbums';
 import { ChevronLeftIcon, ChevronRightIcon, DownloadIcon, ImageIcon, LockIcon, MapPinIcon, PlayIcon, SettingsIcon, TrashIcon, UploadIcon, VideoIcon } from '../../design-system/icons';
 import { authorize, canDeleteResource, canMutateOwnedResource } from '../../authz/policy';
 import { albumDraftToUpdateInput, albumToDraft, type AlbumDraft } from '../../domain/albumForm';
@@ -215,7 +216,7 @@ function AlbumContent({ album, items, uploads, load, change, hold, release, onDe
     {sort === 'taken' && !organizing && <p className="small muted album-sort-note" id="album-sort-note">{captureTimeCopy.sortNote}</p>}
 
     {shown.length === 0
-      ? <EmptyState title={filter === 'all' ? 'まだ写真や動画はありません' : `${filterLabels[filter]}はありません`} action={filter === 'all' && canUpload ? <button data-control-id="albums.detail.upload-empty" className="button primary" type="button" onClick={() => setPanel('upload')}>写真や動画を追加</button> : undefined}>{filter === 'all' ? '追加すると、ここに並びます。' : 'ほかの種類を選んでください。'}</EmptyState>
+      ? <EmptyState title={filter === 'all' ? 'まだ写真や動画はありません' : `${filterLabels[filter]}はありません`} illustration={<EmptyAlbums/>} action={filter === 'all' && canUpload ? <button data-control-id="albums.detail.upload-empty" className="button primary" type="button" onClick={() => setPanel('upload')}>写真や動画を追加</button> : undefined}>{filter === 'all' ? '追加すると、ここに並びます。' : 'ほかの種類を選んでください。'}</EmptyState>
       : organizing
         ? <ul className="album-organize">{shown.map((item, index) => <li className="album-organize-row" key={item.id}>
           <span className="album-organize-thumb"><ItemImage item={item}/></span>

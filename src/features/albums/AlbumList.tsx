@@ -3,6 +3,7 @@ import { memberName, useApp } from '../../app/AppContext';
 import { navigate } from '../../app/router';
 import { ja } from '../../content/ja';
 import { Dialog, EmptyState, PageHeader } from '../../design-system/components';
+import { EmptyAlbums } from '../../design-system/illustrations/EmptyAlbums';
 import { ImageIcon, LockIcon, PlusIcon } from '../../design-system/icons';
 import { albumDraftToCreateInput, newAlbumDraft, type AlbumAudience, type AlbumDraft } from '../../domain/albumForm';
 import { coverItem } from '../../domain/albumView';
@@ -78,7 +79,7 @@ export function AlbumList({ uploads, deleted, onRestored }: Props) {
     {albums === null
       ? !loadError && <div className="album-list" aria-busy="true" aria-label="アルバムを読み込んでいます"><div className="skeleton"/><div className="skeleton"/></div>
       : albums.length === 0
-        ? <EmptyState title="見られるアルバムはまだありません" action={canCreate ? <button data-control-id="albums.create.empty" className="button primary" type="button" onClick={() => setCreating(true)}>アルバムを作る</button> : undefined}>{canCreate ? '運動会や旅行など、まとめたい写真ごとに作れます。' : '共有されると、ここに表示されます。'}</EmptyState>
+        ? <EmptyState title="見られるアルバムはまだありません" illustration={<EmptyAlbums/>} action={canCreate ? <button data-control-id="albums.create.empty" className="button primary" type="button" onClick={() => setCreating(true)}>アルバムを作る</button> : undefined}>{canCreate ? '運動会や旅行など、まとめたい写真ごとに作れます。' : '共有されると、ここに表示されます。'}</EmptyState>
         : <ul className="album-list">{albums.map((album) => <li key={album.id}><a data-control-id={`albums.open.${album.id}`} className="card album-card" href={`/albums/${album.id}`} data-link>
           <span className="album-cover"><AlbumCover album={album}/></span>
           <span className="album-card-body">

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../../app/AppContext';
 import { useMemberScope } from '../../app/useMemberScope';
 import { EmptyState } from '../../design-system/components';
+import { EmptyEvents } from '../../design-system/illustrations/EmptyEvents';
 import { addDateKeyDays } from '../../domain/calendarDate';
 import { lastDayOfMonth, occurrencesBetween, occursOn, type Occurrence } from '../../domain/calendarLayout';
 import { dayLabel, dayTone, holidayMap, labelStyle, monthHeading, timeOnDay } from './calendarLabels';
@@ -19,7 +20,7 @@ interface Props {
 
 /** 一覧。月の初めから日ごとに読み、下へ進むと後の日を足す。日付の見出しは上に留まる。 */
 export function AgendaView({ monthKey, todayKey, selected, onOpen }: Props) {
-  const { snapshot } = useApp();
+  const { snapshot, can, requestQuickCreate } = useApp();
   const { events } = useMemberScope();
   const from = `${monthKey}-01`;
   const limit = addDateKeyDays(from, MAX_DAYS);
@@ -40,7 +41,7 @@ export function AgendaView({ monthKey, todayKey, selected, onOpen }: Props) {
     if (selected && selected !== from) document.getElementById(`calendar-agenda-${selected}`)?.closest('section')?.scrollIntoView({ block: 'start' });
   }, [selected, from]);
   return <section className="calendar-agenda" aria-label={`${monthHeading(monthKey)}からの予定の一覧`}>
-    {occurrences.length === 0 && <EmptyState title={`${monthHeading(monthKey)}からの予定はありません`}>前月・次月の予定も確認できます。</EmptyState>}
+    {occurrences.length === 0 && <EmptyState title={`${monthHeading(monthKey)}からの予定はありません`} illustration={<EmptyEvents/>} action={can('event.create') ? <button data-control-id="calendar.agenda.create" className="button primary" type="button" onClick={() => requestQuickCreate('event')}>この月に予定を追加</button> : undefined}>前月・次月の予定も確認できます。</EmptyState>}
     {days.map((day) => {
       const holiday = holidays.get(day);
       const entries = occurrences.filter((item) => occursOn(item, day));

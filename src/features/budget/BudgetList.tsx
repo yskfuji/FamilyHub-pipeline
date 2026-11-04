@@ -1,6 +1,8 @@
 import { useApp } from '../../app/AppContext';
 import { ja } from '../../content/ja';
 import { EmptyState, formatDate, formatDateOnly, formatYen } from '../../design-system/components';
+import { EmptyBudget } from '../../design-system/illustrations/EmptyBudget';
+import { EmptySearch } from '../../design-system/illustrations/EmptySearch';
 import { budgetPeriods, budgetRange, budgetSorts, filterLedger, ledgerGroups, monthRange, sortLedger, type BudgetCategory, type BudgetLocation, type BudgetPeriod, type BudgetSort, type DateRange, type LedgerGroup } from '../../domain/budgetView';
 import { dateKeyFromRfc3339 } from '../../domain/calendarDate';
 import { expenseCategories, incomeCategories } from '../../domain/ledger';
@@ -69,7 +71,7 @@ export function BudgetList({ expenses, location, currentMonth, search, onChange 
   return <>
     <ListFilters location={location} isCurrentMonth={location.month === currentMonth} status={`${rangeText(range)} · ${shown.length}件`} onChange={onChange}/>
     {shown.length === 0
-      ? <div className="mt-1"><EmptyState title="該当する記録はありません" action={filtered ? <button data-control-id="budget.list.clear" className="button" type="button" onClick={() => onChange({ category: null, period: 'month', from: null, to: null })}>絞り込みを外す</button> : undefined}>{filtered ? '別の条件を選ぶか、絞り込みを外してください。' : 'この月の記録はまだありません。'}</EmptyState></div>
+      ? <div className="mt-1"><EmptyState title="該当する記録はありません" illustration={filtered ? <EmptySearch/> : <EmptyBudget/>} action={filtered ? <button data-control-id="budget.list.clear" className="button" type="button" onClick={() => onChange({ category: null, period: 'month', from: null, to: null })}>絞り込みを外す</button> : undefined}>{filtered ? '別の条件を選ぶか、絞り込みを外してください。' : 'この月の記録はまだありません。'}</EmptyState></div>
       : <section className="card mt-1" aria-label="記録の一覧">{groups.map((group) => <div className="ledger-group" key={group.date ?? 'all'}>
         {group.date && <div className="ledger-day"><h2>{formatDate(group.date)}</h2><DayTotal group={group}/></div>}
         <ul className="list">{group.items.map((expense) => <ExpenseRow expense={expense} search={search} showDate={!group.date} key={expense.id}/>)}</ul>

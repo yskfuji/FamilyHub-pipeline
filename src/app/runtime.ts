@@ -9,6 +9,8 @@ export interface AppRuntime {
   initialSnapshot: HouseholdSnapshot;
   /** 読み込み前に分かっている状態。分からなければ null。 */
   initialSession: SessionInfo | null;
+  /** 内部監査のビルドの見本だけ: 最初から「接続できません」の画面にする（オフラインの空の状態の確認用）。 */
+  initialUnreachable?: boolean;
   setPermissionRevision(revision: number): void;
 }
 

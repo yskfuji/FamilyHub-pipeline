@@ -4,6 +4,8 @@ import { detailId, useCloseTo } from '../../app/router';
 import { DetailNotFound, EmptyState, PageHeader, formatDateOnly, formatYen } from '../../design-system/components';
 import { DetailSurface, useContentWide } from '../../design-system/DetailSurface';
 import { MapPinIcon, NoteIcon, YenIcon } from '../../design-system/icons';
+import { EmptyPlaces } from '../../design-system/illustrations/EmptyPlaces';
+import { EmptySearch } from '../../design-system/illustrations/EmptySearch';
 import { ja } from '../../content/ja';
 import { aggregatePlaces, sortPlaces, type PlaceSort } from '../../domain/places';
 import { PlaceAttributionLink, PlaceSummary } from '../place/PlaceField';
@@ -30,13 +32,13 @@ export function PlacesPage({ path }: { path: string }) {
     <PageHeader eyebrow="場所" title="記録した場所" description="支出やメモに付けた場所を、まとめて確認できます。地図や現在地は使いません。"/>
     {activeKey && !active && <DetailNotFound what="場所" feature="places" backHref="/places"/>}
     <div className="detail-layout" data-pane={wide && active ? 'open' : undefined}><div className="detail-main">
-    {all.length === 0 ? <EmptyState title="まだ場所を記録していません" action={can('expense.create') ? <button data-control-id="places.expense.create" className="button primary" type="button" onClick={() => requestQuickCreate('expense')}><YenIcon width="18"/>支出を追加</button> : undefined}>支出やメモを追加するときに「場所を追加（任意）」から、現在地・写真・名前・手入力で場所を付けられます。</EmptyState> : <>
+    {all.length === 0 ? <EmptyState title="まだ場所を記録していません" illustration={<EmptyPlaces/>} action={can('expense.create') ? <button data-control-id="places.expense.create" className="button primary" type="button" onClick={() => requestQuickCreate('expense')}><YenIcon width="18"/>支出を追加</button> : undefined}>支出やメモを追加するときに「場所を追加（任意）」から、現在地・写真・名前・手入力で場所を付けられます。</EmptyState> : <>
       <div className="places-toolbar">
         <div className="field"><label htmlFor="places-search">場所を検索</label><input data-control-id="places.search" id="places-search" className="input" type="search" value={query} onChange={(event) => setQuery(event.target.value)} aria-describedby="places-search-help"/><span className="field-help" id="places-search-help">場所の名前と住所から探します。</span></div>
         <div className="segmented" role="group" aria-label="並べ替え">{(Object.keys(sortLabels) as PlaceSort[]).map((value) => <button key={value} data-control-id={`places.sort.${value}`} type="button" aria-pressed={sort === value} onClick={() => setSort(value)}>{sortLabels[value]}</button>)}</div>
       </div>
       <p className="small muted" role="status">{items.length}か所{normalized ? `（「${query.trim()}」に一致）` : ''}</p>
-      {items.length === 0 ? <EmptyState title="条件に合う場所はありません">検索語を短くしてください。</EmptyState> : <ul className="places-grid">{items.map((item) => <li key={item.key}>
+      {items.length === 0 ? <EmptyState title="条件に合う場所はありません" illustration={<EmptySearch/>}>検索語を短くしてください。</EmptyState> : <ul className="places-grid">{items.map((item) => <li key={item.key}>
         <a data-control-id={`places.open.${item.key}`} className="card place-card" href={`/places/${item.key}`} data-link data-keep-scroll>
           <span className="place-card-head"><MapPinIcon width="20"/><strong className="wrap" data-transition-title>{item.place.name}</strong></span>
           {item.place.address && <span className="meta wrap">{item.place.address}</span>}

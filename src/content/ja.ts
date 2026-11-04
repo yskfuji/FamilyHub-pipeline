@@ -124,6 +124,7 @@ export const ja = {
   scenario: {
     normal: '通常',
     empty: 'データなし',
+    'all-done': '全部済んだ夜',
     loading: '読み込み中',
     offline: 'オフライン',
     conflict: '変更の競合',

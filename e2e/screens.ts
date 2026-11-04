@@ -12,6 +12,12 @@ export const screens = [
   // 段階9: 変更の記録（家族・自分・絞り込みで空・大人には出ない）、管理者が2人の家族、撮影日順、まとめて精算できる人の精算の画面。
   ['settings-audit','/settings/audit'],['settings-audit-mine','/settings/audit?view=mine'],['settings-audit-empty','/settings/audit?kind=assistant&period=today'],['settings-audit-forbidden-adult','/settings/audit?actor=member-ren'],
   ['household-two-owners','/settings/household?household=two-owners'],['albums-detail-taken','/albums/album-sports?sort=taken'],['budget-settlements-ren','/budget?view=settlements&actor=member-ren'],
+  // 段階10: 挿絵のある空の状態（予定・タスク・メモ・家計・アルバム・場所・オフライン・全部済んだ）、追加できない人の空の状態、
+  // 今日の画面の季節（秋は today）と全部済んだ夜。検索で見つからない・エラー・はじめにの2と3は下の openedStates。
+  ['calendar-empty','/calendar?view=list&scenario=empty'],['tasks-empty','/tasks?scenario=empty'],['tasks-empty-guest','/tasks?scenario=empty&actor=member-yui'],['tasks-all-done','/tasks?scenario=all-done'],
+  ['notes-empty','/notes?scenario=empty'],['budget-empty','/budget?scenario=empty'],['albums-empty','/albums?scenario=empty'],['places-empty','/places?scenario=empty'],
+  ['offline-unreachable','/today?stage=unreachable'],['today-all-done','/today?scenario=all-done'],
+  ['today-spring','/today?season=spring'],['today-summer','/today?season=summer'],['today-winter','/today?season=winter'],
 ] as const;
 
 export const viewports = [
@@ -116,6 +122,35 @@ export const openedStates: readonly OpenedState[] = [
   { name: 'settings-leave-co-owner', route: '/settings/household?household=two-owners', viewports: ['mobile', 'desktop'], async open(page) {
     await page.getByRole('region', { name: '家族グループから退出' }).getByRole('button', { name: '家族グループから退出' }).click();
     await expect(page.getByRole('dialog', { name: '家族グループから退出しますか' })).toBeVisible();
+  } },
+  // 段階10: はじめにの2と3、検索で見つからない、経路のエラー境界。
+  { name: 'onboarding-sharing', route: '/onboarding', viewports: ['mobile', 'tablet', 'desktop'], async open(page) {
+    await page.getByRole('button', { name: '次へ' }).click();
+    await expect(page.getByRole('heading', { name: '共有範囲', level: 1, exact: true })).toBeVisible();
+  } },
+  { name: 'onboarding-welcome', route: '/onboarding', viewports: ['mobile', 'tablet', 'desktop'], async open(page) {
+    await page.getByRole('button', { name: '次へ' }).click();
+    await expect(page.getByRole('heading', { name: '共有範囲', level: 1, exact: true })).toBeVisible();
+    await page.getByRole('button', { name: '次へ' }).click();
+    await expect(page.getByRole('heading', { name: 'ようこそ、よりどころへ' })).toBeVisible();
+  } },
+  { name: 'search-empty', route: '/today', viewports: ['mobile', 'desktop'], async open(page) {
+    await expect(page.locator('main')).toHaveAttribute('aria-busy', 'false');
+    await page.keyboard.press('Control+K');
+    await page.getByRole('searchbox').fill('見つからない言葉');
+    await expect(page.getByRole('heading', { name: '一致する情報はありません' })).toBeVisible();
+  } },
+  { name: 'notes-search-empty', route: '/notes', viewports: ['mobile', 'desktop'], async open(page) {
+    await page.getByLabel('メモを検索').fill('見つからない言葉');
+    await expect(page.getByRole('heading', { name: '条件に合うメモはありません' })).toBeVisible();
+  } },
+  { name: 'route-error', route: '/today', viewports: ['mobile', 'tablet', 'desktop'], async open(page) {
+    // 段階8の FRAME-3 と同じく、ヒントの画面の部品を描けない部品に差し替えてから、アプリの中で移る。
+    const chunk = '**/assets/InsightsPage-*.js';
+    await page.route(chunk, (route) => route.fulfill({ contentType: 'text/javascript', body: 'export function InsightsPage() { throw new Error("injected render failure"); }' }));
+    await page.evaluate(() => { window.history.pushState({}, '', '/insights'); window.dispatchEvent(new PopStateEvent('popstate')); });
+    await expect(page.locator('.route-error').getByRole('heading', { name: 'この画面を表示できませんでした' })).toBeVisible();
+    await page.unroute(chunk);
   } },
   { name: 'quick-create-expense', route: '/budget', viewports: ['mobile'], async open(page) {
     await page.getByRole('button', { name: 'すぐに追加' }).click();

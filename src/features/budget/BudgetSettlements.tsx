@@ -2,6 +2,7 @@ import { Suspense, lazy, useState } from 'react';
 import { memberName, useApp } from '../../app/AppContext';
 import { settleAllCopy } from '../../content/ja';
 import { EmptyState, formatYen } from '../../design-system/components';
+import { EmptyDone } from '../../design-system/illustrations/EmptyDone';
 import { YenIcon } from '../../design-system/icons';
 import { openExpenses } from '../../domain/budgetSummary';
 import { groupedSettlementHistory, settleAllRequest, settledNet, simplifiedTransfers, unsettledSummary, type SettlementHistoryEntry } from '../../domain/ledger';
@@ -48,7 +49,7 @@ export function BudgetSettlements({ expenses, search, onReverse, busyId, memberF
     <Transfers expenses={expenses} memberFilterActive={memberFilterActive} actions={actions}/>
     <section className="card mt-1" aria-labelledby="open-title">
       <div className="section-head"><div><p className="eyebrow">すべての月</p><h2 id="open-title">残りのある記録</h2></div><span className="meta">古い順</span></div>
-      {open.length === 0 ? <EmptyState title="残りのある記録はありません">新しい支出を記録すると、ここに表示します。</EmptyState> : <ul className="list">{open.map((expense) => <ExpenseRow expense={expense} search={search} key={expense.id}/>)}</ul>}
+      {open.length === 0 ? <EmptyState title="残りのある記録はありません" illustration={<EmptyDone/>}>新しい支出を記録すると、ここに表示します。</EmptyState> : <ul className="list">{open.map((expense) => <ExpenseRow expense={expense} search={search} key={expense.id}/>)}</ul>}
     </section>
     <section className="card mt-1" aria-labelledby="history-title">
       <div className="section-head"><div><p className="eyebrow">精算</p><h2 id="history-title">精算の履歴</h2></div><span className="meta">新しい順</span></div>

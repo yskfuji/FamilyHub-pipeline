@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Brand, EmptyState } from '../design-system/components';
+import { EmptyOffline } from '../design-system/illustrations/EmptyOffline';
 import { useApp } from './AppContext';
 import { navigate } from './router';
 import type { AppStage } from './AppContext';
@@ -24,7 +25,7 @@ export function StageScreen({ stage }: { stage: Exclude<AppStage, 'ready'> }) {
     if (stage === 'household-setup') navigate('/onboarding', true);
   }, [stage]);
   if (stage === 'restoring' || stage === 'signed-out' || stage === 'household-setup') return <Restoring/>;
-  if (stage === 'unreachable') return <main className="stage-screen"><Brand/><EmptyState title="接続できません" action={<button data-control-id="stage.unreachable.retry" className="button primary" onClick={() => void refresh()}>もう一度試す</button>}>インターネットの接続を確認してください。</EmptyState></main>;
+  if (stage === 'unreachable') return <main className="stage-screen"><Brand/><EmptyState title="接続できません" illustration={<EmptyOffline/>} action={<button data-control-id="stage.unreachable.retry" className="button primary" onClick={() => void refresh()}>もう一度試す</button>}>インターネットの接続を確認してください。</EmptyState></main>;
   if (stage === 'suspended') return <main className="stage-screen"><Brand/><EmptyState title="参加が一時停止されています" action={<button data-control-id="stage.suspended.sign-out" className="button secondary" onClick={() => void endSession()}>サインアウト</button>}>家族グループの管理者に確認してください。</EmptyState></main>;
   return <main className="stage-screen"><Brand/><EmptyState title="利用期間が終わりました" action={<button data-control-id="stage.paywall.sign-out" className="button secondary" onClick={() => void endSession()}>サインアウト</button>}>記録は残っています。続けて使うには、運営者へ利用の延長を依頼してください。</EmptyState></main>;
 }

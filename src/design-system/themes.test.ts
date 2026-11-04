@@ -150,7 +150,8 @@ describe('配色の濃さ（A11）', () => {
     const defined = new Set(sheets.flatMap((css) => [...css.matchAll(/(--[a-z0-9-]+)\s*:/g)].map(([, name]) => name)));
     const used = [...new Set(sheets.flatMap((css) => [...css.matchAll(/var\((--[a-z0-9-]+)\)/g)].map(([, name]) => name)))];
     // 予定の帯の位置は、画面の部品が style の変数（--start・--length・--column・--columns）で渡す。
-    const setByComponents = new Set(['--start', '--length', '--column', '--columns']);
+    // 今日の画面の時刻の帯（段階10）も同じく、印の位置と長さを --strip-at・--strip-span で渡す。
+    const setByComponents = new Set(['--start', '--length', '--column', '--columns', '--strip-at', '--strip-span']);
     expect(used.filter((name) => !defined.has(name) && !setByComponents.has(name))).toEqual([]);
   });
 });
