@@ -24,6 +24,10 @@
     --brand: #a8462f;
     --brand-soft: #f1d5c5;
     --on-brand: #ffffff;
+    /* 柿の印（ブランドの印と挿絵の柿の実）。テーマの --brand（モダンでは青）に従わず、どのテーマでも柿の色にする（段階12）。 */
+    --kaki: #a8462f;
+    --kaki-soft: #f1d5c5;
+    --kaki-stem: #173951;
     --attention: #863f30;
     --attention-soft: #f1d5c5;
     --info: #254e70;
@@ -86,6 +90,11 @@
     --layout-bottom-nav: 4.6rem;
     --layout-fab: 3.25rem;
     --layout-fab-bottom: 5.5rem;
+    /* 操作の大きさ（段階12）。タッチの配置（narrow と medium）では 44px 以上、主な操作は 48px 以上（WCAG 2.5.5、Apple・Material）。 */
+    --layout-target: 2.75rem;
+    --layout-target-primary: 3rem;
+    /* 狭い幅の今日の見出しの季節の場面の幅。小さな見出しの文字は、この幅だけ右を空ける。 */
+    --layout-season-narrow: 4.75rem;
     /* 図表（段階11）。棒の先に書く値の幅（金額と割合・金額・件数）と、行の名前の列の幅。文字は縮めないので、この幅を棒から空ける。 */
     --layout-chart-share: 8rem;
     --layout-chart-yen: 5rem;
@@ -167,7 +176,7 @@
   }
 
   /* 下のナビがある幅では、すぐに追加のボタンが右下に浮かぶ。最後の欄がボタンの下に入らないよう、ボタンの上端まで空ける（段階10で測って直した）。 */
-  @media (max-width: 760px) {
+  @media (width < 42.7rem) {
     :root { --layout-page-end: calc(var(--layout-fab-bottom) + var(--layout-fab) + var(--space-4)); }
   }
 
@@ -180,5 +189,9 @@
     --scrim: rgb(2 6 10 / 70%);
     --scrim-soft: rgb(2 6 10 / 40%);
     --art-ground: var(--info-soft);
+    /* 夜の柿の印は標準の夜（dusk）の色にそろえる。 */
+    --kaki: #ed9e7b;
+    --kaki-soft: #543329;
+    --kaki-stem: #d3e9f6;
   }
 }

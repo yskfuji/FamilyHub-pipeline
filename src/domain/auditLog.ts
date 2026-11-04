@@ -7,8 +7,7 @@ import type { Id, IsoDate, Rfc3339 } from './types';
  * 変更の記録（監査の記録）の見せ方。API と確認用の実装が同じ規則を使う。
  * 記録には本文・秘密・トークン・IP を残さない。detail は変えた項目の名前だけ（{"fields":["kind"]}）。
  */
-/** 変更の記録を残す月数の既定（FAMILY_HUB_AUDIT_RETENTION_MONTHS で変えられる）。規約とポリシーにも書く。 */
-export const AUDIT_RETENTION_MONTHS = 24;
+export { AUDIT_RETENTION_MONTHS } from './auditRetention';
 
 export const auditGroups = ['account', 'household', 'members', 'events', 'tasks', 'memos', 'expenses', 'albums', 'links', 'notifications', 'assistant', 'operator'] as const;
 export type AuditGroup = typeof auditGroups[number] | 'other';

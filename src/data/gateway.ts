@@ -153,7 +153,8 @@ export interface NotificationPort {
 }
 
 export interface ExpensePort {
-  createExpense(input: ExpenseInput): Promise<Result<Expense>>;
+  /** 同じフォームから送り直すときは同じ idempotencyKey を渡す（応答だけが届かなかったときに記録が2つにならない）。 */
+  createExpense(input: ExpenseInput, idempotencyKey?: string): Promise<Result<Expense>>;
   updateExpense(id: Id, input: ExpenseUpdateInput, expectedVersion: number): Promise<Result<Expense>>;
   /** 取り消していない精算がある支出は削除できない（先に精算を取り消す）。削除後7日間は復元できる。 */
   deleteExpense(id: Id, expectedVersion: number): Promise<Result<void>>;

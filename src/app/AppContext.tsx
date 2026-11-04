@@ -33,7 +33,8 @@ interface AppState {
   /** 最新の設定を取り直してから、渡した項目だけを変えて保存する（別の画面での変更を上書きしない）。 */
   updatePrivacy: (patch: Partial<PrivacySettings>) => Promise<Result<PrivacySettings>>;
   requestQuickCreate: (kind?: QuickCreateKind, prefill?: EventPrefill, expenseKind?: Expense['kind'], seed?: QuickCreateSeed) => void;
-  executeQueueable: <T>(command: QueueableCommand, execute: () => Promise<Result<T>>) => Promise<CommandOutcome<T>>;
+  /** idempotencyKey は、すぐに送れずに待ち行列へ入れたときの送り直しにも使う（フォームの1つのキー）。 */
+  executeQueueable: <T>(command: QueueableCommand, execute: () => Promise<Result<T>>, idempotencyKey?: string) => Promise<CommandOutcome<T>>;
   pendingCommands: QueuedCommand[]; retryQueued: (id?: string) => Promise<void>;
   discardQueued: (id: string) => Promise<void>; clearQueued: () => Promise<void>;
 }
@@ -148,12 +149,12 @@ export function AppProvider({ runtime, children }: PropsWithChildren<{ runtime: 
   const requestQuickCreate = useCallback((kind?: QuickCreateKind, prefill?: EventPrefill, expenseKind?: Expense['kind'], seed?: QuickCreateSeed) => window.dispatchEvent(new CustomEvent('family-hub:quick-create', { detail: { kind, prefill, expenseKind, seed } })), []);
   const can = useCallback((capability: Capability) => snapshot.viewer.status === 'active' && snapshot.viewer.capabilities.includes(capability), [snapshot.viewer]);
 
-  const executeQueueable = useCallback(async <T,>(command: QueueableCommand, execute: () => Promise<Result<T>>): Promise<CommandOutcome<T>> => {
+  const executeQueueable = useCallback(async <T,>(command: QueueableCommand, execute: () => Promise<Result<T>>, idempotencyKey?: string): Promise<CommandOutcome<T>> => {
     const result = await execute();
     if (result.ok) return { status: 'completed', value: result.value };
     if (result.error.code !== 'OFFLINE') return { status: 'failed', error: result.error };
     try {
-      await queue.enqueue(command, { actorUserId: snapshot.viewer.userId, householdId: snapshot.household.id, permissionRevision: snapshot.viewer.permissionRevision });
+      await queue.enqueue(command, { actorUserId: snapshot.viewer.userId, householdId: snapshot.household.id, permissionRevision: snapshot.viewer.permissionRevision, ...(idempotencyKey ? { clientOperationId: idempotencyKey } : {}) });
       await loadQueue(); announce('未送信の変更として、この端末に保存しました。'); return { status: 'queued' };
     } catch (cause) {
       return { status: 'failed', error: { code: 'OFFLINE', message: cause instanceof Error ? cause.message : result.error.message, retryable: true } };

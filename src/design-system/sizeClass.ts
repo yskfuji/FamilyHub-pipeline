@@ -5,19 +5,35 @@ import { useSyncExternalStore } from 'react';
  * - narrow（600px 未満）: 詳細は全画面のシートで開く。
  * - medium（600〜1100px）: 詳細は右からのドロワーで開く。
  * - wide（1100px 以上）: 一覧の横に詳細を並べる（一覧と詳細を持つ画面だけ）。
- * 上部・下のナビ・レールの切り替えは、レールが本文の幅を決めるため、ウィンドウの幅（760px）のまま。
+ * 下のナビとレールの切り替えも同じ段階にそろえる（段階12）。レールは、置いたときに本文が 600px 以上になる窓の幅
+ * （600px ＋ レールの 5.2rem = 42.7rem）から出す。下のナビがある間は、#main の幅によらず narrow とする。
+ * こうすると「下のナビ」と「medium のドロワー」の組（前の 600〜760px の窓）がなくなる。
  */
 export type SizeClass = 'narrow' | 'medium' | 'wide';
 
 export const NARROW_BELOW_PX = 600;
 export const WIDE_FROM_PX = 1100;
 
+/** 下のナビを出す窓の幅。global.css と tokens.css の `@media (width < 42.7rem)` と同じ（600px ＋ レールの幅 5.2rem）。 */
+export const BOTTOM_NAV_QUERY = '(width < 42.7rem)';
+
 export const sizeClassFor = (width: number): SizeClass => (width < NARROW_BELOW_PX ? 'narrow' : width < WIDE_FROM_PX ? 'medium' : 'wide');
 
-/** #main があればその幅、なければ（サインインの画面など）ウィンドウの幅。 */
+/** 下のナビを出しているか。matchMedia のない環境（単体試験の jsdom）では分からないので null。 */
+const bottomNavShown = () => (typeof window.matchMedia === 'function' ? window.matchMedia(BOTTOM_NAV_QUERY).matches : null);
+
+/**
+ * #main があればその幅、なければ（サインインの画面など）ウィンドウの幅。
+ * 下のナビがある間は narrow。レールがあるのに #main が 600px に届かない（窓の縦のスクロールバーの分など）ときは medium。
+ */
 function measure(): SizeClass {
   const main = document.getElementById('main');
-  return sizeClassFor(main ? main.clientWidth : window.innerWidth);
+  if (!main) return sizeClassFor(window.innerWidth);
+  const measured = sizeClassFor(main.clientWidth);
+  const bottomNav = bottomNavShown();
+  if (bottomNav === null) return measured;
+  if (bottomNav) return 'narrow';
+  return measured === 'narrow' ? 'medium' : measured;
 }
 
 const listeners = new Set<() => void>();

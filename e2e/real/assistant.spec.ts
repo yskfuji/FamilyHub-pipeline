@@ -32,7 +32,7 @@ test('reading helpers work against the LLM double, and nothing saves until the u
     await dialog.getByRole('button', { name: '読み取る', exact: true }).click();
     const form = page.getByRole('dialog', { name: 'すぐに追加' });
     await expect(form.getByLabel('支出名')).toHaveValue('試験スーパー', { timeout: 15_000 });
-    await expect(form.getByLabel('金額（円）')).toHaveValue('2480');
+    await expect(form.getByLabel('金額（円）')).toHaveValue('2,480');
     await expect(form.getByLabel('費目')).toHaveValue('food');
     await expect(form).toContainText('確かめてから保存してください');
     await form.getByRole('button', { name: 'キャンセル' }).click();

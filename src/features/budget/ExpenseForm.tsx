@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useApp } from '../../app/AppContext';
 import { ja, kindChangeCopy } from '../../content/ja';
 import { AlertIcon } from '../../design-system/icons';
+import { AmountInput } from '../../design-system/AmountInput';
 import { useUnsavedGuard } from '../../design-system/unsavedGuard';
 import { activeAdults, defaultCategory, expenseDraftProblem, expenseTitleLabel, kindChangeEffects, payerChoices, peopleOutsideExpense, withKind, type ExpenseDraft } from '../../domain/expenseForm';
 import { formatYen } from '../../design-system/components';
@@ -63,7 +64,7 @@ export function ExpenseForm({ formId, initial, original, splitLocked, submitLabe
     <fieldset className="fieldset stack" disabled={splitLocked} aria-describedby={splitLocked ? `split-locked-${formId}` : undefined}>
       <legend>{income ? '金額' : '金額と負担'}</legend>
       <div className="grid two">
-        <label className="field"><span>金額（円）</span><input data-control-id={`budget.form.amount.${formId}`} className="input" name="amount" inputMode="numeric" autoComplete="off" required value={draft.amount} onChange={(event) => patch({ amount: event.target.value })}/></label>
+        <label className="field"><span>金額（円）</span><AmountInput data-control-id={`budget.form.amount.${formId}`} className="input" name="amount" required value={draft.amount} onValueChange={(amount) => patch({ amount })}/></label>
         <label className="field"><span>{income ? '受け取った人' : '支払った人'}</span><select data-control-id={`budget.form.payer.${formId}`} className="select" name="payer" value={draft.payerId} onChange={(event) => patch({ payerId: event.target.value })}>{payers.map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</select></label>
       </div>
       {!income && <ExpenseSplitFields formId={formId} draft={draft} adultIds={adultIds} onChange={patch}/>}

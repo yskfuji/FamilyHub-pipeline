@@ -207,7 +207,7 @@ export function createHttpGateway(baseUrl: string, getCsrfToken: CsrfProvider, g
       restoreMemo: (id) => request(`/v1/memos/${encodeURIComponent(id)}/restore`, { method: 'POST', csrf: true }),
     },
     expenses: {
-      createExpense: (input) => request('/v1/expenses', { method: 'POST', body: JSON.stringify(input), csrf: true }),
+      createExpense: (input, idempotencyKey) => request('/v1/expenses', { method: 'POST', body: JSON.stringify(input), csrf: true, idempotencyKey }),
       updateExpense: (id, input, expectedVersion) => request(`/v1/expenses/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ input, expectedVersion }), csrf: true }),
       deleteExpense: (id, expectedVersion) => request(`/v1/expenses/${encodeURIComponent(id)}?expectedVersion=${expectedVersion}`, { method: 'DELETE', csrf: true }),
       restoreExpense: (id) => request(`/v1/expenses/${encodeURIComponent(id)}/restore`, { method: 'POST', csrf: true }),

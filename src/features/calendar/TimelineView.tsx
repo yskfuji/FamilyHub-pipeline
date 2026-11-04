@@ -82,7 +82,7 @@ export function TimelineView({ dates, label, narrow, todayKey, selected, canCrea
                 const hidden = layouts.get(date)?.hidden ?? 0;
                 return <button data-control-id={`calendar.day.${date}`} className="timeline-date" type="button" data-tone={dayTone(date, holiday)} aria-pressed={selected === date} aria-current={date === todayKey ? 'date' : undefined} key={date} onClick={() => onSelect(date)}>
                   <span className="timeline-date-label">{Number(date.slice(8, 10))}<small>{WEEKDAYS[new Date(`${date}T00:00:00Z`).getUTCDay()]}</small></span>
-                  {holiday && <span className="day-holiday">{holiday}</span>}
+                  {holiday && <span className="day-holiday" title={holiday}>{holiday}</span>}
                   {hidden > 0 && <span className="timeline-hidden">他{hidden}件</span>}
                 </button>;
               })}

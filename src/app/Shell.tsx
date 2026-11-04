@@ -10,8 +10,9 @@ import { ja, notificationStatusLabels, roleLabels } from '../content/ja';
 import { auditPath, auditSurface } from '@audit-surface';
 import { setDevicePreferences, useDevicePreferences } from './devicePreferences';
 import { useNewVersion } from './useNewVersion';
-import { useSizeClass } from '../design-system/sizeClass';
+import { BOTTOM_NAV_QUERY, useSizeClass } from '../design-system/sizeClass';
 import { markReady } from './routeLoading';
+import { watchFocusInScrollers } from '../design-system/revealFocus';
 
 /** 検索は開いたときに読む。 */
 const SearchOverlay = lazy(async () => ({ default: (await import('./SearchOverlay')).SearchOverlay }));
@@ -38,8 +39,7 @@ function NavCount({ count }: { count: number }) {
 function NavAnchor({ href, label, icon: Icon, path, match, count = 0 }: { href: string; label: string; icon: (props: any) => ReactNode; path: string; match?: string; count?: number }) {
   return <a data-control-id={`navigation.open.${href.replace(/^\//, "").replaceAll("/", ".")}`} className="nav-link" href={href} data-link aria-current={isCurrent(path, match ?? href) ? 'page' : undefined}><Icon/><span className="nav-label">{label}</span><NavCount count={count}/></a>;
 }
-/** 下のナビを出す幅（レールが本文の幅を決めるので、ここだけはウィンドウの幅で決める）。 */
-const BOTTOM_NAV_QUERY = '(max-width: 760px)';
+/** 下のナビを出す幅。画面の段階（sizeClass.ts）と同じ境目で、下のナビがある間は narrow。 */
 const subscribeBottomNav = (notify: () => void) => { const query = window.matchMedia(BOTTOM_NAV_QUERY); query.addEventListener('change', notify); return () => query.removeEventListener('change', notify); };
 const useBottomNav = () => useSyncExternalStore(subscribeBottomNav, () => window.matchMedia(BOTTOM_NAV_QUERY).matches);
 
@@ -76,6 +76,8 @@ export function Shell({ path, children }: PropsWithChildren<{ path: string }>) {
   useEffect(() => { if (!canNotify) return; void (async () => { const result = await gateway.notifications.list(); if (result.ok) setNotifications(result.value); else setNotificationsError(result.error.message); })(); }, [gateway, canNotify]);
   // 画面を移ったら「その他」を閉じる（開いたまま次の画面に重ならないようにする）。
   useEffect(() => { setMore(false); }, [path]);
+  // 横にスクロールする並びの中の焦点を、並びの中に全部見せる。
+  useEffect(() => watchFocusInScrollers(), []);
   const unauthenticated = error?.code === 'UNAUTHENTICATED';
   // 本人確認が要るときは本文を描かないので、ここで描き終えた印を書く（読み込み中は書かない）。
   useLayoutEffect(() => { if (unauthenticated && !loading) markReady(window.location.pathname); });

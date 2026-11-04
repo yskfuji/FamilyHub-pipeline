@@ -139,7 +139,6 @@ export default function AuditLog() {
   const filters = readAuditFilters(search, people.map((member) => member.id));
   const change = (changes: Partial<AuditFilters>) => navigate(`/settings/audit${auditSearch({ ...filters, ...changes })}`, true, true);
   return <div className="audit-page">
-    <p className="muted audit-lede">{auditCopy.description} {auditCopy.retention}。</p>
     <div className="segmented audit-views" role="group" aria-label={auditCopy.tab}>
       {(['household', 'mine'] as const).map((view) => <button data-control-id={`settings.audit.view.${view}`} key={view} type="button" aria-pressed={filters.view === view} onClick={() => change({ view })}>{auditCopy.views[view]}</button>)}
     </div>

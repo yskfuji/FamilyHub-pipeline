@@ -41,7 +41,6 @@ export function AgendaView({ monthKey, todayKey, selected, onOpen }: Props) {
     if (selected && selected !== from) document.getElementById(`calendar-agenda-${selected}`)?.closest('section')?.scrollIntoView({ block: 'start' });
   }, [selected, from]);
   return <section className="calendar-agenda" aria-label={`${monthHeading(monthKey)}からの予定の一覧`}>
-    {occurrences.length === 0 && <EmptyState title={`${monthHeading(monthKey)}からの予定はありません`} illustration={<EmptyEvents/>} action={can('event.create') ? <button data-control-id="calendar.agenda.create" className="button primary" type="button" onClick={() => requestQuickCreate('event')}>この月に予定を追加</button> : undefined}>前月・次月の予定も確認できます。</EmptyState>}
     {days.map((day) => {
       const holiday = holidays.get(day);
       const entries = occurrences.filter((item) => occursOn(item, day));
@@ -56,7 +55,9 @@ export function AgendaView({ monthKey, todayKey, selected, onOpen }: Props) {
         </ul>}
       </section>;
     })}
+    {/* 空の状態は、今日（と選んだ日）の行の下に置く（段階12。前は行の上にあり、日付の行より先に読まれていた）。 */}
+    {occurrences.length === 0 && <EmptyState title={`${monthHeading(monthKey)}からの予定はありません`} illustration={<EmptyEvents/>} action={can('event.create') ? <button data-control-id="calendar.agenda.create" className="button primary" type="button" onClick={() => requestQuickCreate('event')}>この月に予定を追加</button> : undefined}>前月・次月の予定も確認できます。</EmptyState>}
     <div ref={marker} className="calendar-sentinel"/>
-    {canGrow ? <button data-control-id="calendar.agenda.more" className="button" type="button" onClick={more}>さらに表示</button> : <p className="small muted">{dayLabel(limit)}までの予定を表示しました。</p>}
+    {canGrow ? <button data-control-id="calendar.agenda.more" className="button" type="button" onClick={more}>さらに表示</button> : <p className="small muted">{limit.slice(0, 4) !== from.slice(0, 4) && `${Number(limit.slice(0, 4))}年`}{dayLabel(limit)}までの予定を表示しました。</p>}
   </section>;
 }

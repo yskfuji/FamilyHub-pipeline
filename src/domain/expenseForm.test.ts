@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { baseSnapshot } from '../data/fixtures';
-import { activeAdults, customSplitGap, expenseDraftProblem, expenseDraftToCreateInput, expenseDraftToUpdateInput, expenseToDraft, kindChangeEffects, newExpenseDraft, parseYen, payerChoices, peopleOutsideExpense, plannedShares, seedCustomAmounts, withKind, type ExpenseDraft } from './expenseForm';
+import { activeAdults, caretAfterDigits, customSplitGap, expenseDraftProblem, expenseDraftToCreateInput, expenseDraftToUpdateInput, expenseToDraft, formatAmountInput, kindChangeEffects, newExpenseDraft, parseYen, payerChoices, peopleOutsideExpense, plannedShares, seedCustomAmounts, withKind, type ExpenseDraft } from './expenseForm';
 import { expenseInputSchema, expenseUpdateSchema } from './schemas';
 import type { Expense } from './types';
 
@@ -210,5 +210,21 @@ describe('peopleOutsideExpense', () => {
 
   it('looks only at who received income', () => {
     expect(peopleOutsideExpense(draftOf({ kind: 'income', audience: 'creator', payerId: 'member-ren' }), adults, members, 'member-aoi').map((item) => item.id)).toEqual(['member-ren']);
+  });
+});
+
+describe('amount field display (stage 12)', () => {
+  it('groups digits by three, from full width and with yen marks, and keeps unreadable text as typed', () => {
+    expect(formatAmountInput('1234567')).toBe('1,234,567');
+    expect(formatAmountInput('１２，０００円')).toBe('12,000');
+    expect(formatAmountInput('¥ 980')).toBe('980');
+    expect(formatAmountInput('0012')).toBe('12');
+    expect(formatAmountInput('')).toBe('');
+    expect(formatAmountInput('12a')).toBe('12a');
+  });
+  it('puts the caret after the same digit', () => {
+    expect(caretAfterDigits('1,234', 2)).toBe(3);
+    expect(caretAfterDigits('1,234', 0)).toBe(0);
+    expect(caretAfterDigits('1,234', 9)).toBe(5);
   });
 });

@@ -135,7 +135,7 @@ test('a receipt fills the expense form for review and saves nothing by itself', 
   await dialog.getByRole('button', { name: '読み取る' }).click();
   const form = page.getByRole('dialog', { name: 'すぐに追加' });
   await expect(form.getByLabel('支出名')).toHaveValue('見本スーパー 青葉店');
-  await expect(form.getByLabel('金額（円）')).toHaveValue('2480');
+  await expect(form.getByLabel('金額（円）')).toHaveValue('2,480');
   await expect(form.getByLabel('日付')).toHaveValue('2026-09-29');
   await expect(form.getByLabel('費目')).toHaveValue('food');
   await expect(form).toContainText('見本のデータです');

@@ -21,6 +21,12 @@ interface Props {
   onMonth: (monthKey: string) => void;
 }
 
+/**
+ * 見出しを折り返してよい切れ目で分ける（段階12）。年と月日のあいだ、期間の「〜」の後ろだけで折り返し、
+ * 「2026年9月」のような月の見出しは分けない（文字の間隔を広げたとき、隣のボタンへはみ出さずに折り返すため）。
+ */
+const headingParts = (heading: string) => heading.split(/(?<=〜)|(?<=年)(?=\d+月\d+日)/);
+
 export function CalendarToolbar({ view, heading, monthKey, onView, onStep, onToday, onMonth }: Props) {
   const [picker, setPicker] = useState(false);
   const [year, setYear] = useState(Number(monthKey.slice(0, 4)));
@@ -30,7 +36,7 @@ export function CalendarToolbar({ view, heading, monthKey, onView, onStep, onTod
   return <div className="calendar-toolbar">
     <div className="calendar-month-navigation" role="group" aria-label="表示する期間の移動">
       <button data-control-id="calendar.month.previous" className="button" type="button" onClick={() => onStep(-1)}>{previous}</button>
-      <button data-control-id="calendar.month.choose" className="calendar-month-heading" type="button" aria-haspopup="dialog" aria-expanded={picker} onClick={openPicker}><SeasonMark date={monthKey}/><span aria-live="polite">{heading}</span><span aria-hidden="true">⌄</span></button>
+      <button data-control-id="calendar.month.choose" className="calendar-month-heading" type="button" aria-haspopup="dialog" aria-expanded={picker} onClick={openPicker}><SeasonMark date={monthKey}/><span aria-live="polite">{headingParts(heading).map((part, index) => <span className="keep-together" key={index}>{part}</span>)}</span><span aria-hidden="true">⌄</span></button>
       <button data-control-id="calendar.month.today" className="button" type="button" onClick={onToday}>{today}</button>
       <button data-control-id="calendar.month.next" className="button" type="button" onClick={() => onStep(1)}>{next}</button>
     </div>

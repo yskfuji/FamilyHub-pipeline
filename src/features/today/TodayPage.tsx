@@ -14,6 +14,7 @@ import { seasonOf, type Season } from '../../domain/season';
 import type { CalendarEvent } from '../../domain/types';
 import { MemberScopeSelect } from '../shared/MemberScopeSelect';
 import { SyncStatus } from '../shared/SyncStatus';
+import { stripLanes } from '../../domain/timeStrip';
 
 // 日付と時刻は家族の時間帯（日本時間。household.timezone は 'Asia/Tokyo' だけ）で読む。
 const monthDay = (asOf: string) => new Intl.DateTimeFormat('ja-JP', { month: 'long', day: 'numeric', timeZone: 'Asia/Tokyo' }).format(new Date(asOf));
@@ -64,10 +65,12 @@ function TimeStrip({ items, now }: { items: TimelineItem[]; now: number }) {
   const ticks: number[] = [];
   // 最後の目盛り（帯の右の端）は字を出さない（手前の目盛りと重ならないように）。
   for (let minute = from; minute < to; minute += 180) ticks.push(minute);
-  const place = (start: string, span = 0) => ({ '--strip-at': start, '--strip-span': String(span / (to - from)) }) as CSSProperties;
+  const place = (start: string, span = 0, lane = 0) => ({ '--strip-at': start, '--strip-span': String(span / (to - from)), '--strip-lane': String(lane) }) as CSSProperties;
+  const lanes = stripLanes(items.map((item, index) => ({ start: starts[index], minutes: item.minutes })), to - from);
+  const laneCount = Math.max(1, ...lanes.map((lane) => lane + 1));
   return <div className="time-strip" aria-hidden="true">
-    <div className="time-strip-track">
-      {items.map((item, index) => <span key={item.key} className="time-strip-mark" data-kind={item.kind === '予定' ? 'event' : 'task'} data-past={starts[index] + item.minutes < now ? 'true' : undefined} style={place(at(starts[index]), Math.min(item.minutes, to - starts[index]))}/>)}
+    <div className="time-strip-track" style={{ '--strip-lanes': String(laneCount) } as CSSProperties}>
+      {items.map((item, index) => <span key={item.key} className="time-strip-mark" data-kind={item.kind === '予定' ? 'event' : 'task'} data-lane={lanes[index]} data-past={starts[index] + item.minutes < now ? 'true' : undefined} style={place(at(starts[index]), Math.min(item.minutes, to - starts[index]), lanes[index])}/>)}
       {now >= from && now <= to && <span className="time-strip-now" style={place(at(now))}/>}
     </div>
     <div className="time-strip-ticks">{ticks.map((minute) => <span key={minute} style={place(at(minute))}>{minute / 60}時</span>)}</div>
@@ -132,7 +135,7 @@ export function TodayPage() {
           {nextTask && <div className="callout next-item"><CheckIcon/><div><strong>{nextTask.title}</strong><p className="muted small">次のタスク · 期限 {formatDue(nextTask.dueAt, asOf)}</p></div><a data-control-id={`today.next.open.${nextTask.id}`} className="button" href={`/tasks/${nextTask.id}`} data-link aria-label={`次のタスク「${nextTask.title}」を開く`}>開く <ArrowIcon width="16"/></a></div>}
         </div>}
     </section>,
-    timeline: () => <section className="card" aria-labelledby="timeline-title"><div className="section-head"><div><p className="eyebrow">{no('timeline')} · 今日の予定とタスク</p><h2 id="timeline-title">時刻順に確認</h2></div><a data-control-id="today.calendar.open" href="/calendar" data-link>カレンダーへ</a></div>
+    timeline: () => <section className="card" aria-labelledby="timeline-title"><div className="section-head"><div><p className="eyebrow">{no('timeline')} · 今日の予定とタスク</p><h2 id="timeline-title">時刻順に確認</h2></div><a data-control-id="today.calendar.open" className="standalone-link" href="/calendar" data-link>カレンダーへ</a></div>
       {timeline.length === 0 ? <p className="muted mb-0">今日の予定と期限のタスクはありません。</p> : <><TimeStrip items={timeline} now={now}/><ul className="list timeline">{timeline.map((item) => <li className="list-row" key={item.key} data-past={Date.parse(item.at) + item.minutes * 60_000 < Date.parse(asOf) ? 'true' : undefined}><time className="time">{formatTime(item.at)}</time><div className="row-main"><strong>{item.title}</strong><span className="meta">{item.kind} · {item.meta}</span></div><a data-control-id={item.kind === '予定' ? `today.event.open.${item.id}` : `today.timeline-todo.open.${item.id}`} className="button" href={item.href} data-link aria-label={`${item.title}を開く`}>開く</a></li>)}</ul></>}
     </section>,
     due: () => <section className="card" aria-labelledby="mine-title"><div className="section-head"><div><p className="eyebrow">{no('due')} · 期限 · 自分の担当</p><h2 id="mine-title">{snapshot.user.displayName}さんのタスク</h2></div><span className="metric">{mine.length}</span></div>

@@ -1,4 +1,4 @@
-import { AUDIT_RETENTION_MONTHS } from '../domain/auditLog';
+import { auditIntro } from './auditIntro';
 import type { AuditGroup, AuditTargetKind } from '../domain/auditLog';
 
 /**
@@ -90,9 +90,9 @@ export const auditCopy = {
   chainOk: '記録の改ざんは見つかっていません',
   chainProblem: '記録に食い違いが見つかりました。運営者に連絡してください',
   chainUnchecked: 'まだ確かめていません',
-  retention: `変更の記録は${AUDIT_RETENTION_MONTHS}か月残し、その後は消します`,
+  retention: auditIntro.retention,
   tab: '変更の記録',
-  description: '家族の記録を誰がいつ変えたかを、新しい順に表示します。記録の中身や入力した値は残していません。',
+  description: auditIntro.description,
   views: { household: '家族の記録', mine: '自分の操作' },
   chainHeading: '改ざんの確認',
   chainCheckedAt: (at: string) => `最後に確かめた日時：${at}`,

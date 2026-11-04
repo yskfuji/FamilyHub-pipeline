@@ -268,6 +268,27 @@ export function runGatewaySuite(world: (actorMembershipId?: string) => FamilyHub
       expect(created).toMatchObject({ ok: true, value: { place: { name: '三軒茶屋の文具店' } } });
     });
 
+    it('creates one record for one form key: a resend returns the first result, and a failed send can be corrected under the same key (stage 12)', async () => {
+      const gateway = world();
+      const before = await gateway.household.getSnapshot();
+      if (!before.ok) throw new Error(before.error.message);
+      const context = { idempotencyKey: 'form-key-todo-0001', expectedPermissionRevision: before.value.viewer.permissionRevision };
+      const input = { title: '一度だけ作るタスク', assigneeMembershipId: 'member-aoi', visibility: { audience: 'household' as const, selectedMembershipIds: [] } };
+      const first = await gateway.todos.createTodo(input, context);
+      const again = await gateway.todos.createTodo(input, context);
+      expect(first.ok && again.ok && again.value.id === first.value.id).toBe(true);
+      const after = await gateway.household.getSnapshot();
+      if (!after.ok) throw new Error(after.error.message);
+      expect(after.value.todos.filter((todo) => todo.title === '一度だけ作るタスク')).toHaveLength(1);
+      // 支出: 入力の誤りで断られた送信は記録されないので、同じキーのまま直して送れる。
+      const key = 'form-key-expense-0001';
+      expect(await gateway.expenses.createExpense({ title: '', amountJpy: 100, incurredOn: '2026-09-30', payerMembershipId: 'member-aoi', shareMembershipIds: ['member-aoi'] }, key)).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+      const fixed = { title: '直して送る支出', amountJpy: 100, incurredOn: '2026-09-30', payerMembershipId: 'member-aoi', shareMembershipIds: ['member-aoi'] };
+      const sent = await gateway.expenses.createExpense(fixed, key);
+      const resent = await gateway.expenses.createExpense(fixed, key);
+      expect(sent.ok && resent.ok && resent.value.id === sent.value.id).toBe(true);
+    });
+
     it('removes places from mutation results for viewers without place access', async () => {
       const owner = world();
       const ownerView = await owner.memos.updateMemo('memo-school', { title: '学校公開のお知らせ（更新）' }, 1);

@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useSubmission } from './useSubmission';
 import { eventInputSchema, expenseInputSchema, memoInputSchema, todoInputSchema } from '../domain/schemas';
 import { useApp, type QuickCreateKind, type QuickCreateSeed } from './AppContext';
 import { Dialog } from '../design-system/components';
@@ -32,7 +33,10 @@ export interface QuickCreateDialogProps {
 export default function QuickCreateDialog({ kinds, kind, onKind, prefill, expenseKind, seed, onClose }: QuickCreateDialogProps) {
   const { gateway, snapshot, refresh, announce, can, executeQueueable, privacy } = useApp();
   const [error, setError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  // 送信中の印と、このダイアログを開いている間の1つの冪等キー。種類を切り替えても同じダイアログなので同じキーを使う（送るのは1回だけ）。
+  const submission = useSubmission();
+  const { submitting, idempotencyKey } = submission;
+  const context = { idempotencyKey, expectedPermissionRevision: snapshot.viewer.permissionRevision };
   const [place, setPlace] = useState<PlaceRef | null>(null);
   // メモの入力は送るときに読むので、触ったかどうかだけを覚える。
   const [memoTouched, setMemoTouched] = useState(false);
@@ -42,52 +46,52 @@ export default function QuickCreateDialog({ kinds, kind, onKind, prefill, expens
   const adultIds = activeAdults(snapshot.memberships).map((member) => member.id);
   const setOpen = (value: false) => { if (!value) onClose(); };
 
-  const finish = async (label: string) => { await refresh(); setOpen(false); setSubmitting(false); setPlace(null); announce(`${label}を追加しました`); };
+  const finish = async (label: string) => { await refresh(); setOpen(false); submission.end(); setPlace(null); announce(`${label}を追加しました`); };
   const submit = async (form: HTMLFormElement) => {
-    if (submitting) return;
-    setError(''); setSubmitting(true);
+    if (!submission.start()) return;
+    setError('');
     const values = new FormData(form);
     const text = (name: string) => String(values.get(name) ?? '');
     const title = text('title');
-    const stop = (message: string) => { setError(message); setSubmitting(false); };
+    const stop = (message: string) => { setError(message); submission.end(); };
     const parsed = memoInputSchema.safeParse({ title, body: text('body'), tags: text('tags').split(/[,、]/).map((tag) => tag.trim()).filter(Boolean), ...(place ? { place } : {}) });
     if (!parsed.success) return stop(firstIssue(parsed.error.issues));
-    const outcome = await executeQueueable({ operation: 'memo.create', summary: `メモ「${title}」を作成`, payload: { input: parsed.data } }, () => gateway.memos.createMemo(parsed.data));
+    const outcome = await executeQueueable({ operation: 'memo.create', summary: `メモ「${title}」を作成`, payload: { input: parsed.data } }, () => gateway.memos.createMemo(parsed.data, context), idempotencyKey);
     if (outcome.status === 'failed') return stop(outcome.error.message);
-    if (outcome.status === 'queued') { setOpen(false); setSubmitting(false); return; }
+    if (outcome.status === 'queued') { setOpen(false); submission.end(); return; }
     return finish('メモ');
   };
 
   const submitEvent = async (draft: EventDraft) => {
-    if (submitting) return;
-    setError(''); setSubmitting(true);
-    const stop = (message: string) => { setError(message); setSubmitting(false); };
+    if (!submission.start()) return;
+    setError('');
+    const stop = (message: string) => { setError(message); submission.end(); };
     const parsed = eventInputSchema.safeParse(draftToCreateInput(draft));
     if (!parsed.success) return stop(firstIssue(parsed.error.issues));
-    const outcome = await executeQueueable({ operation: 'event.create', summary: `予定「${parsed.data.title}」を作成`, payload: { input: parsed.data } }, () => gateway.events.createEvent(parsed.data));
+    const outcome = await executeQueueable({ operation: 'event.create', summary: `予定「${parsed.data.title}」を作成`, payload: { input: parsed.data } }, () => gateway.events.createEvent(parsed.data, context), idempotencyKey);
     if (outcome.status === 'failed') return stop(outcome.error.message);
-    if (outcome.status === 'queued') { setOpen(false); setSubmitting(false); return; }
+    if (outcome.status === 'queued') { setOpen(false); submission.end(); return; }
     return finish('予定');
   };
   const submitTask = async (draft: TaskDraft) => {
-    if (submitting) return;
-    setError(''); setSubmitting(true);
-    const stop = (message: string) => { setError(message); setSubmitting(false); };
+    if (!submission.start()) return;
+    setError('');
+    const stop = (message: string) => { setError(message); submission.end(); };
     const parsed = todoInputSchema.safeParse(taskDraftToCreateInput(draft));
     if (!parsed.success) return stop(firstIssue(parsed.error.issues));
-    const outcome = await executeQueueable({ operation: 'task.create', summary: `タスク「${parsed.data.title}」を作成`, payload: { input: parsed.data } }, () => gateway.todos.createTodo(parsed.data));
+    const outcome = await executeQueueable({ operation: 'task.create', summary: `タスク「${parsed.data.title}」を作成`, payload: { input: parsed.data } }, () => gateway.todos.createTodo(parsed.data, context), idempotencyKey);
     if (outcome.status === 'failed') return stop(outcome.error.message);
-    if (outcome.status === 'queued') { setOpen(false); setSubmitting(false); return; }
+    if (outcome.status === 'queued') { setOpen(false); submission.end(); return; }
     return finish('タスク');
   };
   const submitExpense = async (draft: ExpenseDraft) => {
-    if (submitting) return;
-    setError(''); setSubmitting(true);
+    if (!submission.start()) return;
+    setError('');
     const label = ja.expenseKind[draft.kind];
-    const stop = (message: string) => { setError(message); setSubmitting(false); };
+    const stop = (message: string) => { setError(message); submission.end(); };
     const parsed = expenseInputSchema.safeParse(expenseDraftToCreateInput(draft, adultIds));
     if (!parsed.success) return stop(firstIssue(parsed.error.issues));
-    const result = await gateway.expenses.createExpense(parsed.data);
+    const result = await gateway.expenses.createExpense(parsed.data, idempotencyKey);
     if (!result.ok) return stop(`${result.error.message} ${label}は未送信の変更として保存されません。`);
     return finish(label);
   };

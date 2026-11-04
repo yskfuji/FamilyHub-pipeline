@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { BOTTOM_NAV_QUERY as NARROW_QUERY } from '../../design-system/sizeClass';
 import { minutesOfDay } from '../../domain/calendarLayout';
 
-const NARROW_QUERY = '(max-width: 760px)';
-
-/** 狭い幅かどうか。global.css の 760px の切り替えと同じ条件。 */
+/** 狭い幅かどうか（下のナビがある幅）。global.css の `(width < 42.7rem)` の切り替えと同じ条件。 */
 export function useIsNarrow() {
   return useSyncExternalStore((notify) => {
     const media = window.matchMedia(NARROW_QUERY);

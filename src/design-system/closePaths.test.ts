@@ -5,6 +5,7 @@ import { flushSync } from 'react-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Dialog, Drawer } from './components';
 import { DetailSurface } from './DetailSurface';
+import { BOTTOM_NAV_QUERY, currentSizeClass } from './sizeClass';
 import { finishLeaving, pendingLeave, stayHere } from './unsavedGuard';
 
 /**
@@ -92,5 +93,22 @@ describe('every close path asks when a form inside has unsaved input (FRAME-4)',
     expect(shown(600)).toBe('drawer');
     expect(shown(1099)).toBe('drawer');
     expect(shown(1100)).toBe('pane');
+  });
+
+  it('follows the bottom nav: narrow whenever it is shown, and never narrow beside the rail (stage 12)', () => {
+    let bottomNav = true;
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({ matches: query === BOTTOM_NAV_QUERY && bottomNav, media: query, addEventListener: () => undefined, removeEventListener: () => undefined })) as unknown as typeof window.matchMedia;
+    try {
+      Object.defineProperty(main, 'clientWidth', { configurable: true, value: 650 });
+      expect(currentSizeClass()).toBe('narrow');
+      bottomNav = false;
+      Object.defineProperty(main, 'clientWidth', { configurable: true, value: 585 });
+      expect(currentSizeClass()).toBe('medium');
+      Object.defineProperty(main, 'clientWidth', { configurable: true, value: 1200 });
+      expect(currentSizeClass()).toBe('wide');
+    } finally {
+      window.matchMedia = original;
+    }
   });
 });

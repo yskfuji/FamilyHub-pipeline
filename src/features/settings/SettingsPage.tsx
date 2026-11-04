@@ -7,7 +7,7 @@ import { capabilityCeilingFor, defaultCapabilitiesFor } from '../../authz/policy
 import { auditCopy } from '../../content/auditLabels';
 import { externalLinkLabel, ja, membershipStatusLabels, roleLabels } from '../../content/ja';
 import { settingsTabFor, settingsTabs } from './settingsTabs';
-import { closeGuarded } from '../../design-system/unsavedGuard';
+import { closeGuarded, useUnsavedGuard } from '../../design-system/unsavedGuard';
 import { Dialog, GuardedForm, PageHeader, StatusBadge, formatDate, formatRelative, formatTime } from '../../design-system/components';
 import { navigate } from '../../app/router';
 import { ArrowIcon, LinkIcon, LockIcon, PeopleIcon, ShieldIcon } from '../../design-system/icons';
@@ -34,7 +34,8 @@ const inviteRoles: Array<Exclude<MembershipRole, 'owner'>> = ['adult', 'child', 
 
 export function SettingsPage({ path }: { path: string }) {
   const { can } = useApp();
-  const current = settingsTabFor(path)?.label ?? '';
+  const tab = settingsTabFor(path);
+  const current = tab?.label ?? '';
   // 狭い画面ではタブが横にスクロールするため、表示中のタブが隠れないよう横方向だけ寄せる（縦には動かさない）。
   const tabsRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -45,9 +46,9 @@ export function SettingsPage({ path }: { path: string }) {
   }, [path]);
 
   return <div className="page">
-    <PageHeader eyebrow="設定" title={current} description="家族との共有範囲や、表示・通知・サインイン方法を変更できます。"/>
+    <PageHeader eyebrow="設定" title={current} description={tab?.description ?? ''}/>
     <nav ref={tabsRef} className="segmented settings-tabs" aria-label="設定項目">
-      {settingsTabs.filter((tab) => can(tab.capability)).map(({ href, label }) => <a data-control-id={`settings.section.${href.split("/").at(-1)}`} key={href} className="button" href={href} data-link aria-current={settingsTabFor(path)?.href === href ? 'page' : undefined}>{label}</a>)}
+      {settingsTabs.filter((tab) => can(tab.capability)).map(({ href, label }) => <a data-control-id={`settings.section.${href.split("/").at(-1)}`} key={href} className="button" href={href} data-link aria-current={tab?.href === href ? 'page' : undefined}>{label}</a>)}
     </nav>
     {path.startsWith('/settings/account') ? <AccountSection/>
       : path.startsWith('/settings/security') ? <Security/>
@@ -71,6 +72,8 @@ function Household() {
   const [role, setRole] = useState<MembershipRole>('adult');
   const [roleError, setRoleError] = useState('');
   const [overrides, setOverrides] = useState<PermissionOverride[]>([]);
+  // 権限の画面で読み込んだときの値。役割か個別設定を変えたまま閉じようとしたら確かめる（段階12で設定の重ね表示に広げた）。
+  const [loadedOverrides, setLoadedOverrides] = useState<PermissionOverride[]>([]);
   const [saving, setSaving] = useState(false);
   const [inviteRole, setInviteRole] = useState<Exclude<MembershipRole, 'owner'>>('adult');
   const [invite, setInvite] = useState<HouseholdInvite | null>(null);
@@ -99,10 +102,10 @@ function Household() {
   }, [canInvite, gateway, announce]);
 
   const openPermissions = async (item: HouseholdMembership) => {
-    setMember(item); setRole(item.role); setRoleError(''); setOverrides([]);
+    setMember(item); setRole(item.role); setRoleError(''); setOverrides([]); setLoadedOverrides([]);
     if (!canManage) return;
     const result = await gateway.household.getPermissionOverrides(item.id);
-    if (result.ok) setOverrides(result.value);
+    if (result.ok) { setOverrides(result.value); setLoadedOverrides(result.value); }
     else setRoleError(result.error.message);
   };
   const saveRole = async () => {
@@ -149,6 +152,8 @@ function Household() {
     ...(effect === 'default' || !member ? [] : [{ membershipId: member.id, capability, effect }]),
   ]);
 
+  const permissionsChanged = Boolean(member) && (role !== member?.role || JSON.stringify(overrides) !== JSON.stringify(loadedOverrides));
+  const permissionGuard = useUnsavedGuard(permissionsChanged, saving);
   const renameHousehold = async (form: HTMLFormElement) => {
     const name = String(new FormData(form).get('householdName') ?? '');
     const result = await gateway.household.updateProfile({ name });
@@ -186,13 +191,13 @@ function Household() {
     <ColorLists/>
     <LeaveHousehold/>
     {member && <Dialog title={`${member.displayName}さんの権限`} description="役割の標準設定を基準に、必要な項目だけを個別に変更できます。" onClose={() => { if (!saving) setMember(null); }}>
-      <div className="stack">
+      <div className="stack" {...permissionGuard.formProps}>
         <label className="field" htmlFor="member-role"><span>メンバーの役割</span></label><select data-control-id={`settings.member.role.${member.id}`} className="select" id="member-role" value={role} disabled={saving} onChange={(event) => { setRole(event.target.value as MembershipRole); setOverrides([]); }}>{(Object.keys(roleLabels) as MembershipRole[]).map((value) => <option key={value} value={value}>{roleLabels[value]}</option>)}</select>
         {role !== member.role && <div className="notice"><strong>役割を変更すると、個別設定の確認が必要です。</strong><p className="small mb-0">まず役割を保存し、もう一度この画面を開いて個別設定を確認してください。</p></div>}
         <fieldset className="fieldset" disabled={role !== member.role || saving}><legend>個別設定</legend><div className="stack">{editableCapabilities.map((capability) => <label className="setting-row" key={capability}><span><strong>{permissionLabels[capability]}</strong><span className="small muted">標準：{defaultCapabilitiesFor(role).includes(capability) ? '利用できる' : '利用できない'}</span></span><select data-control-id={`settings.member.permission.${member.id}.${capability}`} className="select permission-select" aria-label={`${permissionLabels[capability]}の個別設定`} value={overrideValue(capability)} onChange={(event) => changeOverride(capability, event.target.value as 'default' | 'allow' | 'deny')}><option value="default">役割の標準</option><option value="allow">利用を許可</option><option value="deny">利用を制限</option></select></label>)}</div></fieldset>
         <MemberActions member={member} onDone={() => setMember(null)}/>
         {roleError && <p className="field-error" role="alert">{roleError}</p>}
-        <div className="dialog-actions"><button data-control-id={`settings.member.cancel.${member.id}`} className="button" type="button" disabled={saving} onClick={() => setMember(null)}>{ja.actions.cancel}</button>{role === member.role ? <><button data-control-id={`settings.member.reset.${member.id}`} className="button" type="button" disabled={saving || overrides.length === 0} onClick={() => void resetOverrides()}>標準に戻す</button><button data-control-id={`settings.member.save-overrides.${member.id}`} className="button primary" type="button" disabled={saving} onClick={() => void saveOverrides()}>{saving ? ja.actions.saving : '個別設定を保存'}</button></> : <button data-control-id={`settings.member.save-role.${member.id}`} className="button primary" type="button" disabled={saving} onClick={() => void saveRole()}>{saving ? ja.actions.saving : '役割を保存'}</button>}</div>
+        <div className="dialog-actions"><button data-control-id={`settings.member.cancel.${member.id}`} className="button" type="button" disabled={saving} onClick={() => permissionGuard.leave(() => setMember(null))}>{ja.actions.cancel}</button>{role === member.role ? <><button data-control-id={`settings.member.reset.${member.id}`} className="button" type="button" disabled={saving || overrides.length === 0} onClick={() => void resetOverrides()}>標準に戻す</button><button data-control-id={`settings.member.save-overrides.${member.id}`} className="button primary" type="button" disabled={saving} onClick={() => void saveOverrides()}>{saving ? ja.actions.saving : '個別設定を保存'}</button></> : <button data-control-id={`settings.member.save-role.${member.id}`} className="button primary" type="button" disabled={saving} onClick={() => void saveRole()}>{saving ? ja.actions.saving : '役割を保存'}</button>}</div>
       </div>
     </Dialog>}
   </>;
@@ -286,8 +291,8 @@ function LocationPrivacy() {
     <section className="card"><h2>{ja.place.settings.consentLabel}</h2>
       <div className="setting-row"><div><strong>{granted ? ja.place.settings.consentOn : ja.place.settings.consentOff}</strong><p className="small muted mb-0">{ja.place.settings.revokeNote}</p></div><button data-control-id="settings.location.lookup-consent" type="button" className="toggle" aria-label={ja.place.settings.consentLabel} aria-pressed={granted} disabled={saving || consent.status === 'loading' || consent.status === 'unavailable'} onClick={() => void toggle()}/></div>
       <ul className="list">
-        <li className="list-row"><LinkIcon width="20"/><div className="row-main"><a data-control-id="settings.location.terms" href={OPENPOI_TERMS_URL} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" aria-label={externalLinkLabel(ja.place.settings.terms)}>{ja.place.settings.terms}</a></div></li>
-        <li className="list-row"><LinkIcon width="20"/><div className="row-main"><a data-control-id="settings.location.attribution" href={OPENPOI_ATTRIBUTION_URL} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" aria-label={externalLinkLabel(ja.place.settings.attribution)}>{ja.place.settings.attribution}</a></div></li>
+        <li className="list-row"><LinkIcon width="20"/><div className="row-main"><a data-control-id="settings.location.terms" className="standalone-link" href={OPENPOI_TERMS_URL} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" aria-label={externalLinkLabel(ja.place.settings.terms)}>{ja.place.settings.terms}</a></div></li>
+        <li className="list-row"><LinkIcon width="20"/><div className="row-main"><a data-control-id="settings.location.attribution" className="standalone-link" href={OPENPOI_ATTRIBUTION_URL} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" aria-label={externalLinkLabel(ja.place.settings.attribution)}>{ja.place.settings.attribution}</a></div></li>
       </ul>
     </section>
   </div>;

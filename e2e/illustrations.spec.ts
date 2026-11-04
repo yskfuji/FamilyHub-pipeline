@@ -115,7 +115,7 @@ test.describe('ILLUS-3 illustrations take every colour from the theme', () => {
       await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
       await expect(page.locator('.empty svg.illustration')).toBeVisible();
       const { used, palette } = await page.evaluate(() => {
-        const names = ['--paper', '--paper-deep', '--sheet', '--ink', '--ink-soft', '--ink-faint', '--line', '--line-strong', '--accent', '--accent-strong', '--brand', '--brand-soft', '--moss', '--moss-soft', '--gold', '--info-soft', '--attention', '--attention-soft', '--art-ground'];
+        const names = ['--paper', '--paper-deep', '--sheet', '--ink', '--ink-soft', '--ink-faint', '--line', '--line-strong', '--accent', '--accent-strong', '--brand', '--brand-soft', '--moss', '--moss-soft', '--gold', '--info-soft', '--attention', '--attention-soft', '--art-ground', '--kaki', '--kaki-soft'];
         const probe = document.createElement('div');
         document.body.append(probe);
         const palette = Object.fromEntries(names.map((name) => { probe.style.color = `var(${name})`; return [name, getComputedStyle(probe).color]; }));

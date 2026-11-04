@@ -9,7 +9,7 @@ import { wordmark } from './wordmark';
 import { useSizeClass } from './sizeClass';
 
 export function BrandMark() {
-  return <svg className="brand-mark" viewBox="0 0 48 48" role="img" aria-label={ja.brand.markLabel}><path d="M24 4c7 8 16 10 16 21 0 9-7 17-16 17S8 34 8 25C8 14 17 12 24 4Z" fill="var(--brand-soft)" stroke="var(--brand)" strokeWidth="2"/><path d="M16 27c4-7 12-7 16 0M24 18v17" fill="none" stroke="var(--accent-strong)" strokeWidth="2" strokeLinecap="round"/></svg>;
+  return <svg className="brand-mark" viewBox="0 0 48 48" role="img" aria-label={ja.brand.markLabel}><path d="M24 4c7 8 16 10 16 21 0 9-7 17-16 17S8 34 8 25C8 14 17 12 24 4Z" fill="var(--kaki-soft)" stroke="var(--kaki)" strokeWidth="2"/><path d="M16 27c4-7 12-7 16 0M24 18v17" fill="none" stroke="var(--kaki-stem)" strokeWidth="2" strokeLinecap="round"/></svg>;
 }
 
 export function Brand({ compact = false }: { compact?: boolean }) {

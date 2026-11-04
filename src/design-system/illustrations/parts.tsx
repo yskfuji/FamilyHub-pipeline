@@ -8,7 +8,7 @@ export const Ground = () => <path d="M20 98c-10-22-2-52 24-66 22-12 52-14 76-6 2
 
 /** 柿の実（へたと実）。x と y は実の中心、s は倍率（1 で幅 22）。 */
 export const Kaki = ({ x, y, s = 1 }: { x: number; y: number; s?: number }) => <g transform={`translate(${x} ${y}) scale(${s})`}>
-  <ellipse cy="2" rx="11" ry="9.5" fill="var(--brand-soft)" stroke="var(--brand)"/>
+  <ellipse cy="2" rx="11" ry="9.5" fill="var(--kaki-soft)" stroke="var(--kaki)"/>
   <path d="M-8-6c3-3 5-3 8-1 3-2 5-2 8 1-3 2-5 2-8 1-3 1-5 1-8-1ZM0-7v-4" fill="var(--moss-soft)" stroke="var(--moss)"/>
 </g>;
 

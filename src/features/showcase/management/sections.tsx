@@ -33,7 +33,7 @@ export function OverviewSection({ state }: { state: ConsoleState }) {
       <p className="muted small">{card.label}</p>
       <p className="mgmt-kpi-value">{card.value}</p>
       <p className="small muted">{card.note}</p>
-      <a data-control-id={`showcase.management.overview.open.${card.section}`} className="small" href={sectionHref(card.section)} data-link>{card.link}</a>
+      <a data-control-id={`showcase.management.overview.open.${card.section}`} className="small standalone-link" href={sectionHref(card.section)} data-link>{card.link}</a>
     </article>)}</div>
     <h3 className="mt-1">最近の操作</h3>
     <ul className="mgmt-rows">{state.audit.slice(0, 3).map((entry) => <li className="mgmt-row" key={entry.id}><div><p>{entry.action}：{entry.target}</p><p className="small muted">{formatAt(entry.at)} · {entry.actor}</p></div></li>)}</ul>
@@ -145,7 +145,7 @@ export function RecordsSection({ state }: { state: ConsoleState }) {
     <SectionHead title="記録の閲覧" description="架空の記録を読むだけの画面で、変更はできません。個人に関わる項目は伏せて表示します。"/>
     <div className="mgmt-filters">
       <div className="field"><label htmlFor="mgmt-record-collection">種類</label>
-        <select data-control-id="showcase.management.record.collection" id="mgmt-record-collection" className="input" value={collection} onChange={(event) => setCollection(event.target.value as RecordCollection)}>
+        <select data-control-id="showcase.management.record.collection" id="mgmt-record-collection" className="select" value={collection} onChange={(event) => setCollection(event.target.value as RecordCollection)}>
           {(Object.keys(collectionLabels) as RecordCollection[]).map((value) => <option key={value} value={value}>{collectionLabels[value]}</option>)}
         </select>
       </div>

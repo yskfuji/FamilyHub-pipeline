@@ -293,7 +293,7 @@ test('partial settlement checks the limit, leaves the remainder open, and revers
   await page.goto('/budget/expense-books');
   const drawer = page.getByRole('dialog', { name: '学校教材' });
   const amount = drawer.getByLabel(/蓮さんの精算額/);
-  await expect(amount).toHaveValue('1430');
+  await expect(amount).toHaveValue('1,430');
   await amount.fill('2000');
   await drawer.getByRole('button', { name: new RegExp(`^蓮さんの${yen('2,000')}を精算$`) }).click();
   await expect(drawer.getByRole('alert')).toContainText(new RegExp(`残りの${yen('1,430')}以下`));
@@ -305,12 +305,12 @@ test('partial settlement checks the limit, leaves the remainder open, and revers
   await drawer.getByRole('button', { name: new RegExp(`^半分（${yen('715')}）$`) }).click();
   await expect(amount).toHaveValue('715');
   await drawer.getByRole('button', { name: new RegExp(`^残り全額（${yen('1,430')}）$`) }).click();
-  await expect(amount).toHaveValue('1430');
+  await expect(amount).toHaveValue('1,430');
   await amount.fill('430');
   await drawer.getByRole('button', { name: new RegExp(`^蓮さんの${yen('430')}を精算$`) }).click();
   await expect(page.locator('.toast-visible')).toContainText('精算を記録');
   await expect(drawer.getByRole('row', { name: /^蓮/ })).toContainText(new RegExp(`${yen('430')}.*${yen('1,000')}`));
-  await expect(amount).toHaveValue('1000');
+  await expect(amount).toHaveValue('1,000');
   await expect(drawer.getByRole('button', { name: new RegExp(`^蓮さんの残り${yen('1,000')}を精算$`) })).toBeVisible();
 
   await expect(drawer.getByRole('button', { name: '支出を削除' })).toBeDisabled();
@@ -325,7 +325,7 @@ test('partial settlement checks the limit, leaves the remainder open, and revers
   await drawer.getByRole('button', { name: new RegExp(`の${yen('430')}の精算を取り消す$`) }).click();
   await expect(drawer.getByText('取り消し済み')).toBeVisible();
   await expect(drawer.getByText(/^取り消し（蓮さんの精算）$/)).toBeVisible();
-  await expect(amount).toHaveValue('1430');
+  await expect(amount).toHaveValue('1,430');
   await expect(drawer.getByRole('button', { name: '支出を削除' })).toBeEnabled();
 });
 

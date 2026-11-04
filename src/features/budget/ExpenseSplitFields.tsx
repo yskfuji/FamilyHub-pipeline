@@ -3,6 +3,7 @@ import { ja } from '../../content/ja';
 import { formatYen } from '../../design-system/components';
 import { customSplitGap, plannedShares, seedCustomAmounts, splitModes, type ExpenseDraft, type SplitMode } from '../../domain/expenseForm';
 import type { Id } from '../../domain/types';
+import { AmountInput } from '../../design-system/AmountInput';
 
 interface Props {
   formId: string;
@@ -28,7 +29,7 @@ export function ExpenseSplitFields({ formId, draft, adultIds, onChange }: Props)
     <div className="split-choice">{splitModes.map((mode) => <label key={mode}><input data-control-id={`budget.form.split.${formId}.${mode}`} type="radio" name={`split-${formId}`} value={mode} checked={draft.splitMode === mode} onChange={() => select(mode)}/>{ja.splitMode[mode]}</label>)}</div>
     {draft.splitMode === 'custom'
       ? <>
-        <div className="grid two mt-1">{rows.map((id) => <label className="field" key={id}><span>{nameOf(id)}さんの負担（円）</span><input data-control-id={`budget.form.share.${formId}.${id}`} className="input" inputMode="numeric" autoComplete="off" value={draft.customAmounts[id] ?? ''} onChange={(event) => onChange({ customAmounts: { ...draft.customAmounts, [id]: event.target.value } })}/></label>)}</div>
+        <div className="grid two mt-1">{rows.map((id) => <label className="field" key={id}><span>{nameOf(id)}さんの負担（円）</span><AmountInput data-control-id={`budget.form.share.${formId}.${id}`} className="input" value={draft.customAmounts[id] ?? ''} onValueChange={(amount) => onChange({ customAmounts: { ...draft.customAmounts, [id]: amount } })}/></label>)}</div>
         <p className="field-help mb-0 mt-1" role="status">{gapText(customSplitGap(draft))}</p>
       </>
       : <p className="field-help mb-0 mt-1">{plannedShares(draft, adultIds).map((share) => `${nameOf(share.membershipId)}さん ${formatYen(share.amountJpy)}`).join('・')}</p>}

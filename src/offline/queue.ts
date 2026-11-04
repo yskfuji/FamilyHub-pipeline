@@ -116,7 +116,8 @@ export class EncryptedOfflineQueue {
     return records;
   }
 
-  async enqueue(command: QueueableCommand, context: { actorUserId: Id; householdId: Id; permissionRevision: number }) {
+  /** clientOperationId を渡すと、それを送り直しの冪等キーにする（フォームで最初に送ったときと同じキー。応答だけが失われていても記録は増えない）。 */
+  async enqueue(command: QueueableCommand, context: { actorUserId: Id; householdId: Id; permissionRevision: number; clientOperationId?: string }) {
     // 家計の変更・種類の変更・精算は、接続できるときだけ行う（待ち行列に入れない）。型の外から渡されても断る。
     if (!queueableOperations.has(command.operation)) throw new Error('この変更は接続してから行ってください。');
     const records = await this.currentRecords();

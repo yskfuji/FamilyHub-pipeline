@@ -5,6 +5,7 @@ import { parseYen } from '../../domain/expenseForm';
 import { settlementAmountProblem, settlementPresets } from '../../domain/settlementForm';
 import type { Expense, Id } from '../../domain/types';
 import type { ExpenseActions } from './useBudgetActions';
+import { AmountInput } from '../../design-system/AmountInput';
 
 interface Props {
   expense: Expense;
@@ -35,7 +36,7 @@ export function SettlementForm({ expense, membershipId, remainingJpy, actions }:
   return <form className="settlement-form" aria-label={`${name}さんの精算`} noValidate onSubmit={(event) => void submit(event)}>
     <div className="field">
       <label htmlFor={`settle-${key}`}>{name}さんの精算額（残り{formatYen(remainingJpy)}）</label>
-      <input data-control-id={`budget.settlement.amount.${expense.id}.${membershipId}`} className="input" id={`settle-${key}`} inputMode="numeric" autoComplete="off" value={amount} aria-invalid={problem ? true : undefined} aria-describedby={problem ? `settle-error-${key}` : undefined} onChange={(event) => { setAmount(event.target.value); setProblem(''); }}/>
+      <AmountInput data-control-id={`budget.settlement.amount.${expense.id}.${membershipId}`} className="input" id={`settle-${key}`} value={amount} aria-invalid={problem ? true : undefined} aria-describedby={problem ? `settle-error-${key}` : undefined} onValueChange={(value) => { setAmount(value); setProblem(''); }}/>
     </div>
     <div className="settlement-presets" role="group" aria-label={`${name}さんのすぐに選べる額`}>
       {settlementPresets(remainingJpy).map((preset) => <button key={preset.kind} data-control-id={`budget.settlement.preset.${preset.kind}.${expense.id}.${membershipId}`} className="button" type="button" onClick={() => { setAmount(String(preset.amountJpy)); setProblem(''); }}>{presetLabels[preset.kind]}（{formatYen(preset.amountJpy)}）</button>)}

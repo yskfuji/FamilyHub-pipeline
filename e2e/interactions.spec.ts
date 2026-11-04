@@ -91,6 +91,9 @@ test('all household permission controls, sole-owner guard, and invite creation w
   await page.getByRole('button', { name: '役割を保存' }).click();
   await expect(page.getByRole('alert')).toContainText('管理者は1人以上');
   await page.getByRole('button', { name: 'キャンセル' }).click();
+  // 段階12: 役割を変えたまま閉じると、未保存の確認が出る。
+  await page.getByRole('dialog', { name: '入力中の内容を破棄しますか' }).getByRole('button', { name: '破棄する' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await permissionButtons.nth(1).click();
   await page.getByRole('dialog').getByLabel('メンバーの役割', { exact: true }).selectOption('guest');
   await page.getByRole('button', { name: '役割を保存' }).click();

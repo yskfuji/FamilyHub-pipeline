@@ -33,6 +33,28 @@ export function parseYen(text: string): number | null {
   return Number.isSafeInteger(value) ? value : null;
 }
 
+/**
+ * 金額の欄に表示する文字（段階12）。数字・桁区切り・円の記号・空白だけなら、数字だけにして3桁ごとに「,」で区切る（全角も半角にする）。
+ * ほかの文字を含むときは、そのまま返す（読めないことを確かめの文で伝えるため。勝手に消さない）。
+ */
+export function formatAmountInput(text: string): string {
+  const normalized = text.normalize('NFKC');
+  if (!/^[\d,\s¥￥円]*$/.test(normalized)) return text;
+  const digits = normalized.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+/** 区切りを付け直したあと、カーソルを同じ数字の後ろに置くための位置。digitsBefore はカーソルより前にあった数字の数。 */
+export function caretAfterDigits(formatted: string, digitsBefore: number): number {
+  if (digitsBefore <= 0) return 0;
+  let seen = 0;
+  for (let index = 0; index < formatted.length; index += 1) {
+    if (/\d/.test(formatted[index])) seen += 1;
+    if (seen === digitsBefore) return index + 1;
+  }
+  return formatted.length;
+}
+
 export const activeAdults = (memberships: readonly HouseholdMembership[]) => memberships.filter((member) => member.status === 'active' && (member.role === 'owner' || member.role === 'adult'));
 
 /** 支払った人に選べる人。今の支払った人は、変えずに保存できるように残す。 */

@@ -69,7 +69,7 @@ const MONTH_GROUP_LABEL = '月の日付。矢印キーで日を移せます';
 function DayCell({ day, column, todayKey, selected, onSelect, holiday, count, yen, tabStop }: DayProps & { day: CalendarGridDate; column: number; holiday?: string; count: number; yen: boolean; tabStop: string }) {
   const description = [dayLabel(day.date), holiday, `予定${count}件`, yen ? '支出あり' : undefined].filter(Boolean).join('、');
   return <button data-control-id={`calendar.day.${day.date}`} type="button" className="day" data-col={column} data-date={day.date} data-tone={dayTone(day.date, holiday)} data-outside={day.inCurrentMonth ? undefined : true} aria-label={description} aria-pressed={selected === day.date} aria-current={day.date === todayKey ? 'date' : undefined} tabIndex={day.date === tabStop ? 0 : -1} onClick={() => onSelect(day.date)}>
-    <span className="day-head"><span className="date-num">{day.day}</span>{holiday && <span className="day-holiday">{holiday}</span>}{yen && <span className="day-yen">¥</span>}</span>
+    <span className="day-head"><span className="date-num">{day.day}</span>{holiday && <span className="day-holiday" title={holiday}>{holiday}</span>}{yen && <span className="day-yen">¥</span>}</span>
   </button>;
 }
 

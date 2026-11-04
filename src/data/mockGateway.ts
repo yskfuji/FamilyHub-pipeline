@@ -360,6 +360,11 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi', options:
     if (result.ok) replays.set(key, { fingerprint, result: structuredClone(result) });
     return result;
   };
+  // 作成の操作も、フォームごとの1つの冪等キーを受け取る（段階12。二度押しや応答の失われた送り直しで記録を増やさない）。
+  gateway.events.createEvent = idempotent('createEvent', gateway.events.createEvent, (_input, context) => context?.idempotencyKey);
+  gateway.todos.createTodo = idempotent('createTodo', gateway.todos.createTodo, (_input, context) => context?.idempotencyKey);
+  gateway.memos.createMemo = idempotent('createMemo', gateway.memos.createMemo, (_input, context) => context?.idempotencyKey);
+  gateway.expenses.createExpense = idempotent('createExpense', gateway.expenses.createExpense, (_input, key) => key);
   gateway.expenses.settleAll = idempotent('settleAll', gateway.expenses.settleAll, (_input, key) => key);
   gateway.expenses.reverseBatch = idempotent('reverseBatch', gateway.expenses.reverseBatch, (_batchId, key) => key);
   return gateway;

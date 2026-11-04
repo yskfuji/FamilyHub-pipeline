@@ -141,7 +141,7 @@ export function BudgetOverview({ expenses, location, currentMonth, search, href 
       <section className="card"><span className="meta">差し引き</span><p className="metric">{formatSignedYen(overview.netJpy)}</p><p className="muted small mb-0">収入から支出を引いた額</p></section>
     </div>
     <BalanceCard spendingJpy={overview.spending.totalJpy} incomeJpy={overview.income.totalJpy} comparison={comparisonText(monthComparison(expenses, month))}/>
-    <div className="grid two mt-1">
+    <div className="grid two mt-1 budget-split">
       <div className="stack budget-column">
         {categories.length > 0 && <CategoryChart name="spending-categories" tone={1} eyebrow="費目別" title={`${shortMonth(month)}の支出の内訳`} items={categories} href={categoryHref}/>}
         {income.length > 0 && <CategoryChart name="income-categories" tone={4} eyebrow="収入" title={`${shortMonth(month)}の収入の内訳`} items={income} href={categoryHref}/>}

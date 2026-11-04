@@ -21,9 +21,19 @@
   }
   h1, h2, h3, p { margin-block-start: 0; }
   /* 行末に1〜2字だけ残る折り返しを避ける（対応していない端末では普通に折り返す）。 */
+  /*
+   * 折り返し（段階12で全体に広げた）。日本語は文節の切れ目で折り返し（Chrome 119 以降の auto-phrase。継承する）、
+   * 「選択したメ／ンバー」のような語の途中の折り返しを、ボタン・札・ラベルを含むすべての文字で避ける。
+   * auto-phrase のない端末では、短い UI の文字だけを keep-all にし、収まらないときだけ任意の位置で折り返す。
+   */
+  html { word-break: auto-phrase; }
+  @supports not (word-break: auto-phrase) {
+    button, .button, .badge, .meta, .eyebrow, label, legend, th, dt, summary, .nav-label, .segmented button, .person-chip { word-break: keep-all; overflow-wrap: anywhere; }
+  }
   p, li, dd, .meta, .row-main span { text-wrap: pretty; }
-  h1, h2, h3 { text-wrap: balance; word-break: auto-phrase; }
-  p { line-height: var(--leading-body); word-break: auto-phrase; }
+  h1, h2, h3 { text-wrap: balance; }
+  /* 説明文は 16px・行間 1.75、1行は 40em まで（全画面。段階10では今日の画面だけだった）。 */
+  p { line-height: var(--leading-body); max-inline-size: 40em; }
   h1, h2 { font-family: var(--font-serif); font-weight: 650; letter-spacing: .035em; }
   h1 { font-size: clamp(var(--text-2xl), 4vw, var(--text-4xl)); line-height: var(--leading-heading); margin-bottom: var(--space-2); }
   h2 { font-size: var(--text-xl); line-height: var(--leading-heading); margin-bottom: var(--space-4); }
@@ -58,7 +68,7 @@
   .page { width: min(100%, 94rem); margin-inline: auto; padding: clamp(var(--space-5), 4vw, var(--space-7)); padding-bottom: var(--layout-page-end); }
   .page-head { display: flex; align-items: end; justify-content: space-between; gap: var(--space-5); margin-bottom: var(--space-6); }
   .eyebrow { margin-bottom: var(--space-1); color: var(--brand); font-size: var(--text-xs); font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
-  .lede { max-width: 45rem; margin-bottom: 0; color: var(--ink-soft); }
+  .lede { max-width: 40em; margin-bottom: 0; color: var(--ink-soft); }
   .button { min-height: 2.75rem; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); padding: var(--space-2) var(--space-4); display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); color: var(--ink); background: var(--sheet); text-decoration: none; font-weight: 700; cursor: pointer; transition: transform var(--duration-2) var(--ease-standard), background var(--duration-3) var(--ease-standard), border-color var(--duration-3) var(--ease-standard); }
   .button:hover { border-color: var(--ink-soft); transform: translateY(-1px); }
   .button:active { transform: translateY(0); }
@@ -92,6 +102,8 @@
   .list { margin: 0; padding: 0; list-style: none; }
   .list-row { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--space-4); align-items: center; padding: var(--space-4) 0; border-bottom: 1px solid var(--line); }
   .list-row:last-child { border-bottom: 0; }
+  /* 本文と操作の2つだけの行（招待の一覧など）は、本文の列を伸ばし、操作の列は中身の幅にする。 */
+  .list-row:has(> .row-main:first-child):has(> :nth-child(2):last-child) { grid-template-columns: minmax(0, 1fr) auto; }
   .row-main { min-width: 0; }
   .row-main strong { display: block; line-height: 1.5; }
   .row-main span { display: block; overflow-wrap: anywhere; }
@@ -120,7 +132,6 @@
   .segmented { width: fit-content; max-width: 100%; display: flex; padding: var(--space-1); border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--paper-deep); }
   .segmented button { min-height: 2.75rem; border: 0; border-radius: var(--radius-pill); padding: var(--space-2) var(--space-3); color: var(--ink-soft); background: transparent; cursor: pointer; font-weight: 700; }
   .segmented button[aria-pressed='true'] { color: var(--ink); background: var(--sheet); box-shadow: var(--shadow-1); }
-  .segmented button { word-break: auto-phrase; }
   .scenario-segmented { width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(4.75rem, 1fr)); border-radius: var(--radius-md); }
   .notice { padding: var(--space-3) var(--space-4); border-radius: var(--radius-sm); background: var(--success-soft); color: var(--success); font-weight: 680; }
   .notice.error { background: var(--danger-soft); color: var(--danger); }
@@ -148,8 +159,11 @@
   .toast-visible { position: fixed; z-index: var(--z-toast); left: 50%; bottom: 1.5rem; transform: translateX(-50%); width: max-content; max-width: calc(100% - 2rem); padding: var(--space-3) var(--space-4); border-radius: var(--radius-pill); background: var(--ink); color: var(--sheet); box-shadow: var(--shadow-3); font-weight: 700; font-size: var(--text-sm); }
   .calendar-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(17rem, .8fr); gap: var(--space-4); align-items: start; }
   .calendar-toolbar { display: grid; gap: var(--space-3); margin-bottom: var(--space-4); }
-  .calendar-month-navigation { display: grid; grid-template-columns: minmax(4.5rem, auto) minmax(9rem, 1fr) minmax(4.5rem, auto) minmax(4.5rem, auto); gap: var(--space-2); align-items: center; }
-  .calendar-month-heading { min-width: 0; min-height: 2.75rem; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); border: 1px solid transparent; border-radius: var(--radius-sm); color: var(--ink); background: transparent; font: inherit; font-family: var(--font-serif); font-size: var(--text-xl); font-weight: 800; cursor: pointer; }
+  /* 前・見出し・今・次。収まらないときは折り返す（段階12。文字の間隔を広げると、見出しが隣のボタンへ重なっていた）。 */
+  .calendar-month-navigation { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+  .calendar-month-navigation > .button { flex: none; min-width: 4.5rem; }
+  .calendar-month-navigation > .calendar-month-heading { flex: 1 1 9rem; }
+  .calendar-month-heading { min-width: auto; min-height: 2.75rem; text-wrap: balance; text-align: center; display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); border: 1px solid transparent; border-radius: var(--radius-sm); color: var(--ink); background: transparent; font: inherit; font-family: var(--font-serif); font-size: var(--text-xl); font-weight: 800; cursor: pointer; }
   .calendar-month-heading:hover { border-color: var(--line); background: var(--paper); }
   .calendar-toolbar > .segmented { justify-self: end; }
   .month { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius-md); overflow: clip; background: var(--sheet); }
@@ -243,7 +257,7 @@
   .timeline-add { position: absolute; inset: 0; width: 100%; padding: 0; border: 0; background: transparent; cursor: copy; }
   .timeline-add:focus-visible { outline-offset: -3px; }
   .timeline-block { --column-width: calc((100% - var(--block-gap, .25rem)) / var(--columns)); position: absolute; z-index: var(--z-raised); top: calc(var(--hour) * var(--start)); left: calc(var(--column-width) * var(--column)); width: var(--column-width); height: calc(var(--hour) * var(--length) - 1px); min-height: 2.75rem; display: grid; align-content: start; padding: var(--space-1) var(--space-1); overflow: hidden; border: 0; border-left: 3px solid var(--event-color, var(--accent)); border-radius: var(--radius-xs); background: color-mix(in srgb, var(--accent) 12%, var(--sheet)); color: var(--ink); cursor: pointer; text-align: left; }
-  .timeline-block time, .timeline-block strong { display: block; overflow: hidden; line-height: 1.25; text-overflow: clip; white-space: nowrap; }
+  .timeline-block time, .timeline-block strong { display: block; overflow: hidden; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
   .timeline-block time { color: var(--ink-soft); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
   .timeline-block strong { font-size: var(--text-xs); }
   .timeline-now { position: absolute; z-index: var(--z-overlap); inset-inline: 0; top: calc(var(--hour) * var(--start)); height: 0; border-top: 2px solid var(--danger); pointer-events: none; }
@@ -302,14 +316,18 @@
   .welcome-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-6); }
   .welcome-note { margin-top: var(--space-6); }
   .welcome h1 { font-size: clamp(var(--text-3xl), 7vw, var(--text-4xl)); line-height: var(--leading-heading); }
-  .welcome-art { min-height: 34rem; position: relative; border: 1px solid var(--line); border-radius: 3rem 3rem 10rem 3rem; background: linear-gradient(155deg, var(--sheet), var(--paper-deep)); box-shadow: var(--shadow-2); overflow: hidden; }
+  .welcome-art { min-height: 34rem; position: relative; display: grid; align-content: center; gap: var(--space-5); padding: var(--space-6) 0; border: 1px solid var(--line); border-radius: 3rem 3rem 10rem 3rem; background: linear-gradient(155deg, var(--sheet), var(--paper-deep)); box-shadow: var(--shadow-2); }
+  /* 飾りの円は、自分の箱の中で切る（見本のカードの文字を切る箱と分ける）。 */
+  .welcome-orbits { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; pointer-events: none; }
   .orbit { position: absolute; border: 1px solid var(--line); border-radius: 50%; }
   .orbit.one { width: 28rem; height: 28rem; right: -6rem; top: -4rem; }
   .orbit.two { width: 18rem; height: 18rem; left: -5rem; bottom: -5rem; }
-  .art-card { position: absolute; width: min(18rem, 70%); padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-md); background: color-mix(in srgb, var(--sheet) 92%, transparent); box-shadow: var(--shadow-1); backdrop-filter: blur(8px); }
-  .art-card.first { left: 10%; top: 16%; transform: rotate(-3deg); }
-  .art-card.second { right: 8%; top: 43%; transform: rotate(2deg); }
-  .art-card.third { left: 17%; bottom: 8%; transform: rotate(-1deg); }
+  .art-card { position: relative; width: min(18rem, 85%); padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-md); background: color-mix(in srgb, var(--sheet) 92%, transparent); box-shadow: var(--shadow-1); backdrop-filter: blur(8px); }
+  /* 見本のカードは流れに置き、文字の間隔を広げても切れたり重なったりしないようにする（段階12。前は位置を固定して重ねていた）。 */
+  .art-card .split { margin-bottom: var(--space-2); }
+  .art-card.first { justify-self: start; margin-inline-start: 8%; transform: rotate(-3deg); }
+  .art-card.second { justify-self: end; margin-inline-end: 6%; transform: rotate(2deg); }
+  .art-card.third { justify-self: start; margin-inline-start: 14%; transform: rotate(-1deg); }
   .auth-layout { min-height: 100vh; display: grid; grid-template-columns: minmax(16rem, .75fr) minmax(0, 1.25fr); }
   .auth-aside { padding: clamp(var(--space-6), 6vw, var(--space-8)); display: flex; flex-direction: column; justify-content: space-between; background: var(--accent-strong); color: var(--on-accent); }
   .auth-aside .brand, .auth-aside .brand-kicker, .auth-aside .eyebrow { color: var(--on-accent); }
@@ -490,7 +508,7 @@
     .day-holiday { order: 1; flex: 0 0 100%; line-height: var(--leading-compact); }
   }
 
-  @media (max-width: 760px) {
+  @media (width < 42.7rem) {
     .place-disclosure > div { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
     .detail-list > div { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
     .history-side, .expense-side { justify-items: start; }
@@ -511,7 +529,7 @@
     .mobile-nav svg { width: 1.25rem; height: 1.25rem; }
     .dialog-backdrop { align-items: end; padding: 0; }
     .dialog { width: 100%; max-height: 92vh; border-radius: var(--radius-lg) var(--radius-lg) 0 0; padding: var(--space-4) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom)); }
-    .calendar-month-navigation { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-1); }
+    .calendar-month-navigation { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-1); }
     .calendar-month-heading { grid-column: 1 / -1; grid-row: 1; }
     .calendar-month-navigation > .button { grid-row: 2; min-width: 0; padding-inline: var(--space-2); }
     .calendar-toolbar > .segmented { justify-self: stretch; }
@@ -544,8 +562,8 @@
     .topbar-actions { gap: var(--space-1); }
     .topbar-actions .icon-button { width: 2.75rem; }
     .segmented { width: 100%; border-radius: var(--radius-sm); }
-    .segmented button { flex: 1; min-width: 0; padding-inline: var(--space-1); font-size: var(--text-xs); }
-    .filter-head .segmented button, .places-toolbar .segmented button { flex: 0 0 auto; padding-inline: var(--space-3); }
+    .segmented button { flex: 1; min-width: var(--layout-target); padding-inline: var(--space-1); font-size: var(--text-xs); }
+    .filter-head .segmented button, .places-toolbar .segmented button, .help-categories button { flex: 0 0 auto; padding-inline: var(--space-3); }
     /* 設定のタブは語の途中で折り返さず、横にスクロールする。 */
     .settings-tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
     .settings-tabs .button { flex: 0 0 auto; padding-inline: var(--space-3); font-size: var(--text-xs); }
@@ -768,7 +786,7 @@
     .rail .nav-link { justify-content: center; }
     .rail .nav-count { position: absolute; top: .15rem; right: .15rem; margin: 0; }
   }
-  @media (max-width: 760px) {
+  @media (width < 42.7rem) {
     .page-head-actions { width: 100%; justify-content: flex-start; }
     .page:has(.calendar-layout) .page-head { flex-wrap: wrap; }
     .page:has(.calendar-layout) .page-head h1 { white-space: nowrap; }
@@ -829,7 +847,6 @@
   .loading-slow { margin-top: var(--space-4); }
 
   /* 囲みの見出しを語の途中で折り返さない（狭い列で「開けま／せん」のように残さない。Chrome 119 以降）。 */
-  .callout strong { word-break: auto-phrase; }
   .keep-together { white-space: nowrap; }
 
   /* 経路ごとのエラー境界。 */
@@ -840,7 +857,7 @@
 @layer responsive {
   /* narrow の詳細は全画面のシート。幅の段階の上書き（max-width: 1100px）より後に置く。 */
   .drawer[data-presentation='sheet'] { left: 0; width: 100%; padding: var(--space-4) var(--space-4) calc(var(--space-6) + env(safe-area-inset-bottom)); border-left: 0; animation-name: sheet-in; }
-  @media (max-width: 760px) {
+  @media (width < 42.7rem) {
     html { scroll-padding-block: calc(var(--layout-topbar-compact) + var(--space-3)) calc(var(--layout-fab-bottom) + var(--layout-fab) + var(--space-3) + env(safe-area-inset-bottom)); }
   }
   @media (prefers-reduced-motion: reduce) {
@@ -856,7 +873,6 @@
   .search-result.grouped { grid-template-columns: minmax(0, 1fr); min-height: 2.75rem; padding-inline: var(--space-2); }
 
   /* 変更の記録（A5-8） */
-  .audit-lede { max-width: 40em; }
   .audit-views { margin-top: var(--space-3); }
   .audit-filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); margin-top: var(--space-4); }
   .audit-filters .field { margin: 0; }
@@ -870,7 +886,6 @@
   .audit-row:last-child { border-bottom: 0; }
   .audit-time { padding-top: var(--space-1); color: var(--ink-soft); font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
   .audit-main { min-width: 0; display: grid; gap: var(--space-1); }
-  .audit-main strong { word-break: auto-phrase; }
   .audit-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--space-3); }
   .audit-meta a { min-height: 2.75rem; display: inline-flex; align-items: center; }
   .audit-hidden { display: inline-flex; align-items: center; min-height: 1.75rem; padding: 0 var(--space-2); border: 1px dashed var(--line-strong); border-radius: var(--radius-xs); color: var(--ink-soft); }
@@ -934,7 +949,7 @@
     .media-bar-actions { margin-left: auto; }
     .media-stage.pdf-stage { padding-top: calc(var(--space-8) + var(--space-6)); }
   }
-  @media (max-width: 760px) {
+  @media (width < 42.7rem) {
     .audit-filters { grid-template-columns: minmax(0, 1fr); }
     .settle-all-action .button { width: 100%; }
   }
@@ -947,7 +962,7 @@
   .illustration * { vector-effect: non-scaling-stroke; }
   .empty[data-illustrated] { padding-block: var(--space-6); }
   .empty-art { width: 8.75rem; margin: 0 auto var(--space-3); }
-  .empty p { max-width: 40em; margin-inline: auto; }
+  .empty p { margin-inline: auto; }
   .empty.compact { padding: var(--space-3) var(--space-2); border: 0; background: transparent; }
   .empty.compact .empty-art { width: 6rem; margin-bottom: var(--space-2); }
   .empty.compact .illustration { stroke-width: 1.75px; }
@@ -970,7 +985,7 @@
   .today-col { min-width: 0; display: grid; gap: var(--space-5); align-content: start; }
   .today-span { grid-column: 1 / -1; }
   /* 説明文の行は 40em まで（全幅の欄でも長くしない）。 */
-  .today-layout p, .today-layout .row-main { max-width: 40em; }
+  .today-layout .row-main { max-width: 40em; }
   .today-next-list { gap: var(--space-3); }
   .callout.next-item { border-color: var(--line); background: var(--sheet); }
   .today-layout[data-layout='wide'] .callout { grid-template-columns: auto minmax(0, 1fr); }
@@ -984,8 +999,8 @@
 
   /* 時刻の帯。予定は長さのある帯、期限のタスクは点、今の時刻は縦の線。下の一覧と同じ内容なので読み上げない。 */
   .time-strip { margin-bottom: var(--space-2); }
-  .time-strip-track { position: relative; height: 1.25rem; border-radius: var(--radius-pill); background: var(--paper-deep); }
-  .time-strip-mark { position: absolute; top: .25rem; left: calc(var(--strip-at) * 100%); width: max(.75rem, calc(var(--strip-span) * 100%)); height: .75rem; border-radius: var(--radius-pill); background: var(--accent-strong); }
+  .time-strip-track { position: relative; height: calc(var(--strip-lanes, 1) * 1rem + .25rem); border-radius: var(--radius-sm); background: var(--paper-deep); }
+  .time-strip-mark { position: absolute; top: calc(.25rem + var(--strip-lane, 0) * 1rem); left: calc(var(--strip-at) * 100%); width: max(.75rem, calc(var(--strip-span) * 100%)); height: .75rem; border-radius: var(--radius-pill); background: var(--accent-strong); }
   .time-strip-mark[data-kind='task'] { width: .75rem; transform: translateX(-50%); background: var(--brand); box-shadow: 0 0 0 2px var(--sheet); }
   .time-strip-mark[data-past='true'] { background: var(--line-strong); }
   .time-strip-now { position: absolute; top: -.25rem; bottom: -.25rem; left: calc(var(--strip-at) * 100%); width: 2px; transform: translateX(-50%); border-radius: var(--radius-pill); background: var(--danger); }
@@ -995,9 +1010,8 @@
 }
 
 @layer responsive {
-  @media (max-width: 760px) {
+  @media (width < 42.7rem) {
     .page-head-copy.has-art { display: block; }
-    .page-head-copy.has-art > .season-scene { float: right; width: 4.75rem; margin: 0 0 var(--space-1) var(--space-3); }
     .empty-art { width: 7.5rem; }
   }
   @media (prefers-reduced-motion: reduce) {
@@ -1066,5 +1080,44 @@
   @media (forced-colors: active) {
     .chart-mark rect { fill: CanvasText; }
     .chart-axis { stroke: CanvasText; }
+  }
+}
+
+/*
+ * 段階12: 全画面を同じ体系にそろえる。操作の大きさ（タッチの配置では 44px、主な操作は 48px）、
+ * 文の外に置くリンク、家計の2列の高さ、今日の見出しの季節の場面（狭い幅）。試験は e2e/layout.spec.ts（LAYOUT-*）。
+ */
+@layer components {
+  /* 文の中ではなく、それだけで置くリンク（「カレンダーへ」など）。押せる範囲を 44px にする。 */
+  .standalone-link { display: inline-flex; align-items: center; min-height: var(--layout-target); min-width: var(--layout-target); }
+  /* 切り替えの1字のボタン（月・週・日）も 44px の幅にする。 */
+  .segmented button { min-width: var(--layout-target); }
+  /* 家計の概要の2列。右の「未精算」の欄を左の列の高さまで伸ばさない。 */
+  .budget-split { align-items: start; }
+  /* ボタンは文字が短くても 44px の幅を下回らない。一覧の行の右のボタンは折り返さず、本文の側を縮める。 */
+  .button { min-width: var(--layout-target); }
+  .list-row > .button, .list-row > a.button { white-space: nowrap; }
+  /* 日付と時刻の欄は、中の年・月・日の部分と暦のボタンに焦点が入る（暦のボタンのとき、欄は :focus にもならない）。:focus-within で欄の輪郭を出す。 */
+  input:is([type='date'], [type='datetime-local'], [type='time'], [type='month']):focus-within { outline: 3px solid var(--focus); outline-offset: 3px; }
+}
+
+@layer responsive {
+  /*
+   * 予定の月の表と日の欄の2列は、本文が狭い medium（レールがあり、窓が 42.7〜49rem）では1列にする。
+   * 下のナビとレールの切り替えを段階にそろえたので、前は下のナビだった 684〜760px の窓でも2列になり、マスが 39px になっていた。
+   */
+  @media (width < 49rem) {
+    .calendar-layout { grid-template-columns: minmax(0, 1fr); }
+  }
+  /* タッチの配置（narrow と medium）では、主な操作を 48px にする。 */
+  html:not([data-size-class='wide']) .button.primary { min-height: var(--layout-target-primary); }
+  /*
+   * 狭い幅の今日の見出し: 季節の場面を見出しの行の上の余白（ページの上の余白）と小さな見出しの行の右に置き、
+   * 大きな見出しは全幅で折り返す（長い名前で、見出しが場面の横で細く折り返していた）。高さは増やさない。
+   */
+  @media (width < 42.7rem) {
+    .page-head-copy.has-art { position: relative; }
+    .page-head-copy.has-art > .season-scene { position: absolute; float: none; top: calc(var(--space-4) * -1); right: 0; width: var(--layout-season-narrow); margin: 0; }
+    .page-head-copy.has-art > .eyebrow { padding-inline-end: calc(var(--layout-season-narrow) + var(--space-3)); }
   }
 }

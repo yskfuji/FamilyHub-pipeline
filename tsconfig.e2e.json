@@ -20,6 +20,7 @@
   "include": [
     "e2e/**/*.ts",
     "src/domain/theme.ts",
+    "src/content/settingsRoutes.ts",
     "src/domain/types.ts",
     "src/domain/captureTime.ts",
     "src/domain/exifTiff.ts",
