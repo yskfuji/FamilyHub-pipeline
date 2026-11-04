@@ -2,8 +2,11 @@ import { memberName, useApp } from '../../app/AppContext';
 import { ja } from '../../content/ja';
 import { EmptyState, formatSignedYen, formatYen } from '../../design-system/components';
 import { EmptyBudget } from '../../design-system/illustrations/EmptyBudget';
+import { BarChart, GroupedBarChart, type ChartTone } from '../../design-system/charts/BarCharts';
+import { ChartFrame } from '../../design-system/charts/ChartFrame';
 import { YenIcon } from '../../design-system/icons';
 import { balanceOf, incomeBreakdown, monthComparison, monthOverview } from '../../domain/budgetSummary';
+import { budgetTrend, trendIsDrawable, type TrendMonth } from '../../domain/budgetTrend';
 import { sortLedger, type BudgetCategory, type BudgetLocation } from '../../domain/budgetView';
 import { categoryBreakdown, simplifiedTransfers, unsettledSummary } from '../../domain/ledger';
 import type { Expense } from '../../domain/types';
@@ -36,17 +39,60 @@ function BalanceCard({ spendingJpy, incomeJpy, comparison }: { spendingJpy: numb
   </section>;
 }
 
-function CategoryBars({ title, eyebrow, items, href }: { title: string; eyebrow: string; items: ReadonlyArray<{ category: BudgetCategory; totalJpy: number; percent: number }>; href: (category: BudgetCategory) => string }) {
+/** 費目の内訳。多い順の横棒で、行ごとにその費目の一覧へのリンクにする。 */
+function CategoryChart({ name, title, eyebrow, items, href, tone }: { name: string; title: string; eyebrow: string; items: ReadonlyArray<{ category: BudgetCategory; totalJpy: number; percent: number }>; href: (category: BudgetCategory) => string; tone: ChartTone }) {
   const id = `category-${eyebrow}`;
+  const share = (item: typeof items[number]) => `（${item.percent}%）`;
   return <section className="card" aria-labelledby={id}>
     <p className="eyebrow">{eyebrow}</p>
     <h2 id={id}>{title}</h2>
-    <ul className="category-list">{items.map((item) => <li key={item.category}>
-      <a data-control-id={`budget.category.open.${item.category}`} className="category-link" href={href(item.category)} data-link aria-label={`${ja.expenseCategory[item.category]}の記録を見る ${formatYen(item.totalJpy)}（${item.percent}%）`}>
-        <span className="split"><strong>{ja.expenseCategory[item.category]}</strong><span className="amount">{formatYen(item.totalJpy)}<span className="muted">（{item.percent}%）</span></span></span>
-        <span className="bar" aria-hidden="true"><span style={{ width: `${item.percent}%` }}/></span>
-      </a>
-    </li>)}</ul>
+    <ChartFrame name={name} table={{ caption: title, columns: ['費目', '金額', '割合'], rows: items.map((item) => ({ key: item.category, header: ja.expenseCategory[item.category], cells: [formatYen(item.totalJpy), `${item.percent}%`] })) }}>
+      <BarChart tone={tone} room="share"
+        items={items.map((item) => ({ key: item.category, name: ja.expenseCategory[item.category], value: item.totalJpy, label: <>{formatYen(item.totalJpy)}<tspan className="chart-label-soft">{share(item)}</tspan></> }))}
+        wrap={(bar, content) => {
+          const item = items.find((entry) => entry.category === bar.key)!;
+          return <a data-control-id={`budget.category.open.${item.category}`} className="category-link" href={href(item.category)} data-link aria-label={`${ja.expenseCategory[item.category]}の記録を見る ${formatYen(item.totalJpy)}${share(item)}`}>{content}</a>;
+        }}/>
+    </ChartFrame>
+  </section>;
+}
+
+/**
+ * 表示中の月までの6か月の、月ごとの支出と収入。記録のない月は 0 円。記録のある月が2か月に満たなければ文で伝える。
+ * 支出と収入は桁が大きく違うことが多く、1つの尺度にすると支出の棒が読めなくなるので、別の面に分けて並べる（どちらも 0 から）。
+ */
+function TrendCard({ expenses, month, currentMonth }: { expenses: Expense[]; month: string; currentMonth: string }) {
+  const trend = budgetTrend(expenses, month);
+  const first = trend.months[0].month;
+  const mark = (key: string) => (key === currentMonth ? '今月' : key === month ? '表示中' : undefined);
+  const peak = trend.months.reduce((top, item) => (item.spendingJpy > top.spendingJpy ? item : top), trend.months[0]);
+  const panels: ReadonlyArray<{ key: 'spending' | 'income'; name: string; tone: ChartTone; pick: (item: TrendMonth) => number }> = [
+    { key: 'spending', name: '支出', tone: 1, pick: (item) => item.spendingJpy },
+    ...(trend.showIncome ? [{ key: 'income' as const, name: '収入', tone: 4 as const, pick: (item: TrendMonth) => item.incomeJpy }] : []),
+  ];
+  const summary = `${monthLabel(first)}から${monthLabel(month)}までの、月ごとの${panels.map((panel) => panel.name).join('と')}。${shortMonth(month)}の支出は${formatYen(trend.months.at(-1)!.spendingJpy)}、6か月でいちばん支出が多いのは${shortMonth(peak.month)}の${formatYen(peak.spendingJpy)}です。`;
+  return <section className="card mt-1" aria-labelledby="trend-title">
+    <p className="eyebrow">推移</p>
+    <h2 id="trend-title">6か月の推移</h2>
+    {!trendIsDrawable(trend)
+      ? <p className="chart-note" data-chart-empty="trend">記録のある月が2か月以上になると、{shortMonth(first)}から{shortMonth(month)}までの推移を表示します。</p>
+      : <>
+        <p className="muted small">月ごとの{panels.map((panel) => panel.name).join('と')}の合計です。記録のない月は0円です。{panels.length > 1 && '支出と収入は、それぞれの最も多い月を同じ長さにして描いています。'}</p>
+        <ChartFrame name="trend" summary={summary} table={{
+          caption: `${monthLabel(first)}〜${monthLabel(month)}の推移`,
+          columns: ['月', ...panels.map((panel) => panel.name)],
+          rows: trend.months.map((item) => ({ key: item.month, header: `${monthLabel(item.month)}${mark(item.month) ? `（${mark(item.month)}）` : ''}`, cells: panels.map((panel) => formatYen(panel.pick(item))) })),
+        }}>
+          <div className="chart-panels">{panels.map((panel) => <div className="chart-panel" key={panel.key} data-panel={panel.key}>
+            <p className="chart-panel-title">{panel.name}</p>
+            <GroupedBarChart room="yen" series={[{ key: panel.key, name: panel.name, tone: panel.tone }]} groups={trend.months.map((item) => ({
+              key: item.month, name: shortMonth(item.month), mark: mark(item.month),
+              values: { [panel.key]: panel.pick(item) },
+              labels: { [panel.key]: formatYen(panel.pick(item)) },
+            }))}/>
+          </div>)}</div>
+        </ChartFrame>
+      </>}
   </section>;
 }
 
@@ -68,12 +114,13 @@ function UnsettledCard({ expenses, settlementsHref }: { expenses: Expense[]; set
 interface Props {
   expenses: Expense[];
   location: BudgetLocation;
+  currentMonth: string;
   search: string;
   href: (changes: Partial<BudgetLocation>) => string;
 }
 
 /** 月の収支、先月との比較、最近の記録、費目の内訳、未精算のまとめ。 */
-export function BudgetOverview({ expenses, location, search, href }: Props) {
+export function BudgetOverview({ expenses, location, currentMonth, search, href }: Props) {
   const { snapshot } = useApp();
   const { month } = location;
   const overview = monthOverview(expenses, month);
@@ -96,11 +143,12 @@ export function BudgetOverview({ expenses, location, search, href }: Props) {
     <BalanceCard spendingJpy={overview.spending.totalJpy} incomeJpy={overview.income.totalJpy} comparison={comparisonText(monthComparison(expenses, month))}/>
     <div className="grid two mt-1">
       <div className="stack budget-column">
-        {categories.length > 0 && <CategoryBars eyebrow="費目別" title={`${shortMonth(month)}の支出の内訳`} items={categories} href={categoryHref}/>}
-        {income.length > 0 && <CategoryBars eyebrow="収入" title={`${shortMonth(month)}の収入の内訳`} items={income} href={categoryHref}/>}
+        {categories.length > 0 && <CategoryChart name="spending-categories" tone={1} eyebrow="費目別" title={`${shortMonth(month)}の支出の内訳`} items={categories} href={categoryHref}/>}
+        {income.length > 0 && <CategoryChart name="income-categories" tone={4} eyebrow="収入" title={`${shortMonth(month)}の収入の内訳`} items={income} href={categoryHref}/>}
       </div>
       {unsettled}
     </div>
+    <TrendCard expenses={expenses} month={month} currentMonth={currentMonth}/>
     <section className="card mt-1" aria-labelledby="recent-title">
       <div className="section-head"><div><p className="eyebrow">記録</p><h2 id="recent-title">最近の記録</h2></div><a data-control-id="budget.recent.open-list" className="button" href={href({ view: 'list' })} data-link>一覧を見る</a></div>
       <ul className="list">{recent.map((expense) => <ExpenseRow expense={expense} search={search} key={expense.id}/>)}</ul>

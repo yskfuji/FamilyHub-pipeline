@@ -73,7 +73,7 @@ function nameOf(snapshot: HouseholdSnapshot, id: Id) {
   return snapshot.memberships.find((member) => member.id === id)?.displayName ?? '非公開';
 }
 
-const openTodos = (snapshot: HouseholdSnapshot) => snapshot.todos.filter((todo) => todo.status !== 'done' && !todo.deletedAt);
+export const openTodos = (snapshot: HouseholdSnapshot) => snapshot.todos.filter((todo) => todo.status !== 'done' && !todo.deletedAt);
 const isOverdue = (todo: Todo, asOf: string) => Boolean(todo.dueAt) && Date.parse(todo.dueAt as string) < Date.parse(asOf);
 
 function upcoming(snapshot: HouseholdSnapshot, today: string, until: string) {

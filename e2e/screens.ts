@@ -18,6 +18,9 @@ export const screens = [
   ['notes-empty','/notes?scenario=empty'],['budget-empty','/budget?scenario=empty'],['albums-empty','/albums?scenario=empty'],['places-empty','/places?scenario=empty'],
   ['offline-unreachable','/today?stage=unreachable'],['today-all-done','/today?scenario=all-done'],
   ['today-spring','/today?season=spring'],['today-summer','/today?season=summer'],['today-winter','/today?season=winter'],
+  // 段階11: 図表。推移の記録が1か月だけの月（文で伝える）と、表示する人で絞った蓮さんの家計（収入の面が消える）。
+  // 費目・推移は budget、差し引きは budget-settlements と budget-settlements-ren、日ごとの件数は insights に写る。表は下の openedStates。
+  ['budget-trend-short','/budget?month=2026-08'],['budget-ren','/budget?actor=member-ren'],
 ] as const;
 
 export const viewports = [
@@ -151,6 +154,25 @@ export const openedStates: readonly OpenedState[] = [
     await page.evaluate(() => { window.history.pushState({}, '', '/insights'); window.dispatchEvent(new PopStateEvent('popstate')); });
     await expect(page.locator('.route-error').getByRole('heading', { name: 'この画面を表示できませんでした' })).toBeVisible();
     await page.unroute(chunk);
+  } },
+  // 段階11: 図表の「表で見る」を開いた状態。
+  { name: 'budget-trend-table', route: '/budget', viewports: ['mobile', 'tablet', 'desktop'], async open(page) {
+    const trend = page.locator('[data-chart="trend"]');
+    await trend.getByRole('button', { name: '表で見る' }).click();
+    await expect(trend.getByRole('table')).toBeVisible();
+    await trend.getByRole('table').scrollIntoViewIfNeeded();
+  } },
+  { name: 'budget-balances-table', route: '/budget?view=settlements', viewports: ['mobile', 'desktop'], async open(page) {
+    const balances = page.locator('[data-chart="balances"]');
+    await balances.getByRole('button', { name: '表で見る' }).click();
+    await expect(balances.getByRole('table')).toBeVisible();
+    await balances.scrollIntoViewIfNeeded();
+  } },
+  { name: 'insights-week-table', route: '/insights', viewports: ['mobile', 'desktop'], async open(page) {
+    const week = page.locator('[data-chart="week-load"]');
+    await week.getByRole('button', { name: '表で見る' }).click();
+    await expect(week.getByRole('table')).toBeVisible();
+    await week.getByRole('table').scrollIntoViewIfNeeded();
   } },
   { name: 'quick-create-expense', route: '/budget', viewports: ['mobile'], async open(page) {
     await page.getByRole('button', { name: 'すぐに追加' }).click();

@@ -86,6 +86,13 @@
     --layout-bottom-nav: 4.6rem;
     --layout-fab: 3.25rem;
     --layout-fab-bottom: 5.5rem;
+    /* 図表（段階11）。棒の先に書く値の幅（金額と割合・金額・件数）と、行の名前の列の幅。文字は縮めないので、この幅を棒から空ける。 */
+    --layout-chart-share: 8rem;
+    --layout-chart-yen: 5rem;
+    --layout-chart-count: 3rem;
+    --layout-chart-name: 3rem;
+    --layout-chart-name-wide: 5.5rem;
+    --layout-chart-series: 2.75rem;
 
     --radius-xs: 6px;
     --radius-sm: 10px;

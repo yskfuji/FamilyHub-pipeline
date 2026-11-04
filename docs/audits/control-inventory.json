@@ -1922,6 +1922,25 @@
       "entity": null
     },
     {
+      "idPattern": "^chart\\.table\\.",
+      "routes": [
+        "/budget",
+        "/insights"
+      ],
+      "roles": [
+        "owner",
+        "adult"
+      ],
+      "capability": "expense.read|insight.read",
+      "risk": "display",
+      "onlineRequired": false,
+      "successObservation": "図表と同じ数値の表を開き、もう一度押すと閉じる",
+      "failureRecovery": "図表と直接のラベルはそのまま残る",
+      "undo": "もう一度押して表を閉じる",
+      "alternative": "図表の直接のラベル",
+      "entity": null
+    },
+    {
       "idPattern": "^showcase\\.management\\.nav\\.",
       "routes": [
         "/showcase/management"

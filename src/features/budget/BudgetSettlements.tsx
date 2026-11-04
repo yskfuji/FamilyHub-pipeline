@@ -3,15 +3,38 @@ import { memberName, useApp } from '../../app/AppContext';
 import { settleAllCopy } from '../../content/ja';
 import { EmptyState, formatYen } from '../../design-system/components';
 import { EmptyDone } from '../../design-system/illustrations/EmptyDone';
+import { DivergingBarChart } from '../../design-system/charts/BarCharts';
+import { ChartFrame } from '../../design-system/charts/ChartFrame';
 import { YenIcon } from '../../design-system/icons';
 import { openExpenses } from '../../domain/budgetSummary';
-import { groupedSettlementHistory, settleAllRequest, settledNet, simplifiedTransfers, unsettledSummary, type SettlementHistoryEntry } from '../../domain/ledger';
-import type { Expense, SettleAllInput } from '../../domain/types';
+import { groupedSettlementHistory, netBalances, openShares, settleAllRequest, settledNet, simplifiedTransfers, unsettledSummary, type SettlementHistoryEntry } from '../../domain/ledger';
+import type { Expense, HouseholdSnapshot, SettleAllInput } from '../../domain/types';
 import { ExpenseRow } from './ExpenseRow';
 import { SettlementHistory } from './SettlementHistory';
 import type { ExpenseActions } from './useBudgetActions';
 
 const SettleAllDialog = lazy(async () => ({ default: (await import('./SettleAllDialog')).SettleAllDialog }));
+
+const direction = (value: number) => (value > 0 ? '受け取る' : value < 0 ? '支払う' : '残りなし');
+const balanceText = (value: number) => (value === 0 ? direction(0) : `${direction(value)} ${formatYen(Math.abs(value))}`);
+
+/**
+ * 人ごとの差し引き（受け取る人は右、支払う人は左）。値は受け渡しのまとめと同じ netBalances(openShares()) で、
+ * 表示する人で絞っているときは、示した記録の中での差し引きになる（受け渡しのまとめと同じ）。
+ */
+function BalanceChart({ expenses, snapshot }: { expenses: Expense[]; snapshot: HouseholdSnapshot }) {
+  const order = snapshot.memberships.map((member) => member.id);
+  const rank = (id: string) => (order.includes(id) ? order.indexOf(id) : order.length);
+  const rows = [...netBalances(openShares(expenses))].sort(([a, x], [b, y]) => y - x || rank(a) - rank(b));
+  const items = rows.map(([id, value]) => ({ key: id, name: memberName(snapshot, id), value, label: balanceText(value) }));
+  const summary = `人ごとの差し引き。${items.map((item) => `${item.name}さんは${item.label}`).join('、')}。`;
+  return <div className="chart-section">
+    <h3 id="balances-title">人ごとの差し引き</h3>
+    <ChartFrame name="balances" summary={summary} table={{ caption: '人ごとの差し引き', columns: ['人', '向き', '金額'], rows: items.map((item) => ({ key: item.key, header: item.name, cells: [direction(item.value), formatYen(Math.abs(item.value))] })) }}>
+      <DivergingBarChart items={items} positiveTone={4} negativeTone={1}/>
+    </ChartFrame>
+  </div>;
+}
 
 /**
  * 受け渡しのまとめ。「まとめて精算する」は、表示する人が「すべて」のときだけ出す（A4-3）。絞り込み中に示した一覧は家計の全体ではないため。
@@ -28,6 +51,8 @@ function Transfers({ expenses, memberFilterActive, actions }: { expenses: Expens
       ? <p className="muted mb-0">支払いが残っている人はいません。</p>
       : <div className="stack">
         <p className="muted small mb-0">残りのある記録をすべて相殺した金額です。受け渡しのあとは「まとめて精算する」で一度に記録するか、下の記録ごとに精算を残してください。</p>
+        <BalanceChart expenses={expenses} snapshot={snapshot}/>
+        <h3 className="mb-0">受け渡し</h3>
         {transfers.map((transfer) => <div className="callout" key={`${transfer.from}-${transfer.to}`}><YenIcon/><div><strong>{memberName(snapshot, transfer.from)}さんから{memberName(snapshot, transfer.to)}さんへ</strong><p className="metric mb-0">{formatYen(transfer.amountJpy)}</p></div></div>)}
         {request && <div className="settle-all-action"><button data-control-id="budget.settle-all.open" className="button primary" type="button" disabled={actions.busy !== null} onClick={() => setConfirming(request)}>{settleAllCopy.open}</button></div>}
         {memberFilterActive && can('expense.settle') && <p className="small muted mb-0">{settleAllCopy.filtered}</p>}

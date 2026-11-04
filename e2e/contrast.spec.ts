@@ -222,11 +222,13 @@ async function axeProblems(page: Page): Promise<string[]> {
       const measured = await page.evaluate(({ selector, photoSelectors }) => {
         const element = document.querySelector(selector);
         const marks = (window as unknown as { __contrastMarks?: WeakMap<Element, boolean> }).__contrastMarks;
-        if (!element || !marks) return { found: Boolean(element), ok: false, photo: false };
+        if (!element || !marks) return { found: Boolean(element), ok: false, photo: false, chart: false };
         const values = [element, ...element.querySelectorAll('*')].map((item) => marks.get(item)).filter((value) => value !== undefined);
-        return { found: true, ok: values.length > 0 && values.every(Boolean), photo: photoSelectors.some((item) => element.closest(item)) };
+        return { found: true, ok: values.length > 0 && values.every(Boolean), photo: photoSelectors.some((item) => element.closest(item)), chart: Boolean(element.closest('svg.chart-svg')) && element.matches('text, tspan') };
       }, { selector: target[0], photoSelectors: photoExceptions.map(([, selector]) => selector) });
+      // 段階11: 図表の値の文字は SVG の text なので、axe は「画像の中」として背景を決めない。ここで同じ要素を測って合格したときだけ受け入れる。
       const explained = ((reason === 'bgImage' || reason === 'imgNode') && measured.photo && measured.ok)
+        || (reason === 'imgNode' && measured.chart && measured.ok)
         || (reason in axeIncompleteMeasuredHere && measured.ok)
         || (!measured.found && reason === 'outsideViewport');
       if (!explained) problems.push(`axe incomplete (${reason}) ${target.join(' ')}: ${measured.found ? 'not measured as passing here' : 'element not found'}`);

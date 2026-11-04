@@ -47,7 +47,7 @@ for (const [viewport,width,height] of viewports) {
   }
 }
 
-for (const [name,route] of [['today','/today'],['calendar','/calendar'],['tasks','/tasks'],['budget','/budget'],['showcase','/showcase']] as const) {
+for (const [name,route] of [['today','/today'],['calendar','/calendar'],['tasks','/tasks'],['budget','/budget'],['budget-settlements','/budget?view=settlements'],['insights','/insights'],['showcase','/showcase']] as const) {
   test(`desktop ${name} dusk`, async ({ page, browserName }) => {
     test.skip(browserName !== 'chromium', 'delivery capture uses fixed Chromium DPR 1');
     await page.setViewportSize({ width: 1440, height: 1000 });

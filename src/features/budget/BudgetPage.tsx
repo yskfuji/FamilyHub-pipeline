@@ -56,7 +56,7 @@ export function BudgetPage({ path }: { path: string }) {
     {expenses.length === 0
       ? <div className="mt-1"><EmptyState title={memberId ? '該当する記録はありません' : 'まだ記録がありません'} illustration={<EmptyBudget/>} action={!memberId && canCreate ? <button data-control-id="budget.empty.create" className="button primary" type="button" onClick={() => requestQuickCreate('expense')}>最初の支出を記録</button> : undefined}>{memberId ? <ScopeNote/> : '「支出を追加」や「収入を追加」から記録すると、ここに集計と精算の状態を表示します。'}</EmptyState></div>
       : <>
-        {location.view === 'overview' && <BudgetOverview expenses={expenses} location={location} search={search} href={href}/>}
+        {location.view === 'overview' && <BudgetOverview expenses={expenses} location={location} currentMonth={currentMonth} search={search} href={href}/>}
         {location.view === 'list' && <BudgetList expenses={expenses} location={location} currentMonth={currentMonth} search={search} onChange={filter}/>}
         {location.view === 'members' && <BudgetMembers expenses={expenses} month={location.month}/>}
         {location.view === 'settlements' && <BudgetSettlements expenses={expenses} search={search} onReverse={(entry) => void actions.reverse(entry)} busyId={actions.busy} memberFilterActive={Boolean(memberId)} actions={actions}/>}
