@@ -572,6 +572,25 @@ test.describe('LAYOUT-7 fail-safe input and response', () => {
     await expect(page.locator('.task-card', { hasText: '二度押しの確かめ' })).toHaveCount(1);
     expect(await page.locator('.task-card').count()).toBe(before + 1);
   });
+
+  test('an edit form sends once from a double press and closes without a conflict', async ({ page }) => {
+    await page.goto('/tasks/todo-form');
+    await page.getByRole('dialog').getByRole('button', { name: '内容を編集' }).click();
+    const form = page.getByRole('dialog', { name: 'タスクを編集' });
+    await form.getByLabel('タスク名').fill('二度押しの編集');
+    const save = form.getByRole('button', { name: '変更を保存' });
+    // 同じフレームで2回押す。2回目は ref の印で止まり、古い版での送信（CONFLICT）にならない。
+    const disabledNextFrame = await save.evaluate((button) => new Promise<boolean>((resolve) => {
+      (button as HTMLButtonElement).click();
+      (button as HTMLButtonElement).click();
+      requestAnimationFrame(() => resolve((button as HTMLButtonElement).disabled));
+    }));
+    expect(disabledNextFrame).toBe(true);
+    await expect(form).toHaveCount(0);
+    await expect(page.getByRole('dialog', { name: '二度押しの編集' })).toBeVisible();
+    await page.getByRole('dialog').getByRole('button', { name: '内容を編集' }).click();
+    await expect(page.getByRole('dialog', { name: 'タスクを編集' }).locator('.field-error, [role="alert"]')).toHaveCount(0);
+  });
 });
 
 test.describe('LAYOUT-9 the unsaved-changes guard also covers the permission dialog in the settings', () => {
@@ -614,6 +633,25 @@ test.describe('LAYOUT-8 axe finds no serious or critical problem on the main scr
         await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
         const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
         for (const violation of results.violations.filter((item) => ['serious', 'critical'].includes(item.impact ?? ''))) failures.push(`${route}: ${violation.id} ${violation.nodes.map((node) => node.target.join(' ')).join(', ')}`);
+      }
+      expect(failures).toEqual([]);
+    });
+  }
+});
+
+test.describe('LAYOUT-10 every visible label is part of the accessible name, and axe finds no WCAG A or AA problem of any impact', () => {
+  // WCAG 2.5.3（A）。axe では実験的な規則なので、タグでは選ばれない。名前で選んで、深刻度に関わらず失敗にする。
+  const screens = ['/today', '/calendar', '/calendar?view=week', '/calendar?view=day', '/calendar?view=list', '/tasks', '/notes', '/budget', '/budget?view=settlements', '/albums', '/places', '/insights', '/settings/household', '/settings/audit'];
+  for (const [label, width, height] of [['narrow', 390, 844], ['wide', 1440, 900]] as const) {
+    test(label, async ({ page }) => {
+      test.setTimeout(180_000);
+      await page.setViewportSize({ width, height });
+      const failures: string[] = [];
+      for (const route of screens) {
+        await page.goto(route);
+        await page.waitForLoadState('networkidle');
+        const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).withRules(['label-content-name-mismatch']).analyze();
+        for (const violation of results.violations) failures.push(`${route}: ${violation.id} (${violation.impact}) ${violation.nodes.map((node) => node.target.join(' ')).join(', ')}`);
       }
       expect(failures).toEqual([]);
     });

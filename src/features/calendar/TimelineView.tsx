@@ -29,7 +29,8 @@ function Block({ block, onOpen }: { block: TimelineBlock; onOpen: (occurrence: O
   const { occurrence, start, end, column, columns } = block;
   const range = `${formatTime(occurrence.startsAt)}〜${formatTime(occurrence.endsAt)}`;
   const style = { ...positionOf(start, end), '--column': column, '--columns': columns, ...labelStyle(snapshot.colorLabels, occurrence.colorLabelId) } as CSSProperties;
-  return <button data-control-id={`calendar.event.open.${occurrence.id}.${occurrence.occurrenceDate}`} className="timeline-block" type="button" style={style} aria-label={`${range} ${occurrence.title}を開く`} onClick={() => onOpen(occurrence)}>
+  return <button data-control-id={`calendar.event.open.${occurrence.id}.${occurrence.occurrenceDate}`} className="timeline-block" type="button" style={style} aria-label={`${formatTime(occurrence.startsAt)}${occurrence.title}を開く（${range}）`} onClick={() => onOpen(occurrence)}>
+    {/* 名前は見えている「時刻 予定名」から始め、終わりの時刻は後ろに足す（WCAG 2.5.3）。切れて省略記号になる文字も、名前には全部入る。 */}
     <time>{formatTime(occurrence.startsAt)}</time><strong>{occurrence.title}</strong>
   </button>;
 }

@@ -54,9 +54,9 @@
 
 - ファイル: `FAMILY_HUB_AUDIT_DB`（既定は本体の DB と同じディレクトリの `audit.db`）。API と命令が権限 0600 で作り、すでにあるファイルも 0600 にそろえます（`-wal` と `-shm` も同じ権限になります）。置き場所は `family-hub-api.service` の `ReadWritePaths` の中にしてください。別のディレクトリに置くなら `ReadWritePaths` に足します。
 - **別のファイルにしても、API と同じ OS の利用者や root からは守れません。** 両方のファイルを書き換えられ、trigger も外せます。改ざんに気づけるのは、別の場所に残した基準点の範囲だけです。
-- 基準点: API は毎日1回、運用ログ（journald）に `audit anchor day=… seq=… hash=…` の行を出します。運用ログを別の機械へ送るか、この行を別の場所に控えてください。**最後の基準点より後の切り捨ては検出できません。** 今の基準点は `node dist-server/cli.js audit anchor` でも表示できます。
+- 基準点: API は毎日1回、運用ログ（journald）に `audit anchor day=… seq=… hash=…` の行を出します。同じ値を本体の DB の `audit_anchors` にも残し、バックアップの目録にも入れます。本体の DB の控えは、両方のファイルを書き換えられる人には効かないので、運用ログを別の機械へ送るか、この行を別の場所に控えてください。**最後の基準点より後の切り捨ては検出できません。** 今の基準点は `node dist-server/cli.js audit anchor` でも表示できます。
 - 確かめる: `journalctl -u family-hub-api | grep 'audit anchor' > anchors.txt` で控えを作り、`node dist-server/cli.js audit verify --anchors anchors.txt`。改変・削除・並べ替え・挿入・基準点より前の切り捨てを、行の番号とともに標準エラーに出し、終了コード2で終わります。食い違いがなければ0です。API も起動のときと毎日、直近の5000行を確かめ、食い違いを運用ログ（`audit: the chain check failed at seq …`）と管理者の「変更の記録」に出します。`/ready` は落としません。
-- 保持: 既定で24か月（`FAMILY_HUB_AUDIT_RETENTION_MONTHS`、0 なら消さない）。API が毎日、過ぎた分を消します。手で消すなら `node dist-server/cli.js audit prune --before 2025-01-01`（省くと24か月より前）。消す前に、消す区間の末尾の hash を checkpoint として残し、そのことを鎖に1行足します。verify はそこから続きを確かめます。
+- 保持: 既定で24か月（`FAMILY_HUB_AUDIT_RETENTION_MONTHS`、0 なら消さない）。API が毎日、過ぎた分を消します。手で消すなら `node dist-server/cli.js audit prune --before 2025-01-01`（省くと `FAMILY_HUB_AUDIT_RETENTION_MONTHS` の月数より前。0 にしているときは、省くと何も消さずに終了コード1で止まるので、`--before` を付けてください）。消す前に、消す区間の末尾の hash を checkpoint として残し、そのことを鎖に1行足します。verify はそこから続きを確かめます。
 - 移行: 以前の版の本体の DB にあった `audit_events` の行は、最初の起動で送り出しの箱（`audit_outbox`）へ移し、`audit.db` の鎖の起点にします（表は消えます）。起動の前に本体の DB を別に写しておいてください。
 - バックアップ: `audit.db` は毎日のバックアップに入ります（下の「バックアップ」）。目録には、写した `audit.db` の鎖の末尾（基準点）を入れ、確かめるときと復元のときに照らし合わせます。
 
@@ -111,7 +111,7 @@ API と同じ環境変数で実行します。終了コードは、成功が0、
 ### 復元の手順
 
 1. `backup list` で戻す世代を選び、`backup verify <ID>` が0で終わることを確かめます。
-2. API を止めます（`systemctl stop family-hub-api`）。API は起動の間 `FAMILY_HUB_DATABASE` の隣に `.server.lock` を持ち、これがある間は `restore` が断ります。
+2. API を止めます（`systemctl stop family-hub-api`）。API は起動の間 `FAMILY_HUB_DATABASE` の名前に `.server.lock` を足したファイルを持ち、これがある間は `restore` が断ります。
 3. `node dist-server/cli.js restore <ID> --to /var/lib/family-hub-restore` を実行します。行き先は、新しいか空のディレクトリだけです。今のファイルは上書きしません。書いた後にもう一度、hash と DB の検査を行います。
    - 世代が使う鍵（確認コードの秘密を暗号化した kid）が鍵束にないか、秘密が違うと、kid を示して止まります。鍵束を直して実行し直してください。鍵を本当になくしたときだけ `--allow-missing-key <kid>` を付けます（その人は回復コードかパスキーでサインインし、確認コードを設定し直します）。
 4. 表示された `FAMILY_HUB_DATABASE=…`、`FAMILY_HUB_AUDIT_DB=…`、`FAMILY_HUB_MEDIA=…` を `/etc/family-hub/api.env` に設定します。元の場所に戻すなら、今のファイル（`-wal` と `-shm` を含む）とメディアを別の名前に移してから、復元したものを移します。所有者は API を動かす利用者、ファイルの権限は 0600 にします。

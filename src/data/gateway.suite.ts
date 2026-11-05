@@ -97,8 +97,9 @@ export function runGatewaySuite(world: (actorMembershipId?: string) => FamilyHub
       const owner = world();
       const guest = await owner.household.updateMembershipRole('member-yui', 'adult', 1);
       expect(guest).toMatchObject({ ok: true, value: { role: 'adult' } });
-      expect(await owner.household.updateMembershipRole('member-yui', 'owner', 2)).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
-      expect(await owner.family.transferOwnership('member-yui', 2)).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
+      // 理由まで確かめる。ほかの入力の誤りで INVALID_INPUT になっても通らないように。
+      expect(JSON.stringify(await owner.household.updateMembershipRole('member-yui', 'owner', 2))).toContain(serverMessages.ownerMustBeAdult);
+      expect(JSON.stringify(await owner.family.transferOwnership('member-yui', 2))).toContain(serverMessages.ownerMustBeAdult);
       expect(await owner.household.updateMembershipRole('member-ren', 'owner', 1)).toMatchObject({ ok: true, value: { role: 'owner' } });
       expect(await owner.family.leaveHousehold()).toEqual({ ok: true, value: undefined });
     });
@@ -227,8 +228,8 @@ export function runGatewaySuite(world: (actorMembershipId?: string) => FamilyHub
 
     it('refuses common, personal and patterned new passwords everywhere and accepts a passphrase (A9)', async () => {
       const gateway = world();
-      // 一覧の見本（全件は passwordPolicy.test.ts）、表示名・家族の名前・サービス名、並び。
-      for (const value of ['manchesterunited', 'TransportOnline', '1q2w3e4r5t6y7u8i9o0p', 'qazwsxedcrfvtgb', '碧1234567890123456', '森さんち2026!!!!!!!!!', 'yoridokoro2026!!!!!', 'zzzzzzzzzzzzzzzz']) {
+      // 一覧の見本（全件は passwordPolicy.test.ts）、本人と同じ家族のメンバーの表示名・家族グループの名前・サービス名、並び。
+      for (const value of ['manchesterunited', 'TransportOnline', '1q2w3e4r5t6y7u8i9o0p', 'qazwsxedcrfvtgb', '碧1234567890123456', '蓮1234567890123456', '結衣2026!!!!!!!!!!!', '森さんち2026!!!!!!!!!', 'yoridokoro2026!!!!!', 'zzzzzzzzzzzzzzzz']) {
         expect(await gateway.auth.changePassword('current-password-long-enough', value)).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
       }
       expect(await gateway.auth.confirmPasswordReset({ token: 'not-a-real-token', newPassword: 'manchesterunited' })).toMatchObject({ ok: false, error: { code: 'INVALID_INPUT' } });
@@ -762,7 +763,7 @@ export function runGatewaySuite(world: (actorMembershipId?: string) => FamilyHub
     it('refuses with a message that reveals nothing when a hidden expense between the same people is still open', async () => {
       const gateway = world();
       const snapshot = await gateway.household.getSnapshot();
-      if (!snapshot.ok) return;
+      if (!snapshot.ok) throw new Error('snapshot unavailable');
       const request = settleAllRequest(snapshot.value.expenses, { memberFilterActive: false })!;
       expect(request.shares.map((item) => item.expenseId)).toEqual(['expense-books', 'expense-train']);
       const refused = await gateway.expenses.settleAll(request);

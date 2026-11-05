@@ -335,6 +335,18 @@ describe('retention and prune (A6-7)', () => {
     expect(store.verify(log.anchors()).ok).toBe(true);
   });
 
+  it('keeps everything when the retention period is 0: the daily job and a prune without --before delete nothing', () => {
+    const { log, store, db } = setup();
+    addRows(log, 4, 1, (index) => `2024-0${index}-01`);
+    const keys = new Keyring({ keys: [{ kid: LEGACY_KID, secret: 'x'.repeat(32) }], activeKid: LEGACY_KID });
+    const errors: string[] = [];
+    expect(runOperatorCommand(['audit', 'prune'], { db, keys, now: '2026-11-03T10:00:00+09:00', out: () => undefined, err: (line) => errors.push(line), audit: log, auditRetentionMonths: 0 })).toBe(1);
+    expect(errors.join('\n')).toContain('--before');
+    runAuditDaily({ db, audit: log, config: { auditRetentionMonths: 0 }, clock: { now: () => '2026-11-03T03:00:00+09:00' }, ids: { next: () => 'audit-prune-0' } } as never);
+    expect(store.latestCheckpoint()).toBeNull();
+    expect(store.db.all<{ seq: number }>('SELECT seq FROM audit_events ORDER BY seq').map((row) => row.seq).slice(0, 4)).toEqual([1, 2, 3, 4]);
+  });
+
   it('notices a checkpoint planted to cut the head of the chain', () => {
     const { log, store } = setup();
     addRows(log, 10);

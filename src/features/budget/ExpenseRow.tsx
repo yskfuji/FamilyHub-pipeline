@@ -2,6 +2,7 @@ import { memberName, useApp } from '../../app/AppContext';
 import { ja } from '../../content/ja';
 import { StatusBadge, formatDateOnly, formatYen } from '../../design-system/components';
 import { CheckIcon, MapPinIcon } from '../../design-system/icons';
+import { Phrases } from '../../design-system/Phrases';
 import { remainingTotal } from '../../domain/ledger';
 import type { Expense } from '../../domain/types';
 
@@ -24,7 +25,7 @@ export function ExpenseRow({ expense, search, showDate = true }: { expense: Expe
     <span className="avatar" aria-hidden="true">{payer.slice(0, 1)}</span>
     <div className="row-main">
       <a data-control-id={`budget.expense.open.${expense.id}`} className="row-link" href={`/budget/${expense.id}${search}`} data-link data-keep-scroll><strong data-transition-title>{expense.title}</strong></a>
-      <span className="meta">{parts.join(' · ')}</span>
+      <span className="meta"><Phrases parts={parts}/></span>
       {expense.place && <span className="place-chip"><MapPinIcon width="14"/>{expense.place.name}</span>}
     </div>
     <div className="expense-side">

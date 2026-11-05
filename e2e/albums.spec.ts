@@ -154,6 +154,34 @@ test.describe('album detail', () => {
     await expect(toast(page)).toHaveCount(0);
   });
 
+  test('files chosen but not sent stay while moving inside the albums, and leaving the albums asks first', async ({ page }) => {
+    await page.goto('/albums/album-sports');
+    const nav = page.getByRole('navigation', { name: '主な機能' });
+    const prompt = page.getByRole('dialog', { name: '入力中の内容を破棄しますか' });
+    let dialog = await openUpload(page);
+    await dialog.getByLabel('アルバムに追加するファイルを選択').setInputFiles([photo('later.jpg')]);
+    await expect(dialog.getByRole('button', { name: '1件を送る' })).toBeVisible();
+    // 閉じても同じ画面に残るので、閉じるときは確かめない。
+    await dialog.getByRole('button', { name: '閉じる' }).first().click();
+    await expect(prompt).toHaveCount(0);
+    // アルバムの一覧へ移っても残るので確かめない。
+    await nav.getByRole('link', { name: 'アルバム' }).click();
+    await expect(page).toHaveURL(/\/albums$/);
+    await expect(prompt).toHaveCount(0);
+    await page.getByRole('link', { name: /運動会/ }).first().click();
+    dialog = await openUpload(page);
+    await expect(dialog.getByRole('button', { name: '1件を送る' })).toBeVisible();
+    await dialog.getByRole('button', { name: '閉じる' }).first().click();
+    // ほかの画面へ移ると消えるので、確かめる。
+    await nav.getByRole('link', { name: '今日' }).click();
+    await expect(prompt).toBeVisible();
+    await prompt.getByRole('button', { name: '編集に戻る' }).click();
+    await expect(page).toHaveURL(/\/albums\/album-sports/);
+    await nav.getByRole('link', { name: '今日' }).click();
+    await prompt.getByRole('button', { name: '破棄する' }).click();
+    await expect(page).toHaveURL(/\/today$/);
+  });
+
   test('deleting an item can be undone, and the location badge shows only when kept', async ({ page }) => {
     await makeAlbum(page, '撮影場所');
     const dialog = await openUpload(page);

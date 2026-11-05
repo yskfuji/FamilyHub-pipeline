@@ -18,7 +18,7 @@ export const settingsTabs: ReadonlyArray<{ href: typeof settingsRoutes[number]; 
   { href: '/settings/resources', label: '関連リンク', capability: 'resource.read', description: '学校や自治体など、家族でよく使うリンクを開きます。' },
   { href: '/settings/recently-deleted', label: '最近削除', capability: 'settings.own', description: '削除した記録を、完全に消える前に元に戻せます。' },
   // 変更の記録は管理者だけ（audit.read）。ほかの人にはタブも出さず、URL で開いても表示しない。
-  { href: '/settings/audit', label: '変更の記録', capability: 'audit.read', description: `${auditIntro.description} ${auditIntro.retention}。` },
+  { href: '/settings/audit', label: '変更の記録', capability: 'audit.read', description: `${auditIntro.description}${auditIntro.retention}。` },
   { href: '/settings/help', label: 'ヘルプ', capability: 'settings.own', description: 'よくある質問と、それぞれの画面の使い方を探せます。' },
   { href: '/settings/legal', label: '規約（草案）', capability: 'settings.own', description: '利用規約とプライバシーポリシーの草案を確認できます。' },
 ];

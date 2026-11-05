@@ -53,7 +53,7 @@ test('clicking empty space on the timeline opens create at that 30-minute slot',
   await expect(form.getByLabel('終了', { exact: true })).toHaveValue('2026-10-05T15:30');
   await form.getByLabel('予定名').fill('面談');
   await addEvent(page);
-  await expect(column.getByRole('button', { name: /14:30〜15:30 面談を開く/ })).toBeVisible();
+  await expect(column.getByRole('button', { name: /14:30\s?面談を開く（14:30〜15:30）/ })).toBeVisible();
 });
 
 test('the keyboard reaches the timeline and opens a morning slot', async ({ page }) => {

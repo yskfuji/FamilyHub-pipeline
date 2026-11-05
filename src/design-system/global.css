@@ -132,7 +132,9 @@
   .segmented { width: fit-content; max-width: 100%; display: flex; padding: var(--space-1); border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--paper-deep); }
   .segmented button { min-height: 2.75rem; border: 0; border-radius: var(--radius-pill); padding: var(--space-2) var(--space-3); color: var(--ink-soft); background: transparent; cursor: pointer; font-weight: 700; }
   .segmented button[aria-pressed='true'] { color: var(--ink); background: var(--sheet); box-shadow: var(--shadow-1); }
-  .scenario-segmented { width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(4.75rem, 1fr)); border-radius: var(--radius-md); }
+  /* 10の状態の切り替え。欄を等分すると「サインイ / ンの / 期限切れ」と切れるので、ラベルの幅で並べて折り返す。 */
+  .scenario-segmented { width: 100%; display: flex; flex-wrap: wrap; border-radius: var(--radius-md); }
+  .scenario-segmented button { flex: 1 1 auto; white-space: nowrap; }
   .notice { padding: var(--space-3) var(--space-4); border-radius: var(--radius-sm); background: var(--success-soft); color: var(--success); font-weight: 680; }
   .notice.error { background: var(--danger-soft); color: var(--danger); }
   .empty { padding: var(--space-8) var(--space-5); text-align: center; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); background: color-mix(in srgb, var(--sheet) 65%, transparent); }
@@ -160,9 +162,20 @@
   .calendar-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(17rem, .8fr); gap: var(--space-4); align-items: start; }
   .calendar-toolbar { display: grid; gap: var(--space-3); margin-bottom: var(--space-4); }
   /* 前・見出し・今・次。収まらないときは折り返す（段階12。文字の間隔を広げると、見出しが隣のボタンへ重なっていた）。 */
-  .calendar-month-navigation { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
-  .calendar-month-navigation > .button { flex: none; min-width: 4.5rem; }
-  .calendar-month-navigation > .calendar-month-heading { flex: 1 1 9rem; }
+  /*
+   * 前・見出し・今・次。並びの幅が 36rem 以上なら1行、狭ければ見出しを1行目に置き、3つのボタンを2行目に並べる。
+   * 折り返しに任せると「次月」だけが2行目に落ち、見出しを縮めると文字の間隔を広げたときに見出しがボタンに重なった。
+   * 年月を選ぶ画面は body に出すので、ここを container にしても固定の位置は変わらない。
+   */
+  .calendar-toolbar { container-type: inline-size; }
+  .calendar-month-navigation { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); align-items: center; }
+  .calendar-month-navigation > .calendar-month-heading { grid-column: 1 / -1; grid-row: 1; }
+  .calendar-month-navigation > .button { grid-row: 2; min-width: 0; }
+  @container (width >= 36rem) {
+    .calendar-month-navigation { grid-template-columns: auto minmax(0, 1fr) auto auto; }
+    .calendar-month-navigation > .calendar-month-heading { grid-column: auto; }
+    .calendar-month-navigation > .button { grid-row: 1; min-width: 4.5rem; }
+  }
   .calendar-month-heading { min-width: auto; min-height: 2.75rem; text-wrap: balance; text-align: center; display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); border: 1px solid transparent; border-radius: var(--radius-sm); color: var(--ink); background: transparent; font: inherit; font-family: var(--font-serif); font-size: var(--text-xl); font-weight: 800; cursor: pointer; }
   .calendar-month-heading:hover { border-color: var(--line); background: var(--paper); }
   .calendar-toolbar > .segmented { justify-self: end; }
@@ -437,9 +450,10 @@
   .place-card-head svg { color: var(--moss); margin-top: var(--space-1); }
   .place-card-stats { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); font-size: var(--text-sm); font-weight: 650; }
   .place-disclosure { display: grid; gap: 0; margin: 0; }
-  .place-disclosure > div { display: grid; grid-template-columns: minmax(6rem, 9rem) minmax(0, 1fr); gap: var(--space-4); padding: var(--space-3) 0; border-bottom: 1px solid var(--line); }
-  .place-disclosure dt { color: var(--ink-soft); font-size: var(--text-sm); font-weight: 750; }
-  .place-disclosure dd { margin: 0; }
+  /* 説明の欄が 16rem より狭くなるときは、項目名の下に置く（2列の欄の中で数文字ごとに折り返していた）。 */
+  .place-disclosure > div { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); padding: var(--space-3) 0; border-bottom: 1px solid var(--line); }
+  .place-disclosure dt { flex: 0 1 9rem; color: var(--ink-soft); font-size: var(--text-sm); font-weight: 750; }
+  .place-disclosure dd { flex: 1 1 16rem; min-width: 0; margin: 0; }
 
   .calendar-readers { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-4); }
   .calendar-readers:empty { display: none; }
@@ -509,7 +523,7 @@
   }
 
   @media (width < 42.7rem) {
-    .place-disclosure > div { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
+    .place-disclosure dt { flex-basis: 100%; }
     .detail-list > div { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
     .history-side, .expense-side { justify-items: start; }
     .app-shell { display: block; }
@@ -521,7 +535,8 @@
     .page-head { align-items: start; flex-direction: column; margin-bottom: var(--space-5); }
     .grid.two, .grid.three, .calendar-layout, .task-board, .welcome, .auth-layout, .review-findings { grid-template-columns: minmax(0, 1fr); }
     .grid.three { gap: var(--space-3); }
-    .topbar-actions .button .label { display: none; }
+    /* 見た目だけ隠し、名前には残す。名前が見えている「⌘K」を含み、読み上げでは「検索」と分かる（WCAG 2.5.3）。 */
+    .topbar-actions .button .label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
     .quick-create[data-placement='floating'] { will-change: transform; }
     .mobile-nav { position: fixed; z-index: var(--z-nav); inset: auto 0 0; min-height: 4.6rem; padding: var(--space-1) max(var(--space-2), env(safe-area-inset-right)) max(var(--space-1), env(safe-area-inset-bottom)) max(var(--space-2), env(safe-area-inset-left)); display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid var(--line); background: var(--sheet); will-change: transform; }
     .mobile-nav a, .mobile-nav button { min-width: 0; min-height: 3.7rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-1); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink-soft); text-decoration: none; font-size: var(--text-xs); font-weight: 750; }
@@ -567,7 +582,7 @@
     /* 設定のタブは語の途中で折り返さず、横にスクロールする。 */
     .settings-tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
     .settings-tabs .button { flex: 0 0 auto; padding-inline: var(--space-3); font-size: var(--text-xs); }
-    .scenario-segmented button { min-width: 4.75rem; }
+    .scenario-segmented button { flex: 1 1 auto; min-width: 4.75rem; }
     /* 狭い画面では「印・本文」を1行目に、操作を本文の下に回す（3要素を2列に詰めると本文と操作が潰れる）。 */
     .list-row { grid-template-columns: auto minmax(0, 1fr); row-gap: var(--space-2); }
     .list-row > :nth-child(3) { grid-column: 2; justify-self: start; }
@@ -848,6 +863,11 @@
 
   /* 囲みの見出しを語の途中で折り返さない（狭い列で「開けま／せん」のように残さない。Chrome 119 以降）。 */
   .keep-together { white-space: nowrap; }
+  /* 選択の印をテーマの色にする（ブラウザの既定の青のままだった）。 */
+  input[type='radio'], input[type='checkbox'] { accent-color: var(--accent); }
+  /* 区切りで並べた短い文のまとまり（Phrases）。まとまりの中では折り返さず、欄より長いときだけ中で折り返す。 */
+  .phrase { display: inline-block; max-inline-size: 100%; }
+  .notification-actions { gap: var(--space-2); }
 
   /* 経路ごとのエラー境界。 */
   .route-error .empty { max-width: 40rem; margin-inline: auto; }
@@ -910,7 +930,8 @@
   .batch-records li a { min-height: 2.75rem; display: inline-flex; align-items: center; }
 
   /* 繰り返しの「すべて」の編集の見通し（A13-6） */
-  .series-preview .button { white-space: nowrap; }
+  /* 断る理由の文を狭めないよう、切り替えのボタンは文の下に置く。 */
+  .series-preview .button { grid-column: 2 / -1; justify-self: start; white-space: nowrap; }
 
   /* アルバムの並べ方（A15-5） */
   .album-view-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); margin-bottom: var(--space-4); }

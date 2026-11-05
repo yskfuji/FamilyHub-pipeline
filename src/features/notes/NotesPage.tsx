@@ -94,7 +94,7 @@ export function NotesPage({ path }: { path: string }) {
         <p className="muted">{memo.body}</p>
         {memo.place && <span className="place-chip"><MapPinIcon width="14"/>{memo.place.name}</span>}
         <div className="split">
-          <span className="meta">{memberName(snapshot, memo.authorMembershipId)} · {memo.tags.join(' / ')} · <LockIcon width="12" aria-hidden="true"/> {audienceText('memo', memo.visibility, (id) => memberName(snapshot, id))}</span>
+          <span className="meta"><span className="phrase">{memberName(snapshot, memo.authorMembershipId)} ·</span> {memo.tags.length > 0 && <><span className="phrase">{memo.tags.join(' / ')} ·</span> </>}<span className="phrase"><LockIcon width="12" aria-hidden="true"/> {audienceText('memo', memo.visibility, (id) => memberName(snapshot, id))}</span></span>
           {memo.attachments.length > 0 && <StatusBadge tone={attachmentTone(memo.attachments)}>添付 {memo.attachments.length}件</StatusBadge>}
         </div>
       </a>)}</div>}

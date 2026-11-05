@@ -6,6 +6,7 @@ import { densityLabels } from '../../app/paletteCommands';
 import { capabilityCeilingFor, defaultCapabilitiesFor } from '../../authz/policy';
 import { auditCopy } from '../../content/auditLabels';
 import { externalLinkLabel, ja, membershipStatusLabels, roleLabels } from '../../content/ja';
+import { Phrases } from '../../design-system/Phrases';
 import { settingsTabFor, settingsTabs } from './settingsTabs';
 import { closeGuarded, useUnsavedGuard } from '../../design-system/unsavedGuard';
 import { Dialog, GuardedForm, PageHeader, StatusBadge, formatDate, formatRelative, formatTime } from '../../design-system/components';
@@ -162,12 +163,13 @@ function Household() {
   };
   return <>
     {canManage && <section className="card household-profile"><h2>家族グループの名前</h2><GuardedForm className="inline-form" onSubmit={(event) => { event.preventDefault(); void renameHousehold(event.currentTarget); }}><label className="field"><span>名前</span><input data-control-id="settings.household.name" className="input" name="householdName" required maxLength={40} defaultValue={snapshot.household.name} key={snapshot.household.name}/></label><button data-control-id="settings.household.name-save" className="button" type="submit" disabled={renamesLeft === 0}>名前を保存</button></GuardedForm><p className="small muted mb-0">{renamesLeft > 0 ? `あと${renamesLeft}回変更できます（24時間で${MAX_NAME_CHANGES_PER_DAY}回まで）。` : `名前の変更は24時間で${MAX_NAME_CHANGES_PER_DAY}回までです。時間をおいてお試しください。`} 日時は日本時間で表示します。</p></section>}
-    <div className="grid two">
+    {/* 招待の欄がない人（大人など）には2列にしない。右の列が空のまま、家族の欄が半分の幅に詰まっていた。 */}
+    <div className={canInvite ? 'grid two' : 'stack'}>
       <section className="card" id="household-members" tabIndex={-1}>
-        <p className="eyebrow">家族</p><h2>{snapshot.household.name}</h2><p className="muted">利用中 {activeCount}人 / {MAX_HOUSEHOLD_MEMBERS}人まで · 日時の表示 · 日本時間</p>
+        <p className="eyebrow">家族</p><h2>{snapshot.household.name}</h2><p className="muted"><Phrases parts={[`利用中 ${activeCount}人 / ${MAX_HOUSEHOLD_MEMBERS}人まで`, '日時の表示', '日本時間']}/></p>
         <ul className="list">{people.map((item) => <li className="list-row" key={item.id}>
           <span className="avatar" style={{ background: item.color, color: readableTextOn(item.color) }} aria-hidden="true">{item.displayName.slice(0, 1)}</span>
-          <div className="row-main"><strong>{item.displayName}</strong><span className="meta">{roleLabels[item.role]} · {membershipStatusLabels[item.status]}</span></div>
+          <div className="row-main"><strong>{item.displayName}</strong><span className="meta"><Phrases parts={[roleLabels[item.role], membershipStatusLabels[item.status]]}/></span></div>
           {canManage ? <button data-control-id={`settings.member.permissions.${item.id}`} className="button" type="button" aria-label={`${item.displayName}さんの権限を設定`} onClick={() => void openPermissions(item)}>権限を設定</button> : <StatusBadge>{roleLabels[item.role]}</StatusBadge>}
         </li>)}</ul>
         {!canManage && <p className="small muted">メンバーの権限変更と招待は、管理者だけが行えます。</p>}
@@ -181,7 +183,7 @@ function Household() {
         <p className="small muted mt-1">有効期間：24時間 · 使用回数：1回 · 管理者はいつでも無効にできます</p>
         {invite && <div className="notice invite-result" role="status"><strong>この画面でのみ表示する招待コード</strong><code>{invite.token}</code><span className="small">有効期限：{formatDate(invite.expiresAt)} {formatTime(invite.expiresAt)} · 残り{invite.remainingUses}回</span><button data-control-id="settings.invite.copy" className="button" type="button" onClick={() => void copyInvite()}>招待コードをコピー</button></div>}
         <h3 className="mt-1">作成した招待</h3>
-        {invites.length === 0 ? <p className="muted small">使用できる招待コードはありません。</p> : <ul className="list">{invites.map((item) => <li className="list-row" key={item.id}><div className="row-main"><strong>{roleLabels[item.role]}として招待</strong><span className="meta">{item.revokedAt ? '無効' : `残り${item.remainingUses}回 · ${`${formatDate(item.expiresAt)} ${formatTime(item.expiresAt)}`}まで`}</span></div>{!item.revokedAt && <button data-control-id={`settings.invite.revoke.${item.id}`} className="button danger" type="button" onClick={async () => {
+        {invites.length === 0 ? <p className="muted small">使用できる招待コードはありません。</p> : <ul className="list">{invites.map((item) => <li className="list-row" key={item.id}><div className="row-main"><strong><span className="phrase">{roleLabels[item.role]}として</span><span className="phrase">招待</span></strong><span className="meta">{item.revokedAt ? '無効' : <Phrases parts={[`残り${item.remainingUses}回`, `${formatDate(item.expiresAt)} ${formatTime(item.expiresAt)}まで`]}/>}</span></div>{!item.revokedAt && <button data-control-id={`settings.invite.revoke.${item.id}`} className="button danger" type="button" onClick={async () => {
           const result = await gateway.household.revokeInvite(item.id);
           if (!result.ok) { announce(result.error.message); return; }
           await loadInvites(); announce('招待コードを無効にしました。');
@@ -245,7 +247,7 @@ function Security() {
     if (next !== confirm) { setPasswordError('新しいパスワードと確認用の入力が一致しません。'); return; }
     const parsed = passwordSchema.safeParse(next);
     if (!parsed.success) { setPasswordError(parsed.error.issues[0]?.message ?? '新しいパスワードを確認してください。'); return; }
-    const problem = await checkNewPassword(next, { email: snapshot.user.email, displayName: snapshot.memberships.find((member) => member.id === snapshot.viewer.membershipId)?.displayName, householdName: snapshot.household.name });
+    const problem = await checkNewPassword(next, { email: snapshot.user.email, displayName: snapshot.memberships.find((member) => member.id === snapshot.viewer.membershipId)?.displayName, householdName: snapshot.household.name, memberNames: snapshot.memberships.filter((member) => member.id !== snapshot.viewer.membershipId).map((member) => member.displayName) });
     if (problem) { setPasswordError(problem); return; }
     const result = await gateway.auth.changePassword(current, next);
     if (!result.ok) { setPasswordError(result.error.message); return; }
@@ -263,7 +265,7 @@ function Security() {
       <section className="card accent"><ShieldIcon width="30"/><p className="eyebrow">おすすめ</p><h2>パスキー</h2><p>端末の画面ロックを使って本人確認します。パスワードのみを使うより、偽のサインイン画面に情報を入力するリスクを減らせます。</p>{overview?.authenticators.map((item) => <div className="setting-row" key={item.id}><div><strong>{item.label}</strong><p className="small muted mb-0">{item.demo ? 'デモ登録' : '登録済み'}</p></div><StatusBadge tone="success">利用中</StatusBadge></div>)}<button data-control-id="settings.passkey.add" className="button full" type="button" onClick={() => void addPasskey()}>別のパスキーを追加</button>{runtimeMode === 'mock' && <p className="small muted mt-1">このデモでは実際のパスキーは登録されません。実際の利用時は、ブラウザの本人確認画面が開きます。</p>}</section>
       <section className="card"><LockIcon width="30"/><p className="eyebrow">別の方法</p><h2>パスワード</h2><p>15文字以上64文字以内で設定します。数字や記号を必ず混ぜる必要はありません。安全性が低いと判断されたパスワードは使用できません。</p><button data-control-id="settings.password.open" className="button full" type="button" onClick={() => setPasswordOpen(true)}>パスワードを変更</button></section>
       <section className="card"><h2>サインイン中の端末</h2><ul className="list">{overview?.sessions.map((session) => <li className="list-row" key={session.id}><span className="status-dot" style={{ color: session.current ? 'var(--success)' : undefined }}/><div className="row-main"><strong>{session.label}</strong><span className="meta">{session.location} · {session.current ? 'この端末' : `最終利用：${formatRelative(session.lastSeenAt, snapshot.context.asOf)}`}</span></div>{session.current ? <StatusBadge tone="success">利用中</StatusBadge> : <button data-control-id={`settings.session.revoke-open.${session.id}`} className="button danger" type="button" onClick={() => setRevoke(session.id)}>サインアウト</button>}</li>)}</ul></section>
-      <section className="card"><h2>この端末からサインアウト</h2><p>共用の端末や、しばらく使わない端末では、使い終わったらサインアウトしてください。次回の利用時には、もう一度本人確認が必要です。</p><button data-control-id="settings.session.sign-out-current" className="button full" type="button" onClick={() => setSigningOut(true)}>この端末からサインアウト</button><p className="small muted mt-1 mb-0">紛失した端末は、左の一覧から個別にサインアウトできます。</p></section>
+      <section className="card"><h2>この端末からサインアウト</h2><p>共用の端末や、しばらく使わない端末では、使い終わったらサインアウトしてください。次回の利用時には、もう一度本人確認が必要です。</p><button data-control-id="settings.session.sign-out-current" className="button full" type="button" onClick={() => setSigningOut(true)}>この端末からサインアウト</button><p className="small muted mt-1 mb-0">紛失した端末は、「サインイン中の端末」の一覧から個別にサインアウトできます。</p></section>
     </div>
     <section className="card mt-1" aria-labelledby="account-activity-title"><h2 id="account-activity-title">{auditCopy.mineHeading}</h2><p className="small muted">{auditCopy.mineDescription}</p><Suspense fallback={<div className="skeleton"/>}><AccountActivity/></Suspense></section>
     {passwordOpen && <Dialog title="パスワードを変更" description="この画面を閉じると、入力中のパスワードは消去されます。" onClose={() => { setPasswordOpen(false); setPasswordError(''); }}><GuardedForm className="stack" onSubmit={(event) => { event.preventDefault(); void changePassword(event.currentTarget); }}><label className="field"><span>現在のパスワード</span><input data-control-id="settings.password.current" className="input" name="current" type="password" autoComplete="current-password" minLength={15} maxLength={64} required/></label><label className="field"><span>新しいパスワード</span><input data-control-id="settings.password.new" className="input" name="next" type="password" autoComplete="new-password" minLength={15} maxLength={64} required/></label><label className="field"><span>新しいパスワード（確認）</span><input data-control-id="settings.password.confirm" className="input" name="confirm" type="password" autoComplete="new-password" minLength={15} maxLength={64} required/></label>{passwordError && <p className="field-error" role="alert">{passwordError}</p>}<div className="dialog-actions"><button data-control-id="settings.password.cancel" className="button" type="button" onClick={(event) => closeGuarded(event.currentTarget.closest('[data-modal-root]'), () => setPasswordOpen(false))}>{ja.actions.cancel}</button><button data-control-id="settings.password.submit" className="button primary" type="submit">変更する</button></div></GuardedForm></Dialog>}

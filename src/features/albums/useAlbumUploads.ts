@@ -1,9 +1,12 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useApp } from '../../app/AppContext';
+import { useUnsavedGuard } from '../../design-system/unsavedGuard';
 import { createUploadQueue } from './uploadQueue';
 import { makeVideoThumbnail } from './videoThumbnail';
 
 export type AlbumUploads = ReturnType<typeof useAlbumUploads>;
+
+const keptInAlbums = (pathname: string) => pathname === '/albums' || pathname.startsWith('/albums/');
 
 /** アルバムの画面全体で1つ持つ待ち行列。一覧と詳細を行き来しても送信は続く。 */
 export function useAlbumUploads() {
@@ -14,6 +17,9 @@ export function useAlbumUploads() {
   const entries = useSyncExternalStore(queue.subscribe, queue.getEntries);
   const sending = entries.some((entry) => entry.state === 'sending' || entry.state === 'waiting');
   useEffect(() => () => queue.dispose(), [queue]);
+  // 送る前・送っている途中のファイルは、アルバムの画面の中を移っても残るが、ほかの画面へ移ると消える。そのときだけ確かめる。
+  const pending = entries.filter((entry) => entry.state === 'staged' || entry.state === 'waiting' || entry.state === 'sending').length;
+  useUnsavedGuard(pending, false, keptInAlbums);
   // 送っている途中でタブを閉じると、送り直しができなくなる。
   useEffect(() => {
     if (!sending) return;

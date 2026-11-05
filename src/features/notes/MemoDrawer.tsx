@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSubmission } from '../../app/useSubmission';
 import { memberName, useApp } from '../../app/AppContext';
 import { canDeleteResource, canMutateOwnedResource } from '../../authz/policy';
 import { ja } from '../../content/ja';
@@ -28,7 +29,9 @@ export function MemoDrawer({ memo, queue, onClose, onDeleted }: Props) {
   const { snapshot, gateway, refresh, announce, executeQueueable } = useApp();
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  // 送信中の印は ref でも持ち、同じフレームの二度押しを止める（更新は版で守るので冪等キーは使わない）。
+  const submission = useSubmission();
+  const submitting = submission.submitting;
   const [formError, setFormError] = useState('');
   const { viewer } = snapshot;
   const canEdit = canMutateOwnedResource(viewer, 'memo.update', memo.authorMembershipId).allowed;
@@ -36,11 +39,11 @@ export function MemoDrawer({ memo, queue, onClose, onDeleted }: Props) {
   const canDelete = canDeleteResource(viewer, 'memo.delete', [memo.authorMembershipId]).allowed;
 
   const update = async (draft: MemoDraft) => {
-    if (submitting) return;
-    setSubmitting(true); setFormError('');
+    if (!submission.start()) return;
+    setFormError('');
     const input = memoDraftToUpdateInput(draft, memo);
     const outcome = await executeQueueable({ operation: 'memo.update', summary: `メモ「${memo.title}」を変更`, payload: { id: memo.id, input, expectedVersion: memo.version } }, () => gateway.memos.updateMemo(memo.id, input, memo.version));
-    setSubmitting(false);
+    submission.end();
     if (outcome.status === 'failed') { setFormError(outcome.error.message); return; }
     if (outcome.status === 'queued') { setEditing(false); return; }
     await refresh(); setEditing(false); announce('メモを更新しました');

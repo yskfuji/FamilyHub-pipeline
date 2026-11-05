@@ -42,6 +42,8 @@ for (const [viewport,width,height] of viewports) {
       test.skip(browserName !== 'chromium', 'delivery capture uses fixed Chromium DPR 2');
       await page.setViewportSize({ width, height }); await page.goto(state.route);
       await state.open(page);
+      // scrollIntoViewIfNeeded は滑らかに動く。止まる前に撮ると、枠ごとずれた絵になる（表を開いた図表の撮影で起きた）。
+      await page.waitForFunction(() => new Promise<boolean>((resolve) => { let last = window.scrollY; let still = 0; const tick = () => { if (window.scrollY === last) still += 1; else { still = 0; last = window.scrollY; } if (still >= 5) resolve(true); else requestAnimationFrame(tick); }; requestAnimationFrame(tick); }));
       await page.screenshot({ path: `artifacts/screens/${viewport}-${state.name}-light.png`, fullPage: false, animations: 'disabled' });
     });
   }

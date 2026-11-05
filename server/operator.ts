@@ -172,7 +172,10 @@ export function runOperatorCommand(argv: readonly string[], env: OperatorEnv): n
     }
     if (target === 'prune' && (argv.length === 2 || (argument === '--before' && extra && argv.length === 4))) {
       if (extra && !/^\d{4}-\d{2}-\d{2}$/.test(extra)) return refuse('--before takes a date (YYYY-MM-DD)');
-      const before = extra ?? retentionCutoff(now, env.auditRetentionMonths ?? 24);
+      const months = env.auditRetentionMonths ?? 24;
+      // 0 は「消さない」（毎日の手入れも消さない）。日付を書かずに呼んで、今日より前を全部消すことはしない。
+      if (!extra && months === 0) return refuse('the retention period is 0 (keep everything); pass --before <YYYY-MM-DD> to prune');
+      const before = extra ?? retentionCutoff(now, months);
       log.flush();
       const { pruned, checkpoint } = log.store.prune(before, now, `audit-${randomUUID()}`);
       out(checkpoint ? `pruned ${pruned} row(s) before ${before}; checkpoint seq ${checkpoint.through_seq} hash ${checkpoint.hash}` : `nothing to prune before ${before}`);

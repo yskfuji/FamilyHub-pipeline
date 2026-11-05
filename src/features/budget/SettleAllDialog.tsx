@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSubmission } from '../../app/useSubmission';
 import { memberName, useApp } from '../../app/AppContext';
 import { ja, settleAllCopy } from '../../content/ja';
 import { serverMessages } from '../../content/serverMessages';
@@ -22,31 +23,34 @@ interface Props {
 export function SettleAllDialog({ request, onClose, onDone }: Props) {
   const { snapshot, gateway, refresh, announce } = useApp();
   const [shown] = useState(request);
-  const [idempotencyKey] = useState(() => crypto.randomUUID());
-  const [busy, setBusy] = useState(false);
+  // 冪等キーはダイアログに1つ。送信中の印は ref でも持ち、同じフレームの二度押しを止める。
+  const submission = useSubmission();
+  const { idempotencyKey } = submission;
+  const [reloading, setReloading] = useState(false);
+  const busy = submission.submitting || reloading;
   // stale: 示した内容が古くなった（読み込み直せば記録できる）。refused: まとめては記録できない（1件ずつにする）。
   const [error, setError] = useState<{ message: string; kind: 'stale' | 'refused' | 'other' } | null>(null);
   const expenseCount = new Set(shown.shares.map((share) => share.expenseId)).size;
 
   const submit = async () => {
-    if (busy) return;
-    setBusy(true); setError(null);
+    if (reloading || !submission.start()) return;
+    setError(null);
     const result = await gateway.expenses.settleAll(shown, idempotencyKey);
     if (!result.ok) {
-      setBusy(false);
+      submission.end();
       const kind = result.error.code !== 'CONFLICT' ? 'other' : result.error.message === serverMessages.settleAllChanged ? 'stale' : 'refused';
       setError({ message: result.error.message, kind });
       return;
     }
     await refresh();
-    setBusy(false);
+    submission.end();
     onDone(result.value);
     onClose();
   };
   const reload = async () => {
-    setBusy(true);
+    setReloading(true);
     await refresh();
-    setBusy(false);
+    setReloading(false);
     onClose();
     announce(settleAllCopy.reloaded);
   };
