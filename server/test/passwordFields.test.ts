@@ -32,6 +32,8 @@ describe('password fields', () => {
       expect(code.tag, code.path).toContain('autoComplete="one-time-code"');
       expect(code.tag, code.path).toContain('inputMode="numeric"');
     }
+    // one-time-code は確認コードの欄だけに付ける（招待コードなどに付けると、端末が届いたコードを誤って入れる）。
+    expect(screens.filter((file) => file.text.includes('one-time-code')).map((file) => file.path).sort()).toEqual(['src/features/auth/AuthPage.tsx', 'src/features/auth/ResetPasswordPage.tsx', 'src/features/settings/AccountSection.tsx']);
     // 1桁ごとに欄を分けない（1つの画面に code の欄は1つ）。
     for (const file of screens) expect([...file.text.matchAll(/autoComplete="one-time-code"/g)].length, file.path).toBeLessThanOrEqual(1);
   });

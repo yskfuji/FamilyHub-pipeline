@@ -40,7 +40,7 @@ describe('規約とポリシーの草案', () => {
   });
   it('削除した記録とアカウントも、最長6か月はバックアップに残ることを明記する（A8-9）', () => {
     const text = documentText('privacy');
-    for (const phrase of ['バックアップ', '暗号化', '最長6か月', '削除した記録や退会したアカウントの情報も']) expect(text).toContain(phrase);
+    for (const phrase of ['バックアップ', '暗号化', '最長6か月', '削除してから最長で30日と6か月ほど', '退会したアカウントの情報も、退会から最長6か月ほど', '古いバックアップを消さずに残します']) expect(text).toContain(phrase);
   });
   it('バックアップの鍵を別の場所に保管することと、漏えいの照会を外部へ送らないことを明記する（A8-9、A9-6）', () => {
     const text = documentText('privacy');

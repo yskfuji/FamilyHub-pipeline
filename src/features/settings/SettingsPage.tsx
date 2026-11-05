@@ -247,7 +247,7 @@ function Security() {
     if (next !== confirm) { setPasswordError('新しいパスワードと確認用の入力が一致しません。'); return; }
     const parsed = passwordSchema.safeParse(next);
     if (!parsed.success) { setPasswordError(parsed.error.issues[0]?.message ?? '新しいパスワードを確認してください。'); return; }
-    const problem = await checkNewPassword(next, { email: snapshot.user.email, displayName: snapshot.memberships.find((member) => member.id === snapshot.viewer.membershipId)?.displayName, householdName: snapshot.household.name });
+    const problem = await checkNewPassword(next, { email: snapshot.user.email, displayName: snapshot.memberships.find((member) => member.id === snapshot.viewer.membershipId)?.displayName, householdName: snapshot.household.name, memberNames: snapshot.memberships.filter((member) => member.id !== snapshot.viewer.membershipId).map((member) => member.displayName) });
     if (problem) { setPasswordError(problem); return; }
     const result = await gateway.auth.changePassword(current, next);
     if (!result.ok) { setPasswordError(result.error.message); return; }

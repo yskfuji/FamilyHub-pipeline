@@ -23,6 +23,8 @@ export interface PasswordContext {
   email?: string | null;
   displayName?: string | null;
   householdName?: string | null;
+  /** 同じ家族のほかのメンバーの表示名。家族の名前で作ったパスワードを拒否する（A9-2）。 */
+  memberNames?: readonly string[] | null;
 }
 
 export const normalizePassword = (value: string) => value.normalize('NFKC').toLowerCase();
@@ -82,7 +84,7 @@ export function hasWeakPattern(value: string) {
 
 export function contextWords(context: PasswordContext = {}) {
   const local = context.email ? context.email.split('@')[0] : '';
-  return [...passwordMessages.serviceWords, local, context.displayName ?? '', context.householdName ?? ''].filter((word) => word.trim() !== '');
+  return [...passwordMessages.serviceWords, local, context.displayName ?? '', context.householdName ?? '', ...(context.memberNames ?? [])].filter((word) => word.trim() !== '');
 }
 
 /** 文脈の語そのもの、数字と記号を除くと文脈の語になるもの、文脈の語を繰り返しただけのものを拒否する。 */

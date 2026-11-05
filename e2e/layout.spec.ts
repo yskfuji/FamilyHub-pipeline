@@ -638,3 +638,22 @@ test.describe('LAYOUT-8 axe finds no serious or critical problem on the main scr
     });
   }
 });
+
+test.describe('LAYOUT-10 every visible label is part of the accessible name, and axe finds no WCAG A or AA problem of any impact', () => {
+  // WCAG 2.5.3（A）。axe では実験的な規則なので、タグでは選ばれない。名前で選んで、深刻度に関わらず失敗にする。
+  const screens = ['/today', '/calendar', '/calendar?view=week', '/calendar?view=day', '/calendar?view=list', '/tasks', '/notes', '/budget', '/budget?view=settlements', '/albums', '/places', '/insights', '/settings/household', '/settings/audit'];
+  for (const [label, width, height] of [['narrow', 390, 844], ['wide', 1440, 900]] as const) {
+    test(label, async ({ page }) => {
+      test.setTimeout(180_000);
+      await page.setViewportSize({ width, height });
+      const failures: string[] = [];
+      for (const route of screens) {
+        await page.goto(route);
+        await page.waitForLoadState('networkidle');
+        const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).withRules(['label-content-name-mismatch']).analyze();
+        for (const violation of results.violations) failures.push(`${route}: ${violation.id} (${violation.impact}) ${violation.nodes.map((node) => node.target.join(' ')).join(', ')}`);
+      }
+      expect(failures).toEqual([]);
+    });
+  }
+});

@@ -204,7 +204,7 @@ export function createMockGateway(actorMembershipId: Id = 'member-aoi', options:
         if (!currentPasswordSchema.safeParse(currentPassword).success) return fail({ code: 'UNAUTHENTICATED', message: '現在のパスワードを確認してください。', retryable: false });
         const parsed = passwordSchema.safeParse(newPassword);
         if (!parsed.success) return fail({ code: 'INVALID_INPUT', message: parsed.error.issues[0]?.message ?? '新しいパスワードを確認してください。', retryable: false });
-        const problem = await checkNewPassword(parsed.data, { email: account.email, displayName: account.displayName, householdName: state.household.name });
+        const problem = await checkNewPassword(parsed.data, { email: account.email, displayName: account.displayName, householdName: state.household.name, memberNames: state.memberships.filter((member) => member.id !== actorMember?.id).map((member) => member.displayName) });
         return problem ? fail({ code: 'INVALID_INPUT', message: problem, retryable: false }) : ok(undefined);
       },
       async revokeSession(sessionId) {

@@ -33,12 +33,13 @@ const today = (deps: AppDeps) => deps.clock.now().slice(0, 10);
 export const auditAccount = (deps: AppDeps, userId: string, action: string, options: { householdId?: string; fields?: readonly string[] } = {}) => deps.audit.record({ id: deps.ids.next('audit'), at: deps.clock.now(), householdId: options.householdId ?? null, actorUserId: userId, action, detail: options.fields?.length ? JSON.stringify({ fields: [...options.fields].sort() }) : null });
 const clientKey = (request: FastifyRequest) => request.ip;
 
-/** 新しいパスワードと比べる、その人に関わる語（メールアドレス・表示名・家族グループの名前）。 */
+/** 新しいパスワードと比べる、その人に関わる語（メールアドレス・表示名・家族グループの名前・同じ家族のメンバーの表示名）。 */
 export function passwordContextFor(deps: AppDeps, userId: string): PasswordContext {
   const user = deps.db.get<{ email: string; display_name: string }>('SELECT email, display_name FROM users WHERE id = ?', userId);
   const member = deps.db.get<{ household_id: string }>('SELECT household_id FROM household_members WHERE user_id = ?', userId);
   const household = member ? deps.db.get<{ name: string | null }>("SELECT json_extract(body, '$.household.name') AS name FROM records WHERE household_id = ? AND collection = 'meta' AND id = 'household'", member.household_id) : undefined;
-  return { email: user?.email, displayName: user?.display_name, householdName: household?.name ?? null };
+  const members = member ? deps.db.all<{ display_name: string }>('SELECT u.display_name FROM household_members m JOIN users u ON u.id = m.user_id WHERE m.household_id = ? AND m.user_id != ?', member.household_id, userId) : [];
+  return { email: user?.email, displayName: user?.display_name, householdName: household?.name ?? null, memberNames: members.map((row) => row.display_name) };
 }
 
 const weakPassword = (message: string) => ({ code: 'INVALID_INPUT' as const, message, retryable: false });
