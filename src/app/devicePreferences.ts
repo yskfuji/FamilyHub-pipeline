@@ -34,10 +34,12 @@ const read = (key: string) => { try { return localStorage.getItem(key); } catch 
 const write = (key: string, value: string) => { try { localStorage.setItem(key, value); } catch { /* この画面の間だけ有効にする */ } };
 
 function readPreferences(): DevicePreferences {
-  const theme = parseTheme(read(keys.theme));
+  const stored = read(keys.theme);
+  const theme = parseTheme(stored);
   return {
     palette: paletteOf(theme),
-    colorMode: read(keys.followSystem) === 'true' ? 'system' : isNightTheme(theme) ? 'night' : 'day',
+    // まだ選んでいないときは、端末の昼と夜の設定に従う（iPhone のシミュレーターで、夜の表示の端末でも昼の色になっていた）。
+    colorMode: read(keys.followSystem) === 'true' || stored === null ? 'system' : isNightTheme(theme) ? 'night' : 'day',
     density: read(keys.density) === 'compact' ? 'compact' : 'comfortable',
     reducedMotion: read(keys.reducedMotion) === 'true',
     privacyBlur: read(keys.privacyBlur) === 'true',
