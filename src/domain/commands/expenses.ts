@@ -4,7 +4,7 @@ import { serverMessages } from '../../content/serverMessages';
 import { hasActiveSettlement, netBalances, splitShares, transfersSettle } from '../ledger';
 import { expenseInputSchema, expenseUpdateSchema, incomeCategorySchema, settleAllInputSchema } from '../schemas';
 import type { Expense, ExpenseShare, Id, Result, SettlementBatch } from '../types';
-import { applyPatch, archive, conflict, denied, invalid, missing, ok, fail } from './context';
+import { applyPatch, archive, conflict, denied, invalid, missing, ok, fail, archivedRecord } from './context';
 import type { CommandContext, SyncPort } from './context';
 
 export function createExpenseCommands(c: CommandContext): SyncPort<ExpensePort> {
@@ -92,7 +92,7 @@ export function createExpenseCommands(c: CommandContext): SyncPort<ExpensePort> 
     },
     restoreExpense(id) {
       const guard = requireCapability<Expense>('expense.delete'); if (guard) return guard;
-      const target = state.expenses.find((item) => item.id === id) ?? a.archives.expenses[id]; if (!seen(target) || !target.deletedAt) return missing('支出');
+      const target = state.expenses.find((item) => item.id === id) ?? archivedRecord(a.archives.expenses, id); if (!seen(target) || !target.deletedAt) return missing('支出');
       const decision = canDeleteResource(viewer(), 'expense.delete', stakeholders(target)); if (!decision.allowed) return denied(decision);
       if (!withinRestoreWindow(target.deletedAt)) return fail({ code: 'CONFLICT', message: '削除から7日を過ぎたため、元に戻せません。', retryable: false });
       delete target.deletedAt; target.version += 1; delete a.archives.expenses[id];

@@ -2,7 +2,7 @@ import type { MemoPort } from '../../data/gateway';
 import { authorizeVisibleResource, canDeleteResource, canMutateOwnedResource } from '../../authz/policy';
 import { memoInputSchema } from '../schemas';
 import type { Attachment, Id, Memo, Result } from '../types';
-import { applyPatch, archive, denied, invalid, missing, ok, fail } from './context';
+import { applyPatch, archive, denied, invalid, missing, ok, fail, archivedRecord } from './context';
 import type { CommandContext, SyncPort } from './context';
 
 type RuleMemoPort = SyncPort<Omit<MemoPort, 'uploadAttachment' | 'getAttachmentLink'>> & {
@@ -93,7 +93,7 @@ export function createMemoCommands(c: CommandContext): RuleMemoPort {
       target.deletedAt = now(); archive(a.archives.memos, id, structuredClone(target)); return ok(undefined);
     },
     restoreMemo(id) {
-      const target = state.memos.find((item) => item.id === id) ?? a.archives.memos[id]; if (!target || !seen(target)) return missing('メモ');
+      const target = state.memos.find((item) => item.id === id) ?? archivedRecord(a.archives.memos, id); if (!target || !seen(target)) return missing('メモ');
       const decision = canDeleteResource(viewer(), 'memo.delete', [target.authorMembershipId]); if (!decision.allowed) return denied(decision);
       if (!withinRestoreWindow(target.deletedAt)) return fail({ code: 'CONFLICT', message: '削除から7日を過ぎたため、元に戻せません。', retryable: false });
       delete target.deletedAt; target.version += 1; delete a.archives.memos[id]; return ok(visible(target));

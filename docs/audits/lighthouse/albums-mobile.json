@@ -1,21 +1,55 @@
 {
   "lighthouse": "12.8.2",
-  "fetchTime": "2026-11-04T21:53:07.931Z",
+  "fetchTime": "2026-11-06T15:12:28.913Z",
   "build": "dist-http, signed in (seeded demo household), vite preview + server/dev.ts on this machine",
-  "throttling": "simulate {\"rttMs\":150,\"throughputKbps\":1638.4,\"requestLatencyMs\":562.5,\"downloadThroughputKbps\":1474.5600000000002,\"uploadThroughputKbps\":675,\"cpuSlowdownMultiplier\":4}",
+  "throttling": {
+    "rttMs": 150,
+    "throughputKbps": 1638.4,
+    "requestLatencyMs": 562.5,
+    "downloadThroughputKbps": 1474.5600000000002,
+    "uploadThroughputKbps": 675,
+    "cpuSlowdownMultiplier": 4
+  },
   "screen": "albums",
   "path": "/albums",
   "formFactor": "mobile",
-  "performance": 92,
+  "runs": 3,
+  "performance": 97,
   "accessibility": 100,
   "bestPractices": 96,
-  "lcpMs": 2952,
-  "fcpMs": 2332,
-  "cls": 0.016,
+  "lcpMs": 2406,
+  "fcpMs": 1729,
+  "cls": 0,
   "tbtMs": 0,
-  "failingBinaryAudits": [
-    "errors-in-console",
-    "label-content-name-mismatch"
+  "lcpElement": "div.page > header.page-head > div > p.lede",
+  "lcpPhases": [
+    {
+      "phase": "TTFB",
+      "ms": 452
+    },
+    {
+      "phase": "Load Delay",
+      "ms": 0
+    },
+    {
+      "phase": "Load Time",
+      "ms": 0
+    },
+    {
+      "phase": "Render Delay",
+      "ms": 1954
+    }
   ],
-  "meetsTargets": false
+  "failingBinaryAudits": [
+    "errors-in-console"
+  ],
+  "lcpMsRuns": [
+    2406,
+    2405,
+    2406
+  ],
+  "exceptions": {
+    "bestPractices": "seeded album items have no media files in the measurement folder (thumbnail 502)"
+  },
+  "meetsTargets": true
 }

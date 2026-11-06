@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { isNewerBuild } from '../domain/buildVersion';
 import { useApp } from './AppContext';
+import { afterPageLoad } from './afterPageLoad';
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000;
 
@@ -16,7 +17,8 @@ export function useNewVersion() {
       if (active && result.ok && isNewerBuild(import.meta.env.VITE_BUILD_ID, result.value.build)) setAvailable(true);
     };
     const whenShown = () => { if (document.visibilityState === 'visible') void check(); };
-    void check();
+    // 最初の確認は、最初の画面を描き終えてから行う。
+    void afterPageLoad().then(() => { if (active) void check(); });
     window.addEventListener('focus', whenShown);
     document.addEventListener('visibilitychange', whenShown);
     const timer = window.setInterval(() => void check(), CHECK_INTERVAL_MS);

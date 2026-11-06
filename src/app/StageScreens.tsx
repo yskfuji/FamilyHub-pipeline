@@ -7,14 +7,22 @@ import type { AppStage } from './AppContext';
 
 const SLOW_RESTORE_MS = 15_000;
 
+/**
+ * 読み込み中の画面の見た目。index.html の #root にも同じものを書いておき、JS を読む前から出す（staticShell.test.ts が一致を確かめる）。
+ * React が描くときに同じ位置へ同じものを描くので、表示はずれない。
+ */
+export function RestoringScreen({ slow = false, onRetry }: { slow?: boolean; onRetry?: () => void }) {
+  return <main className="stage-screen" aria-busy="true"><Brand/>
+    <p role="status">{slow ? '読み込みに時間がかかっています。接続を確認してください。' : '読み込んでいます。'}</p>
+    {slow && <button data-control-id="stage.restoring.retry" className="button primary" onClick={onRetry}>もう一度読み込む</button>}
+  </main>;
+}
+
 function Restoring() {
   const [slow, setSlow] = useState(false);
   useEffect(() => { const id = window.setTimeout(() => setSlow(true), SLOW_RESTORE_MS); return () => window.clearTimeout(id); }, []);
   const { refresh } = useApp();
-  return <main className="stage-screen" aria-busy="true"><Brand/>
-    <p role="status">{slow ? '読み込みに時間がかかっています。接続を確認してください。' : '読み込んでいます。'}</p>
-    {slow && <button data-control-id="stage.restoring.retry" className="button primary" onClick={() => void refresh()}>もう一度読み込む</button>}
-  </main>;
+  return <RestoringScreen slow={slow} onRetry={() => void refresh()}/>;
 }
 
 /** 本編に入る前の状態ごとの画面。 */

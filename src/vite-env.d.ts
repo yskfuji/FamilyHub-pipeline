@@ -5,5 +5,4 @@ interface ImportMetaEnv {
   readonly VITE_BUILD_ID: string;
 }
 
-declare module '@fontsource-variable/noto-sans-jp';
 declare module '@fontsource-variable/noto-serif-jp';

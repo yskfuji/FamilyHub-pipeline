@@ -57,7 +57,8 @@ export function registerHouseholdRoutes(app: FastifyInstance, deps: AppDeps) {
       const stored = rules.context.a.invites.find((item) => item.id === created.value.id);
       if (stored?.token) stored.token = hashInviteToken(stored.token);
       return created;
-    });
+    // 冪等の記録にもコードを残さない（侵入試験 PT-INVITE、docs/security/pentest-2026-11.md）。
+    }, undefined, (invite) => ({ ...invite, token: undefined }));
   });
   app.delete('/v1/household-invites/:inviteId', { config: declare('revokeHouseholdInvite', { recentAuth: true }) }, (request, reply) => mutate(deps, request, reply, (rules) => rules.household.revokeInvite(param(request, 'inviteId'))));
   registerInviteAcceptance(app, deps);

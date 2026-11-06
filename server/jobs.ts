@@ -10,6 +10,7 @@ import { maintenanceLock } from './backup/lock';
 import { createBackupScheduler } from './backup/schedule';
 import { originalPath, quarantinePath } from './media/pipeline';
 import { retentionCutoff } from './operator';
+import { purgeRateLimits } from './http/rateLimit';
 
 const defaults = { privacy: { defaultAudience: 'household' as const, hideNotificationContent: true, placeLookupConsent: null }, notificationPreferences: { todoDue: true, eventDeparture: true, quietHours: true } };
 const IDEMPOTENCY_KEEP_MS = 72 * 3_600_000;
@@ -42,6 +43,7 @@ async function purgeAndTidy(deps: AppDeps) {
   for (const file of files) await rm(dirname(originalPath(deps.config.mediaPath, file.householdId, file.id)), { recursive: true, force: true });
   const cutoff = new Date(Date.parse(now) - IDEMPOTENCY_KEEP_MS).toISOString();
   deps.db.run('DELETE FROM idempotency_records WHERE unixepoch(created_at) < unixepoch(?)', cutoff);
+  purgeRateLimits(deps);
   deps.db.run('DELETE FROM sessions WHERE unixepoch(expires_at) < unixepoch(?) OR unixepoch(revoked_at) < unixepoch(?)', now, cutoff);
   deps.db.run('DELETE FROM webauthn_challenges WHERE unixepoch(expires_at) < unixepoch(?)', now);
   deps.db.run('DELETE FROM password_resets WHERE unixepoch(expires_at) < unixepoch(?)', cutoff);

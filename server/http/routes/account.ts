@@ -17,7 +17,7 @@ import { clearSessionCookie } from '../../auth/sessions';
 import { sendError, unauthenticated } from '../context';
 import type { AppDeps, RouteDeclaration } from '../context';
 import { parse } from '../parse';
-import { limit } from '../rateLimit';
+import { addressBucket, limit } from '../rateLimit';
 
 const RESET_TTL_MS = 30 * 60_000;
 const RESEND_INTERVAL_MS = 60_000;
@@ -31,7 +31,7 @@ interface AccountRow { id: string; email: string; display_name: string; password
 const today = (deps: AppDeps) => deps.clock.now().slice(0, 10);
 /** 本人のアカウントの操作の記録。家族には属さない（本人の「アカウントの記録」にだけ出る）。 */
 export const auditAccount = (deps: AppDeps, userId: string, action: string, options: { householdId?: string; fields?: readonly string[] } = {}) => deps.audit.record({ id: deps.ids.next('audit'), at: deps.clock.now(), householdId: options.householdId ?? null, actorUserId: userId, action, detail: options.fields?.length ? JSON.stringify({ fields: [...options.fields].sort() }) : null });
-const clientKey = (request: FastifyRequest) => request.ip;
+const clientKey = (request: FastifyRequest) => addressBucket(request.ip);
 
 /** 新しいパスワードと比べる、その人に関わる語（メールアドレス・表示名・家族グループの名前・同じ家族のメンバーの表示名）。 */
 export function passwordContextFor(deps: AppDeps, userId: string): PasswordContext {
@@ -123,7 +123,10 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AppDeps) {
     const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
     deps.db.run('UPDATE password_resets SET used_at = ? WHERE user_id = ? AND used_at IS NULL', deps.clock.now(), user.id);
     deps.db.run('INSERT INTO password_resets (id, user_id, token_hash, code_hash, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)', deps.ids.next('reset'), user.id, deps.config.keys.sign('reset', token), deps.config.keys.sign('reset', `${user.id}:${code}`), deps.clock.now(), new Date(now + RESET_TTL_MS).toISOString());
-    await deps.mailer.send({ to: user.email, subject: serverMessages.resetSubject, text: serverMessages.resetBody(code, `${deps.config.origin}/reset-password#token=${token}`) });
+    // 送り終わるのを待たずに答える。待つと、登録のあるアドレスだけ応答が遅くなり、登録の有無が分かる（侵入試験 PT-ENUM）。
+    const sending = deps.mailer.send({ to: user.email, subject: serverMessages.resetSubject, text: serverMessages.resetBody(code, `${deps.config.origin}/reset-password#token=${token}`) }).catch(() => undefined);
+    deps.jobs.add(sending);
+    void sending.finally(() => deps.jobs.delete(sending));
     return reply.code(202).send({ resendAfterSeconds: 60 });
   });
 
@@ -142,6 +145,8 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AppDeps) {
     if (body.token) row = deps.db.get<ResetRow>('SELECT id, user_id, code_hash, attempts, expires_at, used_at FROM password_resets WHERE token_hash IN (SELECT value FROM json_each(?))', JSON.stringify(deps.config.keys.candidates('reset', body.token)));
     else if (body.email && body.code) {
       const user = deps.db.get<{ id: string }>('SELECT id FROM users WHERE email = ?', body.email.trim());
+      // コードを出し直しても試せる回数が増えないよう、その人ごとに1日10回までにする。超えたらメールのリンクだけが使える（侵入試験 PT-RESET）。
+      if (user) limit(deps, `reset-code:${user.id}`, 10, 86_400_000);
       row = user ? deps.db.get<ResetRow>('SELECT id, user_id, code_hash, attempts, expires_at, used_at FROM password_resets WHERE user_id = ? ORDER BY created_at DESC LIMIT 1', user.id) : undefined;
       if (row && !deps.config.keys.verify('reset', `${row.user_id}:${body.code}`, row.code_hash)) {
         deps.db.run('UPDATE password_resets SET attempts = attempts + 1 WHERE id = ?', row.id);

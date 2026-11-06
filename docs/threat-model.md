@@ -173,6 +173,10 @@ AVのclean判定は絶対安全を意味しない。未知脅威、パーサ脆�
 
 API は `trustProxy: 'loopback'` で、同じ機械の nginx から届く `X-Forwarded-For` の末尾だけを信じる。別の機械の転送を挟む場合は、この設定を変えないと回数制限が転送元の1つの宛先に集まる。
 
+## 侵入試験（2026-11）
+
+`docs/security/pentest-2026-11.md`。直したもの: 動画のメタデータを消す処理の際限のない書き込み（PT-MP4）、画像の展開の爆弾（PT-PIXELS）、同じアップロードへの同時の書き込み（PT-UPLOAD）、外れた人の続きの送信（PT-UPLOAD-MEMBER）、「最近削除」の題名の漏れ（PT-TRASH）、権限のない「元に戻す」（PT-RESTORE）、再設定のコードと確認コードの総当たり（PT-RESET・PT-TOTP）、パスワードの変更での試し（PT-RATE）、登録の有無の時間差（PT-ENUM）、IPv6 の上限の抜け（PT-RATE）、冪等の記録に残る招待コード（PT-INVITE）、DB とメディアの権限（PT-PERMS）、GCM のタグの長さ（PT-GCM）、`/_headers` の配信と API の見出し（PT-HEADERS）、契約の経路の引数の宣言（PT-CONTRACT）。回帰の試験は `server/test/pentest/`。実装した側による試験で、第三者の侵入試験はまだ受けていない。
+
 ## 依存関係
 
 依存はすべて固定の版で `package-lock.json` に記録する。これは将来の脆弱性不存在を保証しないため、lockfileを含む継続監査とlocalhost限定の開発サーバー運用を維持する。結果は `docs/audits/verification-report.md` に残す。
