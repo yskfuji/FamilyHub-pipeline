@@ -5,7 +5,7 @@ import { isOccurrence, occurrenceStartsAt, remainderRule, withUntil } from '../r
 import { eventFieldsSchema, eventUpdateSchema, isEventTimeRangeValid } from '../schemas';
 import { daysBetweenKeys, seriesShiftRefusalMessage, shiftOccurrenceDeletions, shiftSeries } from '../seriesShift';
 import type { CalendarEvent, IsoDate } from '../types';
-import { applyPatch, archive, conflict, denied, fail, invalid, missing, ok } from './context';
+import { applyPatch, archive, conflict, denied, fail, invalid, missing, ok, archivedRecord } from './context';
 import type { CommandContext, SyncPort } from './context';
 
 export function createEventCommands(c: CommandContext): SyncPort<EventPort> {
@@ -115,9 +115,12 @@ export function createEventCommands(c: CommandContext): SyncPort<EventPort> {
         series.version += 1;
         return ok(structuredClone(series));
       }
-      const archived = a.archives.events[id]; const target = state.events.find((item) => item.id === id);
+      const archived = archivedRecord(a.archives.events, id); const target = state.events.find((item) => item.id === id);
       if (!archived || !target || !seen(target)) return missing('予定');
       const decision = canDeleteResource(viewer(), 'event.delete', stakeholders(target)); if (!decision.allowed) return denied(decision);
+      // 消していない予定を、変更の前の状態へ戻すのは、変更と同じ操作になる。変更できる人だけに許す。
+      // そうしないと、変更の権限のない参加者が、持ち主の変更を取り消せる（侵入試験 PT-RESTORE、docs/security/pentest-2026-11.md）。
+      if (!target.deletedAt) { const update = canMutateOwnedResource(viewer(), 'event.update', target.ownerMembershipId); if (!update.allowed) return denied(update); }
       if (!withinRestoreWindow(target.deletedAt)) return fail({ code: 'CONFLICT', message: '削除から7日を過ぎたため、元に戻せません。', retryable: false });
       // 削除・回の除外・シリーズの短縮のどれでも、操作前の状態へ戻す。
       Object.assign(target, { ...archived, version: target.version + 1 });

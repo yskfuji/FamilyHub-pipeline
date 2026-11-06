@@ -102,6 +102,13 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     routeTable.push({ method: String(route.method), url: route.url, declaration: route.config.route });
   });
   app.addHook('preHandler', (request) => guard(deps, request));
+  // API の応答は、型を推測させず、ブラウザやプロキシに残させない。配信の nginx も付けるが、API だけで動かしたときも同じにする（侵入試験 PT-HEADERS）。
+  // 写真や添付の配信は、それぞれの経路で Cache-Control を決める。
+  app.addHook('onSend', async (_request, reply, payload) => {
+    reply.header('X-Content-Type-Options', 'nosniff');
+    if (!reply.hasHeader('Cache-Control')) reply.header('Cache-Control', 'no-store');
+    return payload;
+  });
   app.setErrorHandler((error: Error & { statusCode?: number }, request, reply) => {
     if (error instanceof ApiError) return sendError(reply, error.error);
     if (error.statusCode && error.statusCode < 500) return sendError(reply, { code: 'INVALID_INPUT', message: serverMessages.invalidInput, retryable: false });

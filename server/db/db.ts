@@ -27,13 +27,13 @@ export class Db {
 
   constructor(path: string, options: DbOptions = {}) {
     this.path = path;
-    if (path !== ':memory:') {
-      mkdirSync(dirname(path), { recursive: true });
-      if (options.mode !== undefined) {
-        // SQLite は WAL と共有メモリのファイルを、本体のファイルと同じ権限で作る。
-        closeSync(openSync(path, 'a', options.mode));
-        chmodSync(path, options.mode);
-      }
+    if (path !== ':memory:' && options.access !== 'readOnly') {
+      // 既定でも、持ち主だけが読み書きできるようにする（パスワードの hash や家族の記録を、同じ機械のほかの利用者に見せない。侵入試験 PT-PERMS）。
+      const mode = options.mode ?? 0o600;
+      mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+      // SQLite は WAL と共有メモリのファイルを、本体のファイルと同じ権限で作る。
+      closeSync(openSync(path, 'a', mode));
+      chmodSync(path, mode);
     }
     if (options.access === 'readOnly') {
       this.raw = new DatabaseSync(path, { readOnly: true });

@@ -57,7 +57,7 @@ export class BackupKeys {
   /** 読めなければ例外（形・鍵・位置・内容のどれかが違う）。 */
   openChunk(blob: string, index: number, last: boolean, stored: Buffer) {
     if (stored.length < HEADER || !stored.subarray(0, 4).equals(CHUNK_MAGIC)) throw new BackupFormatError('chunk header');
-    const decipher = createDecipheriv('aes-256-gcm', this.chunkKey, stored.subarray(4, 16));
+    const decipher = createDecipheriv('aes-256-gcm', this.chunkKey, stored.subarray(4, 16), { authTagLength: 16 });
     decipher.setAAD(BackupKeys.chunkAad(blob, index, last));
     decipher.setAuthTag(stored.subarray(16, HEADER));
     try {
@@ -81,7 +81,7 @@ export class BackupKeys {
   /** 目録の本文（JSON の文字列）。復号と MAC の両方を確かめる。 */
   openManifest(id: string, stored: Buffer): string {
     if (stored.length < HEADER || !stored.subarray(0, 4).equals(MANIFEST_MAGIC)) throw new BackupFormatError('manifest header');
-    const decipher = createDecipheriv('aes-256-gcm', this.manifestKey, stored.subarray(4, 16));
+    const decipher = createDecipheriv('aes-256-gcm', this.manifestKey, stored.subarray(4, 16), { authTagLength: 16 });
     decipher.setAAD(Buffer.from(`family-hub-backup/manifest/v1\u0000${id}`));
     decipher.setAuthTag(stored.subarray(16, HEADER));
     let plaintext: Buffer;

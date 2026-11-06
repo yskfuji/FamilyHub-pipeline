@@ -179,6 +179,8 @@ export interface ScrubResult { blanked: number; blankedSamples: number }
 class Scrubber {
   blanked = 0;
   blankedSamples = 0;
+  /** 0 にしたサンプルのバイト数の合計（全部のトラック）。 */
+  private zeroedBytes = 0;
   fragmented = false;
   constructor(readonly walker: Walker, readonly keepLocation: boolean) {}
 
@@ -285,6 +287,8 @@ class Scrubber {
     const wide = offsetsBox.type === 'co64';
     const chunkCount = offsets.readUInt32BE(4);
     if (offsets.length < 8 + chunkCount * (wide ? 8 : 4)) throw new VideoMetadataError('malformed chunk offsets');
+    // どのチャンクにも1つ以上のサンプルがあるので、チャンクはサンプルより多くならない。
+    if (chunkCount > sampleCount) throw new VideoMetadataError('more chunks than samples');
     const chunkOffset = (index: number) => (wide ? Number(offsets.readBigUInt64BE(8 + index * 8)) : offsets.readUInt32BE(8 + index * 4));
     const runs = stsc.readUInt32BE(4);
     if (stsc.length < 8 + runs * 12) throw new VideoMetadataError('malformed stsc');
@@ -299,6 +303,10 @@ class Scrubber {
         let length = 0;
         for (let index = 0; index < perChunk && sample < sampleCount; index += 1, sample += 1) length += sizeOf(sample);
         if (!Number.isSafeInteger(at) || at + length > this.walker.size) throw new VideoMetadataError('sample outside the file');
+        // 正しいファイルではサンプルの範囲は重ならないので、0 にする合計はファイルの長さを超えない。
+        // 同じ範囲を何度も指す表で、小さなファイルから際限なく書かせる攻撃を止める（侵入試験 PT-MP4、docs/security/pentest-2026-11.md）。
+        this.zeroedBytes += length;
+        if (this.zeroedBytes > this.walker.size) throw new VideoMetadataError('sample ranges overlap');
         await this.walker.zero(at, length);
       }
     }

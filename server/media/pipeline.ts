@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { mkdir, open, rename, rm, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import sharp from 'sharp';
+import sharp, { type SharpOptions } from 'sharp';
 import { sniff } from './sniff';
 import type { SniffResult } from './sniff';
 import { readVideoCaptureTime, scrubVideoMetadata, UnsupportedVideoMetadata } from './mp4Metadata';
@@ -17,7 +17,7 @@ export const quarantinePath = (root: string, id: string) => join(root, 'quaranti
 export const originalPath = (root: string, householdId: string, id: string) => join(root, householdId, id, 'original');
 export const thumbnailPath = (root: string, householdId: string, id: string) => join(root, householdId, id, 'thumbnail.jpg');
 
-export async function ensureParent(path: string) { await mkdir(dirname(path), { recursive: true }); }
+export async function ensureParent(path: string) { await mkdir(dirname(path), { recursive: true, mode: 0o700 }); }
 
 export async function sniffFile(path: string): Promise<SniffResult> {
   const file = await open(path, 'r');
@@ -66,9 +66,35 @@ export function minimalExif(facts: PhotoFacts): Record<string, Record<string, st
 
 export interface CaptureContext { timeZone: string; now: Date }
 
+/**
+ * 画像の画素数の上限。4800万画素の端末の写真が入る大きさにする。
+ * 小さなファイルが展開すると何 GB にもなる画像（展開の爆弾）で、メモリを使い切らせないため（侵入試験 PT-PIXELS、docs/security/pentest-2026-11.md）。
+ * 縮小画像と読み取りの補助は、前から 4000万画素で止めている。
+ */
+export const MAX_IMAGE_PIXELS = 50_000_000;
+/** 画像を展開する処理を同時にいくつまで動かすか。多くのアップロードが重なっても、使うメモリの上限を決めておく。 */
+const IMAGE_SLOTS = 2;
+let busySlots = 0;
+const waiting: Array<() => void> = [];
+async function withImageSlot<T>(work: () => Promise<T>): Promise<T> {
+  if (busySlots >= IMAGE_SLOTS) await new Promise<void>((resume) => waiting.push(resume));
+  else busySlots += 1;
+  try { return await work(); } finally {
+    const next = waiting.shift();
+    if (next) next(); else busySlots -= 1;
+  }
+}
+const decode = (input: string | Buffer, options: SharpOptions = {}) => sharp(input, { failOn: 'error', limitInputPixels: MAX_IMAGE_PIXELS, ...options });
+/** 展開する前に、ヘッダーの大きさで上限を確かめる。 */
+async function checkedMetadata(source: string) {
+  const metadata = await sharp(source, { limitInputPixels: MAX_IMAGE_PIXELS }).metadata();
+  if (!metadata.width || !metadata.height || metadata.width * metadata.height > MAX_IMAGE_PIXELS) throw new Error('image too large');
+  return metadata;
+}
+
 /** 写真の EXIF から、撮影日時（A15）と位置。読めなければ空。 */
 export async function readImageFacts(source: string): Promise<PhotoFacts> {
-  const { exif } = await sharp(source).metadata();
+  const { exif } = await checkedMetadata(source);
   return exif ? readPhotoFacts(exif) : {};
 }
 
@@ -77,33 +103,35 @@ export async function readImageFacts(source: string): Promise<PhotoFacts> {
  * 撮影日時はメタデータを消す前に読む（A15）。位置を残すときだけ、最小の EXIF を書く。
  */
 export async function sanitizeImage(source: string, destination: string, options: { keepLocation: boolean } & CaptureContext): Promise<{ width?: number; height?: number; capture: CaptureTime | null }> {
-  const facts = await readImageFacts(source);
-  const capture = captureTimeFromExif(facts.dateTimeOriginal, facts.offsetTimeOriginal, options.timeZone, options.now);
-  const { format } = await sharp(source).metadata();
-  await ensureParent(destination);
-  const exif = options.keepLocation ? minimalExif(facts) : null;
-  let image = sharp(source, { failOn: 'error' }).rotate();
-  if (exif) {
-    // withExif は入力の EXIF の塊（縮小画像など）を引き継ぐことがあるので、画素だけにしてから書く。
-    const { data, info } = await image.raw().toBuffer({ resolveWithObject: true });
-    image = sharp(data, { raw: { width: info.width, height: info.height, channels: info.channels } });
-  }
-  image = format === 'png' ? image.png() : image.jpeg({ quality: 92, mozjpeg: true });
-  if (exif) image = image.withExif(exif);
-  const written = await image.toFile(destination);
-  await rm(source, { force: true });
-  return { width: written.width, height: written.height, capture };
+  return withImageSlot(async () => {
+    const facts = await readImageFacts(source);
+    const capture = captureTimeFromExif(facts.dateTimeOriginal, facts.offsetTimeOriginal, options.timeZone, options.now);
+    const { format } = await checkedMetadata(source);
+    await ensureParent(destination);
+    const exif = options.keepLocation ? minimalExif(facts) : null;
+    let image = decode(source).rotate();
+    if (exif) {
+      // withExif は入力の EXIF の塊（縮小画像など）を引き継ぐことがあるので、画素だけにしてから書く。
+      const { data, info } = await image.raw().toBuffer({ resolveWithObject: true });
+      image = decode(data, { raw: { width: info.width, height: info.height, channels: info.channels } });
+    }
+    image = format === 'png' ? image.png() : image.jpeg({ quality: 92, mozjpeg: true });
+    if (exif) image = image.withExif(exif);
+    const written = await image.toFile(destination);
+    await rm(source, { force: true });
+    return { width: written.width, height: written.height, capture };
+  });
 }
 
 export async function writeThumbnail(source: string, destination: string) {
   await ensureParent(destination);
-  await sharp(source, { failOn: 'error' }).rotate().resize({ width: 640, height: 640, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 78, mozjpeg: true }).toFile(destination);
+  await withImageSlot(() => decode(source).rotate().resize({ width: 640, height: 640, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 78, mozjpeg: true }).toFile(destination));
 }
 
 /** 動画の縮小画像は端末で作ったものを受け取る。信用できない入力として読み直す。 */
 export async function acceptClientThumbnail(bytes: Buffer, destination: string) {
   await ensureParent(destination);
-  await sharp(bytes, { failOn: 'error', limitInputPixels: 40_000_000 }).rotate().resize({ width: 640, height: 640, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 78 }).toFile(destination);
+  await withImageSlot(() => sharp(bytes, { failOn: 'error', limitInputPixels: 40_000_000 }).rotate().resize({ width: 640, height: 640, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 78 }).toFile(destination));
 }
 
 export type ProcessOutcome = { status: 'ready'; media: ProcessedMedia; sha256: string; mimeType: string; kind: 'photo' | 'video' } | { status: 'duplicate'; existingId: string } | { status: 'rejected'; message: string };

@@ -65,7 +65,11 @@ interface StoredResponse { request_hash: string; status: number; body: string | 
  * 変更の操作。規則の実行・保存・監査・冪等の記録を1つのトランザクションで行う。
  * 規則が失敗を返したら、途中の変更は保存しない。
  */
-export function mutate<T>(deps: AppDeps, request: FastifyRequest, reply: FastifyReply, work: (rules: Rules, context: WorkContext) => Result<T>, options?: LoadOptions) {
+/**
+ * storedBody: 冪等の記録に残す応答の本文。秘密（招待コードなど）を含む応答は、ここで取り除いた形を残す。
+ * 送り直しのときは取り除いた形が返る（コードを見られなかったときは、招待を出し直す）。
+ */
+export function mutate<T>(deps: AppDeps, request: FastifyRequest, reply: FastifyReply, work: (rules: Rules, context: WorkContext) => Result<T>, options?: LoadOptions, storedBody: (value: T) => unknown = (value) => value) {
   const actor = requireActor(request);
   const key = request.headers['idempotency-key'];
   const idempotencyKey = typeof key === 'string' ? key : undefined;
@@ -91,7 +95,7 @@ export function mutate<T>(deps: AppDeps, request: FastifyRequest, reply: Fastify
       action: declaration?.operationId ?? request.url, target: targetOf(request, declaration?.successStatus === 201 ? result.value : undefined),
       detail: auditDetail(fields ?? auditFieldsFor(declaration?.operationId ?? '', (request.body as { input?: unknown } | null)?.input)),
     });
-    if (idempotencyKey) deps.db.run('INSERT INTO idempotency_records (scope, key, request_hash, status, body, created_at) VALUES (?, ?, ?, ?, ?, ?)', scope, idempotencyKey, fingerprint, result.value === undefined ? 204 : declaration?.successStatus ?? 200, result.value === undefined ? null : JSON.stringify(result.value), deps.clock.now());
+    if (idempotencyKey) deps.db.run('INSERT INTO idempotency_records (scope, key, request_hash, status, body, created_at) VALUES (?, ?, ?, ?, ?, ?)', scope, idempotencyKey, fingerprint, result.value === undefined ? 204 : declaration?.successStatus ?? 200, result.value === undefined ? null : JSON.stringify(storedBody(result.value)), deps.clock.now());
     return { result };
   }, (value) => Boolean(value.replay || value.result?.ok));
   if (outcome.replay) {

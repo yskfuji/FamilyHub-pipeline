@@ -4,7 +4,7 @@ import { dateKeyFromRfc3339, toJstRfc3339 } from '../calendarDate';
 import { nextOccurrenceAfter, occurrenceStartsAt } from '../recurrence';
 import { todoInputSchema, todoUpdateSchema } from '../schemas';
 import type { Todo } from '../types';
-import { applyPatch, archive, conflict, denied, invalid, missing, ok, fail } from './context';
+import { applyPatch, archive, conflict, denied, invalid, missing, ok, fail, archivedRecord } from './context';
 import type { CommandContext, SyncPort } from './context';
 
 /** 繰り返しのタスクを次の回へ進める。期間のタスクは開始も同じだけ動かして、長さを保つ。 */
@@ -102,9 +102,11 @@ export function createTodoCommands(c: CommandContext): SyncPort<TodoPort> {
       return ok(undefined);
     },
     restoreTodo(id) {
-      const archived = a.archives.todos[id]; const target = state.todos.find((item) => item.id === id);
+      const archived = archivedRecord(a.archives.todos, id); const target = state.todos.find((item) => item.id === id);
       if (!archived || !target || !seen(target)) return missing('タスク');
       const decision = canDeleteResource(viewer(), 'task.delete', stakeholders(target)); if (!decision.allowed) return denied(decision);
+      // 消していないタスクを変更の前へ戻すのは、変更と同じ操作になる。変更できる人だけに許す（侵入試験 PT-RESTORE）。
+      if (!target.deletedAt) { const update = canMutateOwnedResource(viewer(), 'task.update', target.creatorMembershipId); if (!update.allowed) return denied(update); }
       if (!withinRestoreWindow(target.deletedAt)) return fail({ code: 'CONFLICT', message: '削除から7日を過ぎたため、元に戻せません。', retryable: false });
       Object.assign(target, { ...archived, version: target.version + 1 });
       if (!archived.deletedAt) delete target.deletedAt;
