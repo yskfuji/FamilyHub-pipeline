@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type PropsWithChildren, type ReactNode } from 'react';
+import { afterPageLoad } from './afterPageLoad';
 import { useApp } from './AppContext';
 import { Brand, Drawer, EmptyState, PageHeader, StatusBadge, formatTime } from '../design-system/components';
 import { filterTasks } from '../domain/taskList';
@@ -73,7 +74,8 @@ export function Shell({ path, children }: PropsWithChildren<{ path: string }>) {
     window.addEventListener('keydown', keyboard);
     return () => window.removeEventListener('keydown', keyboard);
   }, []);
-  useEffect(() => { if (!canNotify) return; void (async () => { const result = await gateway.notifications.list(); if (result.ok) setNotifications(result.value); else setNotificationsError(result.error.message); })(); }, [gateway, canNotify]);
+  // 通知は最初の画面を描き終えてから取りに行く（afterPageLoad）。
+  useEffect(() => { if (!canNotify) return; let active = true; void (async () => { await afterPageLoad(); if (!active) return; const result = await gateway.notifications.list(); if (!active) return; if (result.ok) setNotifications(result.value); else setNotificationsError(result.error.message); })(); return () => { active = false; }; }, [gateway, canNotify]);
   // 画面を移ったら「その他」を閉じる（開いたまま次の画面に重ならないようにする）。
   useEffect(() => { setMore(false); }, [path]);
   // 横にスクロールする並びの中の焦点を、並びの中に全部見せる。

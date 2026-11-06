@@ -2,7 +2,8 @@ import { mkdir } from 'node:fs/promises';
 import { expect, test } from './fixtures';
 import { openedStates, screens, viewports } from './screens';
 
-test.use({ deviceScaleFactor: 2 });
+// 画面の部品を差し替える試験がある。service worker が部品を取ると page.route を通らないので止める。
+test.use({ deviceScaleFactor: 2, serviceWorkers: 'block' });
 
 test.beforeAll(async () => { await mkdir('artifacts/screens', { recursive: true }); });
 

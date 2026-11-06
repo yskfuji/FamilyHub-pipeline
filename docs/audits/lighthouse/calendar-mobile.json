@@ -1,20 +1,51 @@
 {
   "lighthouse": "12.8.2",
-  "fetchTime": "2026-11-04T21:52:28.811Z",
+  "fetchTime": "2026-11-06T15:12:28.913Z",
   "build": "dist-http, signed in (seeded demo household), vite preview + server/dev.ts on this machine",
-  "throttling": "simulate {\"rttMs\":150,\"throughputKbps\":1638.4,\"requestLatencyMs\":562.5,\"downloadThroughputKbps\":1474.5600000000002,\"uploadThroughputKbps\":675,\"cpuSlowdownMultiplier\":4}",
+  "throttling": {
+    "rttMs": 150,
+    "throughputKbps": 1638.4,
+    "requestLatencyMs": 562.5,
+    "downloadThroughputKbps": 1474.5600000000002,
+    "uploadThroughputKbps": 675,
+    "cpuSlowdownMultiplier": 4
+  },
   "screen": "calendar",
   "path": "/calendar",
   "formFactor": "mobile",
-  "performance": 93,
+  "runs": 3,
+  "performance": 91,
   "accessibility": 100,
   "bestPractices": 100,
-  "lcpMs": 2730,
-  "fcpMs": 2260,
-  "cls": 0.016,
-  "tbtMs": 99,
-  "failingBinaryAudits": [
-    "label-content-name-mismatch"
+  "lcpMs": 2410,
+  "fcpMs": 1728,
+  "cls": 0,
+  "tbtMs": 283,
+  "lcpElement": "div.calendar-toolbar > div.calendar-month-navigation > button.calendar-month-heading > span",
+  "lcpPhases": [
+    {
+      "phase": "TTFB",
+      "ms": 452
+    },
+    {
+      "phase": "Load Delay",
+      "ms": 0
+    },
+    {
+      "phase": "Load Time",
+      "ms": 0
+    },
+    {
+      "phase": "Render Delay",
+      "ms": 1959
+    }
   ],
-  "meetsTargets": false
+  "failingBinaryAudits": [],
+  "lcpMsRuns": [
+    2412,
+    2410,
+    2410
+  ],
+  "exceptions": {},
+  "meetsTargets": true
 }

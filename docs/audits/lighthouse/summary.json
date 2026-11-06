@@ -1,6 +1,8 @@
 {
   "lighthouse": "12.8.2",
-  "measuredOn": "2026-11-05",
+  "measuredOn": "2026-11-06",
+  "runsPerScreen": 3,
+  "statistic": "median by LCP",
   "targets": {
     "performance": ">=90",
     "accessibility": 100,
@@ -8,168 +10,419 @@
     "lcpMs": "<2500",
     "cls": "<0.1"
   },
-  "note": "INP needs field data; TBT is the lab proxy. albums Best Practices 96 is the thumbnail 502 of seeded items whose media files do not exist in the measurement media folder.",
+  "note": "INP needs field data; TBT is the lab proxy.",
+  "knownExceptions": {
+    "albums": {
+      "bestPractices": "seeded album items have no media files in the measurement folder (thumbnail 502)"
+    }
+  },
   "results": [
     {
       "screen": "today",
       "path": "/today",
       "formFactor": "mobile",
-      "performance": 94,
+      "runs": 3,
+      "performance": 98,
       "accessibility": 100,
       "bestPractices": 100,
-      "lcpMs": 2714,
-      "fcpMs": 2180,
-      "cls": 0.0156,
+      "lcpMs": 2262,
+      "fcpMs": 1654,
+      "cls": 0,
       "tbtMs": 0,
-      "failingBinaryAudits": [
-        "label-content-name-mismatch"
+      "lcpElement": "div.page > header.page-head > div.page-head-copy > p.lede",
+      "lcpPhases": [
+        {
+          "phase": "TTFB",
+          "ms": 452
+        },
+        {
+          "phase": "Load Delay",
+          "ms": 0
+        },
+        {
+          "phase": "Load Time",
+          "ms": 0
+        },
+        {
+          "phase": "Render Delay",
+          "ms": 1810
+        }
       ],
-      "meetsTargets": false
+      "failingBinaryAudits": [],
+      "lcpMsRuns": [
+        2263,
+        2262,
+        2260
+      ],
+      "exceptions": {},
+      "meetsTargets": true
     },
     {
       "screen": "today",
       "path": "/today",
       "formFactor": "desktop",
+      "runs": 3,
       "performance": 100,
       "accessibility": 100,
       "bestPractices": 100,
-      "lcpMs": 610,
-      "fcpMs": 487,
-      "cls": 0.0034,
+      "lcpMs": 527,
+      "fcpMs": 424,
+      "cls": 0.0026,
       "tbtMs": 0,
-      "failingBinaryAudits": [
-        "label-content-name-mismatch"
+      "lcpElement": "div.page > header.page-head > div.page-head-copy > h1",
+      "lcpPhases": [
+        {
+          "phase": "TTFB",
+          "ms": 122
+        },
+        {
+          "phase": "Load Delay",
+          "ms": 0
+        },
+        {
+          "phase": "Load Time",
+          "ms": 0
+        },
+        {
+          "phase": "Render Delay",
+          "ms": 405
+        }
       ],
+      "failingBinaryAudits": [],
+      "lcpMsRuns": [
+        527,
+        527,
+        530
+      ],
+      "exceptions": {},
       "meetsTargets": true
     },
     {
       "screen": "calendar",
       "path": "/calendar",
       "formFactor": "mobile",
-      "performance": 93,
+      "runs": 3,
+      "performance": 91,
       "accessibility": 100,
       "bestPractices": 100,
-      "lcpMs": 2730,
-      "fcpMs": 2260,
-      "cls": 0.016,
-      "tbtMs": 99,
-      "failingBinaryAudits": [
-        "label-content-name-mismatch"
+      "lcpMs": 2410,
+      "fcpMs": 1728,
+      "cls": 0,
+      "tbtMs": 283,
+      "lcpElement": "div.calendar-toolbar > div.calendar-month-navigation > button.calendar-month-heading > span",
+      "lcpPhases": [
+        {
+          "phase": "TTFB",
+          "ms": 452
+        },
+        {
+          "phase": "Load Delay",
+          "ms": 0
+        },
+        {
+          "phase": "Load Time",
+          "ms": 0
+        },
+        {
+          "phase": "Render Delay",
+          "ms": 1959
+        }
       ],
-      "meetsTargets": false
+      "failingBinaryAudits": [],
+      "lcpMsRuns": [
+        2412,
+        2410,
+        2410
+      ],
+      "exceptions": {},
+      "meetsTargets": true
     },
     {
       "screen": "calendar",
       "path": "/calendar",
       "formFactor": "desktop",
+      "runs": 3,
       "performance": 100,
       "accessibility": 100,
       "bestPractices": 100,
-      "lcpMs": 612,
-      "fcpMs": 488,
+      "lcpMs": 567,
+      "fcpMs": 423,
       "cls": 0.0025,
       "tbtMs": 0,
-      "failingBinaryAudits": [
-        "label-content-name-mismatch"
+      "lcpElement": "div.page > header.page-head > div > h1",
+      "lcpPhases": [
+        {
+          "phase": "TTFB",
+          "ms": 122
+        },
+        {
+          "phase": "Load Delay",
+          "ms": 0
+        },
+        {
+          "phase": "Load Time",
+          "ms": 0
+        },
+        {
+          "phase": "Render Delay",
+          "ms": 445
+        }
       ],
+      "failingBinaryAudits": [],
+      "lcpMsRuns": [
+        573,
+        567,
+        567
+      ],
+      "exceptions": {},
       "meetsTargets": true
     },
     {
       "screen": "budget",
       "path": "/budget",
       "formFactor": "mobile",
-      "performance": 93,
+      "runs": 3,
+      "performance": 97,
       "accessibility": 100,
       "bestPractices": 100,
-      "lcpMs": 2730,
-      "fcpMs": 2333,
-      "cls": 0.016,
+      "lcpMs": 2407,
+      "fcpMs": 1804,
+      "cls": 0.0156,
       "tbtMs": 0,
-      "failingBinaryAudits": [
-        "label-content-name-mismatch"
+      "lcpElement": "div.page > header.page-head > div > p.lede",
+      "lcpPhases": [
+        {
+          "phase": "TTFB",
+          "ms": 452
+        },
+        {
+          "phase": "Load Delay",
+          "ms": 0
+        },
+        {
+          "phase": "Load Time",
+          "ms": 0
+        },
+        {
+          "phase": "Render Delay",
+          "ms": 1955
+        }
       ],
-      "meetsTargets": false
+      "failingBinaryAudits": [],
+      "lcpMsRuns": [
+        2415,
+        2407,
+        2405
+      ],
+      "exceptions": {},
+      "meetsTargets": true
     },
     {
       "screen": "budget",
       "path": "/budget",
       "formFactor": "desktop",
+      "runs": 3,
       "performance": 100,
       "accessibility": 100,
       "bestPractices": 100,
-      "lcpMs": 651,
-      "fcpMs": 507,
-      "cls": 0.0027,
+      "lcpMs": 567,
+      "fcpMs": 424,
+      "cls": 0.0028,
       "tbtMs": 0,
-      "failingBinaryAudits": [
-        "label-content-name-mismatch"
+      "lcpElement": "div.page > header.page-head > div > h1",
+      "lcpPhases": [
+        {
+          "phase": "TTFB",
+          "ms": 122
+        },
+        {
+          "phase": "Load Delay",
+          "ms": 0
+        },
+        {
+          "phase": "Load Time",
+          "ms": 0
+        },
+        {
+          "phase": "Render Delay",
+          "ms": 445
+        }
       ],
+      "failingBinaryAudits": [],
+      "lcpMsRuns": [
+        566,
+        567,
+        567
+      ],
+      "exceptions": {},
       "meetsTargets": true
     },
     {
       "screen": "albums",
       "path": "/albums",
       "formFactor": "mobile",
-      "performance": 92,
+      "runs": 3,
+      "performance": 97,
       "accessibility": 100,
       "bestPractices": 96,
-      "lcpMs": 2952,
-      "fcpMs": 2332,
-      "cls": 0.016,
+      "lcpMs": 2406,
+      "fcpMs": 1729,
+      "cls": 0,
       "tbtMs": 0,
-      "failingBinaryAudits": [
-        "errors-in-console",
-        "label-content-name-mismatch"
+      "lcpElement": "div.page > header.page-head > div > p.lede",
+      "lcpPhases": [
+        {
+          "phase": "TTFB",
+          "ms": 452
+        },
+        {
+          "phase": "Load Delay",
+          "ms": 0
+        },
+        {
+          "phase": "Load Time",
+          "ms": 0
+        },
+        {
+          "phase": "Render Delay",
+          "ms": 1954
+        }
       ],
-      "meetsTargets": false
+      "failingBinaryAudits": [
+        "errors-in-console"
+      ],
+      "lcpMsRuns": [
+        2406,
+        2405,
+        2406
+      ],
+      "exceptions": {
+        "bestPractices": "seeded album items have no media files in the measurement folder (thumbnail 502)"
+      },
+      "meetsTargets": true
     },
     {
       "screen": "albums",
       "path": "/albums",
       "formFactor": "desktop",
+      "runs": 3,
       "performance": 100,
       "accessibility": 100,
       "bestPractices": 96,
-      "lcpMs": 650,
-      "fcpMs": 486,
-      "cls": 0.0032,
+      "lcpMs": 566,
+      "fcpMs": 423,
+      "cls": 0.0023,
       "tbtMs": 0,
-      "failingBinaryAudits": [
-        "errors-in-console",
-        "label-content-name-mismatch"
+      "lcpElement": "div.page > header.page-head > div > h1",
+      "lcpPhases": [
+        {
+          "phase": "TTFB",
+          "ms": 121
+        },
+        {
+          "phase": "Load Delay",
+          "ms": 0
+        },
+        {
+          "phase": "Load Time",
+          "ms": 0
+        },
+        {
+          "phase": "Render Delay",
+          "ms": 445
+        }
       ],
-      "meetsTargets": false
+      "failingBinaryAudits": [
+        "errors-in-console"
+      ],
+      "lcpMsRuns": [
+        566,
+        566,
+        569
+      ],
+      "exceptions": {
+        "bestPractices": "seeded album items have no media files in the measurement folder (thumbnail 502)"
+      },
+      "meetsTargets": true
     },
     {
       "screen": "notes",
       "path": "/notes",
       "formFactor": "mobile",
-      "performance": 93,
+      "runs": 3,
+      "performance": 97,
       "accessibility": 100,
       "bestPractices": 100,
-      "lcpMs": 2732,
-      "fcpMs": 2335,
-      "cls": 0.0158,
+      "lcpMs": 2406,
+      "fcpMs": 1804,
+      "cls": 0.0156,
       "tbtMs": 0,
-      "failingBinaryAudits": [
-        "label-content-name-mismatch"
+      "lcpElement": "div.page > header.page-head > div > p.lede",
+      "lcpPhases": [
+        {
+          "phase": "TTFB",
+          "ms": 452
+        },
+        {
+          "phase": "Load Delay",
+          "ms": 0
+        },
+        {
+          "phase": "Load Time",
+          "ms": 0
+        },
+        {
+          "phase": "Render Delay",
+          "ms": 1955
+        }
       ],
-      "meetsTargets": false
+      "failingBinaryAudits": [],
+      "lcpMsRuns": [
+        2253,
+        2406,
+        2411
+      ],
+      "exceptions": {},
+      "meetsTargets": true
     },
     {
       "screen": "notes",
       "path": "/notes",
       "formFactor": "desktop",
+      "runs": 3,
       "performance": 100,
       "accessibility": 100,
       "bestPractices": 100,
-      "lcpMs": 654,
-      "fcpMs": 509,
-      "cls": 0.0032,
+      "lcpMs": 566,
+      "fcpMs": 423,
+      "cls": 0.0023,
       "tbtMs": 0,
-      "failingBinaryAudits": [
-        "label-content-name-mismatch"
+      "lcpElement": "div.page > header.page-head > div > p.lede",
+      "lcpPhases": [
+        {
+          "phase": "TTFB",
+          "ms": 122
+        },
+        {
+          "phase": "Load Delay",
+          "ms": 0
+        },
+        {
+          "phase": "Load Time",
+          "ms": 0
+        },
+        {
+          "phase": "Render Delay",
+          "ms": 445
+        }
       ],
+      "failingBinaryAudits": [],
+      "lcpMsRuns": [
+        567,
+        566,
+        566
+      ],
+      "exceptions": {},
       "meetsTargets": true
     }
   ]

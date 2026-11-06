@@ -1,20 +1,51 @@
 {
   "lighthouse": "12.8.2",
-  "fetchTime": "2026-11-04T21:52:09.290Z",
+  "fetchTime": "2026-11-06T15:12:28.913Z",
   "build": "dist-http, signed in (seeded demo household), vite preview + server/dev.ts on this machine",
-  "throttling": "simulate {\"rttMs\":150,\"throughputKbps\":1638.4,\"requestLatencyMs\":562.5,\"downloadThroughputKbps\":1474.5600000000002,\"uploadThroughputKbps\":675,\"cpuSlowdownMultiplier\":4}",
+  "throttling": {
+    "rttMs": 150,
+    "throughputKbps": 1638.4,
+    "requestLatencyMs": 562.5,
+    "downloadThroughputKbps": 1474.5600000000002,
+    "uploadThroughputKbps": 675,
+    "cpuSlowdownMultiplier": 4
+  },
   "screen": "today",
   "path": "/today",
   "formFactor": "mobile",
-  "performance": 94,
+  "runs": 3,
+  "performance": 98,
   "accessibility": 100,
   "bestPractices": 100,
-  "lcpMs": 2714,
-  "fcpMs": 2180,
-  "cls": 0.0156,
+  "lcpMs": 2262,
+  "fcpMs": 1654,
+  "cls": 0,
   "tbtMs": 0,
-  "failingBinaryAudits": [
-    "label-content-name-mismatch"
+  "lcpElement": "div.page > header.page-head > div.page-head-copy > p.lede",
+  "lcpPhases": [
+    {
+      "phase": "TTFB",
+      "ms": 452
+    },
+    {
+      "phase": "Load Delay",
+      "ms": 0
+    },
+    {
+      "phase": "Load Time",
+      "ms": 0
+    },
+    {
+      "phase": "Render Delay",
+      "ms": 1810
+    }
   ],
-  "meetsTargets": false
+  "failingBinaryAudits": [],
+  "lcpMsRuns": [
+    2263,
+    2262,
+    2260
+  ],
+  "exceptions": {},
+  "meetsTargets": true
 }

@@ -210,6 +210,15 @@ test.describe('new-version notice', () => {
     await expect(page.getByRole('button', { name: '読み込み直す' })).toHaveCount(0);
     expect(asked).toEqual([]);
   });
+
+  test('the service worker registers after the page loads, and a first install shows no notice', async ({ page }) => {
+    // 入口が top-level await で待っていた間は、load の後に登録の処理を足していたので、登録されていなかった。
+    await page.goto('/today');
+    await expect(page.locator('main h1')).toBeVisible();
+    const scope = await page.evaluate(async () => (await navigator.serviceWorker.ready).scope);
+    expect(new URL(scope).pathname).toBe('/');
+    await expect(page.getByRole('button', { name: '読み込み直す' })).toHaveCount(0);
+  });
 });
 
 test.describe('unsaved changes', () => {

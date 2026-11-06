@@ -1,5 +1,6 @@
 import type { FamilyHubGateway } from '../data/gateway';
 import type { HouseholdSnapshot, SessionInfo } from '../domain/types';
+import { createHttpRuntime } from './runtime.http';
 
 /** 接続先ごとの違い。確認用データは VITE_GATEWAY が http のビルドには含めない。 */
 export interface AppRuntime {
@@ -15,10 +16,8 @@ export interface AppRuntime {
 }
 
 export async function loadRuntime(): Promise<AppRuntime> {
-  if (import.meta.env.VITE_GATEWAY === 'http') {
-    const { createHttpRuntime } = await import('./runtime.http');
-    return createHttpRuntime();
-  }
+  // http のビルドでは接続の部品を入口に入れる（別のファイルにすると、遅い回線で往復を1回待つ。docs/audits/lcp-assessment.md）。
+  if (import.meta.env.VITE_GATEWAY === 'http') return createHttpRuntime();
   const { createMockRuntime } = await import('./runtime.mock');
   return createMockRuntime();
 }

@@ -70,6 +70,9 @@ export function AppProvider({ runtime, children }: PropsWithChildren<{ runtime: 
   const [toast, setToast] = useState<string | null>(null);
   const [pendingCommands, setPendingCommands] = useState<QueuedCommand[]>([]);
   const [privacy, setPrivacy] = useState<PrivacySettings | null>(null);
+  const privacyBefore = useRef<PrivacySettings | null>(null);
+  /** 最初の読み込みでプライバシーの設定を一緒に取ったときの権限の並び（同じ並びのうちは取り直さない）。 */
+  const privacyLoadedFor = useRef<readonly Capability[] | null>(null);
 
   const loadQueue = useCallback(async () => {
     try {
@@ -96,8 +99,16 @@ export function AppProvider({ runtime, children }: PropsWithChildren<{ runtime: 
         return current.ok;
       }
     }
+    // 最初の読み込みでは、プライバシーの設定も並べて取り、家族の記録と一緒に反映する。
+    // 別々に反映すると画面全体を2回描き直し、遅い端末では操作できない時間が延びる（docs/audits/lcp-assessment.md）。
+    const privacyRequest = blocking ? gateway.household.getPrivacySettings() : undefined;
     const result = await gateway.household.getSnapshot(scenario);
-    if (result.ok) { setSnapshot(result.value); runtime.setPermissionRevision(result.value.viewer.permissionRevision); } else setError(result.error);
+    const privacyResult = privacyRequest && result.ok && result.value.viewer.capabilities.includes('settings.own') ? await privacyRequest : undefined;
+    if (result.ok) {
+      setSnapshot(result.value);
+      runtime.setPermissionRevision(result.value.viewer.permissionRevision);
+      if (privacyResult?.ok) { setPrivacy(privacyResult.value); privacyBefore.current = privacyResult.value; privacyLoadedFor.current = result.value.viewer.capabilities; }
+    } else setError(result.error);
     if (blocking) setLoading(false); else setRefreshing(false);
     return result.ok;
   }, [gateway, runtime, scenario]);
@@ -119,13 +130,14 @@ export function AppProvider({ runtime, children }: PropsWithChildren<{ runtime: 
   useEffect(() => { queueMicrotask(() => void refresh()); }, [refresh]);
   useEffect(() => {
     if (!snapshot.viewer.capabilities.includes('settings.own')) return;
+    // 最初の読み込みで家族の記録と一緒に取った分は、取り直さない。
+    if (privacyLoadedFor.current === snapshot.viewer.capabilities) return;
     let mounted = true;
     void gateway.household.getPrivacySettings().then((result) => { if (mounted && result.ok) { setPrivacy(result.value); privacyBefore.current = result.value; } });
     return () => { mounted = false; };
   }, [gateway, snapshot.viewer.capabilities]);
   // 読み込みと保存の組を順に処理する。続けて操作しても、先の保存が後の変更を上書きしないようにする。
   const privacyQueue = useRef<Promise<unknown>>(Promise.resolve());
-  const privacyBefore = useRef<PrivacySettings | null>(null);
   const updatePrivacy = useCallback((patch: Partial<PrivacySettings>): Promise<Result<PrivacySettings>> => {
     // 同意の取り消しなどは保存を待たずに全画面へ反映する。保存できなければ記録された内容へ戻す。
     setPrivacy((current) => current && { ...current, ...patch });
