@@ -5,6 +5,7 @@ import { navigate } from '../../app/router';
 import { Brand } from '../../design-system/components';
 import { ADULT_AGE, ageOn, signUpSchema } from '../../domain/account';
 import { checkNewPassword } from '../../domain/passwordPolicy';
+import { TRIAL_DAYS } from '../../content/legal';
 
 export function SignUpPage() {
   const { gateway, finishSignIn } = useApp();
@@ -35,7 +36,7 @@ export function SignUpPage() {
       <div className="field"><label htmlFor="signup-password">パスワード</label><input data-control-id="sign-up.password" className="input" id="signup-password" name="password" type="password" autoComplete="new-password" minLength={15} maxLength={64} required/><span className="field-help">15〜64文字で入力してください。文字種の指定はありません。</span></div>
       <div className="field"><label htmlFor="signup-birthdate">誕生日</label><input data-control-id="sign-up.birthdate" className="input" id="signup-birthdate" name="birthdate" type="date" required value={birthdate} onChange={(event) => setBirthdate(event.target.value)}/><span className="field-help">家族グループを作るには18歳以上である必要があります。</span></div>
       {minor && <label className="check-row"><input data-control-id="sign-up.guardian-consent" name="guardianConsent" type="checkbox"/>保護者の同意を得ています</label>}
-      <p className="small muted mb-0">アカウントを作る前に、<a data-control-id="sign-up.legal" href="/settings/legal" target="_blank" rel="noopener">利用規約とプライバシーポリシーの草案（新しいタブ）</a>を確認してください。</p>
+      <p className="small muted mb-0">「アカウントを作る」を押すと、<a data-control-id="sign-up.legal" href="/settings/legal" target="_blank" rel="noopener">利用規約とプライバシーポリシーの草案（新しいタブ）</a>の利用規約が、運営者とあなたとの契約の内容になります。押す前に確認してください。{TRIAL_DAYS}日間は無料で、自動で有料に切り替わることはありません。</p>
       {error && <p className="field-error" role="alert">{error}</p>}
       <button data-control-id="sign-up.submit" className="button primary full" type="submit" disabled={busy}>{busy ? '作成中…' : 'アカウントを作る'}</button>
       <a data-control-id="sign-up.back" className="button full" href="/auth" data-link>サインインに戻る</a>
