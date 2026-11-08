@@ -1,0 +1,61 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 420 297] /Resources << /Font << /F1 4 0 R /F2 8 0 R >> >> /Contents 7 0 R /Annots [9 0 R] >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type0 /BaseFont /HeiseiKakuGo-W5 /Encoding /UniJIS-UCS2-H /DescendantFonts [5 0 R] >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /CIDFontType0 /BaseFont /HeiseiKakuGo-W5 /CIDSystemInfo << /Registry (Adobe) /Ordering (Japan1) /Supplement 5 >> /FontDescriptor 6 0 R /DW 1000 /W [1 95 500 231 632 500] >>
+endobj
+6 0 obj
+<< /Type /FontDescriptor /FontName /HeiseiKakuGo-W5 /Flags 4 /FontBBox [-92 -250 1010 922] /ItalicAngle 0 /Ascent 752 /Descent -221 /CapHeight 737 /StemV 114 >>
+endobj
+7 0 obj
+<< /Length 341 >>
+stream
+BT
+/F1 18 Tf
+36 250 Td
+<5B666821516C958B306E304A77E53089305BFF08898B672CFF09> Tj
+/F1 12 Tf
+0 -34 Td
+<53D74ED800200039003A00310035301C3000676568218A3C30927740752830573066304F3060305530443002> Tj
+0 -22 Td
+<64AE5F71306F65595BA4306E5916306030513067304A985830443057307E30593002> Tj
+/F2 10 Tf
+0 -40 Td
+(https://example.com/family-hub/school) Tj
+ET
+endstream
+endobj
+8 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+9 0 obj
+<< /Type /Annot /Subtype /Link /Rect [34 150 230 166] /Border [0 0 0] /A << /S /URI /URI (https://example.com/family-hub/school) >> >>
+endobj
+xref
+0 10
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000121 00000 n 
+0000000273 00000 n 
+0000000399 00000 n 
+0000000611 00000 n 
+0000000787 00000 n 
+0000001179 00000 n 
+0000001276 00000 n 
+trailer
+<< /Size 10 /Root 1 0 R >>
+startxref
+1426
+%%EOF

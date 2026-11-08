@@ -1,0 +1,87 @@
+{
+  "album": {
+    "id": "album-sports",
+    "householdId": "house-mori",
+    "title": "運動会",
+    "description": "花の徒競走とお弁当",
+    "coverItemId": "item-sports-1",
+    "place": {
+      "name": "青葉小学校 校庭",
+      "capturedVia": "manual",
+      "selectedAt": "2026-09-20T17:00:00+09:00"
+    },
+    "bgmPreset": "bright",
+    "creatorMembershipId": "member-aoi",
+    "visibility": {
+      "audience": "selected",
+      "creatorMembershipId": "member-aoi",
+      "selectedMembershipIds": [
+        "member-aoi",
+        "member-ren",
+        "member-hana",
+        "member-sora"
+      ]
+    },
+    "createdAt": "2026-09-20T17:00:00+09:00",
+    "version": 1
+  },
+  "items": [
+    {
+      "id": "item-sports-1",
+      "albumId": "album-sports",
+      "householdId": "house-mori",
+      "kind": "photo",
+      "originalName": "item-sports-1.jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 2400000,
+      "width": 1600,
+      "height": 1200,
+      "takenAt": "2026-09-20T09:12:30+09:00",
+      "takenAtSource": "exif-offset",
+      "status": "ready",
+      "locationKept": false,
+      "hasThumbnail": true,
+      "uploaderMembershipId": "member-aoi",
+      "position": 0,
+      "createdAt": "2026-09-20T17:00:00+09:00"
+    },
+    {
+      "id": "item-sports-2",
+      "albumId": "album-sports",
+      "householdId": "house-mori",
+      "kind": "photo",
+      "originalName": "item-sports-2.jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 2401000,
+      "width": 1600,
+      "height": 1200,
+      "takenAt": "2026-09-20T10:05:00+09:00",
+      "takenAtSource": "exif-local",
+      "status": "ready",
+      "locationKept": false,
+      "hasThumbnail": true,
+      "uploaderMembershipId": "member-aoi",
+      "position": 1,
+      "createdAt": "2026-09-20T17:00:00+09:00"
+    },
+    {
+      "id": "item-sports-3",
+      "albumId": "album-sports",
+      "householdId": "house-mori",
+      "kind": "photo",
+      "originalName": "item-sports-3.jpg",
+      "mimeType": "image/jpeg",
+      "byteSize": 2402000,
+      "width": 1600,
+      "height": 1200,
+      "takenAt": "2026-09-20T11:40:12+09:00",
+      "takenAtSource": "exif-offset",
+      "status": "ready",
+      "locationKept": false,
+      "hasThumbnail": true,
+      "uploaderMembershipId": "member-ren",
+      "position": 2,
+      "createdAt": "2026-09-20T17:00:00+09:00"
+    }
+  ]
+}

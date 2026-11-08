@@ -1,0 +1,9 @@
+// これを Local.xcconfig に写して、自分の値を入れる。Local.xcconfig はリポジトリに入れない（.gitignore）。
+// FH_TEAM_ID は Xcode の Settings > Accounts、またはキーチェーンの「Apple Development」の証明書で分かる。
+FH_TEAM_ID = ABCDE12345
+// 世界で1つのバンドル ID になるように、自分のものにする。
+FH_BUNDLE_PREFIX = com.example.yourname.familyhub
+// 実機に入れるときの端末の ID（xcrun devicectl list devices）。scripts/ios/device.sh が読む。
+FH_DEVICE_ID =
+// 手元の https の開発サーバー（npm run dev:lan）。空なら見本だけ。
+FH_DEV_SERVER_URL =

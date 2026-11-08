@@ -1,0 +1,42 @@
+[
+  {
+    "kind": "event",
+    "id": "event-school",
+    "label": "学校公開",
+    "detail": "青葉小学校",
+    "destination": "/calendar/event-school"
+  },
+  {
+    "kind": "memo",
+    "id": "memo-school",
+    "label": "学校公開のお知らせ",
+    "detail": "学校 / 今週",
+    "destination": "/notes/memo-school"
+  },
+  {
+    "kind": "expense",
+    "id": "expense-books",
+    "label": "学校教材",
+    "detail": "青葉書店",
+    "destination": "/budget/expense-books"
+  },
+  {
+    "kind": "place",
+    "id": "7bd6da79",
+    "label": "青葉小学校 体育館",
+    "destination": "/places/7bd6da79"
+  },
+  {
+    "kind": "resource",
+    "id": "resource-school",
+    "label": "青葉小学校の保護者向けページ",
+    "destination": "/settings/resources#resource-school"
+  },
+  {
+    "kind": "album",
+    "id": "album-sports",
+    "label": "運動会",
+    "detail": "青葉小学校 校庭",
+    "destination": "/albums/album-sports"
+  }
+]

@@ -1,0 +1,14 @@
+// 全体の設定。チーム ID とバンドルの接頭辞は、リポジトリに入れない Local.xcconfig で上書きする（docs/ios/README.md）。
+FH_BUNDLE_PREFIX = example.familyhub
+FH_TEAM_ID =
+// パスキーを使うドメイン（webcredentials）。空ならパスキーの入口を出さない。
+FH_ASSOCIATED_DOMAIN =
+
+IPHONEOS_DEPLOYMENT_TARGET = 26.0
+SWIFT_VERSION = 6.0
+SWIFT_STRICT_CONCURRENCY = complete
+TARGETED_DEVICE_FAMILY = 1,2
+DEVELOPMENT_TEAM = $(FH_TEAM_ID)
+CODE_SIGN_STYLE = Automatic
+
+#include? "Local.xcconfig"

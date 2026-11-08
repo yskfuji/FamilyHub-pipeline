@@ -1,0 +1,22 @@
+[
+  {
+    "id": "notification-library",
+    "kind": "todoDue",
+    "destination": "/tasks/todo-library",
+    "title": "図書館の本を返す",
+    "body": "18:00まで・担当：碧さん",
+    "remindAt": "2026-09-30T17:30:00+09:00",
+    "read": false,
+    "status": "active"
+  },
+  {
+    "id": "notification-school",
+    "kind": "eventDeparture",
+    "destination": "/calendar/event-school",
+    "title": "学校公開に出発",
+    "body": "9:30開始・青葉小学校",
+    "remindAt": "2026-09-30T09:00:00+09:00",
+    "read": true,
+    "status": "active"
+  }
+]

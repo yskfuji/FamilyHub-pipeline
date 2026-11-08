@@ -1,0 +1,6 @@
+{
+  "code": "CONFLICT",
+  "message": "別の端末で予定が更新されています。現在の内容を確認してください。",
+  "retryable": true,
+  "reason": "VERSION"
+}

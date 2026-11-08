@@ -1,0 +1,447 @@
+{
+  "items": [
+    {
+      "id": "audit-seed-28",
+      "at": "2026-09-30T07:25:00+09:00",
+      "actor": {
+        "kind": "member",
+        "membershipId": "member-ren",
+        "displayName": "蓮"
+      },
+      "action": "updateAlbum",
+      "group": "albums",
+      "target": {
+        "kind": "album",
+        "id": "album-park",
+        "hidden": false
+      },
+      "detail": {
+        "fields": [
+          "title"
+        ]
+      }
+    },
+    {
+      "id": "audit-seed-27",
+      "at": "2026-09-30T07:20:00+09:00",
+      "actor": {
+        "kind": "member",
+        "membershipId": "member-aoi",
+        "displayName": "碧"
+      },
+      "action": "createHouseholdInvite",
+      "group": "members",
+      "target": {
+        "kind": "invite",
+        "id": "invite-demo",
+        "hidden": false
+      },
+      "detail": null
+    },
+    {
+      "id": "audit-seed-25",
+      "at": "2026-09-30T07:10:00+09:00",
+      "actor": {
+        "kind": "member",
+        "membershipId": "member-aoi",
+        "displayName": "碧"
+      },
+      "action": "updateExpense",
+      "group": "expenses",
+      "target": {
+        "kind": "expense",
+        "id": "expense-books",
+        "hidden": false
+      },
+      "detail": {
+        "fields": [
+          "note",
+          "title"
+        ]
+      }
+    },
+    {
+      "id": "audit-seed-24",
+      "at": "2026-09-30T07:05:00+09:00",
+      "actor": {
+        "kind": "member",
+        "membershipId": "member-ren",
+        "displayName": "蓮"
+      },
+      "action": "updateTodo",
+      "group": "tasks",
+      "target": {
+        "kind": "task",
+        "id": "todo-garbage",
+        "hidden": false
+      },
+      "detail": {
+        "fields": [
+          "dueAt"
+        ]
+      }
+    },
+    {
+      "id": "audit-seed-23",
+      "at": "2026-09-30T06:55:00+09:00",
+      "actor": {
+        "kind": "member",
+        "membershipId": "member-aoi",
+        "displayName": "碧"
+      },
+      "action": "uploadAttachment",
+      "group": "memos",
+      "target": {
+        "kind": "memo",
+        "id": "memo-receipt",
+        "hidden": false
+      },
+      "detail": null
+    },
+    {
+      "id": "audit-seed-22",
+      "at": "2026-09-30T06:50:00+09:00",
+      "actor": {
+        "kind": "member",
+        "membershipId": "member-aoi",
+        "displayName": "碧"
+      },
+      "action": "createMemo",
+      "group": "memos",
+      "target": {
+        "kind": "memo",
+        "id": "memo-receipt",
+        "hidden": false
+      },
+      "detail": null
+    },
+    {
+      "id": "audit-seed-20",
+      "at": "2026-09-29T22:00:00+09:00",
+      "actor": {
+        "kind": "member",
+        "membershipId": "member-aoi",
+        "displayName": "碧"
+      },
+      "action": "updateHouseholdProfile",
+      "group": "household",
+      "target": null,
+      "detail": null
+    },
+    {
+      "id": "audit-seed-19",
+      "at": "2026-09-29T21:12:00+09:00",
+      "actor": {
+        "kind": "member",
+        "membershipId": "member-aoi",
+        "displayName": "碧"
+      },
+      "action": "createItemLink",
+      "group": "links",
+      "target": {
+        "kind": "link",
+        "id": "link-school",
+        "hidden": false
+      },
+      "detail": null
+    },
+    {
+      "id": "audit-seed-18",
+      "at": "2026-09-29T21:10:00+09:00",
+      "actor": {
+        "kind": "member",
+        "membershipId": "member-aoi",
+        "displayName": "碧"
+      },
+      "action": "updateMemo",
+      "group": "memos",
+      "target": {
+        "kind": "memo",
+        "id": "memo-school",
+        "hidden": false
+      },
+      "detail": {
+        "fields": [
+          "body",
+          "tags"
+        ]
+      }
+    },
+    {
+      "id": "audit-seed-17",
+      "at": "2026-09-29T20:00:00+09:00",
+      "actor": {
+        "kind": "member",
+        "membershipId": "member-ren",
+        "displayName": "蓮"
+      },
+      "action": "deleteExpense",
+      "group": "expenses",
+      "target": {
+        "kind": "expense",
+        "id": null,
+        "hidden": true
+      },
+      "detail": null
+    },
+    {
+      "id": "audit-seed-16",
+      "at": "2026-09-29T12:00:00+09:00",
+      "actor": {
+        "kind": "member",
+        "membershipId": "member-hana",
+        "displayName": "花"
+      },
+      "action": "updateTodoStatus",
+      "group": "tasks",
+      "target": {
+        "kind": "task",
+        "id": "todo-practice",
+        "hidden": false
+      },
+      "detail": null
+    },
+    {
+      "id": "audit-seed-15",
+      "at": "2026-09-29T09:30:00+09:00",
+      "actor": {
+        "kind": "member",
+        "membershipId": "member-aoi",
+        "displayName": "碧"
+      },
+      "action": "createExpense",
+      "group": "expenses",
+      "target": {
+        "kind": "expense",
+        "id": "expense-books",
+        "hidden": false
+      },
+      "detail": null
+    },
+    {
+      "id": "audit-seed-14",
+      "at": "2026-09-29T08:00:00+09:00",
+      "actor": {
+        "kind": "member",
+        "membershipId": "member-aoi",
+        "displayName": "碧"
+      },
+      "action": "recordSettlement",
+      "group": "expenses",
+      "target": {
+        "kind": "expense",
+        "id": null,
+        "hidden": true
+      },
+      "detail": null
+    },
+    {
+      "id": "audit-seed-13",
+      "at": "2026-09-28T20:00:00+09:00",
+      "actor": {
+        "kind": "member",
+        "membershipId": "member-ren",
+        "displayName": "蓮"
+      },
+      "action": "recordSettlement",
+      "group": "expenses",
+      "target": {
+        "kind": "expense",
+        "id": "expense-groceries",
+        "hidden": false
+      },
+      "detail": null
+    },
+    {
+      "id": "audit-seed-12",
+      "at": "2026-09-28T18:40:00+09:00",
+      "actor": {
+        "kind": "member",
+        "membershipId": "member-ren",
+        "displayName": "蓮"
+      },
+      "action": "createMemo",
+      "group": "memos",
+      "target": {
+        "kind": "memo",
+        "id": "memo-clinic",
+        "hidden": false
+      },
+      "detail": null
+    },
+    {
+      "id": "audit-seed-11",
+      "at": "2026-09-28T08:10:00+09:00",
+      "actor": {
+        "kind": "member",
+        "membershipId": "member-ren",
+        "displayName": "蓮"
+      },
+      "action": "createExpense",
+      "group": "expenses",
+      "target": {
+        "kind": "expense",
+        "id": null,
+        "hidden": true
+      },
+      "detail": null
+    },
+    {
+      "id": "audit-seed-9",
+      "at": "2026-09-27T16:20:00+09:00",
+      "actor": {
+        "kind": "member",
+        "membershipId": "member-aoi",
+        "displayName": "碧"
+      },
+      "action": "uploadAttachment",
+      "group": "memos",
+      "target": {
+        "kind": "memo",
+        "id": "memo-school",
+        "hidden": false
+      },
+      "detail": null
+    },
+    {
+      "id": "audit-seed-8",
+      "at": "2026-09-27T09:00:00+09:00",
+      "actor": {
+        "kind": "member",
+        "membershipId": "member-ren",
+        "displayName": "蓮"
+      },
+      "action": "createExpense",
+      "group": "expenses",
+      "target": {
+        "kind": "expense",
+        "id": "expense-train",
+        "hidden": false
+      },
+      "detail": null
+    },
+    {
+      "id": "audit-seed-7",
+      "at": "2026-09-27T03:00:00+09:00",
+      "actor": {
+        "kind": "operator"
+      },
+      "action": "operator.grant",
+      "group": "operator",
+      "target": null,
+      "detail": null
+    },
+    {
+      "id": "audit-seed-6",
+      "at": "2026-09-26T18:05:00+09:00",
+      "actor": {
+        "kind": "member",
+        "membershipId": "member-ren",
+        "displayName": "蓮"
+      },
+      "action": "updateTodoStatus",
+      "group": "tasks",
+      "target": {
+        "kind": "task",
+        "id": "todo-done",
+        "hidden": false
+      },
+      "detail": null
+    },
+    {
+      "id": "audit-seed-5",
+      "at": "2026-09-26T10:12:00+09:00",
+      "actor": {
+        "kind": "member",
+        "membershipId": "member-aoi",
+        "displayName": "碧"
+      },
+      "action": "createExpense",
+      "group": "expenses",
+      "target": {
+        "kind": "expense",
+        "id": "expense-groceries",
+        "hidden": false
+      },
+      "detail": null
+    },
+    {
+      "id": "audit-seed-4",
+      "at": "2026-09-25T20:40:00+09:00",
+      "actor": {
+        "kind": "member",
+        "membershipId": "member-ren",
+        "displayName": "蓮"
+      },
+      "action": "createTodo",
+      "group": "tasks",
+      "target": {
+        "kind": "task",
+        "id": "todo-library",
+        "hidden": false
+      },
+      "detail": null
+    },
+    {
+      "id": "audit-seed-3",
+      "at": "2026-09-25T08:30:00+09:00",
+      "actor": {
+        "kind": "member",
+        "membershipId": "member-aoi",
+        "displayName": "碧"
+      },
+      "action": "createExpense",
+      "group": "expenses",
+      "target": {
+        "kind": "expense",
+        "id": "income-salary",
+        "hidden": false
+      },
+      "detail": null
+    },
+    {
+      "id": "audit-seed-2",
+      "at": "2026-09-24T21:15:00+09:00",
+      "actor": {
+        "kind": "member",
+        "membershipId": "member-aoi",
+        "displayName": "碧"
+      },
+      "action": "updateRecurringEvent",
+      "group": "events",
+      "target": {
+        "kind": "event",
+        "id": "event-clean",
+        "hidden": false
+      },
+      "detail": {
+        "fields": [
+          "startsAt",
+          "endsAt"
+        ]
+      }
+    },
+    {
+      "id": "audit-seed-1",
+      "at": "2026-09-24T19:02:00+09:00",
+      "actor": {
+        "kind": "member",
+        "membershipId": "member-ren",
+        "displayName": "蓮"
+      },
+      "action": "createEvent",
+      "group": "events",
+      "target": {
+        "kind": "event",
+        "id": "event-park",
+        "hidden": false
+      },
+      "detail": null
+    }
+  ],
+  "nextCursor": null,
+  "chain": {
+    "state": "ok",
+    "checkedAt": "2026-09-30T07:45:00+09:00"
+  }
+}

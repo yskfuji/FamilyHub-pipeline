@@ -1,0 +1,9 @@
+[
+  {
+    "id": "invite-demo",
+    "householdId": "house-mori",
+    "role": "adult",
+    "expiresAt": "2026-10-01T07:30:00+09:00",
+    "remainingUses": 1
+  }
+]
