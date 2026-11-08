@@ -79,7 +79,7 @@ npm run verify:ios     # 生成物が最新か → xcodegen → swift test → �
 1. Xcode の Settings → Apple Accounts に、開発者のチームの Apple ID を足す（一度だけ）。
 2. iPhone で「設定」→「プライバシーとセキュリティ」→「デベロッパモード」を入れ、Mac を信頼する（一度だけ）。
 3. `ios/Config/Local.xcconfig.example` を `ios/Config/Local.xcconfig` に写し、次の値を入れる。
-   - `FH_TEAM_ID`
+   - `FH_TEAM_ID`（チームの ID。証明書の名前の括弧の中の ID ではない。`Local.xcconfig.example` に調べ方がある）
    - `FH_BUNDLE_PREFIX`（世界で1つの名前）
    - `FH_DEVICE_ID`（`xcrun devicectl list devices` で分かる）
 4. `npm run ios:device` で、作って入れて開く。
