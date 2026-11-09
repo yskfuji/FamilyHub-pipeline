@@ -141,7 +141,9 @@ export class Keyring {
       const kid = v2 ? parts[1] : LEGACY_KID;
       if (!this.usable(kid)) return null;
       const [iv, tag, body] = (v2 ? parts.slice(2) : parts).map((part) => Buffer.from(part, 'base64url'));
-      const decipher = createDecipheriv('aes-256-gcm', this.key(kid, purpose), iv);
+      // 認証タグは16バイトに決める。短いタグを受け入れると、改ざんを見逃しやすくなる（侵入試験 PT-GCM）。
+      if (tag.length !== 16) return null;
+      const decipher = createDecipheriv('aes-256-gcm', this.key(kid, purpose), iv, { authTagLength: 16 });
       if (v2) decipher.setAAD(Buffer.from(`${purpose}\u0000${userId}`));
       decipher.setAuthTag(tag);
       return Buffer.concat([decipher.update(body), decipher.final()]);

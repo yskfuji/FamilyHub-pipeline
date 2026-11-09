@@ -51,6 +51,8 @@ const RESTORE_WINDOW_MS = RESTORE_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 export const ok = <T,>(value: T): Result<T> => ({ ok: true, value });
 export const fail = <T,>(error: GatewayError): Result<T> => ({ ok: false, error });
 export const denied = <T,>(decision: AuthorizationDecision, message = ja.errors.FORBIDDEN): Result<T> => fail({ code: 'FORBIDDEN', message, retryable: false, reason: decision.allowed ? 'CAPABILITY_MISSING' : decision.reason });
+/** 消した記録の控えを ID で取り出す。__proto__ などの名前で Object.prototype を拾わないよう、自分の値だけを見る（侵入試験 PT-PROTO）。 */
+export const archivedRecord = <T,>(archives: Record<string, T>, id: string): T | undefined => (Object.hasOwn(archives, id) ? archives[id] : undefined);
 export const missing = <T,>(label: string): Result<T> => fail({ code: 'NOT_FOUND', message: `${label}が見つからないか、表示する権限がありません。`, retryable: false });
 export const invalid = <T,>(issues: ReadonlyArray<{ message: string }>): Result<T> => fail({ code: 'INVALID_INPUT', message: issues[0]?.message ?? '入力を確認してください。', retryable: false });
 export const conflict = <T,>(label: string): Result<T> => fail({ code: 'CONFLICT', message: `別の端末で${label}が更新されています。現在の内容を確認してください。`, retryable: true, reason: 'VERSION' });

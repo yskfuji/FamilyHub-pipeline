@@ -58,8 +58,10 @@ export function createHouseholdCommands(c: CommandContext): SyncPort<Omit<Househ
       invite.revokedAt = now(); invite.remainingUses = 0; return ok(structuredClone(invite));
     },
     getPermissionOverrides(membershipId) {
-      const guard = requireCapability<PermissionOverride[]>('household.members.manage');
-      return guard ?? ok(structuredClone(a.permissionOverrides.filter((item) => item.membershipId === membershipId)));
+      const guard = requireCapability<PermissionOverride[]>('household.members.manage'); if (guard) return guard;
+      // ほかの操作と同じく、この家族にいないメンバーは「見つからない」と答える（侵入試験 PT-IDOR。docs/security/pentest-2026-11.md）。
+      if (!state.memberships.some((item) => item.id === membershipId)) return missing('メンバー');
+      return ok(structuredClone(a.permissionOverrides.filter((item) => item.membershipId === membershipId)));
     },
     updatePermissionOverrides(membershipId, overrides, expectedPermissionRevision) {
       const guard = requireCapability<HouseholdSnapshot>('household.members.manage'); if (guard) return guard;

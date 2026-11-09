@@ -1,20 +1,51 @@
 {
   "lighthouse": "12.8.2",
-  "fetchTime": "2026-11-04T21:52:38.695Z",
+  "fetchTime": "2026-11-06T15:12:28.913Z",
   "build": "dist-http, signed in (seeded demo household), vite preview + server/dev.ts on this machine",
-  "throttling": "simulate {\"rttMs\":40,\"throughputKbps\":10240,\"requestLatencyMs\":0,\"downloadThroughputKbps\":0,\"uploadThroughputKbps\":0,\"cpuSlowdownMultiplier\":1}",
+  "throttling": {
+    "rttMs": 40,
+    "throughputKbps": 10240,
+    "requestLatencyMs": 0,
+    "downloadThroughputKbps": 0,
+    "uploadThroughputKbps": 0,
+    "cpuSlowdownMultiplier": 1
+  },
   "screen": "calendar",
   "path": "/calendar",
   "formFactor": "desktop",
+  "runs": 3,
   "performance": 100,
   "accessibility": 100,
   "bestPractices": 100,
-  "lcpMs": 612,
-  "fcpMs": 488,
+  "lcpMs": 567,
+  "fcpMs": 423,
   "cls": 0.0025,
   "tbtMs": 0,
-  "failingBinaryAudits": [
-    "label-content-name-mismatch"
+  "lcpElement": "div.page > header.page-head > div > h1",
+  "lcpPhases": [
+    {
+      "phase": "TTFB",
+      "ms": 122
+    },
+    {
+      "phase": "Load Delay",
+      "ms": 0
+    },
+    {
+      "phase": "Load Time",
+      "ms": 0
+    },
+    {
+      "phase": "Render Delay",
+      "ms": 445
+    }
   ],
+  "failingBinaryAudits": [],
+  "lcpMsRuns": [
+    573,
+    567,
+    567
+  ],
+  "exceptions": {},
   "meetsTargets": true
 }

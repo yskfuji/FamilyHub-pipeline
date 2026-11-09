@@ -4,6 +4,8 @@ Description=よりどころ API
 After=network.target
 
 [Service]
+# 作るファイルとフォルダーを、持ち主だけが読み書きできるようにする（DB、WAL、写真、バックアップ。docs/security/pentest-2026-11.md の PT-PERMS）。
+UMask=0077
 Type=simple
 User=family-hub
 WorkingDirectory=/opt/family-hub

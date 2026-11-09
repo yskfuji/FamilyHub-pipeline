@@ -523,6 +523,9 @@
   }
 
   @media (width < 42.7rem) {
+    /* 知らせの欄のボタンは、文の下に置く。横に並べると、402px の iPhone でも文の列が数文字の幅になる（iPhone のシミュレーターで確かめた。docs/verification/device-check-2026-11.md）。 */
+    .callout { grid-template-columns: auto minmax(0, 1fr); }
+    .callout > :last-child { grid-column: 2; justify-self: start; }
     .place-disclosure dt { flex-basis: 100%; }
     .detail-list > div { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
     .history-side, .expense-side { justify-items: start; }
@@ -594,8 +597,6 @@
     .timeline .list-row > :first-child.time { grid-column: 1; }
     .timeline .list-row > :last-child { grid-column: 3; justify-self: end; }
     .timeline::before { left: 3.05rem; }
-    .callout { grid-template-columns: auto minmax(0, 1fr); }
-    .callout > :last-child { grid-column: 2; justify-self: start; }
     .budget-month { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); }
     .budget-month-heading { grid-column: 1 / -1; grid-row: 1; }
   }

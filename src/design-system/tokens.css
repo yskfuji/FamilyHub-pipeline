@@ -135,7 +135,7 @@
     --z-skip: 1000;
 
     /* 日本語の本文は端末の書体。明朝はシステムの明朝（ブランドの名前は SVG）。docs/design/tokens.md を参照。 */
-    --font-sans: 'Noto Sans JP Variable', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic UI', 'Yu Gothic', Meiryo, system-ui, sans-serif;
+    --font-sans: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic UI', 'Yu Gothic', Meiryo, system-ui, sans-serif;
     --font-serif: 'Hiragino Mincho ProN', 'Yu Mincho', YuMincho, 'Noto Serif JP', 'Noto Serif CJK JP', serif;
   }
 

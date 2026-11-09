@@ -129,7 +129,8 @@
 - (a) は1画面では 400KB に収まるが、5画面を続けると 403,528 で超える。読む部分ファイルは見出しの字によって変わり、記録が増えた全体の試験では、前の値で家計が 501,304 まで増えた。
 - **(b) を選んだ。** 見出し（h1・h2・金額・月の見出し・アルバムの題名・頭文字）は `--font-serif`（Hiragino Mincho ProN → Yu Mincho → Noto Serif JP / Noto Serif CJK JP（入っていれば）→ serif）。ブランドの名前「よりどころ」は、Noto Serif JP Bold（SIL Open Font License 1.1）の字形を書き出した SVG（`src/design-system/wordmark.ts`）にし、どの端末でも同じ形で出す。柿の印はそのまま。
 - 明朝の @font-face の一覧も CSS から消えた（index の CSS が約 49KB から約 14.5KB（gzip）に減った）。
-- 本文の日本語は前と同じく端末のゴシック（Hiragino Sans、Yu Gothic UI など）。Noto Sans JP の latin の部分ファイル（25,040 バイト）だけを読む。
+- 本文の日本語は前と同じく端末のゴシック（Hiragino Sans、Yu Gothic UI など）。前は Noto Sans JP の latin の部分ファイル（25,040 バイト）だけを読んでいた。
+- **(c) 2026-11-07 に、latin の部分ファイルもやめた。** モバイルの LCP（Lighthouse の模擬の 4G）で、最初の表示の前に読むバイト数がほぼそのまま時間になり、この 25KB で約 140ms 遅れていた（`docs/audits/lcp-assessment.md`）。本文の英字と数字も端末のゴシックで出す。Android の端末のゴシック（Noto Sans CJK）は、もとの書体とほぼ同じ字形。変わるのは iOS（Hiragino Sans）と Windows（Yu Gothic UI）の英字と数字の形で、大きさと行間はトークンで決まるので配置は変わらない。今は woff2 を1つも読まない。
 - 端末に明朝がないとき（Android の一部、Linux）は、見出しはその端末の serif かゴシックになる。字の形は変わるが、大きさと行間はトークンで決まるので、配置は変わらない。
 
 ## 余白・角丸・影・動き・重なり

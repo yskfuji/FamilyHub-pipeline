@@ -14,6 +14,7 @@ import { loadAggregate, saveAggregate } from '../../db/aggregateStore';
 import { scrubVideoMetadata } from '../../media/mp4Metadata';
 import type { ProcessOutcome } from '../../media/pipeline';
 import { acceptClientThumbnail, originalPath, processMedia, quarantinePath, sanitizeImage, sniffFile, thumbnailPath } from '../../media/pipeline';
+import { entitlementActive } from '../app';
 import { ApiError, invalidInput, requireActor, sendError, unauthenticated } from '../context';
 import type { AppDeps, RouteDeclaration } from '../context';
 import { parse } from '../parse';
@@ -97,10 +98,28 @@ function updateItem(deps: AppDeps, upload: UploadRow, change: (item: Record<stri
   deps.db.run("UPDATE records SET body = ? WHERE household_id = ? AND collection = 'albumItems' AND id = ?", JSON.stringify(item), upload.household_id, upload.item_id);
 }
 
+/**
+ * 保存するファイル名。200文字（コードポイント）で切り、対になっていないサロゲートは置き換える。
+ * UTF-16 の単位で切ると絵文字が半分に割れ、配るときの encodeURIComponent が失敗して、その添付を開けなくなる（侵入試験 PT-FILENAME）。
+ */
+export const safeFileName = (name: string) => Array.from(name).slice(0, 200).join('').replace(/[\uD800-\uDFFF]/gu, '\uFFFD');
+
+/** 家族の中で、止められていないメンバーか。 */
+function isActiveMember(deps: AppDeps, actor: { householdId: string; membershipId: string }) {
+  const member = deps.db.get<{ body: string }>("SELECT body FROM records WHERE household_id = ? AND collection = 'memberships' AND id = ?", actor.householdId, actor.membershipId);
+  return Boolean(member) && (JSON.parse(member!.body) as { status?: string }).status === 'active';
+}
+
 function findUpload(deps: AppDeps, request: FastifyRequest): UploadRow {
   const id = param(request, 'uploadId');
   const upload = deps.db.get<UploadRow>('SELECT id, user_id, household_id, membership_id, album_id, item_id, upload_length, upload_offset, keep_location, expires_at FROM uploads WHERE id = ?', id);
-  if (!upload || upload.user_id !== request.session?.user_id || Date.parse(upload.expires_at) <= Date.parse(deps.clock.now())) throw new ApiError(404, { code: 'NOT_FOUND', message: serverMessages.notFound, retryable: false });
+  const notFound = () => new ApiError(404, { code: 'NOT_FOUND', message: serverMessages.notFound, retryable: false });
+  if (!upload || upload.user_id !== request.session?.user_id || Date.parse(upload.expires_at) <= Date.parse(deps.clock.now())) throw notFound();
+  // 送りかけの間に家族から外れた・止められた・利用期間が終わった人は、続きを送れない（侵入試験 PT-UPLOAD-MEMBER、docs/security/pentest-2026-11.md）。
+  const actor = request.actor;
+  if (!actor || actor.householdId !== upload.household_id || actor.membershipId !== upload.membership_id) throw notFound();
+  if (!isActiveMember(deps, actor)) throw notFound();
+  if (!entitlementActive(deps, actor.householdId, deps.clock.now())) throw new ApiError(403, { code: 'FORBIDDEN', message: serverMessages.entitlementEnded, retryable: false, reason: 'MEMBERSHIP_INACTIVE' });
   return upload;
 }
 
@@ -109,6 +128,8 @@ const reorderBody = z.object({ itemIds: z.array(idSchema).max(5000), expectedVer
 const albumPatch = z.object({ input: z.unknown(), expectedVersion: z.number().int() });
 
 export function registerMediaRoutes(app: FastifyInstance, deps: AppDeps) {
+  /** 続きを受け取っている途中のアップロード。API は1つの処理で動く（holdServerLock）ので、この中だけで数えればよい。 */
+  const appending = new Set<string>();
   app.addContentTypeParser('application/offset+octet-stream', (_request, payload, done) => done(null, payload));
   app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer', bodyLimit: 2 * 1024 * 1024 }, (_request, body, done) => done(null, body));
 
@@ -158,7 +179,7 @@ export function registerMediaRoutes(app: FastifyInstance, deps: AppDeps) {
     if (!Buffer.isBuffer(request.body)) throw invalidInput();
     const row = deps.db.get<{ body: string }>("SELECT body FROM records WHERE household_id = ? AND collection = 'albumItems' AND id = ?", actor.householdId, itemId);
     const item = row ? JSON.parse(row.body) as { uploaderMembershipId: string; kind: string } : null;
-    if (!item || item.uploaderMembershipId !== actor.membershipId || item.kind !== 'video') return sendError(reply, { code: 'NOT_FOUND', message: serverMessages.notFound, retryable: false });
+    if (!item || item.uploaderMembershipId !== actor.membershipId || item.kind !== 'video' || !isActiveMember(deps, actor)) return sendError(reply, { code: 'NOT_FOUND', message: serverMessages.notFound, retryable: false });
     try { await acceptClientThumbnail(request.body, thumbnailPath(deps.config.mediaPath, actor.householdId, itemId)); } catch { throw invalidInput(); }
     deps.db.run("UPDATE records SET body = json_set(body, '$.hasThumbnail', json('true')) WHERE household_id = ? AND collection = 'albumItems' AND id = ?", actor.householdId, itemId);
     return reply.code(204).send();
@@ -187,28 +208,35 @@ export function registerMediaRoutes(app: FastifyInstance, deps: AppDeps) {
     const upload = findUpload(deps, request);
     const offset = Number(request.headers['upload-offset']);
     if (!Number.isInteger(offset) || offset !== upload.upload_offset) return reply.code(409).header('Upload-Offset', upload.upload_offset).type('application/problem+json').send({ code: 'CONFLICT', message: serverMessages.unavailable, retryable: true, reason: 'VERSION' });
-    const path = quarantinePath(deps.config.mediaPath, upload.id);
-    await mkdir(dirname(path), { recursive: true });
-    let received = 0;
-    const remaining = upload.upload_length - offset;
-    const body = request.body as Readable;
-    const counted = async function* (source: Readable) {
-      for await (const chunk of source) {
-        received += (chunk as Buffer).length;
-        if (received > remaining) throw invalidInput();
-        yield chunk as Buffer;
-      }
-    };
+    // 同じアップロードへの続きの送信は、一度に1つだけ受け取る。重ねて書くと長さを超えて壊れるか、処理の途中に書き足される（侵入試験 PT-UPLOAD）。
+    if (appending.has(upload.id)) return reply.code(409).header('Upload-Offset', upload.upload_offset).type('application/problem+json').send({ code: 'CONFLICT', message: serverMessages.unavailable, retryable: true, reason: 'VERSION' });
+    appending.add(upload.id);
     try {
-      await pipeline(body, counted, createWriteStream(path, { flags: 'a', start: undefined }));
-    } catch (error) {
-      if (error instanceof ApiError) throw error;
-      // 途中で切れた分も受け取った分として記録し、続きから送れるようにする。
+      const path = quarantinePath(deps.config.mediaPath, upload.id);
+      await mkdir(dirname(path), { recursive: true });
+      let received = 0;
+      const remaining = upload.upload_length - offset;
+      const body = request.body as Readable;
+      const counted = async function* (source: Readable) {
+        for await (const chunk of source) {
+          received += (chunk as Buffer).length;
+          if (received > remaining) throw invalidInput();
+          yield chunk as Buffer;
+        }
+      };
+      try {
+        await pipeline(body, counted, createWriteStream(path, { flags: 'a', start: undefined }));
+      } catch (error) {
+        if (error instanceof ApiError) throw error;
+        // 途中で切れた分も受け取った分として記録し、続きから送れるようにする。
+      }
+      const next = (await stat(path).catch(() => ({ size: 0 }))).size;
+      deps.db.run('UPDATE uploads SET upload_offset = ?, touched_at = ? WHERE id = ?', next, deps.clock.now(), upload.id);
+      if (next === upload.upload_length) track(deps, finishUpload(deps, { ...upload, upload_offset: next }));
+      return reply.code(204).header('Tus-Resumable', '1.0.0').header('Upload-Offset', next).send();
+    } finally {
+      appending.delete(upload.id);
     }
-    const next = (await stat(path).catch(() => ({ size: 0 }))).size;
-    deps.db.run('UPDATE uploads SET upload_offset = ?, touched_at = ? WHERE id = ?', next, deps.clock.now(), upload.id);
-    if (next === upload.upload_length) track(deps, finishUpload(deps, { ...upload, upload_offset: next }));
-    return reply.code(204).header('Tus-Resumable', '1.0.0').header('Upload-Offset', next).send();
   });
   app.delete('/v1/uploads/:uploadId', { config: declare('cancelUpload', { capability: 'own', idempotent: false }) }, async (request, reply) => {
     const upload = findUpload(deps, request);
@@ -236,7 +264,7 @@ export function registerMediaRoutes(app: FastifyInstance, deps: AppDeps) {
     const { size } = await stat(path);
     let attachmentId = '';
     const response = mutate(deps, request, reply, (rules) => {
-      const accepted = rules.memos.acceptAttachment(memoId, { originalName: part.filename.slice(0, 200), mimeType: type.mimeType, byteSize: size });
+      const accepted = rules.memos.acceptAttachment(memoId, { originalName: safeFileName(part.filename), mimeType: type.mimeType, byteSize: size });
       if (!accepted.ok) return accepted;
       attachmentId = accepted.value.id;
       const memo = rules.context.project().memos.find((item) => item.id === memoId);

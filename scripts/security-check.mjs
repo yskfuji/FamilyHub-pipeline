@@ -26,7 +26,7 @@ for (const directive of ["frame-ancestors 'none'", "base-uri 'none'", "form-acti
 const nginx = await readFile(resolve('deploy/nginx.conf'), 'utf8');
 const fromHeaders = (name) => headers.match(new RegExp(`^\\s*${name}:\\s*(.+)$`, 'm'))?.[1].trim();
 const fromNginx = (name) => nginx.match(new RegExp(`add_header ${name} "([^"]+)" always;`))?.[1].trim();
-for (const name of ['Content-Security-Policy', 'Permissions-Policy', 'Strict-Transport-Security', 'Referrer-Policy', 'X-Content-Type-Options', 'Cross-Origin-Opener-Policy', 'Cross-Origin-Resource-Policy']) {
+for (const name of ['Content-Security-Policy', 'Permissions-Policy', 'Strict-Transport-Security', 'Referrer-Policy', 'X-Content-Type-Options', 'Cross-Origin-Opener-Policy', 'Cross-Origin-Resource-Policy', 'X-Frame-Options', 'X-Permitted-Cross-Domain-Policies']) {
   const a = fromHeaders(name); const b = fromNginx(name);
   if (!a || !b) failures.push(`header ${name} must be present in public/_headers and deploy/nginx.conf`);
   else if (a !== b) failures.push(`header ${name} differs between public/_headers and deploy/nginx.conf`);
@@ -45,6 +45,7 @@ for (const required of [`proxy_pass http://127.0.0.1:${defaultPort};`, 'proxy_se
   if (!apiLocation.includes(required)) failures.push(`deploy/nginx.conf location /v1/ must keep ${required}`);
 }
 if (apiLocation.includes('add_header')) failures.push('deploy/nginx.conf location /v1/ must not use add_header');
+if (!/location = \/_headers \{\s*return 404;/.test(nginx)) failures.push('deploy/nginx.conf must not serve /_headers');
 
 // 外部の場所検索: 出口は1ファイルだけにし、Cookie・リファラー・キャッシュを使わない。
 const egress = production.filter((file) => file.text.includes('api.openpoiapi.com'));

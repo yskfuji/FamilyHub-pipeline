@@ -238,7 +238,8 @@ async function axeProblems(page: Page): Promise<string[]> {
 }
 
 test.describe.configure({ mode: 'parallel' });
-test.use({ contextOptions: { reducedMotion: 'reduce' } });
+// 画面の部品を差し替える試験がある。service worker が部品を取ると page.route を通らないので止める。
+test.use({ contextOptions: { reducedMotion: 'reduce' }, serviceWorkers: 'block' });
 
 const pages: Array<{ name: string; route: string; viewport: 'mobile' | 'desktop'; open?: (page: Page) => Promise<void> }> = [
   ...(['mobile', 'desktop'] as const).flatMap((viewport) => screens.map(([name, route]) => ({ name, route, viewport }))),

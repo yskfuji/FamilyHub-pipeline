@@ -38,6 +38,8 @@ const emptyStates: Array<[string, string, RegExp | string, string | null]> = [
 ];
 
 test.describe('ILLUS-1 each empty state has its illustration, its text and one next action', () => {
+  // エラーの境界の試験は部品を差し替える。service worker が部品を取ると page.route を通らないので止める。
+  test.use({ serviceWorkers: 'block' });
   for (const [label, route, heading, action] of emptyStates) {
     test(`${label}: ${route}`, async ({ page }) => {
       await page.goto(route);

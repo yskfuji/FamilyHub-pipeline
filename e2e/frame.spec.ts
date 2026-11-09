@@ -144,6 +144,8 @@ test.describe('FRAME-2 view transitions', () => {
 });
 
 test.describe('FRAME-3 error boundaries per route', () => {
+  // service worker が部品を取ると page.route を通らないので止める。
+  test.use({ serviceWorkers: 'block' });
   /** 端末に残る下書き（未送信の変更）を1件作る。境界の「もう一度読み込む」の後も残ることを確かめるため。 */
   const queueDraft = async (page: Page) => {
     await page.goto('/today?scenario=offline');

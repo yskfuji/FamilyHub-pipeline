@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { parse } from 'yaml';
 
 const [contract, adapter, gateway, domain, audited] = await Promise.all([
   readFile('contracts/family-hub.openapi.yaml', 'utf8'),
@@ -9,6 +10,23 @@ const [contract, adapter, gateway, domain, audited] = await Promise.all([
 ]);
 
 const failures = [];
+
+// 経路の中の {名前} は、経路か操作のどちらかで path の引数として宣言する。宣言がないと、契約を読む道具（OpenAPI の検証器や侵入試験の走査）が経路を読めない（docs/security/pentest-2026-11.md）。
+{
+  const document = parse(contract);
+  const resolveParameter = (parameter) => (parameter.$ref ? parameter.$ref.split('/').slice(1).reduce((node, key) => node[key], document) : parameter);
+  const pathNames = (list) => (list ?? []).map(resolveParameter).filter((parameter) => parameter.in === 'path').map((parameter) => parameter.name);
+  for (const [path, item] of Object.entries(document.paths)) {
+    const names = [...path.matchAll(/\{([^}]+)\}/g)].map((match) => match[1]);
+    const atPath = pathNames(item.parameters);
+    for (const [method, operation] of Object.entries(item)) {
+      if (!['get', 'head', 'post', 'put', 'patch', 'delete'].includes(method)) continue;
+      const atOperation = pathNames(operation.parameters);
+      for (const name of names) if (!atPath.includes(name) && !atOperation.includes(name)) failures.push(`${method.toUpperCase()} ${path}: path parameter ${name} is not declared`);
+      for (const name of atOperation) if (!names.includes(name)) failures.push(`${method.toUpperCase()} ${path}: declares path parameter ${name} that is not in the path`);
+    }
+  }
+}
 const operationIds = [...contract.matchAll(/operationId:\s*([A-Za-z0-9]+)/g)].map((match) => match[1]);
 const duplicates = operationIds.filter((id, index) => operationIds.indexOf(id) !== index);
 if (duplicates.length) failures.push(`duplicate OpenAPI operationId: ${[...new Set(duplicates)].join(', ')}`);

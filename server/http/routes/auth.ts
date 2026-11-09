@@ -10,7 +10,7 @@ import { clearSessionCookie, createSession, issueSessionCookie } from '../../aut
 import { sendError, unauthenticated } from '../context';
 import type { AppDeps, RouteDeclaration } from '../context';
 import { parse } from '../parse';
-import { limit } from '../rateLimit';
+import { addressBucket, checkLimit, limit } from '../rateLimit';
 import { auditAccount, passwordContextFor, totpUnavailable, verifySecondFactor } from './account';
 import { entitlementActive } from '../app';
 
@@ -53,7 +53,7 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
   app.post('/v1/auth/password', { config: anonymous('signInWithPassword') }, async (request, reply) => {
     const { email, password } = parse(z.object({ email: z.string().max(254), password: z.string().max(200) }), request.body);
     const user = deps.db.get<UserRow>('SELECT id, email, display_name, password_hash, totp_enabled_at FROM users WHERE email = ? AND deleted_at IS NULL', email.trim());
-    limit(deps, `sign-in:${request.ip}`, 50, 900_000);
+    limit(deps, `sign-in:${addressBucket(request.ip)}`, 50, 900_000);
     limit(deps, `sign-in:${email.trim().toLowerCase()}`, 10, 900_000);
     const matched = await verifyAndUpgradePassword(deps.db, user?.id, password, user?.password_hash);
     if (!user || !matched) return sendError(reply, rejected);
@@ -69,6 +69,8 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
     const body = parse(z.object({ challengeId: idSchema, code: z.string().max(20) }), request.body);
     limit(deps, `totp-sign-in:${body.challengeId}`, 5, 300_000);
     const challenge = deps.db.get<{ user_id: string; expires_at: string }>("SELECT user_id, expires_at FROM webauthn_challenges WHERE id = ? AND purpose = 'totp'", body.challengeId);
+    // 確かめの番号を作り直しても試せる回数が増えないよう、その人ごとにも数える（侵入試験 PT-TOTP）。
+    if (challenge) limit(deps, `totp-user:${challenge.user_id}`, 10, 900_000);
     const user = challenge ? deps.db.get<UserRow & { id: string; totp_secret: string | null; totp_last_step: number | null }>('SELECT id, email, display_name, password_hash, totp_enabled_at, totp_secret, totp_last_step FROM users WHERE id = ?', challenge.user_id) : undefined;
     if (!challenge || !user || Date.parse(challenge.expires_at) <= Date.parse(deps.clock.now()) || !verifySecondFactor(deps, user, body.code)) {
       // 鍵がなくて確認コードを確かめられないときは、回復コードを使うよう案内する（パスワードは確かめ済み）。
@@ -79,7 +81,11 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
     startSession(deps, request, reply, user.id);
     return { userId: user.id };
   });
-  app.post('/v1/auth/passkey/challenge', { config: anonymous('beginPasskey') }, () => beginAuthentication(deps));
+  app.post('/v1/auth/passkey/challenge', { config: anonymous('beginPasskey') }, (request) => {
+    // 誰でも呼べて、呼ぶたびに行が1つ増えるので、送り元ごとに上限を置く（侵入試験 PT-RATE）。
+    limit(deps, `passkey-challenge:${addressBucket(request.ip)}`, 60, 300_000);
+    return beginAuthentication(deps);
+  });
   app.post('/v1/auth/passkey/complete', { config: anonymous('finishPasskey') }, async (request, reply) => {
     const body = parse(z.object({ challengeId: idSchema, assertion: z.record(z.string(), z.unknown()) }), request.body);
     const userId = await finishAuthentication(deps, body.challengeId, body.assertion as unknown as AuthenticationResponseJSON);
@@ -120,8 +126,13 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AppDeps) {
   });
   app.post('/v1/auth/password/change', { config: declare('changePassword') }, async (request, reply) => {
     const user = currentUser(deps, request);
+    // 今のパスワードを当てる試しに使えないよう、当て損ねた回数を本人確認と同じ枠で数える（侵入試験 PT-RATE）。
+    checkLimit(deps, `reauth:${user.id}`, 10, 900_000);
     const body = parse(z.object({ currentPassword: z.string().max(200), newPassword: z.string().max(200) }), request.body);
-    if (!(await verifyPassword(body.currentPassword, user.password_hash))) return sendError(reply, { code: 'UNAUTHENTICATED', message: serverMessages.currentPasswordWrong, retryable: false });
+    if (!(await verifyPassword(body.currentPassword, user.password_hash))) {
+      limit(deps, `reauth:${user.id}`, 10, 900_000);
+      return sendError(reply, { code: 'UNAUTHENTICATED', message: serverMessages.currentPasswordWrong, retryable: false });
+    }
     const parsed = passwordSchema.safeParse(body.newPassword);
     if (!parsed.success) return sendError(reply, { code: 'INVALID_INPUT', message: parsed.error.issues[0]?.message ?? serverMessages.invalidInput, retryable: false });
     const problem = await checkNewPassword(parsed.data, passwordContextFor(deps, user.id));

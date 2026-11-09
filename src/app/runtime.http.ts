@@ -2,6 +2,7 @@ import { createHttpGateway } from '../data/httpGateway';
 import type { CsrfProvider } from '../data/httpGateway';
 import type { HouseholdSnapshot } from '../domain/types';
 import type { AppRuntime } from './runtime';
+import { bootFetch, takeBootPrefetch } from './bootFetch';
 
 const empty: HouseholdSnapshot = {
   viewer: { userId: '', membershipId: '', role: 'guest', status: 'invited', capabilities: [], permissionRevision: 0 },
@@ -23,7 +24,8 @@ export function createHttpRuntime(): AppRuntime {
   };
   return {
     mode: 'http', actorId: '', initialSnapshot: empty, initialSession: null,
-    gateway: createHttpGateway(window.location.origin, csrf, () => revision),
+    // <head> の先読み（bootPrefetch.ts）で取ったセッションと家族の記録を、最初の1回だけ使う。
+    gateway: createHttpGateway(window.location.origin, csrf, () => revision, bootFetch(takeBootPrefetch(), window.location.origin)),
     setPermissionRevision: (next) => { revision = next > 0 ? next : undefined; },
   };
 }
