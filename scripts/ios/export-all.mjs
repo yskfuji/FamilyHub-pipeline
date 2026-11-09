@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * iOS 向けの生成物をすべて作り直す（--check なら、古いものがないかだけを確かめる）。
- * 順番: 見本の仕組み → 見本の JSON（仕組みを使う）→ 文言 → 計算の答え → テーマ → ブランド → アイコン。
+ * 順番: 見本の仕組み → 見本の JSON（仕組みを使う）→ 文言 → 計算の答え（見本の JSON を使う）→ テーマ → ブランド → 挿絵 → アイコン。
  */
 import { spawnSync } from 'node:child_process';
 
@@ -13,6 +13,8 @@ const steps = [
   ['npx', 'tsx', 'scripts/ios/export-vectors.ts'],
   ['node', 'scripts/ios/export-tokens.mjs'],
   ['node', 'scripts/ios/export-brand.mjs'],
+  // 挿絵は React の部品なので、JSX の設定（tsconfig.app.json）で読む。
+  ['npx', 'tsx', '--tsconfig', 'tsconfig.app.json', 'scripts/ios/export-illustrations.ts'],
   ['node', 'scripts/ios/export-icon.mjs'],
 ];
 let failed = false;

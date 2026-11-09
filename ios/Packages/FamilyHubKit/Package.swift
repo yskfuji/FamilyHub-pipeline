@@ -18,7 +18,7 @@ let package = Package(
   targets: [
     .target(name: "FHModel"),
     .target(name: "FHCopy", resources: [.copy("Copy")]),
-    .target(name: "FHDomain", dependencies: ["FHModel", "FHCopy"]),
+    .target(name: "FHDomain", dependencies: ["FHModel", "FHCopy"], resources: [.copy("Resources/commonPasswords.json")]),
     .target(
       name: "FHGateway",
       dependencies: ["FHModel"],

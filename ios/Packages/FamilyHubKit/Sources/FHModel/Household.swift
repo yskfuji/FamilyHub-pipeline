@@ -64,6 +64,9 @@ public struct RecurrenceRule: Codable, Sendable, Hashable {
   public var rrule: String
   public var timezone: String
   public var exceptions: [IsoDate]
+  public init(rrule: String, timezone: String = "Asia/Tokyo", exceptions: [IsoDate] = []) {
+    self.rrule = rrule; self.timezone = timezone; self.exceptions = exceptions
+  }
 }
 
 public struct CalendarEvent: Codable, Sendable, Hashable, Identifiable {
@@ -408,6 +411,9 @@ public struct PrivacySettings: Codable, Sendable, Hashable {
   public var defaultAudience: VisibilityAudience
   public var hideNotificationContent: Bool
   @Nullable public var placeLookupConsent: PlaceLookupConsent?
+  public init(defaultAudience: VisibilityAudience, hideNotificationContent: Bool, placeLookupConsent: PlaceLookupConsent?) {
+    self.defaultAudience = defaultAudience; self.hideNotificationContent = hideNotificationContent; self.placeLookupConsent = placeLookupConsent
+  }
 }
 
 public struct NotificationPreferences: Codable, Sendable, Hashable {
@@ -431,6 +437,9 @@ public struct SessionInfo: Codable, Sendable, Hashable {
   public var stage: SessionStage
   public var userId: Id?
   public var idleTimeoutMinutes: Int
+  public init(stage: SessionStage, userId: Id? = nil, idleTimeoutMinutes: Int) {
+    self.stage = stage; self.userId = userId; self.idleTimeoutMinutes = idleTimeoutMinutes
+  }
 }
 
 /// 顔の印。initial（名前の頭文字）、preset（用意した絵）、image（画像の data URL）。

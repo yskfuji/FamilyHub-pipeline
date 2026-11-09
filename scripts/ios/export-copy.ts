@@ -64,6 +64,8 @@ function emit(key: string, value: unknown, path: string, indent: string): string
 
 const modules: Array<[string, Record<string, unknown>]> = [
   ['ja', jaModule], ['serverMessages', serverMessages], ['passwordMessages', passwordMessages], ['auditLabels', auditLabels], ['auditIntro', auditIntro],
+  // 規約の文書は JSON に書き出す。数と短い文字の決まりだけをここに置く。
+  ['legal', Object.fromEntries(Object.entries(legal).filter(([, value]) => typeof value === 'number' || typeof value === 'string'))],
 ];
 const body = modules.flatMap(([moduleName, module]) => [
   `  public enum ${moduleName} {`,

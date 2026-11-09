@@ -60,3 +60,30 @@ struct SampleGatewayTests {
     #expect(text.contains("9月30日(水)"))
   }
 }
+
+/// 段階 S1 で足した関数も、見本で Web と同じに動くこと。
+struct SampleGatewayS1Tests {
+  let gateway: SampleGateway
+  init() throws { gateway = SampleGateway(engine: try SampleEngine(timeScale: 0.01)) }
+
+  @Test func privacyRoundTrips() async throws {
+    let before = try await gateway.getPrivacySettings().get()
+    var next = before
+    next.hideNotificationContent.toggle()
+    let saved = try await gateway.savePrivacySettings(next).get()
+    #expect(saved.hideNotificationContent == next.hideNotificationContent)
+  }
+
+  @Test func notificationsCanBeRead() async throws {
+    let list = try await gateway.listNotifications().get()
+    let unread = try #require(list.first { !$0.read })
+    let read = try await gateway.markNotificationRead(id: unread.id).get()
+    #expect(read.read)
+  }
+
+  /// 見本は形だけを返す（Web の見本と同じ。本当の確かめはサーバーが行う）。短い入力は断る。
+  @Test func signInChecksOnlyTheShape() async {
+    #expect(await gateway.signInWithPassword(email: "aoi@example.test", password: "short").failure?.code == .invalidInput)
+    #expect((try? await gateway.signInWithPassword(email: "aoi@example.test", password: "any-long-enough-password").get()) != nil)
+  }
+}

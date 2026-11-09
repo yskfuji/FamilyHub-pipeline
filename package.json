@@ -12,6 +12,7 @@
     "dev:audit": "VITE_INCLUDE_AUDIT_SURFACE=true vite",
     "dev:server": "tsx watch server/dev.ts",
     "dev:stack": "VITE_GATEWAY=http vite --port 4174 --host localhost",
+    "dev:lan": "node scripts/dev-lan.mjs",
     "build": "tsc -b && vite build",
     "build:http": "VITE_GATEWAY=http vite build --outDir dist-http",
     "build:server": "vite build --ssr --outDir dist-server",

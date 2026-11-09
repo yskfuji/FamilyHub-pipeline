@@ -7,34 +7,14 @@ import { EmptyDone } from '../../design-system/illustrations/EmptyDone';
 import { EmptyEvents } from '../../design-system/illustrations/EmptyEvents';
 import { SeasonScene } from '../../design-system/illustrations/SeasonScene';
 import { useSizeClass, type SizeClass } from '../../design-system/sizeClass';
-import { dateKeyFromRfc3339 } from '../../domain/calendarDate';
-import { monthSummary, unsettledSummary } from '../../domain/ledger';
-import { occurrenceDates, occurrenceStartsAt } from '../../domain/recurrence';
 import { seasonOf, type Season } from '../../domain/season';
-import type { CalendarEvent } from '../../domain/types';
+import { minutesOfDay, todayDigest, type TimelineItem } from '../../domain/todayDigest';
 import { MemberScopeSelect } from '../shared/MemberScopeSelect';
 import { SyncStatus } from '../shared/SyncStatus';
-import { stripLanes } from '../../domain/timeStrip';
+import { stripLayout, stripPosition } from '../../domain/timeStrip';
 
-// 日付と時刻は家族の時間帯（日本時間。household.timezone は 'Asia/Tokyo' だけ）で読む。
+// 日付と時刻は家族の時間帯（日本時間。household.timezone は 'Asia/Tokyo' だけ）で読む。中身の計算は src/domain/todayDigest.ts。
 const monthDay = (asOf: string) => new Intl.DateTimeFormat('ja-JP', { month: 'long', day: 'numeric', timeZone: 'Asia/Tokyo' }).format(new Date(asOf));
-const clock = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: 'numeric', hourCycle: 'h23', timeZone: 'Asia/Tokyo' });
-/** 0時からの分。 */
-const minutesOf = (value: string) => {
-  const parts = clock.formatToParts(new Date(value));
-  const read = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value ?? 0);
-  return read('hour') * 60 + read('minute');
-};
-const greeting = (asOf: string) => {
-  const hour = Math.floor(minutesOf(asOf) / 60);
-  return hour < 10 ? 'おはよう' : hour < 18 ? 'こんにちは' : 'こんばんは';
-};
-/** 今日に当たる回（繰り返しを含む）を、その回の開始日時と長さ付きで返す。 */
-const todaysEvents = (events: CalendarEvent[], today: string) => events.flatMap((event) => {
-  const start = dateKeyFromRfc3339(event.startsAt);
-  const hit = event.recurrence ? occurrenceDates(start, event.recurrence, today, today).length > 0 : start === today;
-  return hit ? [{ ...event, startsAt: occurrenceStartsAt(event.startsAt, today), minutes: Math.max(0, (Date.parse(event.endsAt) - Date.parse(event.startsAt)) / 60_000) }] : [];
-});
 const weatherTitle = { rain: '雨と予定', storm: '荒天と予定', sunny: '天気と予定' } as const;
 
 /**
@@ -49,25 +29,17 @@ const seasonFor = (today: string): Season => {
   return seasonOf(today);
 };
 
-interface TimelineItem { key: string; at: string; minutes: number; title: string; meta: string; href: string; id: string; kind: '予定' | 'タスク' }
-
 /**
  * 時刻の帯。今日の予定（長さのある帯）と期限のタスク（点）を、朝から夜の目盛りの上に置き、今の時刻に線を引く。
  * 同じ内容は下の一覧が文で伝えるので、帯は読み上げない（aria-hidden）。目盛りの文字は濃さの確かめの対象。
  */
 function TimeStrip({ items, now }: { items: TimelineItem[]; now: number }) {
-  const starts = items.map((item) => minutesOf(item.at));
-  const first = Math.min(6 * 60, ...starts);
-  const last = Math.max(22 * 60, ...items.map((item, index) => starts[index] + item.minutes), now);
-  const from = Math.floor(first / 180) * 180;
-  const to = Math.min(24 * 60, Math.ceil(last / 180) * 180);
-  const at = (minutes: number) => String((Math.min(to, Math.max(from, minutes)) - from) / (to - from));
-  const ticks: number[] = [];
+  const starts = items.map((item) => minutesOfDay(item.at));
   // 最後の目盛り（帯の右の端）は字を出さない（手前の目盛りと重ならないように）。
-  for (let minute = from; minute < to; minute += 180) ticks.push(minute);
+  const layout = stripLayout(items.map((item, index) => ({ start: starts[index], minutes: item.minutes })), now);
+  const { from, to, ticks, lanes, laneCount } = layout;
+  const at = (minutes: number) => String(stripPosition(layout, minutes));
   const place = (start: string, span = 0, lane = 0) => ({ '--strip-at': start, '--strip-span': String(span / (to - from)), '--strip-lane': String(lane) }) as CSSProperties;
-  const lanes = stripLanes(items.map((item, index) => ({ start: starts[index], minutes: item.minutes })), to - from);
-  const laneCount = Math.max(1, ...lanes.map((lane) => lane + 1));
   return <div className="time-strip" aria-hidden="true">
     <div className="time-strip-track" style={{ '--strip-lanes': String(laneCount) } as CSSProperties}>
       {items.map((item, index) => <span key={item.key} className="time-strip-mark" data-kind={item.kind === '予定' ? 'event' : 'task'} data-lane={lanes[index]} data-past={starts[index] + item.minutes < now ? 'true' : undefined} style={place(at(starts[index]), Math.min(item.minutes, to - starts[index]), lanes[index])}/>)}
@@ -93,30 +65,13 @@ export function TodayPage() {
   const sizeClass = useSizeClass();
   const { asOf, weather } = snapshot.context;
   const scoped = useMemberScope();
-  const today = dateKeyFromRfc3339(asOf);
-  const now = minutesOf(asOf);
+  const { today, now, greeting, mine, unsettled, spentThisMonth, reviewTodo, affected, showWeather, timeline, upcoming, nextTask, attention, empty } = todayDigest(snapshot, scoped);
   const me = snapshot.viewer.membershipId;
-  const mine = scoped.todos.filter((todo) => todo.assigneeMembershipId === me && todo.status !== 'done').sort((a, b) => (a.dueAt ?? '9').localeCompare(b.dueAt ?? '9'));
-  const unsettled = unsettledSummary(scoped.expenses);
-  const spentThisMonth = monthSummary(scoped.expenses, today.slice(0, 7));
-  const reviewTodo = scoped.todos.find((todo) => todo.status === 'review' && (todo.reviewerMembershipId === me || todo.assigneeMembershipId === me));
-  const events = todaysEvents(scoped.events, today);
-  const affected = events.filter((event) => event.weatherSensitive);
-  // 「次にすること」には、今日の予定に影響する天気だけを出す（影響がなければ天気の欄で足りる）。
-  const showWeather = weather.condition !== 'sunny' && Boolean(weather.alert) && affected.length > 0;
-  const timeline: TimelineItem[] = [
-    ...events.map((event) => ({ key: `event-${event.id}`, at: event.startsAt, minutes: event.minutes, title: event.title, meta: event.location ?? memberName(snapshot, event.ownerMembershipId), href: `/calendar/${event.id}?on=${today}`, id: event.id, kind: '予定' as const })),
-    ...scoped.todos.filter((todo) => todo.status !== 'done' && todo.dueAt && dateKeyFromRfc3339(todo.dueAt) === today).map((todo) => ({ key: `todo-${todo.id}`, at: todo.dueAt!, minutes: 0, title: todo.title, meta: `担当：${memberName(snapshot, todo.assigneeMembershipId)}`, href: `/tasks/${todo.id}`, id: todo.id, kind: 'タスク' as const })),
-  ].sort((a, b) => a.at.localeCompare(b.at));
-  // 次の1件: 今の時刻より後の、今日の予定か期限のタスク。なければ自分の担当で期限の近いもの。確認の欄に出したタスクは除く。
-  const upcoming = timeline.find((item) => Date.parse(item.at) >= Date.parse(asOf) && item.id !== reviewTodo?.id);
-  const nextTask = upcoming ? undefined : mine.find((todo) => todo.id !== reviewTodo?.id);
-  const attention = Number(Boolean(reviewTodo)) + Number(showWeather);
-  const title = `${greeting(asOf)}、${snapshot.user.displayName}さん`;
+  const title = `${greeting}、${snapshot.user.displayName}さん`;
   const scene = <SeasonScene season={seasonFor(today)}/>;
 
   if (loading) return <div className="page" aria-busy="true" aria-label="今日の情報を読み込んでいます"><PageHeader eyebrow="今日" title={title} description="今日の予定とタスクを読み込んでいます。"/><div className="grid two"><div className="skeleton"/><div className="skeleton"/><div className="skeleton"/><div className="skeleton"/></div></div>;
-  if (snapshot.events.length + snapshot.todos.length + snapshot.expenses.length === 0) return <div className="page"><PageHeader eyebrow={`今日 · ${monthDay(asOf)}`} title={title} description="今日の予定やタスクを確認できます。" art={scene}/><EmptyState title="今日の予定やタスクはありません" illustration={<EmptyEvents/>} action={can('event.create') ? <button data-control-id="today.event.create" className="button primary" type="button" onClick={() => requestQuickCreate('event')}>予定を追加</button> : undefined}>共有された予定やタスクが追加されると、時刻順に表示されます。</EmptyState></div>;
+  if (empty) return <div className="page"><PageHeader eyebrow={`今日 · ${monthDay(asOf)}`} title={title} description="今日の予定やタスクを確認できます。" art={scene}/><EmptyState title="今日の予定やタスクはありません" illustration={<EmptyEvents/>} action={can('event.create') ? <button data-control-id="today.event.create" className="button primary" type="button" onClick={() => requestQuickCreate('event')}>予定を追加</button> : undefined}>共有された予定やタスクが追加されると、時刻順に表示されます。</EmptyState></div>;
 
   // 見出しの番号は、この閲覧者に表示する欄だけで、読む順に振る（権限で欄が隠れても番号が飛ばないように）。
   const shown = (key: BlockKey) => key !== 'budget' || can('expense.read');

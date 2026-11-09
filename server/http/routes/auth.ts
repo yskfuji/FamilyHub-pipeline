@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { serverMessages } from '../../../src/content/serverMessages';
 import { checkNewPassword } from '../../../src/domain/passwordPolicy';
 import { idSchema, passwordSchema } from '../../../src/domain/schemas';
+import { deviceLabel } from '../../auth/deviceLabel';
 import { hashPassword, verifyAndUpgradePassword, verifyPassword } from '../../auth/password';
 import { beginAuthentication, beginRegistration, finishAuthentication, finishRegistration } from '../../auth/passkeys';
 import { clearSessionCookie, createSession, issueSessionCookie } from '../../auth/sessions';
@@ -21,16 +22,9 @@ const rejected = { code: 'UNAUTHENTICATED' as const, message: serverMessages.sig
 
 interface UserRow { id: string; email: string; display_name: string; password_hash: string | null; totp_enabled_at: string | null }
 
-const deviceLabel = (request: FastifyRequest) => {
-  const agent = request.headers['user-agent'] ?? '';
-  const browser = /Edg\//.test(agent) ? 'Edge' : /Chrome\//.test(agent) ? 'Chrome' : /Firefox\//.test(agent) ? 'Firefox' : /Safari\//.test(agent) ? 'Safari' : serverMessages.genericBrowser;
-  const device = /iPhone/.test(agent) ? 'iPhone' : /iPad/.test(agent) ? 'iPad' : /Android/.test(agent) ? 'Android' : /Macintosh/.test(agent) ? 'Mac' : /Windows/.test(agent) ? 'Windows' : '';
-  return [device, browser].filter(Boolean).join(' ');
-};
-
 function startSession(deps: AppDeps, request: FastifyRequest, reply: FastifyReply, userId: string) {
   // サインインのたびに新しい値にする（固定化を防ぐ）。CSRF トークンも結び直される。
-  issueSessionCookie(reply, deps.config, createSession(deps.db, deps.config, userId, deps.clock.now(), deviceLabel(request), deps.ids.next('session')));
+  issueSessionCookie(reply, deps.config, createSession(deps.db, deps.config, userId, deps.clock.now(), deviceLabel(request.headers['user-agent'] ?? ''), deps.ids.next('session')));
   // どの方法でサインインしたか（パスワード・確認コード・パスキー）を、経路の operationId で残す。
   auditAccount(deps, userId, request.routeOptions.config.route?.operationId ?? 'signIn');
 }

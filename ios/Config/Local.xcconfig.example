@@ -7,5 +7,6 @@ FH_TEAM_ID = ABCDE12345
 FH_BUNDLE_PREFIX = com.example.yourname.familyhub
 // 実機に入れるときの端末の ID（xcrun devicectl list devices）。scripts/ios/device.sh が読む。
 FH_DEVICE_ID =
-// 手元の https の開発サーバー（npm run dev:lan）。空なら見本だけ。
+// 手元の https の開発サーバー（npm run dev:lan が表示する URL）。空なら見本だけ。
+// xcconfig では // が注釈になるので、https:/$()/<Mac の名前>.local:4330 のように書く。
 FH_DEV_SERVER_URL =

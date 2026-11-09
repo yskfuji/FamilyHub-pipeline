@@ -1,12 +1,13 @@
 import { readFile } from 'node:fs/promises';
 import { parse } from 'yaml';
 
-const [contract, adapter, gateway, domain, audited] = await Promise.all([
+const [contract, adapter, gateway, domain, audited, sessions] = await Promise.all([
   readFile('contracts/family-hub.openapi.yaml', 'utf8'),
   readFile('src/data/httpGateway.ts', 'utf8'),
   readFile('src/data/gateway.ts', 'utf8'),
   readFile('src/domain/types.ts', 'utf8'),
   readFile('src/data/gatewayOperations.ts', 'utf8'),
+  readFile('server/auth/sessions.ts', 'utf8'),
 ]);
 
 const failures = [];
@@ -26,6 +27,13 @@ const failures = [];
       for (const name of atOperation) if (!names.includes(name)) failures.push(`${method.toUpperCase()} ${path}: declares path parameter ${name} that is not in the path`);
     }
   }
+}
+// 契約の cookie の名前は、サーバーが https で付ける名前と同じにする（アプリと検証器が契約を読んで送る）。
+{
+  const issued = sessions.match(/session: '(__Host-[^']+)'/)?.[1];
+  const declared = parse(contract).components?.securitySchemes?.sessionCookie?.name;
+  if (!issued) failures.push('server/auth/sessions.ts: could not read the https session cookie name');
+  else if (declared !== issued) failures.push(`OpenAPI sessionCookie is ${declared}, but the server issues ${issued}`);
 }
 const operationIds = [...contract.matchAll(/operationId:\s*([A-Za-z0-9]+)/g)].map((match) => match[1]);
 const duplicates = operationIds.filter((id, index) => operationIds.indexOf(id) !== index);

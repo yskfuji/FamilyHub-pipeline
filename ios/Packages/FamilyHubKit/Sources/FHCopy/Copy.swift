@@ -510,6 +510,7 @@ public enum Copy {
       public static let brand = "よりどころ"
       public static let passkeyLabel = "パスキー"
       public static let genericBrowser = "ブラウザ"
+      public static let appLabel = "アプリ"
       public static let deletedMember = "退会したメンバー"
       public static let birthdateInvalid = "誕生日を確認してください。"
       public static let guardianConsentRequired = "18歳未満の方は、保護者の同意が必要です。"
@@ -666,5 +667,11 @@ public enum Copy {
       public static let description = "家族の記録を誰がいつ変えたかを、新しい順に表示します。記録の中身や入力した値は残していません。"
       public static let retention = "変更の記録は24か月残し、その後は消します"
     }
+  }
+  public enum legal {
+    public static let CONTACT_PLACEHOLDER = "【問い合わせ先：公開前に記入】"
+    public static let OPERATOR_PLACEHOLDER = "【運営者名：公開前に記入】"
+    public static let TRIAL_DAYS: Int = 14
+    public static let legalNotice = "これは草案です。法律の専門家による確認を受けておらず、このまま公開するものではありません。"
   }
 }

@@ -18,6 +18,8 @@ targets:
     platform: iOS
     sources:
       - path: App
+        excludes:
+          - "Info*.plist"
     dependencies:
       - package: FamilyHubKit
         product: FHFeatures
@@ -34,6 +36,7 @@ targets:
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"
         GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_FILE: App/Info.plist
         INFOPLIST_KEY_CFBundleDisplayName: よりどころ
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
@@ -42,6 +45,22 @@ targets:
         INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_PREVIEWS: YES
+      configs:
+        # Debug だけ、同じ Mac の http（127.0.0.1）を許す（App/Info-Debug.plist）。
+        Debug:
+          INFOPLIST_FILE: App/Info-Debug.plist
+  FamilyHubUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: UITests
+    dependencies:
+      - target: FamilyHub
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: $(FH_BUNDLE_PREFIX).uitests
+        TEST_TARGET_NAME: FamilyHub
 schemes:
   FamilyHub:
     build:
@@ -51,3 +70,5 @@ schemes:
       config: Debug
     test:
       config: Debug
+      targets:
+        - FamilyHubUITests
