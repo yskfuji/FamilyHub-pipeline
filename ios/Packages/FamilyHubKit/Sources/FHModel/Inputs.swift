@@ -198,3 +198,77 @@ public struct AttachmentLink: Codable, Sendable, Hashable {
 
 /// inline はアプリの中で見るため、attachment は保存のため（?download=1）。
 public enum AttachmentDisposition: String, Sendable, Hashable { case inline, attachment }
+
+/// 負担の額の指定。
+public struct ShareAmount: Codable, Sendable, Hashable {
+  public var membershipId: Id
+  public var amountJpy: Int
+  public init(membershipId: Id, amountJpy: Int) { self.membershipId = membershipId; self.amountJpy = amountJpy }
+}
+
+/// 支出・収入の追加（expenseInputSchema）。負担は人の指定（等分・支払った人だけ）か額の指定のどちらか。
+public struct ExpenseInput: Codable, Sendable, Hashable {
+  public var kind: ExpenseKind
+  public var title: String
+  public var amountJpy: Int
+  public var incurredOn: IsoDate
+  public var payerMembershipId: Id
+  public var category: ExpenseCategory
+  public var visibility: VisibilityInput?
+  public var shareMembershipIds: [Id]?
+  public var shareAmounts: [ShareAmount]?
+  public var note: String?
+  public var place: PlaceRef?
+
+  public init(kind: ExpenseKind, title: String, amountJpy: Int, incurredOn: IsoDate, payerMembershipId: Id, category: ExpenseCategory, visibility: VisibilityInput? = nil, shareMembershipIds: [Id]? = nil, shareAmounts: [ShareAmount]? = nil, note: String? = nil, place: PlaceRef? = nil) {
+    self.kind = kind; self.title = title; self.amountJpy = amountJpy; self.incurredOn = incurredOn; self.payerMembershipId = payerMembershipId; self.category = category
+    self.visibility = visibility; self.shareMembershipIds = shareMembershipIds; self.shareAmounts = shareAmounts; self.note = note; self.place = place
+  }
+}
+
+/// 支出・収入の変更（expenseUpdateSchema）。メモと場所は null で外せる。
+public struct ExpenseUpdateInput: Encodable, Sendable, Hashable {
+  public var kind: ExpenseKind?
+  public var title: String?
+  public var incurredOn: IsoDate?
+  public var category: ExpenseCategory?
+  public var note: Patch<String> = .keep
+  public var visibility: VisibilityInput?
+  public var place: Patch<PlaceRef> = .keep
+  public var amountJpy: Int?
+  public var payerMembershipId: Id?
+  public var shareMembershipIds: [Id]?
+  public var shareAmounts: [ShareAmount]?
+
+  public init() {}
+
+  private enum Keys: String, CodingKey { case kind, title, incurredOn, category, note, visibility, place, amountJpy, payerMembershipId, shareMembershipIds, shareAmounts }
+
+  public func encode(to encoder: any Encoder) throws {
+    var container = encoder.container(keyedBy: Keys.self)
+    try container.encodeIfPresent(kind, forKey: .kind)
+    try container.encodeIfPresent(title, forKey: .title)
+    try container.encodeIfPresent(incurredOn, forKey: .incurredOn)
+    try container.encodeIfPresent(category, forKey: .category)
+    try container.encode(note, forKey: .note)
+    try container.encodeIfPresent(visibility, forKey: .visibility)
+    try container.encode(place, forKey: .place)
+    try container.encodeIfPresent(amountJpy, forKey: .amountJpy)
+    try container.encodeIfPresent(payerMembershipId, forKey: .payerMembershipId)
+    try container.encodeIfPresent(shareMembershipIds, forKey: .shareMembershipIds)
+    try container.encodeIfPresent(shareAmounts, forKey: .shareAmounts)
+  }
+}
+
+/// まとめた精算（settleAllInputSchema）。画面に示した負担と受け渡しをそのまま送り、サーバーが今の残りと照らす。
+public struct SettleAllInput: Codable, Sendable, Hashable {
+  public struct Share: Codable, Sendable, Hashable {
+    public var expenseId: Id
+    public var membershipId: Id
+    public var remainingJpy: Int
+    public init(expenseId: Id, membershipId: Id, remainingJpy: Int) { self.expenseId = expenseId; self.membershipId = membershipId; self.remainingJpy = remainingJpy }
+  }
+  public var shares: [Share]
+  public var transfers: [SettlementTransfer]
+  public init(shares: [Share], transfers: [SettlementTransfer]) { self.shares = shares; self.transfers = transfers }
+}

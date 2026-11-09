@@ -548,3 +548,179 @@ write('formatRelative', pasts.map((input) => ({ input, expected: formatRelative(
     links: ['https://example.com', 'https://Example.COM/a?b=c#d', 'http://example.com:80/x', 'https://example.com:443/', 'https://example.com:8443/a', 'javascript:alert(1)', 'file:///etc/passwd', 'data:text/html,a', 'mailto:a@example.com', 'not a url', 'ftp://example.com', ' https://example.com/a '].map((value) => [value, safeLinkUrl(value)]),
   });
 }
+
+// ---- 段階 S4: 家計（集計・精算・一覧・入力） ----
+{
+  const { readFileSync } = await import('node:fs');
+  const ledger = await import('../../src/domain/ledger');
+  const summary = await import('../../src/domain/budgetSummary');
+  const trend = await import('../../src/domain/budgetTrend');
+  const view = await import('../../src/domain/budgetView');
+  const form = await import('../../src/domain/expenseForm');
+  const settlement = await import('../../src/domain/settlementForm');
+  const { receiptToDraft } = await import('../../src/domain/assistant');
+  type Expense = import('../../src/domain/types').Expense;
+  type Snapshot = import('../../src/domain/types').HouseholdSnapshot;
+  type SettlementBatch = import('../../src/domain/types').SettlementBatch;
+  const fixture = (actor: string) => JSON.parse(readFileSync(`ios/Packages/FamilyHubKit/Tests/FHModelTests/Fixtures/snapshot.${actor}.json`, 'utf8')) as Snapshot;
+  const aoi = fixture('member-aoi');
+  const memberships = aoi.memberships;
+  const memberOrder = memberships.map((member) => member.id);
+  const adultIds = form.activeAdults(memberships).map((member) => member.id);
+
+  let seed = 20261201;
+  const random = () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const pick = <T,>(list: readonly T[]) => list[Math.floor(random() * list.length)];
+  const people = ['member-aoi', 'member-ren', 'member-hana'];
+  const generated: Expense[] = [];
+  let record = 0;
+  for (let index = 0; index < 80; index += 1) {
+    const income = random() < 0.15;
+    const amount = pick([1, 2, 3, 99, 100, 1001, 2860, 3333, 5840, 12000, 98765, 320000]);
+    const payer = pick(['member-aoi', 'member-ren']);
+    const date = addDateKeyDays('2026-03-01', Math.floor(random() * 300));
+    let shares: Expense['shares'] = [];
+    if (!income) {
+      const mode = random();
+      if (mode < 0.3) shares = [{ membershipId: payer, amountJpy: amount, settledJpy: amount }];
+      else if (mode < 0.75) shares = ledger.splitShares(amount, payer, random() < 0.8 ? ['member-aoi', 'member-ren'] : people);
+      else { const first = Math.floor(amount * random()); shares = [{ membershipId: payer, amountJpy: first, settledJpy: first }, { membershipId: payer === 'member-aoi' ? 'member-ren' : 'member-aoi', amountJpy: amount - first, settledJpy: 0 }].filter((share) => share.amountJpy > 0); }
+    }
+    const settlements: Expense['settlements'] = [];
+    for (const share of shares) {
+      if (share.membershipId === payer || random() < 0.5) continue;
+      const paid = random() < 0.5 ? share.amountJpy : Math.max(1, Math.floor(share.amountJpy / 2));
+      const id = `s${String(record += 1).padStart(3, '0')}`;
+      const at = `${date}T${String(8 + Math.floor(random() * 12)).padStart(2, '0')}:00:00+09:00`;
+      const reversed = random() < 0.25;
+      settlements.push({ id, amountJpy: paid, fromMembershipId: share.membershipId, toMembershipId: payer, recordedAt: at, ...(reversed ? { reversedAt: at } : {}) });
+      if (reversed) settlements.push({ id: `${id}r`, amountJpy: -paid, fromMembershipId: payer, toMembershipId: share.membershipId, recordedAt: at, reversalOfSettlementId: id });
+      else share.settledJpy += paid;
+    }
+    generated.push({
+      id: `x${String(index).padStart(2, '0')}`, householdId: 'house-mori', kind: income ? 'income' : 'expense', title: pick(['食材', '電車', '教材', '給与', '贈り物', '電気代']), amountJpy: amount, incurredOn: date,
+      payerMembershipId: payer, creatorMembershipId: pick(['member-aoi', 'member-ren']), category: income ? pick(ledger.incomeCategories) : pick(ledger.expenseCategories), shares, settlements, version: 1,
+      ...(random() < 0.2 ? { note: '領収書あり' } : {}), visibility: { audience: 'household', creatorMembershipId: 'member-aoi', selectedMembershipIds: [] },
+      ...(random() < 0.05 ? { deletedAt: '2026-09-29T10:00:00+09:00' } : {}),
+    });
+  }
+  // まとめた精算: 1つは生きている、1つはまとめて取り消した、1つは一部を個別に取り消した。
+  const batches: SettlementBatch[] = [];
+  const batchOf = (id: string, picks: Expense[], reverse: 'none' | 'all' | 'part') => {
+    const at = '2026-09-20T21:00:00+09:00';
+    const items: SettlementBatch['items'] = [];
+    picks.forEach((expense, at2) => {
+      const share = expense.shares.find((item) => item.membershipId !== expense.payerMembershipId && item.amountJpy > item.settledJpy);
+      if (!share) return;
+      const amountJpy = share.amountJpy - share.settledJpy;
+      const recordId = `${id}-${expense.id}`;
+      const reversed = reverse === 'all' || (reverse === 'part' && at2 === 0);
+      expense.settlements.push({ id: recordId, amountJpy, fromMembershipId: share.membershipId, toMembershipId: expense.payerMembershipId, recordedAt: at, batchId: id, ...(reversed ? { reversedAt: '2026-09-21T09:00:00+09:00' } : {}) });
+      if (reversed) expense.settlements.push({ id: `${recordId}-r`, amountJpy: -amountJpy, fromMembershipId: expense.payerMembershipId, toMembershipId: share.membershipId, recordedAt: '2026-09-21T09:00:00+09:00', reversalOfSettlementId: recordId, ...(reverse === 'all' ? { batchId: id } : {}) });
+      else share.settledJpy += amountJpy;
+      items.push({ expenseId: expense.id, membershipId: share.membershipId, amountJpy, settlementId: recordId });
+    });
+    batches.push({ id, householdId: 'house-mori', recordedAt: at, recordedByMembershipId: 'member-aoi', transfers: [{ from: 'member-ren', to: 'member-aoi', amountJpy: items.reduce((sum, item) => sum + item.amountJpy, 0) }], items, ...(reverse === 'all' ? { reversedAt: '2026-09-21T09:00:00+09:00' } : {}) });
+  };
+  const openOnes = generated.filter((expense) => !expense.deletedAt && ledger.remainingTotal(expense) > 0);
+  batchOf('batch-live', openOnes.slice(0, 3), 'none');
+  batchOf('batch-reversed', openOnes.slice(3, 5), 'all');
+  batchOf('batch-part', openOnes.slice(5, 8), 'part');
+  const expenses = [...aoi.expenses, ...generated];
+  write('budgetExpenses', expenses);
+  write('budgetBatches', batches);
+
+  // 集計（月ごと）。全体と、表示する人で絞ったもの。
+  const scopes: Array<[string, Expense[]]> = [['all', expenses], ['member-ren', expenses.filter((expense) => expense.payerMembershipId === 'member-ren' || expense.shares.some((share) => share.membershipId === 'member-ren'))]];
+  const months = Array.from({ length: 12 }, (_, index) => shiftMonthKey('2026-02', index));
+  write('budgetMonths', scopes.flatMap(([scope, list]) => months.map((month) => ({
+    input: { scope, month },
+    expected: {
+      overview: summary.monthOverview(list, month), comparison: summary.monthComparison(list, month), categories: ledger.categoryBreakdown(list, month),
+      income: summary.incomeBreakdown(list, month), members: summary.memberTotals(list, month, memberships), trend: trend.budgetTrend(list, month), drawable: trend.trendIsDrawable(trend.budgetTrend(list, month)),
+    },
+  }))));
+  const history = (list: Expense[]) => ledger.settlementHistory(list).map((entry) => ({ expenseId: entry.expenseId, record: entry.record.id, reverses: entry.reverses?.id ?? null, reversedBy: entry.reversedBy?.id ?? null, canReverse: entry.canReverse }));
+  const grouped = (list: Expense[]) => ledger.groupedSettlementHistory(list, batches).map((row) => (row.kind === 'single'
+    ? { kind: 'single', record: row.entry.record.id }
+    : { kind: 'batch', batchId: row.batchId, reversal: row.reversal, recordedAt: row.recordedAt, records: row.entries.map((entry) => entry.record.id), totalJpy: row.totalJpy, canReverse: row.canReverse, partlyReversed: row.partlyReversed, reversed: row.reversed }));
+  write('budgetLedger', scopes.map(([scope, list]) => ({
+    input: scope,
+    expected: {
+      unsettled: ledger.unsettledSummary(list), settledNet: ledger.settledNet(list), openShares: ledger.openShares(list), balances: [...ledger.netBalances(ledger.openShares(list))],
+      transfers: ledger.simplifiedTransfers(list), settleAll: ledger.settleAllRequest(list, { memberFilterActive: false }), settleAllFiltered: ledger.settleAllRequest(list, { memberFilterActive: true }),
+      history: history(list), grouped: grouped(list), open: summary.openExpenses(list).map((expense) => expense.id), latest: view.latestBudgetMonth(list, '2026-09'),
+      active: list.map((expense) => [expense.id, ledger.hasActiveSettlement(expense), ledger.remainingOf(expense)]),
+    },
+  })));
+  const valueLists = [[], [0, 0], [1], [1, 1, 1], [5840, 3360, 2860], [1, 2, 3, 4, 5, 6, 7], [100, 100, 100], [33, 33, 34], [999999, 1, 1]];
+  for (let index = 0; index < 20; index += 1) valueLists.push(Array.from({ length: 1 + Math.floor(random() * 8) }, () => Math.floor(random() * 10000)));
+  write('percentages', valueLists.map((input) => ({ input, expected: ledger.percentages(input) })));
+  const balanceSets: Array<Array<[string, number]>> = [[], [['a', 0]], [['a', -1000], ['b', 1000]], [['a', -1000], ['b', 0], ['c', 1000]], [['a', -700], ['d', -100], ['b', 800], ['c', 0]], [['b', -5], ['a', -5], ['c', 10]]];
+  for (let index = 0; index < 15; index += 1) {
+    const ids = ['m1', 'm2', 'm3', 'm4', 'm5'].slice(0, 2 + Math.floor(random() * 4));
+    const values = ids.map(() => Math.floor(random() * 2000) - 1000);
+    values[values.length - 1] -= values.reduce((sum, value) => sum + value, 0);
+    balanceSets.push(ids.map((id, at) => [id, values[at]]));
+  }
+  write('transfers', balanceSets.map((input) => {
+    const transfers = ledger.transfersFor(new Map(input));
+    return { input, expected: { transfers, settles: ledger.transfersSettle(new Map(input), transfers), offByOne: transfers.length ? ledger.transfersSettle(new Map(input), [{ ...transfers[0], amountJpy: transfers[0].amountJpy + 1 }, ...transfers.slice(1)]) : null } };
+  }));
+  write('splitShares', [[1001, 'a', ['a', 'b']], [1000, 'a', ['a', 'b']], [1, 'b', ['a', 'b', 'c']], [10, 'z', ['a', 'b', 'c']], [5, 'a', ['a']], [0, 'a', ['a', 'b']]].map(([amount, payer, ids]) => ({ input: { amount, payer, ids }, expected: ledger.splitShares(amount as number, payer as string, ids as string[]) })));
+  write('balanceOf', [[250, 1000], [999, 1000], [1500, 1000], [1500, 0], [0, 0], [12060, 320000], [1, 3], [2, 3]].map(([spending, income]) => ({ input: [spending, income], expected: summary.balanceOf(spending, income) })));
+
+  // 一覧の期間・絞り込み・並べ替え。
+  const locations = [
+    ['2026-09', 'month', null, null, '2026-09-30'], ['2026-09', 'week', null, null, '2026-09-30'], ['2026-09', 'week', null, null, '2026-09-16'], ['2026-08', 'week', null, null, '2026-09-30'],
+    ['2026-11', 'week', null, null, '2026-11-01'], ['2026-09', 'custom', '2026-09-10', '2026-09-20', '2026-09-30'], ['2026-09', 'custom', '2026-10-05', '2026-08-28', '2026-09-30'],
+    ['2026-09', 'custom', '2026-09-10', null, '2026-09-30'], ['2028-02', 'month', null, null, '2026-09-30'], ['2026-12', 'week', null, null, '2026-12-31'],
+  ] as const;
+  write('budgetRanges', locations.map(([month, period, from, to, today]) => ({ input: { month, period, from, to, today }, expected: view.budgetRange({ month, period, from, to }, today) })));
+  const categoriesToFilter = [null, 'food', 'education', 'income_salary', 'other'] as const;
+  write('budgetLists', view.budgetSorts.flatMap((sort) => categoriesToFilter.map((category) => {
+    const range = { start: '2026-06-01', end: '2026-10-31' };
+    const sorted = view.sortLedger(view.filterLedger(expenses, range, category), sort, memberOrder);
+    return { input: { sort, category, range }, expected: { ids: sorted.map((expense) => expense.id), groups: view.ledgerGroups(sorted, sort).map((group) => ({ date: group.date, ids: group.items.map((item) => item.id), expenseJpy: group.expenseJpy, incomeJpy: group.incomeJpy })) } };
+  })));
+
+  // 入力。
+  write('parseYen', ['1200', '1,200', '１２００', '¥1,200', '￥1,200', ' 1200円 ', '0', '', '12.5', '-1', 'abc', '1e3', '99999999999999999999', '１，２００円', '1 200', '9007199254740991', '9007199254740992', '　500'].map((input) => ({ input, expected: { yen: form.parseYen(input), formatted: form.formatAmountInput(input) } })));
+  write('formatAmount', ['1234567', '１２，０００円', '¥ 980', '0012', '', '12a', '0', '000', '1,2,3,4', '￥', '円'].map((input) => ({ input, expected: form.formatAmountInput(input) })));
+  write('caretAfterDigits', [['1,234', 2], ['1,234', 0], ['1,234', 9], ['1,234', 1], ['12,345,678', 5], ['', 3]].map(([text, digits]) => ({ input: [text, digits], expected: form.caretAfterDigits(text as string, digits as number) })));
+  const order = (draft: { customAmounts: Record<string, string> }) => Object.keys(draft.customAmounts);
+  write('expenseDrafts', expenses.map((expense) => {
+    const draft = form.expenseToDraft(expense, adultIds);
+    return { input: expense.id, expected: { draft, order: order(draft), problem: form.expenseDraftProblem(draft, false), locked: form.expenseDraftProblem(draft, true), create: form.expenseDraftToCreateInput(draft, adultIds), planned: form.plannedShares(draft, adultIds), gap: form.customSplitGap(draft), seeded: form.seedCustomAmounts({ ...draft, customAmounts: {} }, adultIds), outside: form.peopleOutsideExpense(draft, adultIds, memberships, expense.creatorMembershipId).map((member) => member.id), active: ledger.hasActiveSettlement(expense), kindChange: { expense: form.kindChangeEffects(expense, 'expense'), income: form.kindChangeEffects(expense, 'income') } } };
+  }));
+  write('newExpenseDrafts', [['member-aoi', 'expense'], ['member-aoi', 'income'], ['member-hana', 'expense'], ['member-yui', 'income']].map(([viewer, kind]) => ({ input: { viewer, kind }, expected: form.newExpenseDraft('2026-09-30', viewer, adultIds, 'household', kind as 'expense') })));
+  const base = form.newExpenseDraft('2026-09-30', 'member-aoi', adultIds, 'household');
+  const variants: Array<[string, Partial<import('../../src/domain/expenseForm').ExpenseDraft>]> = [
+    ['empty', {}], ['income empty', { kind: 'income', category: 'income_other' }], ['bad date', { title: 'a', date: '2026-02-30' }], ['no amount', { title: 'a' }], ['zero', { title: 'a', amount: '0' }],
+    ['equal', { title: ' 食材 ', amount: '1,001' }], ['payer', { title: 'a', amount: '５００', splitMode: 'payer' }], ['custom ok', { title: 'a', amount: '1000', splitMode: 'custom', customAmounts: { 'member-ren': '600', 'member-aoi': '400' } }],
+    ['custom gap', { title: 'a', amount: '1000', splitMode: 'custom', customAmounts: { 'member-aoi': '400' } }], ['custom bad', { title: 'a', amount: '1000', splitMode: 'custom', customAmounts: { 'member-aoi': 'x', 'member-ren': '1000' } }],
+    ['custom zero', { title: 'a', amount: '1000', splitMode: 'custom', customAmounts: { 'member-aoi': '0', 'member-ren': '1000', 'member-hana': ' ' } }], ['income', { kind: 'income', category: 'income_salary', title: '給与', amount: '320000', note: ' 9月分 ' }],
+    ['selected none', { title: 'a', amount: '1', audience: 'selected' }], ['place', { title: 'a', amount: '1', place: { name: '青葉書店', capturedVia: 'manual', selectedAt: '2026-09-30T07:30:00+09:00' } }],
+    ['income place', { kind: 'income', category: 'income_side', title: 'a', amount: '1', place: { name: '青葉書店', capturedVia: 'manual', selectedAt: '2026-09-30T07:30:00+09:00' } }], ['payer ren', { title: 'a', amount: '3', payerId: 'member-ren' }],
+  ];
+  write('expenseDraftChecks', variants.map(([name, patch]) => {
+    const draft = { ...base, ...patch };
+    return { input: { name, draft, order: order(draft) }, expected: { problem: form.expenseDraftProblem(draft, false), locked: form.expenseDraftProblem(draft, true), create: form.expenseDraftToCreateInput(draft, adultIds), planned: form.plannedShares(draft, adultIds), gap: form.customSplitGap(draft), seeded: form.seedCustomAmounts(draft, adultIds), seededOrder: Object.keys(form.seedCustomAmounts(draft, adultIds)), outside: form.peopleOutsideExpense(draft, adultIds, memberships, 'member-aoi').map((member) => member.id), toIncome: form.withKind(draft, 'income'), toExpense: form.withKind({ ...draft, kind: 'income', category: 'income_bonus' }, 'expense') } };
+  }));
+  const updates: unknown[] = [];
+  for (const original of expenses.slice(0, 40)) {
+    const draft = form.expenseToDraft(original, adultIds);
+    const edits: Array<[string, Partial<typeof draft>]> = [['same', {}], ['title', { title: ' 新しい名前 ', note: '' }], ['amount', { amount: '1,234' }], ['payer', { payerId: original.payerMembershipId === 'member-aoi' ? 'member-ren' : 'member-aoi' }],
+      ['payer only', { splitMode: 'payer' }], ['custom', { splitMode: 'custom', customAmounts: { 'member-aoi': String(original.amountJpy - 1), 'member-ren': '1' } }], ['to income', form.withKind(draft, 'income')], ['to expense', form.withKind(draft, 'expense')],
+      ['audience', { audience: 'adults' }], ['no place', { place: null }]];
+    for (const [name, edit] of edits) {
+      const changed = { ...draft, ...edit };
+      updates.push({ input: { id: original.id, name, draft: changed, order: order(changed) }, expected: { plain: form.expenseDraftToUpdateInput(changed, original, adultIds, false), locked: form.expenseDraftToUpdateInput(changed, original, adultIds, true) } });
+    }
+  }
+  write('expenseUpdates', updates);
+  write('payerChoices', [undefined, 'member-hana', 'member-gone'].map((keep) => ({ input: keep ?? null, expected: form.payerChoices(memberships, keep).map((member) => member.id) })));
+  write('settlementForms', [['1430', 1430], ['715', 1430], ['1431', 1430], ['0', 5], ['', 5], ['１，０００', 2000], ['abc', 10]].map(([text, rest]) => ({ input: { text, rest }, expected: settlement.settlementAmountProblem(text as string, rest as number, formatYen) })));
+  write('settlementPresets', [1431, 1, 2, 0, 1000].map((input) => ({ input, expected: settlement.settlementPresets(input) })));
+  write('receiptDrafts', [{ amountJpy: 2860, date: '2026-09-29', merchant: '青葉書店', category: 'education' }, { amountJpy: null, date: null, merchant: null, category: 'other' }, { amountJpy: 0, date: '2026-09-30', merchant: '', category: 'food' }].map((input) => ({ input, expected: receiptToDraft(input as never) })));
+}

@@ -227,6 +227,7 @@ public struct ExpenseShare: Codable, Sendable, Hashable {
   public var membershipId: Id
   public var amountJpy: Int
   public var settledJpy: Int
+  public init(membershipId: Id, amountJpy: Int, settledJpy: Int) { self.membershipId = membershipId; self.amountJpy = amountJpy; self.settledJpy = settledJpy }
 }
 
 public struct SettlementRecord: Codable, Sendable, Hashable, Identifiable {
@@ -244,6 +245,7 @@ public struct SettlementTransfer: Codable, Sendable, Hashable {
   public var from: Id
   public var to: Id
   public var amountJpy: Int
+  public init(from: Id, to: Id, amountJpy: Int) { self.from = from; self.to = to; self.amountJpy = amountJpy }
 }
 
 public struct SettlementBatchItem: Codable, Sendable, Hashable {

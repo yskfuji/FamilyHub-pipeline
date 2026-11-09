@@ -16,7 +16,7 @@ public final class SampleGateway: FamilyHubGateway {
   func invoke<Value: Decodable & Sendable>(_ method: GatewayMethod, _ arguments: (any Encodable & Sendable)?..., as type: Value.Type = Value.self) async -> GatewayResult<Value> {
     let parts = method.rawValue.split(separator: ".", maxSplits: 1).map(String.init)
     do {
-      let json = String(decoding: try JSONEncoder().encode(GatewayArgument.list(arguments)), as: UTF8.self)
+      let json = String(decoding: try stableEncoder.encode(GatewayArgument.list(arguments)), as: UTF8.self)
       let data = try await engine.call(parts[0], parts[1], argumentsJSON: json)
       return try JSONDecoder().decode(WireResult<Value>.self, from: data).result
     } catch {
@@ -47,6 +47,16 @@ public final class SampleGateway: FamilyHubGateway {
     await invoke(.deleteEvent, id, scope, expectedVersion, occurrenceDate)
   }
   public func restoreEvent(id: Id, occurrenceDate: IsoDate?) async -> GatewayResult<CalendarEvent> { await invoke(.restoreEvent, id, occurrenceDate) }
+
+  public func createExpense(_ input: ExpenseInput, idempotencyKey: String) async -> GatewayResult<Expense> { await invoke(.createExpense, input, idempotencyKey) }
+  public func updateExpense(id: Id, input: ExpenseUpdateInput, expectedVersion: Int) async -> GatewayResult<Expense> { await invoke(.updateExpense, id, input, expectedVersion) }
+  public func deleteExpense(id: Id, expectedVersion: Int) async -> GatewayResult<Empty> { await invoke(.deleteExpense, id, expectedVersion) }
+  public func restoreExpense(id: Id) async -> GatewayResult<Expense> { await invoke(.restoreExpense, id) }
+  public func recordSettlement(expenseId: Id, fromMembershipId: Id, amountJpy: Int) async -> GatewayResult<Expense> { await invoke(.recordSettlement, expenseId, fromMembershipId, amountJpy) }
+  public func reverseSettlement(expenseId: Id, settlementId: Id) async -> GatewayResult<Expense> { await invoke(.reverseSettlement, expenseId, settlementId) }
+  public func settleAll(_ input: SettleAllInput, idempotencyKey: String) async -> GatewayResult<SettlementBatch> { await invoke(.settleAll, input, idempotencyKey) }
+  public func reverseBatch(id: Id, idempotencyKey: String) async -> GatewayResult<SettlementBatch> { await invoke(.reverseBatch, id, idempotencyKey) }
+  public func readReceipt(_ file: UploadFile) async -> GatewayResult<AssistantJob> { await invoke(.readReceipt, SampleFile(file)) }
 
   public func getAssistantStatus() async -> GatewayResult<AssistantStatus> { await invoke(.getAssistantStatus) }
   public func readEventImage(_ file: UploadFile) async -> GatewayResult<AssistantJob> { await invoke(.readEventImage, SampleFile(file)) }

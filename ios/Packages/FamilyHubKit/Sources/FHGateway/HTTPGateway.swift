@@ -151,7 +151,43 @@ public final class HTTPGateway: FamilyHubGateway {
     await client.download(link.url, to: AttachmentFiles.destination(for: fileName))
   }
 
+  // MARK: expenses
+  public func createExpense(_ input: ExpenseInput, idempotencyKey: String) async -> GatewayResult<Expense> {
+    await send(.json(.post, "/v1/expenses", input, idempotencyKey: idempotencyKey))
+  }
+
+  public func updateExpense(id: Id, input: ExpenseUpdateInput, expectedVersion: Int) async -> GatewayResult<Expense> {
+    await send(.json(.patch, "/v1/expenses/\(id.uriComponent)", ExpenseUpdateBody(input: input, expectedVersion: expectedVersion)))
+  }
+
+  public func deleteExpense(id: Id, expectedVersion: Int) async -> GatewayResult<Empty> {
+    await send(.init(.delete, "/v1/expenses/\(id.uriComponent)?expectedVersion=\(expectedVersion)", csrf: true))
+  }
+
+  public func restoreExpense(id: Id) async -> GatewayResult<Expense> { await send(.init(.post, "/v1/expenses/\(id.uriComponent)/restore", csrf: true)) }
+
+  public func recordSettlement(expenseId: Id, fromMembershipId: Id, amountJpy: Int) async -> GatewayResult<Expense> {
+    await send(json(.post, "/v1/expenses/\(expenseId.uriComponent)/settlements", ["fromMembershipId": .string(fromMembershipId), "amountJpy": .number(Double(amountJpy))]))
+  }
+
+  public func reverseSettlement(expenseId: Id, settlementId: Id) async -> GatewayResult<Expense> {
+    await send(.init(.post, "/v1/expenses/\(expenseId.uriComponent)/settlements/\(settlementId.uriComponent)/reverse", csrf: true))
+  }
+
+  public func settleAll(_ input: SettleAllInput, idempotencyKey: String) async -> GatewayResult<SettlementBatch> {
+    await send(.json(.post, "/v1/settlement-batches", input, idempotencyKey: idempotencyKey))
+  }
+
+  public func reverseBatch(id: Id, idempotencyKey: String) async -> GatewayResult<SettlementBatch> {
+    await send(.init(.post, "/v1/settlement-batches/\(id.uriComponent)/reverse", csrf: true, idempotencyKey: idempotencyKey))
+  }
+
   // MARK: assistant
+  public func readReceipt(_ file: UploadFile) async -> GatewayResult<AssistantJob> {
+    let form = MultipartForm(file: file)
+    return await send(.init(.post, "/v1/assistant/receipt", body: form.body, csrf: true, headers: ["Content-Type": form.contentType]))
+  }
+
   public func getAssistantStatus() async -> GatewayResult<AssistantStatus> { await send(.init(.get, "/v1/assistant/status")) }
 
   public func readEventImage(_ file: UploadFile) async -> GatewayResult<AssistantJob> {
@@ -182,6 +218,12 @@ struct EventUpdateBody: Encodable, Sendable {
 struct ScopedUpdateBody<Input: Encodable & Sendable>: Encodable, Sendable {
   var scope: RecurrenceScope
   var input: Input
+  var expectedVersion: Int
+}
+
+/// 支出の変更の本文。
+struct ExpenseUpdateBody: Encodable, Sendable {
+  var input: ExpenseUpdateInput
   var expectedVersion: Int
 }
 

@@ -7,6 +7,14 @@ import FHModel
 /// - token が古くて 403 CSRF になったら、取り直して同じ冪等キーで1回だけ送り直す。
 /// - Origin は付けない（サーバーは Origin のない要求を通す。server/http/app.ts）。
 /// - 接続できないときは OFFLINE、本文の読めない応答は UPSTREAM_FAILURE。
+/// 同じ値はいつも同じバイト列にする（項目の順を揃える）。サーバーは冪等の鍵ごとに本文を照らすので、
+/// 送り直しで順が変わると「同じ鍵で別の内容」として断られる。
+let stableEncoder: JSONEncoder = {
+  let encoder = JSONEncoder()
+  encoder.outputFormatting = [.sortedKeys]
+  return encoder
+}()
+
 public actor APIClient {
   public enum Method: String, Sendable { case get = "GET", post = "POST", patch = "PATCH", put = "PUT", delete = "DELETE", head = "HEAD" }
 
@@ -23,7 +31,7 @@ public actor APIClient {
     }
 
     public static func json(_ method: Method, _ path: String, _ value: some Encodable, idempotencyKey: String? = nil) -> Request {
-      Request(method, path, body: try? JSONEncoder().encode(value), csrf: true, idempotencyKey: idempotencyKey)
+      Request(method, path, body: try? stableEncoder.encode(value), csrf: true, idempotencyKey: idempotencyKey)
     }
 
     var isMutation: Bool { method != .get && method != .head }

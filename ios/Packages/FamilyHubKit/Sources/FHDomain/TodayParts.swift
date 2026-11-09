@@ -123,7 +123,7 @@ public enum MemberScope {
 
 /// 家計の集計（一部）。元: src/domain/ledger.ts。入力は閲覧者に見えている支出。
 public enum Ledger {
-  public struct Summary: Sendable, Equatable, Decodable {
+  public struct Summary: Sendable, Hashable, Codable {
     public var totalJpy: Int
     public var count: Int
   }

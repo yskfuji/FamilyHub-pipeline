@@ -1,0 +1,1 @@
+[{"input":1431,"expected":[{"kind":"full","amountJpy":1431},{"kind":"half","amountJpy":715}]},{"input":1,"expected":[{"kind":"full","amountJpy":1}]},{"input":2,"expected":[{"kind":"full","amountJpy":2},{"kind":"half","amountJpy":1}]},{"input":0,"expected":[{"kind":"full","amountJpy":0}]},{"input":1000,"expected":[{"kind":"full","amountJpy":1000},{"kind":"half","amountJpy":500}]}]

@@ -53,3 +53,18 @@ write('memo.created', memo);
 write('memo.attached', await engine.value('memos', 'uploadAttachment', memo.id, { name: '持ち物.pdf', type: 'application/pdf', size: 1200 }, 'fixture-key'));
 write('memo.ocr', await engine.value('memos', 'updateMemo', 'memo-school', { ocrText: '令和8年度 学校公開' }, 1));
 write('attachment.link', await engine.value('memos', 'getAttachmentLink', 'memo-school', 'attachment-school', 'inline'));
+
+// 段階 S4: 家計の変更の応答（蓮さんは家計のすべての負担が見えるので、まとめた精算もできる）。
+engine.reset('member-ren', { auditHistory: true });
+write('expense.created', await engine.value('expenses', 'createExpense', { kind: 'expense', title: '上履き', amountJpy: 1001, incurredOn: '2026-09-30', payerMembershipId: 'member-ren', category: 'shopping', shareAmounts: [{ membershipId: 'member-ren', amountJpy: 601 }, { membershipId: 'member-aoi', amountJpy: 400 }], note: '2足', visibility: { audience: 'household', selectedMembershipIds: [] } }, 'fixture-expense'));
+write('expense.settled', await engine.value('expenses', 'recordSettlement', 'expense-books', 'member-ren', 715));
+const renSnapshot = await engine.value('household', 'getSnapshot');
+const openShares = renSnapshot.expenses.flatMap((expense) => expense.shares.filter((share) => share.membershipId !== expense.payerMembershipId && share.amountJpy > share.settledJpy).map((share) => ({ expenseId: expense.id, membershipId: share.membershipId, remainingJpy: share.amountJpy - share.settledJpy, payer: expense.payerMembershipId })));
+const net = new Map();
+for (const share of openShares) { net.set(share.membershipId, (net.get(share.membershipId) ?? 0) - share.remainingJpy); net.set(share.payer, (net.get(share.payer) ?? 0) + share.remainingJpy); }
+const debtor = [...net].find(([, value]) => value < 0);
+const creditor = [...net].find(([, value]) => value > 0);
+const batch = await engine.value('expenses', 'settleAll', { shares: openShares.map(({ expenseId, membershipId, remainingJpy }) => ({ expenseId, membershipId, remainingJpy })), transfers: [{ from: debtor[0], to: creditor[0], amountJpy: creditor[1] }] }, 'fixture-batch');
+write('settlementBatch', batch);
+write('settlementBatch.reversed', await engine.value('expenses', 'reverseBatch', batch.id, 'fixture-undo'));
+write('snapshot.afterBatch', await engine.value('household', 'getSnapshot'));

@@ -51,6 +51,13 @@ struct FixtureRoundTripTests {
     try Self.roundTrip(AttachmentLink.self, "attachment.link")
   }
 
+  /// 段階 S4: 家計の変更の応答。
+  @Test func budgetResponses() throws {
+    for name in ["expense.created", "expense.settled"] { try Self.roundTrip(Expense.self, name) }
+    for name in ["settlementBatch", "settlementBatch.reversed"] { try Self.roundTrip(SettlementBatch.self, name) }
+    try Self.roundTrip(HouseholdSnapshot.self, "snapshot.afterBatch")
+  }
+
   @Test func viewersSeeDifferentRecords() throws {
     let owner = try JSONDecoder().decode(HouseholdSnapshot.self, from: Self.data("snapshot.member-aoi"))
     let child = try JSONDecoder().decode(HouseholdSnapshot.self, from: Self.data("snapshot.member-hana"))

@@ -51,7 +51,7 @@ final class FamilyHubUITests: XCTestCase {
       let budget = app.buttons["内訳と精算を確認"]
       for _ in 0..<6 where !budget.isHittable { app.swipeUp() }
       budget.tap()
-      XCTAssertTrue(app.staticTexts["家計の画面は、これから作ります"].waitForExistence(timeout: 5))
+      XCTAssertTrue(app.staticTexts["家計と割り勘"].waitForExistence(timeout: 5))
     } else {
       // iPad は横の一覧（またはタブの帯）にすべての機能を並べる。
       let calendar = app.buttons["予定"].firstMatch

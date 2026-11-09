@@ -1,0 +1,40 @@
+{
+  "id": "settlement-batch-mock-3",
+  "householdId": "house-mori",
+  "recordedAt": "2026-09-30T07:46:00+09:00",
+  "recordedByMembershipId": "member-ren",
+  "transfers": [
+    {
+      "from": "member-aoi",
+      "to": "member-ren",
+      "amountJpy": 2365
+    }
+  ],
+  "items": [
+    {
+      "expenseId": "expense-mock-1",
+      "membershipId": "member-aoi",
+      "amountJpy": 400,
+      "settlementId": "settlement-mock-4"
+    },
+    {
+      "expenseId": "expense-books",
+      "membershipId": "member-ren",
+      "amountJpy": 715,
+      "settlementId": "settlement-mock-5"
+    },
+    {
+      "expenseId": "expense-train",
+      "membershipId": "member-aoi",
+      "amountJpy": 1680,
+      "settlementId": "settlement-mock-6"
+    },
+    {
+      "expenseId": "expense-ren-private",
+      "membershipId": "member-aoi",
+      "amountJpy": 1000,
+      "settlementId": "settlement-mock-7"
+    }
+  ],
+  "reversedAt": "2026-09-30T07:47:00+09:00"
+}

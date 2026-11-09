@@ -54,7 +54,21 @@ public protocol FamilyHubGateway: Sendable {
   /// リンクの中身を、この端末の一時の場所（AttachmentFiles）に取る。Web にはない（ブラウザがリンクを直接開く）。
   func downloadAttachment(_ link: AttachmentLink, fileName: String) async -> GatewayResult<URL>
 
+  // expenses（家計。精算の変更は本人の再確認が要ることがある）
+  /// 同じ入力の画面から送り直すときは、同じ idempotencyKey を渡す。
+  func createExpense(_ input: ExpenseInput, idempotencyKey: String) async -> GatewayResult<Expense>
+  func updateExpense(id: Id, input: ExpenseUpdateInput, expectedVersion: Int) async -> GatewayResult<Expense>
+  /// 取り消していない精算がある支出は削除できない。削除後7日間は元に戻せる。
+  func deleteExpense(id: Id, expectedVersion: Int) async -> GatewayResult<Empty>
+  func restoreExpense(id: Id) async -> GatewayResult<Expense>
+  func recordSettlement(expenseId: Id, fromMembershipId: Id, amountJpy: Int) async -> GatewayResult<Expense>
+  func reverseSettlement(expenseId: Id, settlementId: Id) async -> GatewayResult<Expense>
+  /// 画面に示した負担をまとめて精算する。冪等の鍵は画面ごとに1つ。
+  func settleAll(_ input: SettleAllInput, idempotencyKey: String) async -> GatewayResult<SettlementBatch>
+  func reverseBatch(id: Id, idempotencyKey: String) async -> GatewayResult<SettlementBatch>
+
   // assistant（読み取りの補助。結果は提案で、記録には何も保存しない）
+  func readReceipt(_ file: UploadFile) async -> GatewayResult<AssistantJob>
   func getAssistantStatus() async -> GatewayResult<AssistantStatus>
   func readEventImage(_ file: UploadFile) async -> GatewayResult<AssistantJob>
   func readEventUrl(_ url: String) async -> GatewayResult<AssistantJob>
@@ -101,6 +115,15 @@ public enum GatewayMethod: String, CaseIterable, Sendable {
   case deleteAttachment = "memos.deleteAttachment"
   case deleteMemo = "memos.deleteMemo"
   case restoreMemo = "memos.restoreMemo"
+  case createExpense = "expenses.createExpense"
+  case updateExpense = "expenses.updateExpense"
+  case deleteExpense = "expenses.deleteExpense"
+  case restoreExpense = "expenses.restoreExpense"
+  case recordSettlement = "expenses.recordSettlement"
+  case reverseSettlement = "expenses.reverseSettlement"
+  case settleAll = "expenses.settleAll"
+  case reverseBatch = "expenses.reverseBatch"
+  case readReceipt = "assistant.readReceipt"
   case getAssistantStatus = "assistant.getStatus"
   case readEventImage = "assistant.readEventImage"
   case readEventUrl = "assistant.readEventUrl"

@@ -180,11 +180,13 @@ public struct FHButtonStyle: ButtonStyle {
   public init(_ kind: Kind = .secondary, fullWidth: Bool = false) { self.kind = kind; self.fullWidth = fullWidth }
   public func makeBody(configuration: Configuration) -> some View {
     let colors = theme.colors
-    let (fore, back, border): (RGBA, RGBA, RGBA) = switch kind {
+    // 押せないボタンは薄くせず（文字が読みにくくなる）、控えめの色で示す。
+    let styled: (RGBA, RGBA, RGBA) = switch kind {
     case .primary: (colors.onAccent, colors.accentStrong, colors.accentStrong)
     case .secondary: (colors.ink, colors.sheet, colors.lineStrong)
     case .danger: (colors.danger, colors.sheet, colors.danger.mixed(0.45, with: colors.line))
     }
+    let (fore, back, border) = isEnabled ? styled : (colors.inkSoft, colors.sheet, colors.line)
     configuration.label
       .font(.body.weight(.bold))
       .padding(.horizontal, TokenSpace.space4)
@@ -193,7 +195,7 @@ public struct FHButtonStyle: ButtonStyle {
       .foregroundStyle(fore.color)
       .background(back.color, in: Capsule())
       .overlay(Capsule().stroke(border.color))
-      .opacity(isEnabled ? (configuration.isPressed ? 0.8 : 1) : 0.5)
+      .opacity(configuration.isPressed ? 0.8 : 1)
       .contentShape(Capsule())
   }
 }

@@ -55,8 +55,7 @@ enum ShellTab: String, Hashable, CaseIterable, Identifiable {
   /// この画面を作る段階（docs/ios/README.md の「段階」）。
   var plannedStage: String? {
     switch self {
-    case .today, .calendar, .tasks, .notes: nil
-    case .budget: "S4"
+    case .today, .calendar, .tasks, .notes, .budget: nil
     case .albums: "S5"
     case .places, .insights: "S6"
     case .settings: "S7"
@@ -200,6 +199,7 @@ struct ShellContent: View {
     case .calendar: CalendarScreen()
     case .tasks: TasksScreen()
     case .notes: NotesScreen()
+    case .budget: BudgetScreen()
     case .settings: InterimSettingsView()
     default: PlannedScreen(tab: tab)
     }
