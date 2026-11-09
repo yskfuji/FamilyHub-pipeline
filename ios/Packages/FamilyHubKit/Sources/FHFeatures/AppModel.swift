@@ -234,6 +234,23 @@ public final class AppModel {
 
   public func announce(_ message: String) { toast = message }
 
+  /// 変更の要求に付ける、冪等の鍵と権限の版。画面を開いている間は同じ鍵を使い、二重に送っても1件にする。
+  public func mutationContext(key: String) -> MutationContext? {
+    snapshot.map { MutationContext(idempotencyKey: key, expectedPermissionRevision: $0.viewer.permissionRevision) }
+  }
+
+  /// 家族の記録を変える。本人確認が要れば確かめてから同じ要求をやり直し、成功したら記録を取り直す。
+  /// 版の競合（409）のときも、最新の内容を取り直してから文言を返す（Web の AppContext と同じ）。
+  public func mutate<Value: Sendable>(_ operation: @escaping @Sendable (any FamilyHubGateway) async -> GatewayResult<Value>) async -> GatewayResult<Value> {
+    let result = await run { [gateway] in await operation(gateway) }
+    switch result {
+    case .success: await refresh()
+    case .failure(let failure) where failure.code == .conflict: await refresh()
+    case .failure: break
+    }
+    return result
+  }
+
   /// 共有範囲などを、最新の設定を取り直してから、変えた項目だけ変えて保存する（別の画面での変更を上書きしない）。
   public func updatePrivacy(_ change: @escaping @Sendable (inout PrivacySettings) -> Void) async -> GatewayResult<PrivacySettings> {
     let result: GatewayResult<PrivacySettings> = await run { [gateway] () async -> GatewayResult<PrivacySettings> in

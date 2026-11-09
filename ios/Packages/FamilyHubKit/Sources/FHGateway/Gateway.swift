@@ -26,8 +26,22 @@ public protocol FamilyHubGateway: Sendable {
   func getPrivacySettings() async -> GatewayResult<PrivacySettings>
   func savePrivacySettings(_ settings: PrivacySettings) async -> GatewayResult<PrivacySettings>
 
+  // events
+  func createEvent(_ input: EventInput, context: MutationContext?) async -> GatewayResult<CalendarEvent>
+  /// 繰り返しの予定では、scope が this / future のとき occurrenceDate（対象の回）が必要。
+  func updateEvent(id: Id, scope: RecurrenceScope, input: EventUpdateInput, expectedVersion: Int, context: MutationContext?, occurrenceDate: IsoDate?) async -> GatewayResult<CalendarEvent>
+  func deleteEvent(id: Id, scope: RecurrenceScope, expectedVersion: Int, occurrenceDate: IsoDate?) async -> GatewayResult<Empty>
+  /// occurrenceDate を渡すと、その1回だけを元に戻す。
+  func restoreEvent(id: Id, occurrenceDate: IsoDate?) async -> GatewayResult<CalendarEvent>
+
   // todos
   func updateTodoStatus(id: Id, status: TodoStatus, expectedVersion: Int, note: String?) async -> GatewayResult<Todo>
+
+  // assistant（読み取りの補助。結果は提案で、記録には何も保存しない）
+  func getAssistantStatus() async -> GatewayResult<AssistantStatus>
+  func readEventImage(_ file: UploadFile) async -> GatewayResult<AssistantJob>
+  func readEventUrl(_ url: String) async -> GatewayResult<AssistantJob>
+  func getAssistantJob(id: Id) async -> GatewayResult<AssistantJob>
 
   // notifications
   func listNotifications() async -> GatewayResult<[HouseholdNotification]>
@@ -54,7 +68,15 @@ public enum GatewayMethod: String, CaseIterable, Sendable {
   case acceptInvite = "household.acceptInvite"
   case getPrivacySettings = "household.getPrivacySettings"
   case savePrivacySettings = "household.savePrivacySettings"
+  case createEvent = "events.createEvent"
+  case updateEvent = "events.updateEvent"
+  case deleteEvent = "events.deleteEvent"
+  case restoreEvent = "events.restoreEvent"
   case updateTodoStatus = "todos.updateTodoStatus"
+  case getAssistantStatus = "assistant.getStatus"
+  case readEventImage = "assistant.readEventImage"
+  case readEventUrl = "assistant.readEventUrl"
+  case getAssistantJob = "assistant.getJob"
   case listNotifications = "notifications.list"
   case markNotificationRead = "notifications.markRead"
 }
@@ -84,4 +106,13 @@ public enum GatewayArgument: Encodable, Sendable {
 public enum GatewayFailure {
   public static let offline = GatewayError(code: .offline, message: "ネットワークに接続できません。", retryable: true)
   public static let response = GatewayError(code: .upstreamFailure, message: "応答を受け取れませんでした。少し待ってからお試しください。", retryable: true)
+}
+
+/// 送るファイル（画像など）。中身は端末の中に置いたまま、名前と種類と大きさを添える。
+public struct UploadFile: Sendable, Hashable {
+  public var name: String
+  public var type: String
+  public var data: Data
+  public var size: Int { data.count }
+  public init(name: String, type: String, data: Data) { self.name = name; self.type = type; self.data = data }
 }

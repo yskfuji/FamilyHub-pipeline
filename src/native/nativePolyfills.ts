@@ -82,10 +82,103 @@ if (typeof host.FileReader !== 'function') {
   };
 }
 
-const urls = host.URL as { createObjectURL?: unknown } | undefined;
-if (!urls || typeof urls.createObjectURL !== 'function') {
-  // 送ったファイルを表示する URL。中身は Swift が ref で持つ。
-  const createObjectURL = (file: NativeFile) => `fh-file://${file.ref}`;
-  if (urls) (urls as { createObjectURL: unknown }).createObjectURL = createObjectURL;
-  else host.URL = { createObjectURL };
+// 送ったファイルを表示する URL（URL.createObjectURL）は、下の NativeURL が持つ。中身は Swift が ref で持つ。
+
+/**
+ * URL の読み取り（WHATWG URL の要る分だけ）。JavaScriptCore には URL がなく、読み取りの URL の確認（readingUrlProblem）や
+ * リンクの確認（safeHttpsUrlSchema）が、どの URL も「形が違う」として断ってしまうため。
+ * スキーム、名前とパスワード、ホスト、ポート、パス、クエリ、フラグメントを分け、ホストのない http(s) などは TypeError にする。
+ * 国際化ドメインの変換（punycode）と、パスの文字の %XX への書き換えはしない（確かめるのに要らないため）。
+ */
+const specialPorts: Record<string, string> = { 'http:': '80', 'https:': '443', 'ws:': '80', 'wss:': '443', 'ftp:': '21', 'file:': '' };
+/** C0 の制御文字と空白（WHATWG の「C0 control or space」）。 */
+const isC0OrSpace = (character: string) => character.charCodeAt(0) <= 0x20;
+/** ホストに使えない文字。 */
+const forbiddenHost = (host: string) => [...host].some((character) => isC0OrSpace(character) || character === '\u007f' || '#%/:<>?@[\\]^|'.includes(character));
+
+/** 名前とパスワードの文字を、WHATWG の userinfo の決まりで %XX にする。 */
+const userinfoSet = '"#<>?`{}/:;=@[\\]^|';
+const encodeUserinfo = (value: string) => [...value].map((character) => {
+  const code = character.codePointAt(0) ?? 0;
+  if (!(code <= 0x20 || code >= 0x7f || userinfoSet.includes(character))) return character;
+  return encodeURIComponent(character).replace(/[!'()*]/g, (mark) => `%${mark.charCodeAt(0).toString(16).toUpperCase()}`);
+}).join('');
+
+export class NativeURL {
+  protocol = '';
+  username = '';
+  password = '';
+  hostname = '';
+  port = '';
+  pathname = '';
+  search = '';
+  hash = '';
+
+  constructor(input: string, base?: string) {
+    let text = String(input);
+    while (text && isC0OrSpace(text[0])) text = text.slice(1);
+    while (text && isC0OrSpace(text[text.length - 1])) text = text.slice(0, -1);
+    text = text.replace(/[\t\n\r]/g, '');
+    const scheme = /^([a-zA-Z][a-zA-Z0-9+.-]*):([\s\S]*)$/.exec(text);
+    if (!scheme) {
+      if (base === undefined) throw new TypeError('Invalid URL');
+      const parent = new NativeURL(base);
+      const path = text.startsWith('/') ? text : `${parent.pathname.replace(/[^/]*$/, '')}${text}`;
+      Object.assign(this, parent, { pathname: '', search: '', hash: '' });
+      this.splitPath(path || parent.pathname);
+      return;
+    }
+    this.protocol = `${scheme[1].toLowerCase()}:`;
+    const special = this.protocol in specialPorts;
+    let rest = scheme[2];
+    if (special || rest.startsWith('//')) {
+      rest = special ? rest.replace(/^[/\\]*/, '') : rest.slice(2);
+      const end = rest.search(special ? /[/\\?#]/ : /[/?#]/);
+      const authority = end === -1 ? rest : rest.slice(0, end);
+      rest = end === -1 ? '' : rest.slice(end);
+      const at = authority.lastIndexOf('@');
+      if (at !== -1) {
+        const userinfo = authority.slice(0, at);
+        const colon = userinfo.indexOf(':');
+        this.username = encodeUserinfo(colon === -1 ? userinfo : userinfo.slice(0, colon));
+        this.password = encodeUserinfo(colon === -1 ? '' : userinfo.slice(colon + 1));
+      }
+      const hostPort = at === -1 ? authority : authority.slice(at + 1);
+      const portAt = hostPort.startsWith('[') ? hostPort.indexOf(']:') + 1 || -1 : hostPort.lastIndexOf(':');
+      const rawHost = (portAt > 0 || (portAt === 0 && !hostPort.startsWith('['))) ? hostPort.slice(0, portAt) : hostPort;
+      // ホストの %XX は文字に戻してから確かめる（国際化ドメインの変換と、パスの %XX への書き換えはしない）。
+      let hostname: string;
+      try { hostname = decodeURIComponent(rawHost); } catch { throw new TypeError('Invalid URL'); }
+      const port = portAt >= 0 && hostPort.slice(portAt).startsWith(':') ? hostPort.slice(portAt + 1) : '';
+      if (!/^\d*$/.test(port) || Number(port) > 65535) throw new TypeError('Invalid URL');
+      const bracketed = /^\[[0-9a-fA-F:.]+\]$/.test(hostname);
+      if ((special && this.protocol !== 'file:' && !hostname) || (!bracketed && forbiddenHost(hostname))) throw new TypeError('Invalid URL');
+      this.hostname = hostname.toLowerCase();
+      this.port = port === '' || specialPorts[this.protocol] === String(Number(port)) ? '' : String(Number(port));
+      this.splitPath(special ? rest.replace(/\\/g, '/') || '/' : rest);
+    } else {
+      this.splitPath(rest);
+    }
+  }
+
+  private splitPath(value: string) {
+    const hashAt = value.indexOf('#');
+    if (hashAt !== -1) { this.hash = value.slice(hashAt) === '#' ? '' : value.slice(hashAt); value = value.slice(0, hashAt); }
+    const queryAt = value.indexOf('?');
+    if (queryAt !== -1) { this.search = value.slice(queryAt) === '?' ? '' : value.slice(queryAt); value = value.slice(0, queryAt); }
+    this.pathname = value;
+  }
+
+  get host() { return this.port ? `${this.hostname}:${this.port}` : this.hostname; }
+  get origin() { return this.protocol in specialPorts && this.protocol !== 'file:' ? `${this.protocol}//${this.host}` : 'null'; }
+  get href() {
+    const credentials = this.username || this.password ? `${this.username}${this.password ? `:${this.password}` : ''}@` : '';
+    const authority = this.protocol in specialPorts || this.hostname ? `//${credentials}${this.host}` : '';
+    return `${this.protocol}${authority}${this.pathname}${this.search}${this.hash}`;
+  }
+  toString() { return this.href; }
+  toJSON() { return this.href; }
+  static createObjectURL(file: NativeFile) { return `fh-file://${file.ref}`; }
 }
+
+if (typeof host.URL !== 'function') host.URL = NativeURL;

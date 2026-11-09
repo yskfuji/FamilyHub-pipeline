@@ -39,10 +39,33 @@ public final class SampleGateway: FamilyHubGateway {
   public func getPrivacySettings() async -> GatewayResult<PrivacySettings> { await invoke(.getPrivacySettings) }
   public func savePrivacySettings(_ settings: PrivacySettings) async -> GatewayResult<PrivacySettings> { await invoke(.savePrivacySettings, settings) }
 
+  public func createEvent(_ input: EventInput, context: MutationContext?) async -> GatewayResult<CalendarEvent> { await invoke(.createEvent, input, context) }
+  public func updateEvent(id: Id, scope: RecurrenceScope, input: EventUpdateInput, expectedVersion: Int, context: MutationContext?, occurrenceDate: IsoDate?) async -> GatewayResult<CalendarEvent> {
+    await invoke(.updateEvent, id, scope, input, expectedVersion, context, occurrenceDate)
+  }
+  public func deleteEvent(id: Id, scope: RecurrenceScope, expectedVersion: Int, occurrenceDate: IsoDate?) async -> GatewayResult<Empty> {
+    await invoke(.deleteEvent, id, scope, expectedVersion, occurrenceDate)
+  }
+  public func restoreEvent(id: Id, occurrenceDate: IsoDate?) async -> GatewayResult<CalendarEvent> { await invoke(.restoreEvent, id, occurrenceDate) }
+
+  public func getAssistantStatus() async -> GatewayResult<AssistantStatus> { await invoke(.getAssistantStatus) }
+  public func readEventImage(_ file: UploadFile) async -> GatewayResult<AssistantJob> { await invoke(.readEventImage, SampleFile(file)) }
+  public func readEventUrl(_ url: String) async -> GatewayResult<AssistantJob> { await invoke(.readEventUrl, url) }
+  public func getAssistantJob(id: Id) async -> GatewayResult<AssistantJob> { await invoke(.getAssistantJob, id) }
+
   public func updateTodoStatus(id: Id, status: TodoStatus, expectedVersion: Int, note: String?) async -> GatewayResult<Todo> {
     await invoke(.updateTodoStatus, id, status, expectedVersion, note)
   }
 
   public func listNotifications() async -> GatewayResult<[HouseholdNotification]> { await invoke(.listNotifications) }
   public func markNotificationRead(id: Id) async -> GatewayResult<HouseholdNotification> { await invoke(.markNotificationRead, id) }
+}
+
+/// 見本の仕組みに渡すファイル（{"__file": {name, type, size, head, ref}}）。中身は先頭の数バイトだけを渡す。
+struct SampleFile: Encodable, Sendable {
+  struct Body: Encodable, Sendable { var name: String; var type: String; var size: Int; var head: String; var ref: String }
+  var __file: Body
+  init(_ file: UploadFile) {
+    __file = Body(name: file.name, type: file.type, size: file.size, head: file.data.prefix(64).base64EncodedString(), ref: UUID().uuidString)
+  }
 }

@@ -7,7 +7,7 @@ final class FamilyHubUITests: XCTestCase {
     continueAfterFailure = false
   }
 
-  private func launch(_ arguments: [String] = ["-FHResetPreferences", "-FHSampleMode"]) -> XCUIApplication {
+  func launch(_ arguments: [String] = ["-FHResetPreferences", "-FHSampleMode"]) -> XCUIApplication {
     let app = XCUIApplication()
     app.launchArguments = arguments
     app.launch()
@@ -37,7 +37,7 @@ final class FamilyHubUITests: XCTestCase {
     XCTAssertTrue(app.staticTexts["次にすること"].waitForExistence(timeout: 10))
     if UIDevice.current.userInterfaceIdiom == .phone {
       app.tabBars.buttons["予定"].tap()
-      XCTAssertTrue(app.staticTexts["予定の画面は、これから作ります"].waitForExistence(timeout: 5))
+      XCTAssertTrue(app.staticTexts["家族の予定"].waitForExistence(timeout: 5))
       app.tabBars.buttons["その他"].tap()
       XCTAssertTrue(app.buttons["アルバム"].waitForExistence(timeout: 5))
       app.buttons["設定"].tap()
@@ -53,7 +53,7 @@ final class FamilyHubUITests: XCTestCase {
       let calendar = app.buttons["予定"].firstMatch
       XCTAssertTrue(calendar.waitForExistence(timeout: 5))
       calendar.tap()
-      XCTAssertTrue(app.staticTexts["予定の画面は、これから作ります"].waitForExistence(timeout: 5))
+      XCTAssertTrue(app.staticTexts["家族の予定"].waitForExistence(timeout: 5))
     }
   }
 
@@ -61,23 +61,6 @@ final class FamilyHubUITests: XCTestCase {
     let app = launch()
     XCTAssertTrue(app.staticTexts["次にすること"].waitForExistence(timeout: 10))
     try audit(app)
-  }
-
-  /// アクセシビリティの監査。見つけたものを全部、要素の名前と位置つきで書き出す（どこを直すかが分かるように）。
-  /// 下のタブの帯と上部はガラスで、下を通る本文の濃さを正しく測れない。帯に重なった要素の濃さの指摘だけは除く
-  /// （帯の外にある同じ要素は、スクロールした位置で測られる）。要素を特定できない文字の大きさの指摘（iPad のタブの帯）も除く。
-  private func audit(_ app: XCUIApplication) throws {
-    let bars = [app.tabBars.firstMatch, app.navigationBars.firstMatch].filter(\.exists).map(\.frame)
-    var found: [String] = []
-    try app.performAccessibilityAudit { issue in
-      let frame = issue.element?.frame ?? .zero
-      if issue.auditType == .contrast, bars.contains(where: { $0.intersects(frame) }) { return true }
-      // iPad の上のタブの帯（システムの部品）は、要素を特定できない文字の大きさの指摘を出す。アプリでは直せないので除く。
-      if issue.auditType == .dynamicType, issue.element == nil { return true }
-      found.append("\(issue.compactDescription): \(issue.element.map { "\($0.elementType.rawValue) 「\($0.label)」 \($0.frame)" } ?? "要素なし")")
-      return true
-    }
-    XCTAssertTrue(found.isEmpty, found.joined(separator: "\n"))
   }
 
   func testNightThemeKeepsTheAudit() throws {

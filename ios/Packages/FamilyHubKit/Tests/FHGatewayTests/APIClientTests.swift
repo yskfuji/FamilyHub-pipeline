@@ -5,7 +5,7 @@ import FHModel
 
 /// 偽のサーバー。試験ごとに別のホスト名を使い、受け取った要求を覚える。
 final class StubServer: @unchecked Sendable {
-  struct Seen: Sendable { let method: String; let path: String; let headers: [String: String]; let body: Data? }
+  struct Seen: Sendable { let method: String; let path: String; let headers: [String: String]; let body: Data?; var url: URL? = nil }
   typealias Handler = @Sendable (URLRequest, Int) -> (status: Int, body: String, headers: [String: String])
 
   private static let lock = NSLock()
@@ -23,6 +23,7 @@ final class StubServer: @unchecked Sendable {
 
   var baseURL: URL { URL(string: "https://\(host)")! }
   var seen: [Seen] { Self.lock.withLock { seenRequests } }
+  var seenURLs: [URLComponents] { seen.compactMap { $0.url.flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) } } }
 
   func session() -> URLSession {
     let configuration = URLSessionConfiguration.ephemeral
@@ -40,7 +41,7 @@ final class StubServer: @unchecked Sendable {
       body = data
     }
     let index: Int = lock.withLock {
-      server.seenRequests.append(Seen(method: request.httpMethod ?? "GET", path: request.url?.path ?? "", headers: request.allHTTPHeaderFields ?? [:], body: body))
+      server.seenRequests.append(Seen(method: request.httpMethod ?? "GET", path: request.url?.path ?? "", headers: request.allHTTPHeaderFields ?? [:], body: body, url: request.url))
       return server.seenRequests.count - 1
     }
     let reply = server.handler(request, index)
