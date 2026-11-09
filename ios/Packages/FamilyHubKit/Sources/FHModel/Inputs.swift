@@ -93,3 +93,108 @@ public struct EventUpdateInput: Encodable, Sendable, Hashable {
     try container.encode(recurrence, forKey: .recurrence)
   }
 }
+
+/// タスクの追加（todoInputSchema）。空の項目は送らない。
+public struct TodoInput: Codable, Sendable, Hashable {
+  public var title: String
+  public var dueAt: Rfc3339?
+  public var dueStartAt: Rfc3339?
+  public var assigneeMembershipId: Id
+  public var reviewerMembershipId: Id?
+  public var note: String?
+  public var priority: TodoPriority?
+  public var colorLabelId: Id?
+  public var recurrence: RecurrenceRule?
+  public var visibility: VisibilityInput?
+
+  public init(title: String, dueAt: Rfc3339? = nil, dueStartAt: Rfc3339? = nil, assigneeMembershipId: Id, reviewerMembershipId: Id? = nil, note: String? = nil, priority: TodoPriority? = nil, colorLabelId: Id? = nil, recurrence: RecurrenceRule? = nil, visibility: VisibilityInput? = nil) {
+    self.title = title; self.dueAt = dueAt; self.dueStartAt = dueStartAt; self.assigneeMembershipId = assigneeMembershipId
+    self.reviewerMembershipId = reviewerMembershipId; self.note = note; self.priority = priority; self.colorLabelId = colorLabelId
+    self.recurrence = recurrence; self.visibility = visibility
+  }
+}
+
+/// タスクの変更（todoUpdateSchema）。null（clear）は項目を外すことを表す。
+public struct TodoUpdateInput: Encodable, Sendable, Hashable {
+  public var title: String?
+  public var assigneeMembershipId: Id?
+  public var reviewerMembershipId: Patch<Id> = .keep
+  public var dueAt: Patch<Rfc3339> = .keep
+  public var dueStartAt: Patch<Rfc3339> = .keep
+  public var note: Patch<String> = .keep
+  public var priority: Patch<TodoPriority> = .keep
+  public var colorLabelId: Patch<Id> = .keep
+  public var visibility: VisibilityInput?
+  public var recurrence: Patch<RecurrenceRule> = .keep
+
+  public init() {}
+
+  private enum Keys: String, CodingKey {
+    case title, assigneeMembershipId, reviewerMembershipId, dueAt, dueStartAt, note, priority, colorLabelId, visibility, recurrence
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var container = encoder.container(keyedBy: Keys.self)
+    try container.encodeIfPresent(title, forKey: .title)
+    try container.encodeIfPresent(assigneeMembershipId, forKey: .assigneeMembershipId)
+    try container.encode(reviewerMembershipId, forKey: .reviewerMembershipId)
+    try container.encode(dueAt, forKey: .dueAt)
+    try container.encode(dueStartAt, forKey: .dueStartAt)
+    try container.encode(note, forKey: .note)
+    try container.encode(priority, forKey: .priority)
+    try container.encode(colorLabelId, forKey: .colorLabelId)
+    try container.encodeIfPresent(visibility, forKey: .visibility)
+    try container.encode(recurrence, forKey: .recurrence)
+  }
+}
+
+/// メモの追加（memoInputSchema）。メモの公開範囲に「参加者」はない。
+public struct MemoInput: Codable, Sendable, Hashable {
+  public var title: String
+  public var body: String
+  public var tags: [String]
+  public var place: PlaceRef?
+  public var memoDate: IsoDate?
+  public var ocrText: String?
+  public var visibility: VisibilityInput?
+
+  public init(title: String, body: String, tags: [String], place: PlaceRef? = nil, memoDate: IsoDate? = nil, ocrText: String? = nil, visibility: VisibilityInput? = nil) {
+    self.title = title; self.body = body; self.tags = tags; self.place = place; self.memoDate = memoDate; self.ocrText = ocrText; self.visibility = visibility
+  }
+}
+
+/// メモの変更（Partial<MemoInput>）。日付・場所・文字認識の結果は null で外せる。
+public struct MemoUpdateInput: Encodable, Sendable, Hashable {
+  public var title: String?
+  public var body: String?
+  public var tags: [String]?
+  public var memoDate: Patch<IsoDate> = .keep
+  public var place: Patch<PlaceRef> = .keep
+  public var ocrText: Patch<String> = .keep
+  public var visibility: VisibilityInput?
+
+  public init() {}
+
+  private enum Keys: String, CodingKey { case title, body, tags, memoDate, place, ocrText, visibility }
+
+  public func encode(to encoder: any Encoder) throws {
+    var container = encoder.container(keyedBy: Keys.self)
+    try container.encodeIfPresent(title, forKey: .title)
+    try container.encodeIfPresent(body, forKey: .body)
+    try container.encodeIfPresent(tags, forKey: .tags)
+    try container.encode(memoDate, forKey: .memoDate)
+    try container.encode(place, forKey: .place)
+    try container.encode(ocrText, forKey: .ocrText)
+    try container.encodeIfPresent(visibility, forKey: .visibility)
+  }
+}
+
+/// 添付を開くための短い期限のリンク（5分）。url はサーバーでは相対の道、見本では fh-sample://。
+public struct AttachmentLink: Codable, Sendable, Hashable {
+  public var url: String
+  public var expiresAt: Rfc3339
+  public init(url: String, expiresAt: Rfc3339) { self.url = url; self.expiresAt = expiresAt }
+}
+
+/// inline はアプリの中で見るため、attachment は保存のため（?download=1）。
+public enum AttachmentDisposition: String, Sendable, Hashable { case inline, attachment }

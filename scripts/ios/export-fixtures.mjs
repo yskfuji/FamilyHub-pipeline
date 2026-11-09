@@ -41,3 +41,15 @@ write('trash', await engine.value('trash', 'list'));
 const failure = await engine.call('events', 'updateEvent', 'event-school', 'series', { title: '学校公開' }, 99);
 if (failure.ok) throw new Error('version conflict expected');
 write('error.version', failure.error);
+
+// 段階 S3: タスクとメモの変更の応答。
+engine.reset('member-aoi', { auditHistory: true });
+write('todo.created', await engine.value('todos', 'createTodo', { title: '上履きを洗う', dueAt: '2026-10-02T20:00:00+09:00', dueStartAt: '2026-10-02T09:00:00+09:00', assigneeMembershipId: 'member-aoi', reviewerMembershipId: 'member-ren', note: '乾かす', priority: 'high', colorLabelId: 'label-school', visibility: { audience: 'household', selectedMembershipIds: [] } }));
+write('todo.waiting', await engine.value('todos', 'updateTodoStatus', 'todo-library', 'waiting', 1, '返却ポストに入れます'));
+// 繰り返しのタスクを完了にすると、完了した写しが返る。
+write('todo.recurringDone', await engine.value('todos', 'updateTodoStatus', 'todo-garbage', 'done', 1, '出しました'));
+const memo = await engine.value('memos', 'createMemo', { title: '持ち物', body: '体操服', tags: ['学校'], memoDate: '2026-10-01', visibility: { audience: 'selected', selectedMembershipIds: ['member-ren'] } });
+write('memo.created', memo);
+write('memo.attached', await engine.value('memos', 'uploadAttachment', memo.id, { name: '持ち物.pdf', type: 'application/pdf', size: 1200 }, 'fixture-key'));
+write('memo.ocr', await engine.value('memos', 'updateMemo', 'memo-school', { ocrText: '令和8年度 学校公開' }, 1));
+write('attachment.link', await engine.value('memos', 'getAttachmentLink', 'memo-school', 'attachment-school', 'inline'));

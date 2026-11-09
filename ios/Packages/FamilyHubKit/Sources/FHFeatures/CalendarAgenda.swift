@@ -176,13 +176,14 @@ struct DayEntriesView: View {
           Text("タスク").font(.headline).foregroundStyle(colors.ink.color).accessibilityAddTraits(.isHeader)
           ForEach(todos) { todo in
             HStack {
-              Image(systemName: todo.status == .done ? "checkmark.circle.fill" : "circle").foregroundStyle(todo.status == .done ? colors.success.color : colors.inkSoft.color).accessibilityHidden(true)
+              // 一覧と同じ丸いボタンで、その場で状態を進める（Web の DayPanel）。
+              InlineTodoButton(todo: todo)
               VStack(alignment: .leading, spacing: 2) {
                 Text(todo.title).font(.body.weight(.semibold)).foregroundStyle(colors.ink.color)
                 Text(taskStatusLabel(todo.status)).font(.caption.weight(.semibold)).foregroundStyle(colors.inkSoft.color)
               }
+              .accessibilityElement(children: .combine)
             }
-            .accessibilityElement(children: .combine)
           }
         }
         if !expenses.isEmpty {

@@ -44,6 +44,13 @@ struct FixtureRoundTripTests {
     try Self.roundTrip(GatewayError.self, "error.version")
   }
 
+  /// 段階 S3: タスクとメモの変更の応答。
+  @Test func contentResponses() throws {
+    for name in ["todo.created", "todo.waiting", "todo.recurringDone"] { try Self.roundTrip(Todo.self, name) }
+    for name in ["memo.created", "memo.attached", "memo.ocr"] { try Self.roundTrip(Memo.self, name) }
+    try Self.roundTrip(AttachmentLink.self, "attachment.link")
+  }
+
   @Test func viewersSeeDifferentRecords() throws {
     let owner = try JSONDecoder().decode(HouseholdSnapshot.self, from: Self.data("snapshot.member-aoi"))
     let child = try JSONDecoder().decode(HouseholdSnapshot.self, from: Self.data("snapshot.member-hana"))

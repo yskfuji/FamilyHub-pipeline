@@ -119,3 +119,23 @@ public enum Visibility {
     }
   }
 }
+
+extension Visibility {
+  /// 関わる人のうち、公開範囲の外になる人。記録が見えなくなるので、保存の前に知らせる。
+  public static func peopleOutside(_ relatedIds: [Id], audience: VisibilityAudience, selectedIds: [Id], memberships: [HouseholdMembership], creatorId: Id) -> [HouseholdMembership] {
+    func sees(_ member: HouseholdMembership) -> Bool {
+      let grown = member.role == .owner || member.role == .adult
+      if member.id == creatorId { return audience != .adults || grown }
+      if audience == .adults { return grown }
+      if audience == .creator { return false }
+      return audience != .selected || selectedIds.contains(member.id)
+    }
+    return memberships.filter { relatedIds.contains($0.id) && !sees($0) }
+  }
+
+  /// 公開範囲の説明。選択したメンバーの場合は名前も示す（src/features/shared/visibilityText.ts）。
+  public static func text(_ kind: SharedKind, _ visibility: VisibilityPolicy, nameOf: (Id) -> String) -> String {
+    guard visibility.audience == .selected else { return label(kind, visibility.audience) }
+    return "\(label(kind, .selected))（\(visibility.selectedMembershipIds.map(nameOf).joined(separator: "、"))）"
+  }
+}

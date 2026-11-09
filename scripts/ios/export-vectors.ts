@@ -390,3 +390,161 @@ write('formatRelative', pasts.map((input) => ({ input, expected: formatRelative(
     return { input: memberId, expected: rows.map((row) => ({ id: row.id, duplicate: row.duplicate, included: proposal.includedByDefault(row), time: proposal.proposalTimeText(row), input: row.kind === 'unknown' ? null : proposal.shiftEventInput(row, { memberId, workLabelId: 'label-work', offLabelId: '', audience: 'household', selectedIds: [] }) })) };
   }));
 }
+
+// ---- 段階 S3: タスク・メモ（一覧・状態の流れ・入力・添付） ----
+{
+  const { readFileSync } = await import('node:fs');
+  const taskList = await import('../../src/domain/taskList');
+  const flow = await import('../../src/domain/todoFlow');
+  const taskForm = await import('../../src/domain/taskForm');
+  const { taskActionLabel, taskActionAriaLabel } = await import('../../src/content/ja');
+  const { dueText } = await import('../../src/features/tasks/taskLabels');
+  const { audienceText } = await import('../../src/features/shared/visibilityText');
+  const { restoreDaysLeft } = await import('../../src/domain/restoreWindow');
+  const memoForm = await import('../../src/domain/memoForm');
+  const memoList = await import('../../src/domain/memoList');
+  const attachments = await import('../../src/domain/memoAttachments');
+  const { viewerKindOf } = await import('../../src/features/notes/attachmentKinds');
+  const { safeLinkUrl } = await import('../../src/features/notes/pdfOptions');
+  const { peopleOutsideAudience } = await import('../../src/domain/visibilityForm');
+  type Todo = import('../../src/domain/types').Todo;
+  type Memo = import('../../src/domain/types').Memo;
+  type Snapshot = import('../../src/domain/types').HouseholdSnapshot;
+  const fixture = (actor: string) => JSON.parse(readFileSync(`ios/Packages/FamilyHubKit/Tests/FHModelTests/Fixtures/snapshot.${actor}.json`, 'utf8')) as Snapshot;
+  const viewers = ['member-aoi', 'member-ren', 'member-hana', 'member-yui'].map((actor) => fixture(actor).viewer);
+  const aoi = fixture('member-aoi');
+
+  let seed = 20261101;
+  const random = () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const pick = <T,>(list: readonly T[]) => list[Math.floor(random() * list.length)];
+  const pad = (value: number) => String(value).padStart(2, '0');
+  const members = ['member-aoi', 'member-ren', 'member-hana', 'member-yui'];
+  const titles = ['提出物', 'ごみ出し', 'あいさつ状', '図書館', 'アルバム', '給食費', '歯医者の予約', 'プリント', 'Ａ４の紙', 'abc', 'ABC', '買い物'];
+  const statuses = ['open', 'doing', 'review', 'waiting', 'done'] as const;
+  const rules = ['FREQ=DAILY', 'FREQ=WEEKLY', 'FREQ=WEEKLY;BYDAY=TH', 'FREQ=MONTHLY', 'FREQ=MONTHLY;BYMONTHDAY=28,29,30,31;BYSETPOS=-1', 'FREQ=DAILY;INTERVAL=3', 'FREQ=WEEKLY;UNTIL=20261231', 'FREQ=DAILY;COUNT=3'];
+  const generated: Todo[] = [];
+  for (let index = 0; index < 60; index += 1) {
+    const day = addDateKeyDays('2026-09-25', Math.floor(random() * 20));
+    const due = random() < 0.8 ? `${day}T${pad(Math.floor(random() * 24))}:${pick(['00', '30', '15'])}:00+09:00` : undefined;
+    const start = due && random() < 0.25 ? `${addDateKeyDays(day, -pick([0, 1, 2]))}T09:00:00+09:00` : undefined;
+    const reviewer = random() < 0.4 ? pick(members) : undefined;
+    generated.push({
+      id: `t${pad(index)}`, householdId: 'house-mori', title: pick(titles), status: pick(statuses), assigneeMembershipId: pick(members), creatorMembershipId: pick(members), version: 1 + Math.floor(random() * 3),
+      ...(due ? { dueAt: random() < 0.1 ? new Date(Date.parse(due)).toISOString() : due } : {}), ...(start ? { dueStartAt: start } : {}), ...(reviewer ? { reviewerMembershipId: reviewer } : {}),
+      ...(random() < 0.3 ? { priority: pick(['low', 'normal', 'high'] as const) } : {}), ...(random() < 0.3 ? { colorLabelId: 'label-school' } : {}), ...(random() < 0.3 ? { note: pick([' メモ ', '持ち物あり']) } : {}),
+      ...(due && random() < 0.3 ? { recurrence: { rrule: pick(rules), timezone: 'Asia/Tokyo', exceptions: random() < 0.3 ? [addDateKeyDays(day, 7)] : [] } } : {}),
+      visibility: { audience: pick(['household', 'adults', 'participants', 'creator', 'selected'] as const), creatorMembershipId: 'member-aoi', selectedMembershipIds: random() < 0.5 ? ['member-ren'] : [] },
+    });
+  }
+  const todos = [...aoi.todos, ...generated];
+  write('taskTodos', todos);
+
+  // 一覧の絞り込みと並び順。
+  write('taskList', viewers.map((viewer) => ({
+    input: viewer.membershipId,
+    expected: { counts: taskList.taskCounts(todos, viewer.membershipId), filtered: Object.fromEntries(taskList.taskFilters.map((filter) => [filter, taskList.filterTasks(todos, filter, viewer.membershipId).map((todo) => todo.id)])) },
+  })));
+  write('taskFilters', ['open', 'mine', 'review', 'done', 'all', '', null].map((input) => ({ input, expected: { filter: taskList.parseTaskFilter(input), columns: taskList.taskColumns(taskList.parseTaskFilter(input)) } })));
+
+  // 状態の流れ。見る人（管理者・大人・子ども・ゲスト、止められた人）×タスク。
+  const stopped = { ...viewers[1], status: 'suspended' as const };
+  const flowViewers = [...viewers, stopped, { ...viewers[2], membershipId: 'member-hana' }];
+  write('todoFlow', flowViewers.flatMap((viewer, at) => todos.map((todo) => ({
+    input: { viewer: at, id: todo.id },
+    expected: { can: flow.canTransitionTodo(viewer, todo), flow: flow.todoFlowFor(todo, viewer), inline: flow.inlineTodoAction(todo, viewer) },
+  }))));
+  write('todoFlowViewers', flowViewers);
+  const actions = ['complete', 'request-review', 'confirm-done', 'start', 'wait', 'reset', 'reopen'] as const;
+  write('todoActionLabels', actions.flatMap((action) => statuses.map((status) => ({ input: { action, status }, expected: { label: taskActionLabel(action, status), aria: taskActionAriaLabel(action, status, '図書館の本を返す') } }))));
+
+  // 期限の表示。
+  const asOf = '2026-09-30T07:30:00+09:00';
+  write('taskDueText', todos.map((todo) => ({ input: todo.id, expected: dueText(todo, asOf) })));
+
+  // タスクの入力。
+  const drafts = todos.map((todo) => taskForm.todoToDraft(todo));
+  write('taskDrafts', todos.map((todo, index) => ({ input: todo.id, expected: { draft: drafts[index], problem: taskForm.taskDraftProblem(drafts[index], true), locked: taskForm.taskDraftProblem(drafts[index], false), create: taskForm.taskDraftToCreateInput(drafts[index]) } })));
+  const base = taskForm.newTaskDraft('2026-09-30', 'member-aoi', 'household');
+  write('newTaskDraft', base);
+  const variants: Array<[string, Partial<import('../../src/domain/taskForm').TaskDraft>]> = [
+    ['empty', {}], ['title', { title: '  提出物 ' }], ['no due', { title: 'a', end: '' }], ['bad start', { title: 'a', start: '2026-09-31T10:00' }], ['bad due', { title: 'a', end: '2026-09-30' }],
+    ['start only', { title: 'a', start: '2026-09-30T10:00', end: '' }], ['start after', { title: 'a', start: '2026-09-30T21:00' }], ['same', { title: 'a', start: '2026-09-30T20:00' }],
+    ['span', { title: 'a', start: '2026-09-28T09:00' }], ['selected none', { title: 'a', audience: 'selected' }], ['selected many', { title: 'a', audience: 'selected', selectedIds: ['1', '2', '3', '4', '5', '6', '7', '8', '9'] }],
+    ['weekly', { title: 'a', recurrence: 'weekly' }], ['weekly no due', { title: 'a', recurrence: 'weekly', end: '' }], ['every 0', { title: 'a', recurrence: 'every-n-days', intervalDays: 0 }],
+    ['until before', { title: 'a', recurrence: 'daily', until: '2026-09-01' }], ['keep', { title: 'a', recurrence: 'keep' }], ['month end', { title: 'a', recurrence: 'month-end', until: '2027-03-31' }],
+    ['full', { title: 'a', note: ' 持ち物 ', reviewerId: 'member-ren', priority: 'high', colorLabelId: 'label-school', audience: 'selected', selectedIds: ['member-ren'] }], ['low', { title: 'a', priority: 'low' }],
+  ];
+  write('taskDraftChecks', variants.map(([name, patch]) => {
+    const draft = { ...base, ...patch };
+    return { input: { name, draft }, expected: { problem: taskForm.taskDraftProblem(draft, true), locked: taskForm.taskDraftProblem(draft, false), create: taskForm.taskDraftToCreateInput(draft) } };
+  }));
+  const updates: unknown[] = [];
+  for (const original of todos.slice(0, 30)) {
+    const draft = taskForm.todoToDraft(original);
+    const edits: Array<[string, Partial<typeof draft>]> = [['same', {}], ['cleared', { note: '', reviewerId: '', colorLabelId: '', priority: 'normal', start: '' }], ['no due', { end: '', start: '' }], ['rule', { recurrence: 'daily' }], ['no rule', { recurrence: 'none' }], ['audience', { audience: 'creator' }], ['title', { title: ' 新しい名前 ', assigneeId: 'member-ren' }]];
+    for (const [name, edit] of edits) {
+      const changed = { ...draft, ...edit };
+      updates.push({ input: { id: original.id, name, draft: changed }, expected: { plain: taskForm.taskDraftToUpdateInput(changed, original, { recurrenceEditable: true }), locked: taskForm.taskDraftToUpdateInput(changed, original, { recurrenceEditable: false }) } });
+    }
+  }
+  write('taskUpdates', updates);
+  write('taskPeople', [['household', []], ['adults', []], ['creator', []], ['selected', ['member-ren']], ['selected', ['member-hana', 'member-aoi']], ['participants', []]].flatMap(([audience, selectedIds]) => [['member-aoi', 'member-hana'], ['member-hana', ''], ['member-sora', 'member-ren']].flatMap(([assigneeId, reviewerId]) => ['member-aoi', 'member-hana'].map((creator) => {
+    const draft = { ...base, assigneeId, reviewerId, audience: audience as 'household', selectedIds: selectedIds as string[] };
+    return { input: { draft, creator }, expected: { outside: taskForm.peopleOutsideVisibility(draft, aoi.memberships, creator).map((member) => member.id), raw: peopleOutsideAudience([assigneeId, reviewerId], audience as 'household', selectedIds as string[], aoi.memberships, creator).map((member) => member.id) } };
+  }))));
+  write('assignablePeople', [[], ['member-yui'], ['member-gone']].map((keep) => ({ input: keep, expected: taskForm.assignablePeople([...aoi.memberships, { ...aoi.memberships[1], id: 'member-gone', status: 'removed' }], keep).map((member) => member.id) })));
+  const names = (id: string) => aoi.memberships.find((member) => member.id === id)?.displayName ?? '';
+  write('audienceText', (['task', 'memo', 'event', 'expense', 'album'] as const).flatMap((kind) => [...aoi.todos.map((todo) => todo.visibility), ...aoi.memos.map((memo) => memo.visibility)].map((visibility) => ({ input: { kind, visibility }, expected: audienceText(kind, visibility, names) }))));
+  write('restoreWindow', ['2026-09-30T07:30:00+09:00', '2026-09-24T07:30:00+09:00', '2026-09-23T07:30:01+09:00', '2026-09-23T07:29:00+09:00', '2026-10-05T00:00:00+09:00', '2026-09-29T22:30:00Z'].map((deletedAt) => ({ input: deletedAt, expected: restoreDaysLeft(deletedAt, asOf) })));
+
+  // メモ。
+  const memos: Memo[] = [...aoi.memos];
+  for (let index = 0; index < 30; index += 1) {
+    const updated = `${addDateKeyDays('2026-09-20', Math.floor(random() * 12))}T${pad(Math.floor(random() * 24))}:${pad(Math.floor(random() * 60))}:00+09:00`;
+    memos.push({
+      id: `m${pad(index)}`, householdId: 'house-mori', title: pick(['連絡', 'お知らせ', 'Memo', 'レシート', '控え']), body: pick(['本文', 'Body TEXT', '持ち物：水筒']), updatedAt: random() < 0.2 ? new Date(Date.parse(updated)).toISOString() : updated,
+      authorMembershipId: pick(members), tags: random() < 0.5 ? [pick(['学校', '家計', 'School'])] : [], attachments: [], version: 1,
+      ...(random() < 0.4 ? { memoDate: addDateKeyDays('2026-09-20', Math.floor(random() * 12)) } : {}), ...(random() < 0.3 ? { ocrText: '教材 2,860円' } : {}),
+      ...(random() < 0.2 ? { place: { name: '青葉図書館', capturedVia: 'manual' as const, selectedAt: updated } } : {}),
+      visibility: { audience: pick(['household', 'adults', 'creator', 'selected'] as const), creatorMembershipId: 'member-aoi', selectedMembershipIds: random() < 0.5 ? ['member-ren'] : [] },
+    });
+  }
+  write('memos', memos);
+  write('memoSort', (['newest', 'oldest'] as const).map((sort) => ({ input: sort, expected: memoList.sortMemos(memos, sort).map((memo) => memo.id) })));
+  write('memoDateKeys', memos.map((memo) => ({ input: memo.id, expected: memoList.memoDateKey(memo) })));
+  write('memoSortParse', ['newest', 'oldest', '', null, 'OLDEST'].map((input) => ({ input, expected: memoList.parseMemoSort(input) })));
+  // 検索（NotesPage.tsx と同じ式）。
+  const matches = (memo: Memo, query: string) => [memo.title, memo.body, memo.ocrText ?? '', ...memo.tags, memo.place?.name ?? ''].join(' ').toLowerCase().includes(query.trim().toLowerCase());
+  write('memoSearch', ['', '学校', ' school ', 'body', '2,860', '図書館', 'ｍｅｍｏ', '体育館', 'なし'].map((query) => ({ input: query, expected: memos.filter((memo) => matches(memo, query)).map((memo) => memo.id) })));
+  write('memoTags', ['学校、今週, 家計 ,,', '', ' , 、 ', 'a,b,c,d,e,f,g,h,i,j,k', '学校　', '　全角の空白　,x'].map((input) => ({ input, expected: memoForm.parseTags(input) })));
+  const memoDrafts = memos.map((memo) => memoForm.memoToDraft(memo));
+  write('memoDrafts', memos.map((memo, index) => ({ input: memo.id, expected: { draft: memoDrafts[index], problem: memoForm.memoDraftProblem(memoDrafts[index]), create: memoForm.memoDraftToCreateInput(memoDrafts[index]) } })));
+  const memoBase = memoForm.newMemoDraft('2026-09-30', 'household');
+  write('newMemoDraft', memoBase);
+  const memoVariants: Array<[string, Partial<import('../../src/domain/memoForm').MemoDraft>]> = [
+    ['empty', {}], ['no body', { title: 'a' }], ['ok', { title: ' a ', body: ' b ' }], ['tags', { title: 'a', body: 'b', tags: 'a,b,c,d,e,f,g,h,i,j,k' }], ['ten tags', { title: 'a', body: 'b', tags: 'a,b,c,d,e,f,g,h,i,j' }],
+    ['no date', { title: 'a', body: 'b', memoDate: '' }], ['selected', { title: 'a', body: 'b', audience: 'selected' }], ['place', { title: 'a', body: 'b', place: { name: '公園', capturedVia: 'manual', selectedAt: asOf } }],
+  ];
+  write('memoDraftChecks', memoVariants.map(([name, patch]) => {
+    const draft = { ...memoBase, ...patch };
+    return { input: { name, draft }, expected: { problem: memoForm.memoDraftProblem(draft), create: memoForm.memoDraftToCreateInput(draft) } };
+  }));
+  const memoUpdates: unknown[] = [];
+  for (const original of memos.slice(0, 15)) {
+    const draft = memoForm.memoToDraft(original);
+    // 場所は Web では参照で比べる。同じ値を作り直したものは「変えた」ことになるので、ここでは元の値そのものか、別の値か、null だけを使う。
+    const edits: Array<[string, Partial<typeof draft>]> = [['same', {}], ['no date', { memoDate: '' }], ['date', { memoDate: '2026-10-02' }], ['no place', { place: null }], ['new place', { place: { name: '駅前', capturedVia: 'manual', selectedAt: asOf } }], ['audience', { audience: 'creator' }], ['tags', { tags: ' x 、y' }]];
+    for (const [name, edit] of edits) {
+      const changed = { ...draft, ...edit };
+      memoUpdates.push({ input: { id: original.id, name, draft: changed }, expected: memoForm.memoDraftToUpdateInput(changed, original) });
+    }
+  }
+  write('memoUpdates', memoUpdates);
+  write('attachmentProblems', [['a.pdf', 'application/pdf', 10], ['a.pdf', '', 10_000_000], ['a.pdf', '', 10_000_001], ['動画.MP4', '', 10_000_001], ['a.mp4', 'video/mp4', 120_000_001], ['a.mov', 'video/quicktime', 10], ['a.heic', '', 10], ['a', '', 1], ['a.JPG', '', 5], ['a.png', 'image/png', 10_000_001], ['.pdf', '', 1], ['a.txt', 'application/pdf', 1]].map(([name, type, size]) => ({ input: { name, type, size }, expected: attachments.attachmentProblem({ name: name as string, type: type as string, size: size as number }) })));
+  write('fileSizes', [0, 1, 12, 499, 500, 842310, 999_499, 999_500, 999_999, 1_000_000, 1_050_000, 1_150_000, 1_250_000, 1_284_300, 9_950_000, 10_000_000, 119_950_000, 120_000_000].map((input) => ({ input, expected: attachments.formatFileSize(input) })));
+  write('attachmentSmall', {
+    limits: attachments.attachmentLimitsText,
+    kinds: ['image/jpeg', 'image/png', 'video/mp4', 'application/pdf', 'video/quicktime', 'image/heic', 'text/html', ''].map((type) => [type, viewerKindOf(type)]),
+    links: ['https://example.com', 'https://Example.COM/a?b=c#d', 'http://example.com:80/x', 'https://example.com:443/', 'https://example.com:8443/a', 'javascript:alert(1)', 'file:///etc/passwd', 'data:text/html,a', 'mailto:a@example.com', 'not a url', 'ftp://example.com', ' https://example.com/a '].map((value) => [value, safeLinkUrl(value)]),
+  });
+}

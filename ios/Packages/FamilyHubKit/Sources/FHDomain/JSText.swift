@@ -167,6 +167,9 @@ extension String {
 
   var jsTrimmed: String { Account.jsTrim(self) }
 
+  /// JS の toLowerCase（言語に依らない小文字）。
+  var jsLowercased: String { lowercased() }
+
   /// JS の normalize('NFKC')。
   var nfkc: String { precomposedStringWithCompatibilityMapping }
 
@@ -182,5 +185,14 @@ extension Array where Element: Hashable {
   func uniqued() -> [Element] {
     var seen = Set<Element>()
     return filter { seen.insert($0).inserted }
+  }
+}
+
+/// String.prototype.localeCompare。ICU の照合で比べる（V8 も ICU）。locale を省くと node の既定（en-US）。
+public func jsLocaleCompare(_ a: String, _ b: String, locale: String = "en-US") -> Int {
+  switch a.compare(b, options: [], range: nil, locale: Locale(identifier: locale)) {
+  case .orderedAscending: -1
+  case .orderedDescending: 1
+  case .orderedSame: 0
   }
 }

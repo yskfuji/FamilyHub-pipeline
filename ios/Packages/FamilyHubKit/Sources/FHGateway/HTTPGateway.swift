@@ -101,10 +101,54 @@ public final class HTTPGateway: FamilyHubGateway {
   }
 
   // MARK: todos
+  public func createTodo(_ input: TodoInput, context: MutationContext?) async -> GatewayResult<Todo> {
+    await send(mutation(.json(.post, "/v1/todos", input), context))
+  }
+
+  public func updateTodo(id: Id, scope: RecurrenceScope, input: TodoUpdateInput, expectedVersion: Int, context: MutationContext?) async -> GatewayResult<Todo> {
+    await send(mutation(.json(.patch, "/v1/todos/\(id.uriComponent)", ScopedUpdateBody(scope: scope, input: input, expectedVersion: expectedVersion)), context))
+  }
+
+  public func deleteTodo(id: Id, expectedVersion: Int, scope: RecurrenceScope) async -> GatewayResult<Empty> {
+    await send(.init(.delete, "/v1/todos/\(id.uriComponent)?scope=\(scope.rawValue.formComponent)&expectedVersion=\(expectedVersion)", csrf: true))
+  }
+
+  public func restoreTodo(id: Id) async -> GatewayResult<Todo> { await send(.init(.post, "/v1/todos/\(id.uriComponent)/restore", csrf: true)) }
+
   public func updateTodoStatus(id: Id, status: TodoStatus, expectedVersion: Int, note: String?) async -> GatewayResult<Todo> {
     var body: [String: JSONValue] = ["status": .string(status.rawValue), "expectedVersion": .number(Double(expectedVersion))]
     if let note, !note.isEmpty { body["note"] = .string(note) }
     return await send(json(.patch, "/v1/todos/\(id.uriComponent)/status", body))
+  }
+
+  // MARK: memos
+  public func createMemo(_ input: MemoInput, context: MutationContext?) async -> GatewayResult<Memo> {
+    await send(mutation(.json(.post, "/v1/memos", input), context))
+  }
+
+  public func updateMemo(id: Id, input: MemoUpdateInput, expectedVersion: Int, context: MutationContext?) async -> GatewayResult<Memo> {
+    await send(mutation(.json(.patch, "/v1/memos/\(id.uriComponent)", MemoUpdateBody(input: input, expectedVersion: expectedVersion)), context))
+  }
+
+  public func uploadAttachment(memoId: Id, file: UploadFile, idempotencyKey: String) async -> GatewayResult<Memo> {
+    let form = MultipartForm(file: file)
+    return await send(.init(.post, "/v1/memos/\(memoId.uriComponent)/attachments", body: form.body, csrf: true, idempotencyKey: idempotencyKey, headers: ["Content-Type": form.contentType]))
+  }
+
+  public func getAttachmentLink(memoId: Id, attachmentId: Id, disposition: AttachmentDisposition) async -> GatewayResult<AttachmentLink> {
+    await send(.init(.get, "/v1/memos/\(memoId.uriComponent)/attachments/\(attachmentId.uriComponent)/link\(disposition == .attachment ? "?download=1" : "")"))
+  }
+
+  public func deleteAttachment(memoId: Id, attachmentId: Id) async -> GatewayResult<Empty> {
+    await send(.init(.delete, "/v1/memos/\(memoId.uriComponent)/attachments/\(attachmentId.uriComponent)", csrf: true))
+  }
+
+  public func deleteMemo(id: Id) async -> GatewayResult<Empty> { await send(.init(.delete, "/v1/memos/\(id.uriComponent)", csrf: true)) }
+  public func restoreMemo(id: Id) async -> GatewayResult<Memo> { await send(.init(.post, "/v1/memos/\(id.uriComponent)/restore", csrf: true)) }
+
+  /// 署名つきの相対の道を、同じセッション（cookie）で取る。
+  public func downloadAttachment(_ link: AttachmentLink, fileName: String) async -> GatewayResult<URL> {
+    await client.download(link.url, to: AttachmentFiles.destination(for: fileName))
   }
 
   // MARK: assistant
@@ -132,6 +176,19 @@ struct EventUpdateBody: Encodable, Sendable {
   var input: EventUpdateInput
   var expectedVersion: Int
   var occurrenceDate: IsoDate?
+}
+
+/// タスクの変更の本文（Web と同じ順と形）。
+struct ScopedUpdateBody<Input: Encodable & Sendable>: Encodable, Sendable {
+  var scope: RecurrenceScope
+  var input: Input
+  var expectedVersion: Int
+}
+
+/// メモの変更の本文。メモには繰り返しがないので scope はない。
+struct MemoUpdateBody: Encodable, Sendable {
+  var input: MemoUpdateInput
+  var expectedVersion: Int
 }
 
 /// file の欄を1つ持つ multipart/form-data（Web の FormData と同じ形）。

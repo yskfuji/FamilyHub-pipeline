@@ -38,6 +38,10 @@ final class FamilyHubUITests: XCTestCase {
     if UIDevice.current.userInterfaceIdiom == .phone {
       app.tabBars.buttons["予定"].tap()
       XCTAssertTrue(app.staticTexts["家族の予定"].waitForExistence(timeout: 5))
+      app.tabBars.buttons["タスク"].tap()
+      XCTAssertTrue(app.staticTexts["家族のタスク"].waitForExistence(timeout: 5))
+      app.tabBars.buttons["メモ"].tap()
+      XCTAssertTrue(app.staticTexts["家族のメモ"].waitForExistence(timeout: 5))
       app.tabBars.buttons["その他"].tap()
       XCTAssertTrue(app.buttons["アルバム"].waitForExistence(timeout: 5))
       app.buttons["設定"].tap()

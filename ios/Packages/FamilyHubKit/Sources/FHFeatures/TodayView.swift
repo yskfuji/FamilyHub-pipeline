@@ -259,6 +259,9 @@ struct NextCard: View {
   let digest: TodayDigest
   let number: String
   let open: (ShellTab) -> Void
+  /// そのタスクを開く（タスクの画面が受け取る）。
+  @Environment(AppModel.self) private var focusModel
+  private func openTask(_ id: Id) { focusModel.focus = .task(id); open(.tasks) }
 
   var body: some View {
     let me = snapshot.viewer.membershipId
@@ -273,7 +276,7 @@ struct NextCard: View {
         VStack(spacing: TokenSpace.space3) {
           if let review = digest.reviewTodo {
             Callout(systemImage: "exclamationmark.triangle", title: review.reviewerMembershipId == me ? "確認を頼まれたタスクがあります" : "確認待ちのタスクがあります", detail: "\(review.title) · 担当：\(name(review.assigneeMembershipId)) · 確認する人：\(name(review.reviewerMembershipId))") {
-              Button { open(.tasks) } label: { Label("タスクを確認", systemImage: "arrow.right") }.fhButton(.secondary)
+              Button { openTask(review.id) } label: { Label("タスクを確認", systemImage: "arrow.right") }.fhButton(.secondary)
             }
           }
           if digest.showWeather, let first = digest.affected.first {
@@ -283,14 +286,14 @@ struct NextCard: View {
           }
           if let upcoming = digest.upcoming {
             Callout(systemImage: "clock", title: "\(Format.time(upcoming.at)) \(upcoming.title)", detail: "次の\(upcoming.kind.rawValue) · \(upcoming.meta)", tone: .plain) {
-              Button { open(upcoming.kind == .event ? .calendar : .tasks) } label: { Label("開く", systemImage: "arrow.right") }
+              Button { upcoming.kind == .event ? open(.calendar) : openTask(upcoming.targetId) } label: { Label("開く", systemImage: "arrow.right") }
                 .fhButton(.secondary)
                 .accessibilityLabel("次の\(upcoming.kind.rawValue)「\(upcoming.title)」を開く")
             }
           }
           if let next = digest.nextTask {
             Callout(systemImage: "checkmark.circle", title: next.title, detail: "次のタスク · 期限 \(Format.due(next.dueAt, asOf: snapshot.context.asOf))", tone: .plain) {
-              Button { open(.tasks) } label: { Label("開く", systemImage: "arrow.right") }
+              Button { openTask(next.id) } label: { Label("開く", systemImage: "arrow.right") }
                 .fhButton(.secondary)
                 .accessibilityLabel("次のタスク「\(next.title)」を開く")
             }
@@ -307,6 +310,9 @@ struct TimelineCard: View {
   let digest: TodayDigest
   let number: String
   let open: (ShellTab) -> Void
+  /// そのタスクを開く（タスクの画面が受け取る）。
+  @Environment(AppModel.self) private var focusModel
+  private func openTask(_ id: Id) { focusModel.focus = .task(id); open(.tasks) }
 
   var body: some View {
     let asOf = TodayDigest.milliseconds(snapshot.context.asOf)
@@ -320,7 +326,7 @@ struct TimelineCard: View {
         TimeStripView(digest: digest)
         VStack(spacing: 0) {
           ForEach(digest.timeline) { item in
-            TodayRow(title: item.title, meta: "\(item.kind.rawValue) · \(item.meta)", past: TodayDigest.milliseconds(item.at) + item.minutes * 60_000 < asOf, openLabel: "\(item.title)を開く", action: { open(item.kind == .event ? .calendar : .tasks) }) {
+            TodayRow(title: item.title, meta: "\(item.kind.rawValue) · \(item.meta)", past: TodayDigest.milliseconds(item.at) + item.minutes * 60_000 < asOf, openLabel: "\(item.title)を開く", action: { item.kind == .event ? open(.calendar) : openTask(item.targetId) }) {
               Text(Format.time(item.at)).font(.callout.weight(.bold)).monospacedDigit().foregroundStyle(theme.colors.inkSoft.color).frame(minWidth: 48, alignment: .leading)
             }
             if item.id != digest.timeline.last?.id { Divider().overlay(theme.colors.line.color) }
@@ -392,6 +398,9 @@ struct DueCard: View {
   let digest: TodayDigest
   let number: String
   let open: (ShellTab) -> Void
+  /// そのタスクを開く（タスクの画面が受け取る）。
+  @Environment(AppModel.self) private var focusModel
+  private func openTask(_ id: Id) { focusModel.focus = .task(id); open(.tasks) }
 
   var body: some View {
     let asOf = snapshot.context.asOf
@@ -404,7 +413,7 @@ struct DueCard: View {
           ForEach(digest.mine) { todo in
             let overdue = todo.dueAt.map { TodayDigest.milliseconds($0) < TodayDigest.milliseconds(asOf) } ?? false
             let reviewer = todo.reviewerMembershipId.map { " · 確認する人 \(memberName(snapshot.memberships, $0))" } ?? ""
-            TodayRow(title: todo.title, meta: "\(overdue ? "期限切れ · " : "")\(Format.due(todo.dueAt, asOf: asOf))\(reviewer)", openLabel: "\(todo.title)を開く", action: { open(.tasks) }) {
+            TodayRow(title: todo.title, meta: "\(overdue ? "期限切れ · " : "")\(Format.due(todo.dueAt, asOf: asOf))\(reviewer)", openLabel: "\(todo.title)を開く", action: { openTask(todo.id) }) {
               Image(systemName: overdue ? "exclamationmark.circle" : "checkmark.circle").foregroundStyle((overdue ? theme.colors.danger : theme.colors.inkSoft).color).accessibilityHidden(true)
             }
             if todo.id != digest.mine.last?.id { Divider().overlay(theme.colors.line.color) }

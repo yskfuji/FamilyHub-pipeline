@@ -53,8 +53,52 @@ public final class SampleGateway: FamilyHubGateway {
   public func readEventUrl(_ url: String) async -> GatewayResult<AssistantJob> { await invoke(.readEventUrl, url) }
   public func getAssistantJob(id: Id) async -> GatewayResult<AssistantJob> { await invoke(.getAssistantJob, id) }
 
+  public func createTodo(_ input: TodoInput, context: MutationContext?) async -> GatewayResult<Todo> { await invoke(.createTodo, input, context) }
   public func updateTodoStatus(id: Id, status: TodoStatus, expectedVersion: Int, note: String?) async -> GatewayResult<Todo> {
     await invoke(.updateTodoStatus, id, status, expectedVersion, note)
+  }
+  public func updateTodo(id: Id, scope: RecurrenceScope, input: TodoUpdateInput, expectedVersion: Int, context: MutationContext?) async -> GatewayResult<Todo> {
+    await invoke(.updateTodo, id, scope, input, expectedVersion, context)
+  }
+  public func deleteTodo(id: Id, expectedVersion: Int, scope: RecurrenceScope) async -> GatewayResult<Empty> { await invoke(.deleteTodo, id, expectedVersion, scope) }
+  public func restoreTodo(id: Id) async -> GatewayResult<Todo> { await invoke(.restoreTodo, id) }
+
+  public func createMemo(_ input: MemoInput, context: MutationContext?) async -> GatewayResult<Memo> { await invoke(.createMemo, input, context) }
+  public func updateMemo(id: Id, input: MemoUpdateInput, expectedVersion: Int, context: MutationContext?) async -> GatewayResult<Memo> {
+    await invoke(.updateMemo, id, input, expectedVersion, context)
+  }
+  /// 見本は中身を見ないので、種類は送る側（端末）で正しく付ける。
+  public func uploadAttachment(memoId: Id, file: UploadFile, idempotencyKey: String) async -> GatewayResult<Memo> {
+    await invoke(.uploadAttachment, memoId, SampleFile(file), idempotencyKey)
+  }
+  public func getAttachmentLink(memoId: Id, attachmentId: Id, disposition: AttachmentDisposition) async -> GatewayResult<AttachmentLink> {
+    await invoke(.getAttachmentLink, memoId, attachmentId, disposition.rawValue)
+  }
+  public func deleteAttachment(memoId: Id, attachmentId: Id) async -> GatewayResult<Empty> { await invoke(.deleteAttachment, memoId, attachmentId) }
+  public func deleteMemo(id: Id) async -> GatewayResult<Empty> { await invoke(.deleteMemo, id) }
+  public func restoreMemo(id: Id) async -> GatewayResult<Memo> { await invoke(.restoreMemo, id) }
+
+  /// 見本の添付（fh-sample://<名前>）は、アプリに入れたファイルを写す。
+  public func downloadAttachment(_ link: AttachmentLink, fileName: String) async -> GatewayResult<URL> {
+    guard let source = Self.sampleFile(link.url) else { return .failure(AttachmentFiles.unavailable) }
+    let destination = AttachmentFiles.destination(for: fileName)
+    do {
+      let copy = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+      try FileManager.default.copyItem(at: source, to: copy)
+      try AttachmentFiles.place(copy, at: destination)
+      return .success(destination)
+    } catch {
+      return .failure(AttachmentFiles.unavailable)
+    }
+  }
+
+  /// fh-sample://sample-notice.pdf を、パッケージの samples/sample-notice.pdf にする。ほかの形は読まない。
+  public static func sampleFile(_ url: String) -> URL? {
+    let prefix = "fh-sample://"
+    guard url.hasPrefix(prefix) else { return nil }
+    let name = String(url.dropFirst(prefix.count))
+    guard !name.isEmpty, !name.contains("/"), !name.contains(".."), let dot = name.lastIndex(of: ".") else { return nil }
+    return Bundle.module.url(forResource: String(name[..<dot]), withExtension: String(name[name.index(after: dot)...]), subdirectory: "samples")
   }
 
   public func listNotifications() async -> GatewayResult<[HouseholdNotification]> { await invoke(.listNotifications) }

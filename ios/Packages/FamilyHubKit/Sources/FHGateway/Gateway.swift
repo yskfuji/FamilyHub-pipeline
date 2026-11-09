@@ -35,7 +35,24 @@ public protocol FamilyHubGateway: Sendable {
   func restoreEvent(id: Id, occurrenceDate: IsoDate?) async -> GatewayResult<CalendarEvent>
 
   // todos
+  func createTodo(_ input: TodoInput, context: MutationContext?) async -> GatewayResult<Todo>
+  /// note は状態を変えるときの一言。完了なら完了の一言、それ以外は引き継ぎの一言になる。
   func updateTodoStatus(id: Id, status: TodoStatus, expectedVersion: Int, note: String?) async -> GatewayResult<Todo>
+  func updateTodo(id: Id, scope: RecurrenceScope, input: TodoUpdateInput, expectedVersion: Int, context: MutationContext?) async -> GatewayResult<Todo>
+  func deleteTodo(id: Id, expectedVersion: Int, scope: RecurrenceScope) async -> GatewayResult<Empty>
+  func restoreTodo(id: Id) async -> GatewayResult<Todo>
+
+  // memos
+  func createMemo(_ input: MemoInput, context: MutationContext?) async -> GatewayResult<Memo>
+  func updateMemo(id: Id, input: MemoUpdateInput, expectedVersion: Int, context: MutationContext?) async -> GatewayResult<Memo>
+  /// 送り直しでも同じ idempotencyKey を使う（応答が届かなかったときに、添付が2つにならない）。
+  func uploadAttachment(memoId: Id, file: UploadFile, idempotencyKey: String) async -> GatewayResult<Memo>
+  func getAttachmentLink(memoId: Id, attachmentId: Id, disposition: AttachmentDisposition) async -> GatewayResult<AttachmentLink>
+  func deleteAttachment(memoId: Id, attachmentId: Id) async -> GatewayResult<Empty>
+  func deleteMemo(id: Id) async -> GatewayResult<Empty>
+  func restoreMemo(id: Id) async -> GatewayResult<Memo>
+  /// リンクの中身を、この端末の一時の場所（AttachmentFiles）に取る。Web にはない（ブラウザがリンクを直接開く）。
+  func downloadAttachment(_ link: AttachmentLink, fileName: String) async -> GatewayResult<URL>
 
   // assistant（読み取りの補助。結果は提案で、記録には何も保存しない）
   func getAssistantStatus() async -> GatewayResult<AssistantStatus>
@@ -72,7 +89,18 @@ public enum GatewayMethod: String, CaseIterable, Sendable {
   case updateEvent = "events.updateEvent"
   case deleteEvent = "events.deleteEvent"
   case restoreEvent = "events.restoreEvent"
+  case createTodo = "todos.createTodo"
   case updateTodoStatus = "todos.updateTodoStatus"
+  case updateTodo = "todos.updateTodo"
+  case deleteTodo = "todos.deleteTodo"
+  case restoreTodo = "todos.restoreTodo"
+  case createMemo = "memos.createMemo"
+  case updateMemo = "memos.updateMemo"
+  case uploadAttachment = "memos.uploadAttachment"
+  case getAttachmentLink = "memos.getAttachmentLink"
+  case deleteAttachment = "memos.deleteAttachment"
+  case deleteMemo = "memos.deleteMemo"
+  case restoreMemo = "memos.restoreMemo"
   case getAssistantStatus = "assistant.getStatus"
   case readEventImage = "assistant.readEventImage"
   case readEventUrl = "assistant.readEventUrl"

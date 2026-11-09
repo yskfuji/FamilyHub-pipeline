@@ -129,8 +129,9 @@ public struct Callout<Action: View>: View {
       HStack(alignment: .top, spacing: TokenSpace.space3) {
         Image(systemName: systemImage).foregroundStyle(colors.ink.color).accessibilityHidden(true)
         VStack(alignment: .leading, spacing: TokenSpace.space1) {
-          Text(title).font(.body.weight(.bold)).foregroundStyle(colors.ink.color)
-          if let detail { Text(detail).font(.footnote).foregroundStyle(colors.inkSoft.color) }
+          // 狭い幅でも途中で切らずに折り返す。
+          Text(title).font(.body.weight(.bold)).foregroundStyle(colors.ink.color).fixedSize(horizontal: false, vertical: true)
+          if let detail { Text(detail).font(.footnote).foregroundStyle(colors.inkSoft.color).fixedSize(horizontal: false, vertical: true) }
         }
         Spacer(minLength: 0)
       }

@@ -36,6 +36,9 @@ public final class AppModel {
   public var error: GatewayError?
   /// 短い知らせ（読み上げにも伝える）。
   public var toast: String?
+  /// ほかの画面から開きたいタスク・メモ。開く画面が受け取ったら nil に戻す。
+  public var focus: Focus?
+  public enum Focus: Hashable, Sendable { case task(Id), memo(Id) }
   public var reauth: ReauthPrompt?
   /// はじめに（家族グループの設定）を進めている間は、段階が active になっても最後まで見せる。
   public var onboarding = false
@@ -136,6 +139,9 @@ public final class AppModel {
   }
 
   private func clearHousehold() {
+    // 開くために取った添付のファイルは、サインアウトの後に残さない。
+    AttachmentFiles.clear()
+    focus = nil
     snapshot = nil
     privacy = nil
     notifications = []

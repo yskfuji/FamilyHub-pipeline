@@ -1,0 +1,21 @@
+{
+  "id": "memo-mock-3",
+  "householdId": "house-mori",
+  "title": "持ち物",
+  "body": "体操服",
+  "tags": [
+    "学校"
+  ],
+  "memoDate": "2026-10-01",
+  "updatedAt": "2026-09-30T07:45:00+09:00",
+  "authorMembershipId": "member-aoi",
+  "attachments": [],
+  "visibility": {
+    "audience": "selected",
+    "creatorMembershipId": "member-aoi",
+    "selectedMembershipIds": [
+      "member-ren"
+    ]
+  },
+  "version": 1
+}

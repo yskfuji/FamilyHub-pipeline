@@ -1,0 +1,20 @@
+{
+  "title": "上履きを洗う",
+  "dueAt": "2026-10-02T20:00:00+09:00",
+  "dueStartAt": "2026-10-02T09:00:00+09:00",
+  "assigneeMembershipId": "member-aoi",
+  "reviewerMembershipId": "member-ren",
+  "note": "乾かす",
+  "priority": "high",
+  "colorLabelId": "label-school",
+  "id": "todo-mock-1",
+  "householdId": "house-mori",
+  "status": "open",
+  "creatorMembershipId": "member-aoi",
+  "version": 1,
+  "visibility": {
+    "audience": "household",
+    "creatorMembershipId": "member-aoi",
+    "selectedMembershipIds": []
+  }
+}

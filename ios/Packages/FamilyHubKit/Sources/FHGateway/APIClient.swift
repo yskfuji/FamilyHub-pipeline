@@ -71,6 +71,27 @@ public actor APIClient {
     }
   }
 
+  /// 添付のファイルを取る。道は署名つきの相対の道（/v1/attachment-files/…）。同じセッションの cookie を使い、destination に置く。
+  public func download(_ path: String, to destination: URL) async -> GatewayResult<URL> {
+    guard let target = URL(string: path, relativeTo: baseURL)?.absoluteURL, target.host == baseURL.host, target.scheme == baseURL.scheme else {
+      return .failure(AttachmentFiles.unavailable)
+    }
+    var request = URLRequest(url: target)
+    request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+    do {
+      let (file, response) = try await session.download(for: request)
+      let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+      guard (200..<300).contains(status) else {
+        try? FileManager.default.removeItem(at: file)
+        return .failure(AttachmentFiles.unavailable)
+      }
+      try AttachmentFiles.place(file, at: destination)
+      return .success(destination)
+    } catch {
+      return .failure(GatewayFailure.offline)
+    }
+  }
+
   private func token(refresh: Bool) async throws -> String? {
     if let csrfToken, !refresh { return csrfToken }
     var request = URLRequest(url: url("/v1/auth/csrf"))

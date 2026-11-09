@@ -1,0 +1,16 @@
+{
+  "id": "todo-mock-2",
+  "householdId": "house-mori",
+  "title": "資源ごみをまとめる",
+  "dueAt": "2026-10-01T07:30:00+09:00",
+  "status": "done",
+  "assigneeMembershipId": "member-ren",
+  "creatorMembershipId": "member-aoi",
+  "version": 1,
+  "visibility": {
+    "audience": "adults",
+    "creatorMembershipId": "member-aoi",
+    "selectedMembershipIds": []
+  },
+  "completionNote": "出しました"
+}
