@@ -280,3 +280,17 @@
 | 段階的に見せる（方針） | 必須の項目を先に出し、任意の項目は「詳細」にまとめる | NN/g（B）、Cowan 2001（R。項目数の規則には使わない） |
 | 図表 | 位置か長さで表す。円グラフは使わない。直接ラベルを付ける。同じ内容の表を必ず添える。試験は `e2e/charts.spec.ts` の CHART-1〜9 と `src/design-system/charts/scale.test.ts`（結果は上の「B（図表）」） | Cleveland と McGill 1984（R）、Heer と Bostock 2010（R） |
 | 性能 | `dist-http` にサインインした状態で、主要5画面（今日・予定・家計・アルバム・メモ）を測る。LCP より前に読む JS の合計が gzip -6 で 150KB 以下。読む woff2 の合計が 400KB 以下。Lighthouse はモバイルと机の両方で、Performance 90 以上・Accessibility 100・Best Practices 100、LCP 2.5秒未満、CLS 0.1未満。nginx は `gzip_static on` にし、前もって圧縮したファイルを用意する | Lighthouse（O） |
+
+## C. iOS アプリ（iPhone と iPad）の合格基準
+
+アプリ（`ios/`）は、Web と同じ規則と文言で動くことを、次の自動の試験で判定する。流し方は `npm run verify:ios`（[docs/ios/README.md](../ios/README.md)）。使い方ごとの試験は `docs/verification/use-cases.json` の products の I に名指しし、`scripts/check-use-cases.mjs` が実在を確かめる。
+
+| 基準 | 判定する試験 |
+|---|---|
+| 計算が Web と同じ答えになる（祝日・月の表・繰り返し・カレンダーの配置・家計の精算・フォームの確かめ・パスワードの規則・シフト表・場所・通知の予定・役割の能力・変更の記録の条件・ヘルプの絞り込みなど） | `scripts/ios/export-vectors.ts` が本物の TS の関数で書いた入力と答えの組を、`ios/Packages/FamilyHubKit/Tests/FHDomainTests` が読んで照らす。組は `--check` で作り直して差分がないことを確かめる |
+| 型が Web とサーバーの JSON を読み書きできる | `scripts/ios/export-fixtures.mjs` の JSON を、`FHModelTests` が読んで書き戻し、同じになることを確かめる |
+| サーバーへの道と本文が Web と同じ | `FHGatewayTests`（偽の応答で道・本文・送らない項目と null・冪等の鍵・CSRF のやり直しを確かめる）。Gateway の関数が Web の FamilyHubGateway にあることも確かめる（`GatewayParityTests`） |
+| 見本のモードで、Web の見本と同じ規則で動く | `FHGatewayTests` の見本の試験（JavaScriptCore で Web の見本を動かす） |
+| 送れなかった変更が、暗号にして端末に置かれ、確かめてから送られる | `OfflineQueueTests`（平文が残らない・書き換えると読めない・24時間・50件）と `S8UITests#testOfflineChangeWaitsUntilSent` |
+| 主な画面がアクセシビリティの監査を通る（昼と夜、文字を最大にしたとき） | 各画面の UI の試験の `performAccessibilityAudit()`。除くのは `ios/UITests/Audit.swift` に理由を書いたものだけ |
+| 実機で動く | 段階ごとに開発用の署名で実機に入れて開く（`npm run ios:device`）。App Store での配布はまだ |

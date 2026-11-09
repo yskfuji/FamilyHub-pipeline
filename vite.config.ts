@@ -143,13 +143,17 @@ function bootPrefetch() {
   };
 }
 
+const lanCertificate = process.env.FAMILY_HUB_LAN_CERT && process.env.FAMILY_HUB_LAN_KEY
+  ? { cert: readFileSync(process.env.FAMILY_HUB_LAN_CERT), key: readFileSync(process.env.FAMILY_HUB_LAN_KEY) }
+  : undefined;
 const apiProxy = { '/v1': { target: process.env.FAMILY_HUB_API ?? 'http://127.0.0.1:8799', changeOrigin: false } };
 
 export default defineConfig(({ isSsrBuild }) => {
   const auditSurface = process.env.VITE_INCLUDE_AUDIT_SURFACE === 'true';
   const realStack = process.env.VITE_GATEWAY === 'http';
   return {
-  server: { proxy: apiProxy },
+  // npm run dev:lan（scripts/dev-lan.mjs）は、mkcert の証明書で https にして LAN に出す（iPhone のアプリから手元のサーバーにつなぐため）。
+  server: { proxy: apiProxy, ...(lanCertificate ? { https: lanCertificate } : {}) },
   preview: { proxy: apiProxy, ...(realStack ? { headers: deliveryHeaders() } : {}) },
   // public/ は画面の配信物で、API の出力先には入れない。
   ...(isSsrBuild ? { publicDir: false as const } : {}),

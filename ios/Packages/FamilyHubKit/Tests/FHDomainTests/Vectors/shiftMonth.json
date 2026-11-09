@@ -1,0 +1,1 @@
+[{"input":{"month":"2026-09","delta":1},"expected":"2026-10"},{"input":{"month":"2026-12","delta":1},"expected":"2027-01"},{"input":{"month":"2026-01","delta":-1},"expected":"2025-12"},{"input":{"month":"2026-09","delta":-21},"expected":"2024-12"},{"input":{"month":"2026-09","delta":40},"expected":"2030-01"}]

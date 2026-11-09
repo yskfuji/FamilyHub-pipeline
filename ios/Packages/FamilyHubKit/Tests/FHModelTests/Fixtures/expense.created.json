@@ -1,0 +1,31 @@
+{
+  "id": "expense-mock-1",
+  "householdId": "house-mori",
+  "kind": "expense",
+  "title": "上履き",
+  "amountJpy": 1001,
+  "incurredOn": "2026-09-30",
+  "payerMembershipId": "member-ren",
+  "creatorMembershipId": "member-ren",
+  "category": "shopping",
+  "settlements": [],
+  "shares": [
+    {
+      "membershipId": "member-ren",
+      "amountJpy": 601,
+      "settledJpy": 601
+    },
+    {
+      "membershipId": "member-aoi",
+      "amountJpy": 400,
+      "settledJpy": 0
+    }
+  ],
+  "visibility": {
+    "audience": "household",
+    "creatorMembershipId": "member-ren",
+    "selectedMembershipIds": []
+  },
+  "version": 1,
+  "note": "2足"
+}

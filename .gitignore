@@ -22,3 +22,10 @@ dist-server/
 *.db-wal
 *.db-shm
 dist-http/
+# iOS（ios/）。xcodegen の生成物、ビルドの置き場所、この Mac だけの設定、開発用の証明書。
+ios/*.xcodeproj/
+ios/build/
+ios/Config/Local.xcconfig
+ios/Packages/FamilyHubKit/.build/
+ios/Packages/FamilyHubKit/.swiftpm/
+.certs/

@@ -48,7 +48,8 @@
       "title": "サインインの維持、有効期限、無操作の終了、再サインイン、サインアウト",
       "products": [
         "B",
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -62,14 +63,18 @@
         "期限切れ",
         "無操作"
       ],
-      "recovery": "再ログインする"
+      "recovery": "再ログインする",
+      "tests": [
+        "ios/UITests/FamilyHubUITests.swift#testLiveServerSignInAndOut"
+      ]
     },
     {
       "id": "UC-A04",
       "title": "氏名、メール、パスワードの変更",
       "products": [
         "B",
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -83,7 +88,11 @@
         "本人確認失敗",
         "入力不正"
       ],
-      "recovery": "入力を保持して修正する"
+      "recovery": "入力を保持して修正する",
+      "tests": [
+        "ios/UITests/SettingsUITests.swift#testSecurityPasswordPasskeyAndSessions",
+        "ios/Packages/FamilyHubKit/Tests/FHGatewayTests/SettingsGatewayTests.swift#accountAndSecurity"
+      ]
     },
     {
       "id": "UC-A05",
@@ -149,7 +158,8 @@
       "id": "UC-A08",
       "title": "パスキー登録、代替パスワード、端末別セッション失効",
       "products": [
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -163,7 +173,11 @@
         "登録中断",
         "端末失効失敗"
       ],
-      "recovery": "再試行またはパスワードを使う"
+      "recovery": "再試行またはパスワードを使う",
+      "tests": [
+        "ios/UITests/SettingsUITests.swift#testSecurityPasswordPasskeyAndSessions",
+        "ios/Packages/FamilyHubKit/Tests/FHGatewayTests/SettingsGatewayTests.swift#PasskeyWireTests"
+      ]
     },
     {
       "id": "UC-H01",
@@ -187,7 +201,8 @@
       "title": "役割付き招待の作成、一覧、コピー、失効、期限と一回利用",
       "products": [
         "B",
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner"
@@ -199,7 +214,10 @@
         "期限切れ",
         "使用済み"
       ],
-      "recovery": "新しい招待を作る"
+      "recovery": "新しい招待を作る",
+      "tests": [
+        "ios/UITests/SettingsUITests.swift#testFamilyInvitePermissionsAndColorList"
+      ]
     },
     {
       "id": "UC-H03",
@@ -245,7 +263,8 @@
       "title": "役割変更、利用停止、再開、削除、最後の管理者保護",
       "products": [
         "B",
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner"
@@ -256,14 +275,18 @@
         "最終管理者",
         "版競合"
       ],
-      "recovery": "最新状態を確認する"
+      "recovery": "最新状態を確認する",
+      "tests": [
+        "ios/Packages/FamilyHubKit/Tests/FHGatewayTests/SettingsGatewayTests.swift#householdManagement"
+      ]
     },
     {
       "id": "UC-H06",
       "title": "個別権限の許可、拒否、初期化、権限revision競合",
       "products": [
         "B",
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner"
@@ -274,7 +297,11 @@
         "ロール上限",
         "権限改訂競合"
       ],
-      "recovery": "最新状態を読み直す"
+      "recovery": "最新状態を読み直す",
+      "tests": [
+        "ios/UITests/SettingsUITests.swift#testFamilyInvitePermissionsAndColorList",
+        "ios/Packages/FamilyHubKit/Tests/FHDomainTests/S7VectorTests.swift#overrides"
+      ]
     },
     {
       "id": "UC-H07",
@@ -322,7 +349,8 @@
       "title": "今日の要確認、予定、担当、未精算、天候影響の順次確認",
       "products": [
         "B",
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -335,14 +363,18 @@
       "failures": [
         "一部取得失敗"
       ],
-      "recovery": "失敗した領域だけ再読み込みする"
+      "recovery": "失敗した領域だけ再読み込みする",
+      "tests": [
+        "ios/UITests/FamilyHubUITests.swift#testTodayShowsTheSampleDay"
+      ]
     },
     {
       "id": "UC-D02",
       "title": "すぐに追加で予定、タスク、支出の入力値を保存",
       "products": [
         "B",
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -355,14 +387,18 @@
         "入力不正",
         "権限変更"
       ],
-      "recovery": "入力を保持して修正する"
+      "recovery": "入力を保持して修正する",
+      "tests": [
+        "ios/UITests/S6UITests.swift#testQuickAddATask"
+      ]
     },
     {
       "id": "UC-C01",
       "title": "月、週、一覧、日付移動、祝日、終日と複数日の表示",
       "products": [
         "B",
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -375,14 +411,18 @@
       "failures": [
         "祝日取得失敗"
       ],
-      "recovery": "予定表示を維持する"
+      "recovery": "予定表示を維持する",
+      "tests": [
+        "ios/UITests/CalendarUITests.swift#testEveryViewShowsTheSampleWeek"
+      ]
     },
     {
       "id": "UC-C02",
       "title": "予定作成、参加者、公開範囲、場所、通知、天候影響",
       "products": [
         "B",
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -395,7 +435,10 @@
         "入力不正",
         "共有相手不正"
       ],
-      "recovery": "入力を保持して修正する"
+      "recovery": "入力を保持して修正する",
+      "tests": [
+        "ios/UITests/CalendarUITests.swift#testAddAndEditAnEvent"
+      ]
     },
     {
       "id": "UC-C03",
@@ -421,7 +464,8 @@
       "title": "予定の版競合、論理削除、7日以内の復元",
       "products": [
         "B",
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -434,7 +478,10 @@
         "版競合",
         "復元期限超過"
       ],
-      "recovery": "最新状態を確認する"
+      "recovery": "最新状態を確認する",
+      "tests": [
+        "ios/UITests/CalendarUITests.swift#testDeleteOneOccurrenceAndRestoreIt"
+      ]
     },
     {
       "id": "UC-C05",
@@ -462,7 +509,8 @@
       "title": "タスク一覧と担当、確認、完了状態による絞り込み",
       "products": [
         "B",
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -476,14 +524,18 @@
         "0件",
         "取得失敗"
       ],
-      "recovery": "条件変更または再読み込み"
+      "recovery": "条件変更または再読み込み",
+      "tests": [
+        "ios/UITests/TasksUITests.swift#testFiltersAndTheInlineCheck"
+      ]
     },
     {
       "id": "UC-T02",
       "title": "タスク作成、担当者、確認する人、期限、優先度、公開範囲",
       "products": [
         "B",
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -496,14 +548,18 @@
         "入力不正",
         "担当者不正"
       ],
-      "recovery": "入力を保持して修正する"
+      "recovery": "入力を保持して修正する",
+      "tests": [
+        "ios/UITests/TasksUITests.swift#testAddRequestReviewAndEdit"
+      ]
     },
     {
       "id": "UC-T03",
       "title": "着手、確認待ち、完了、再開の状態遷移",
       "products": [
         "B",
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -516,14 +572,18 @@
         "不正遷移",
         "競合"
       ],
-      "recovery": "現在状態を読み直す"
+      "recovery": "現在状態を読み直す",
+      "tests": [
+        "ios/UITests/TasksUITests.swift#testAddRequestReviewAndEdit"
+      ]
     },
     {
       "id": "UC-T04",
       "title": "繰り返しタスクの編集、競合、論理削除、復元",
       "products": [
         "B",
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -536,14 +596,18 @@
         "版競合",
         "復元期限超過"
       ],
-      "recovery": "最新状態を確認する"
+      "recovery": "最新状態を確認する",
+      "tests": [
+        "ios/UITests/TasksUITests.swift#testDeleteAndRestore"
+      ]
     },
     {
       "id": "UC-M01",
       "title": "メモ作成、編集、検索、並び替え、公開範囲",
       "products": [
         "B",
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -556,14 +620,19 @@
         "入力不正",
         "検索失敗"
       ],
-      "recovery": "入力保持または再検索"
+      "recovery": "入力保持または再検索",
+      "tests": [
+        "ios/UITests/NotesUITests.swift#testSearchFindsTheReceipt",
+        "ios/UITests/NotesUITests.swift#testAddEditDeleteAndRestore"
+      ]
     },
     {
       "id": "UC-M02",
       "title": "メモの論理削除、復元、私的内容の非開示",
       "products": [
         "B",
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -577,7 +646,10 @@
         "共有範囲外",
         "復元期限超過"
       ],
-      "recovery": "存在を明かさず安全に戻る"
+      "recovery": "存在を明かさず安全に戻る",
+      "tests": [
+        "ios/UITests/NotesUITests.swift#testAddEditDeleteAndRestore"
+      ]
     },
     {
       "id": "UC-M03",
@@ -605,7 +677,8 @@
       "title": "OCR、原本との照合、文字修正、添付取得と削除",
       "products": [
         "B",
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -618,14 +691,18 @@
         "認識失敗",
         "取得失敗"
       ],
-      "recovery": "手入力または再試行"
+      "recovery": "手入力または再試行",
+      "tests": [
+        "ios/UITests/NotesUITests.swift#testCorrectTheRecognizedText"
+      ]
     },
     {
       "id": "UC-B01",
       "title": "月次一覧、収入、支出、カテゴリ、純額",
       "products": [
         "B",
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -636,14 +713,18 @@
       "failures": [
         "取得失敗"
       ],
-      "recovery": "再読み込みする"
+      "recovery": "再読み込みする",
+      "tests": [
+        "ios/UITests/BudgetUITests.swift#testEveryViewShowsTheSampleMonth"
+      ]
     },
     {
       "id": "UC-B02",
       "title": "支出と収入の作成、立替者、分担額、編集、削除",
       "products": [
         "B",
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -655,14 +736,18 @@
         "合計不一致",
         "本人確認不足"
       ],
-      "recovery": "入力を保持して修正する"
+      "recovery": "入力を保持して修正する",
+      "tests": [
+        "ios/UITests/BudgetUITests.swift#testAddAnExpenseSplitEqually"
+      ]
     },
     {
       "id": "UC-B03",
       "title": "精算記録、二重精算拒否、反対記録による取消",
       "products": [
         "B",
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -674,7 +759,10 @@
         "二重精算",
         "競合"
       ],
-      "recovery": "反対記録を追加する"
+      "recovery": "反対記録を追加する",
+      "tests": [
+        "ios/UITests/BudgetUITests.swift#testSettleAndUndo"
+      ]
     },
     {
       "id": "UC-B04",
@@ -755,7 +843,8 @@
       "title": "権限内の横断検索、0件、読込失敗、再試行",
       "products": [
         "B",
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -769,14 +858,18 @@
         "0件",
         "取得失敗"
       ],
-      "recovery": "条件変更または再試行"
+      "recovery": "条件変更または再試行",
+      "tests": [
+        "ios/UITests/S6UITests.swift#testSearchOpensAMemo"
+      ]
     },
     {
       "id": "UC-S02",
       "title": "インサイトの根拠、対象データ、遷移、任意実行",
       "products": [
         "B",
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -788,13 +881,17 @@
         "根拠不足",
         "古い情報"
       ],
-      "recovery": "元データへ戻る"
+      "recovery": "元データへ戻る",
+      "tests": [
+        "ios/UITests/S6UITests.swift#testInsightsOpenTheirTargets"
+      ]
     },
     {
       "id": "UC-N01",
       "title": "通知一覧、既読、30分延期、停止、再開、通知設定",
       "products": [
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -808,14 +905,18 @@
         "オフライン",
         "権限変更"
       ],
-      "recovery": "オンライン復帰後に再試行"
+      "recovery": "オンライン復帰後に再試行",
+      "tests": [
+        "ios/UITests/S6UITests.swift#testNotificationsSnoozeStopAndResume"
+      ]
     },
     {
       "id": "UC-P01",
       "title": "テーマ、文字拡大、動きの低減、色ラベル",
       "products": [
         "B",
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -828,14 +929,19 @@
       "failures": [
         "保存失敗"
       ],
-      "recovery": "現在表示を維持する"
+      "recovery": "現在表示を維持する",
+      "tests": [
+        "ios/UITests/SettingsUITests.swift#testPrivacyLocationAndDisplay",
+        "ios/UITests/SettingsUITests.swift#testFamilyInvitePermissionsAndColorList"
+      ]
     },
     {
       "id": "UC-P02",
       "title": "ロール別ナビゲーション、設定、空状態、安全な戻り先",
       "products": [
         "B",
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -849,7 +955,10 @@
         "直接URL",
         "権限変更"
       ],
-      "recovery": "カレンダーへ戻る"
+      "recovery": "カレンダーへ戻る",
+      "tests": [
+        "ios/UITests/FamilyHubUITests.swift#testTabsOpenEveryArea"
+      ]
     },
     {
       "id": "UC-P03",
@@ -897,7 +1006,8 @@
       "title": "安全な作成と更新だけを暗号化下書きへ保存し確認後に再送",
       "products": [
         "B",
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -911,7 +1021,11 @@
         "件数上限",
         "権限喪失"
       ],
-      "recovery": "修正または破棄"
+      "recovery": "修正または破棄",
+      "tests": [
+        "ios/UITests/S8UITests.swift#testOfflineChangeWaitsUntilSent",
+        "ios/Packages/FamilyHubKit/Tests/FHGatewayTests/OfflineQueueTests.swift#storesEncryptedAndReadsBack"
+      ]
     },
     {
       "id": "UC-F03",
@@ -938,7 +1052,8 @@
       "title": "二重送信防止、冪等キー、通信中断、再実行",
       "products": [
         "B",
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -951,7 +1066,10 @@
         "通信中断",
         "冪等キー不一致"
       ],
-      "recovery": "同じキーで結果を照会する"
+      "recovery": "同じキーで結果を照会する",
+      "tests": [
+        "ios/Packages/FamilyHubKit/Tests/FHGatewayTests/ExpenseGatewayTests.swift#StableBodyTests"
+      ]
     },
     {
       "id": "UC-F05",
@@ -998,7 +1116,8 @@
       "title": "キーボード、VoiceOver、フォーカス、ズーム、長い日本語",
       "products": [
         "B",
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -1013,14 +1132,18 @@
         "名称不足",
         "順序不正"
       ],
-      "recovery": "欠陥として記録し修正する"
+      "recovery": "欠陥として記録し修正する",
+      "tests": [
+        "ios/UITests/S8UITests.swift#testLargestTextKeepsTheAudit"
+      ]
     },
     {
       "id": "UC-X02",
       "title": "320から1920px、明暗、空、エラー、全ロールの光学確認",
       "products": [
         "B",
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -1035,7 +1158,11 @@
         "重なり",
         "意図しない横スクロール"
       ],
-      "recovery": "原因箇所を修正して再撮影する"
+      "recovery": "原因箇所を修正して再撮影する",
+      "tests": [
+        "ios/UITests/FamilyHubUITests.swift#testNightThemeKeepsTheAudit",
+        "ios/UITests/SettingsUITests.swift#testSettingsKeepTheAuditAtNight"
+      ]
     },
     {
       "id": "UC-L01",
@@ -1081,7 +1208,8 @@
       "id": "UC-L03",
       "title": "名前で探す、または手入力で場所を付ける",
       "products": [
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -1094,7 +1222,10 @@
         "外部サービスの停止・混雑",
         "オフライン"
       ],
-      "recovery": "手入力はオフラインでも使え、外部の状態に依存しない"
+      "recovery": "手入力はオフラインでも使え、外部の状態に依存しない",
+      "tests": [
+        "ios/UITests/S6UITests.swift#testMemoGetsAManualPlace"
+      ]
     },
     {
       "id": "UC-L04",
@@ -1159,7 +1290,8 @@
       "id": "UC-H09",
       "title": "家族グループの名前を設定・変更する",
       "products": [
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner"
@@ -1170,13 +1302,18 @@
         "空・長すぎる名前",
         "管理者以外の変更"
       ],
-      "recovery": "入力を保持して理由を示す"
+      "recovery": "入力を保持して理由を示す",
+      "tests": [
+        "ios/Packages/FamilyHubKit/Tests/FHGatewayTests/SettingsGatewayTests.swift#householdManagement",
+        "ios/Packages/FamilyHubKit/Tests/FHDomainTests/S7VectorTests.swift#nameChanges"
+      ]
     },
     {
       "id": "UC-C06",
       "title": "繰り返し予定の1回だけ・これ以降・すべてを変更・削除する",
       "products": [
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -1189,7 +1326,10 @@
         "対象の回が存在しない",
         "版の競合"
       ],
-      "recovery": "回を選び直す、最新の内容を確認して再度変更する"
+      "recovery": "回を選び直す、最新の内容を確認して再度変更する",
+      "tests": [
+        "ios/UITests/CalendarUITests.swift#testDeleteOneOccurrenceAndRestoreIt"
+      ]
     },
     {
       "id": "UC-B06",
@@ -1213,7 +1353,8 @@
       "id": "UC-B07",
       "title": "支出を編集・削除・復元する",
       "products": [
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -1225,13 +1366,17 @@
         "精算がある支出の金額変更・削除",
         "版の競合"
       ],
-      "recovery": "先に精算を取り消すよう案内する"
+      "recovery": "先に精算を取り消すよう案内する",
+      "tests": [
+        "ios/UITests/BudgetUITests.swift#testDeleteAndRestore"
+      ]
     },
     {
       "id": "UC-S03",
       "title": "今使っている端末からサインアウトする",
       "products": [
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -1244,13 +1389,17 @@
       "failures": [
         "通信の失敗"
       ],
-      "recovery": "理由を示し、もう一度試せる"
+      "recovery": "理由を示し、もう一度試せる",
+      "tests": [
+        "ios/UITests/FamilyHubUITests.swift#testLiveServerSignInAndOut"
+      ]
     },
     {
       "id": "UC-P04",
       "title": "共有範囲の初期値と通知の表示を設定画面で変える",
       "products": [
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -1263,13 +1412,17 @@
       "failures": [
         "保存の失敗"
       ],
-      "recovery": "現在の設定を保持して理由を示す。ほかの設定は上書きしない"
+      "recovery": "現在の設定を保持して理由を示す。ほかの設定は上書きしない",
+      "tests": [
+        "ios/UITests/SettingsUITests.swift#testPrivacyLocationAndDisplay"
+      ]
     },
     {
       "id": "UC-L06",
       "title": "記録した場所をまとめて確認し、支出・メモへ移る",
       "products": [
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -1284,7 +1437,10 @@
         "権限なし",
         "該当なし"
       ],
-      "recovery": "場所の付け方を案内する、権限の案内を表示する"
+      "recovery": "場所の付け方を案内する、権限の案内を表示する",
+      "tests": [
+        "ios/UITests/S6UITests.swift#testPlacesListTheSampleRecords"
+      ]
     },
     {
       "id": "UC-A10",
@@ -1308,7 +1464,8 @@
       "id": "UC-A11",
       "title": "メールアドレスの変更（本人再確認と変更の知らせ）",
       "products": [
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -1322,13 +1479,17 @@
         "本人確認切れ",
         "使えないアドレス"
       ],
-      "recovery": "本人確認をしてやり直す"
+      "recovery": "本人確認をしてやり直す",
+      "tests": [
+        "ios/Packages/FamilyHubKit/Tests/FHGatewayTests/SettingsGatewayTests.swift#accountAndSecurity"
+      ]
     },
     {
       "id": "UC-A12",
       "title": "確認コードの設定、回復コード、解除",
       "products": [
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -1342,7 +1503,10 @@
         "コードの誤り",
         "同じコードの再利用"
       ],
-      "recovery": "回復コードを使う"
+      "recovery": "回復コードを使う",
+      "tests": [
+        "ios/UITests/SettingsUITests.swift#testAccountNameAndVerificationCode"
+      ]
     },
     {
       "id": "UC-A13",
@@ -1401,7 +1565,8 @@
       "id": "UC-H11",
       "title": "家族グループからの退出（管理者が2人以上なら管理者も）と、最後の管理者の保護",
       "products": [
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -1419,7 +1584,8 @@
         "e2e/features.spec.ts#S9-LEAVE-1",
         "e2e/features.spec.ts#S9-LEAVE-2",
         "src/data/gateway.suite.ts#lets an owner promote only a declared adult, and lets one of two owners leave",
-        "src/domain/householdLimits.test.ts#lets an owner leave only while another active owner remains"
+        "src/domain/householdLimits.test.ts#lets an owner leave only while another active owner remains",
+        "ios/Packages/FamilyHubKit/Tests/FHDomainTests/S7VectorTests.swift#leave"
       ]
     },
     {
@@ -1462,7 +1628,8 @@
       "id": "UC-T05",
       "title": "5つの状態、次の行動、その場で完了、コメント、並べ替え",
       "products": [
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -1475,7 +1642,10 @@
         "権限なし",
         "版の競合"
       ],
-      "recovery": "読み直して操作する"
+      "recovery": "読み直して操作する",
+      "tests": [
+        "ios/UITests/TasksUITests.swift#testFiltersAndTheInlineCheck"
+      ]
     },
     {
       "id": "UC-M05",
@@ -1637,7 +1807,8 @@
       "id": "UC-S04",
       "title": "最近削除した項目の一覧と7日以内の復元",
       "products": [
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -1650,13 +1821,18 @@
         "期限切れ",
         "権限なし"
       ],
-      "recovery": "期限内なら一覧から戻す"
+      "recovery": "期限内なら一覧から戻す",
+      "tests": [
+        "ios/UITests/SettingsUITests.swift#testHelpOpensTheRelatedSettings",
+        "ios/Packages/FamilyHubKit/Tests/FHGatewayTests/SettingsGatewayTests.swift#trashAndAudit"
+      ]
     },
     {
       "id": "UC-G01",
       "title": "アルバムの作成、名前の変更、削除、復元",
       "products": [
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -1669,13 +1845,17 @@
         "権限なし",
         "版の競合"
       ],
-      "recovery": "読み直して操作する"
+      "recovery": "読み直して操作する",
+      "tests": [
+        "ios/UITests/AlbumsUITests.swift#testCreateEditDeleteAndRestore"
+      ]
     },
     {
       "id": "UC-G02",
       "title": "写真と動画の複数アップロード、待ち行列、中断からの再開",
       "products": [
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -1689,7 +1869,10 @@
         "形式の拒否",
         "容量の超過"
       ],
-      "recovery": "再試行する、または形式を変える"
+      "recovery": "再試行する、または形式を変える",
+      "tests": [
+        "ios/Packages/FamilyHubKit/Tests/FHGatewayTests/AlbumGatewayTests.swift#UploadServer"
+      ]
     },
     {
       "id": "UC-G03",
@@ -1715,7 +1898,8 @@
       "id": "UC-G04",
       "title": "ビューア、スライドショー、BGM の合成、ピクチャーインピクチャー",
       "products": [
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -1728,13 +1912,17 @@
       "failures": [
         "対応していないブラウザ"
       ],
-      "recovery": "一覧から1件ずつ開く"
+      "recovery": "一覧から1件ずつ開く",
+      "tests": [
+        "ios/UITests/AlbumsUITests.swift#testSlideshowPlaysMusic"
+      ]
     },
     {
       "id": "UC-G05",
       "title": "並べ替え、1件の削除と復元、端末への保存",
       "products": [
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -1747,13 +1935,17 @@
         "権限なし",
         "保存の失敗"
       ],
-      "recovery": "もう一度操作する"
+      "recovery": "もう一度操作する",
+      "tests": [
+        "ios/UITests/AlbumsUITests.swift#testOrganizeMovesAndSetsTheCover"
+      ]
     },
     {
       "id": "UC-E01",
       "title": "シフト表の文字の貼り付け、時刻規則の編集、一括保存",
       "products": [
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -1766,7 +1958,10 @@
         "読み取れない行",
         "時刻規則の不足"
       ],
-      "recovery": "行を直す、規則を足す"
+      "recovery": "行を直す、規則を足す",
+      "tests": [
+        "ios/UITests/CalendarUITests.swift#testShiftReaderSavesTheCheckedRows"
+      ]
     },
     {
       "id": "UC-E02",
@@ -1871,7 +2066,8 @@
       "id": "UC-Y02",
       "title": "5つのテーマと昼夜、密度、季節の挿絵",
       "products": [
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -1884,7 +2080,10 @@
       "failures": [
         "保存できないブラウザ"
       ],
-      "recovery": "既定の見た目のまま使う"
+      "recovery": "既定の見た目のまま使う",
+      "tests": [
+        "ios/UITests/SettingsUITests.swift#testPrivacyLocationAndDisplay"
+      ]
     },
     {
       "id": "UC-Y03",
@@ -1909,7 +2108,8 @@
       "id": "UC-Y04",
       "title": "ヘルプの検索と規約の草案の表示",
       "products": [
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -1922,7 +2122,10 @@
       "failures": [
         "該当なし"
       ],
-      "recovery": "検索語を変える"
+      "recovery": "検索語を変える",
+      "tests": [
+        "ios/UITests/SettingsUITests.swift#testHelpOpensTheRelatedSettings"
+      ]
     },
     {
       "id": "UC-O01",
@@ -1979,7 +2182,8 @@
       "id": "UC-A15",
       "title": "自分のアカウントの記録（サインイン、パスワード・メール・確認コードの変更、パスキーの登録、ほかの端末のサインアウト）を見る",
       "products": [
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -1997,14 +2201,16 @@
       "tests": [
         "e2e/features.spec.ts#S9-AUDIT-3",
         "src/data/gateway.suite.ts#change record (A5)",
-        "server/test/audit.test.ts#the record API (A5)"
+        "server/test/audit.test.ts#the record API (A5)",
+        "ios/UITests/SettingsUITests.swift#testAuditFiltersAndOwnRecord"
       ]
     },
     {
       "id": "UC-H13",
       "title": "家族の変更の記録を人・種類・期間で絞って見る。見られない記録は伏せる。改ざんの確認の結果を見る",
       "products": [
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner"
@@ -2022,7 +2228,9 @@
         "e2e/features.spec.ts#S9-AUDIT-2",
         "e2e/features.spec.ts#S9-AUDIT-4",
         "src/data/gateway.suite.ts#change record (A5)",
-        "src/domain/auditView.test.ts#describe("
+        "src/domain/auditView.test.ts#describe(",
+        "ios/UITests/SettingsUITests.swift#testAuditFiltersAndOwnRecord",
+        "ios/Packages/FamilyHubKit/Tests/FHDomainTests/S7VectorTests.swift#AuditViewVectorTests"
       ]
     },
     {
@@ -2051,7 +2259,8 @@
       "id": "UC-M06",
       "title": "メモの添付（画像・MP4・PDF）をアプリの中で開き、別のボタンで端末に保存する",
       "products": [
-        "F"
+        "F",
+        "I"
       ],
       "roles": [
         "owner",
@@ -2074,7 +2283,8 @@
         "e2e/features.spec.ts#S9-VIEW-3",
         "e2e/features.spec.ts#S9-VIEW-4",
         "e2e/features.spec.ts#S9-VIEW-5",
-        "e2e/real/tasks-notes.spec.ts#S9-REAL-VIEW"
+        "e2e/real/tasks-notes.spec.ts#S9-REAL-VIEW",
+        "ios/UITests/NotesUITests.swift#testAttachmentsOpenInTheApp"
       ]
     },
     {

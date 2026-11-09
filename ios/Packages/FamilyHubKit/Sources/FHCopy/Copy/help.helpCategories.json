@@ -1,0 +1,18 @@
+[
+  {
+    "id": "family",
+    "label": "家族と共有"
+  },
+  {
+    "id": "records",
+    "label": "記録の使い方"
+  },
+  {
+    "id": "display",
+    "label": "表示と操作"
+  },
+  {
+    "id": "safety",
+    "label": "安全と接続"
+  }
+]

@@ -1,0 +1,16 @@
+{
+  "id": "todo-library",
+  "householdId": "house-mori",
+  "title": "図書館の本を返す",
+  "dueAt": "2026-09-30T18:00:00+09:00",
+  "status": "waiting",
+  "assigneeMembershipId": "member-aoi",
+  "creatorMembershipId": "member-ren",
+  "version": 2,
+  "visibility": {
+    "audience": "participants",
+    "creatorMembershipId": "member-ren",
+    "selectedMembershipIds": []
+  },
+  "handoffNote": "返却ポストに入れます"
+}

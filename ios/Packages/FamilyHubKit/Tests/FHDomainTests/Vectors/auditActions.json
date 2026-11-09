@@ -1,0 +1,1 @@
+[{"input":"createEvent","expected":"予定を追加した"},{"input":"operator.grant","expected":"運営者が利用期間を延ばした"},{"input":"signIn","expected":"サインインした"},{"input":"somethingNew","expected":"そのほかの操作"},{"input":"","expected":"そのほかの操作"}]

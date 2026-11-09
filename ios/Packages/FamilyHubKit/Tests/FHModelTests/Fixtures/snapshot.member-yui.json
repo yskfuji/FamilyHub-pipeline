@@ -1,0 +1,196 @@
+{
+  "viewer": {
+    "userId": "user-yui",
+    "membershipId": "member-yui",
+    "role": "guest",
+    "status": "active",
+    "capabilities": [
+      "event.read",
+      "task.read",
+      "memo.read",
+      "album.read",
+      "resource.read",
+      "settings.own",
+      "notification.manage"
+    ],
+    "permissionRevision": 1
+  },
+  "permissionOverrides": [],
+  "user": {
+    "id": "user-yui",
+    "displayName": "結衣",
+    "email": "user-yui@example.test",
+    "avatarTone": "indigo"
+  },
+  "household": {
+    "id": "house-mori",
+    "name": "森さんち",
+    "timezone": "Asia/Tokyo"
+  },
+  "memberships": [
+    {
+      "id": "member-aoi",
+      "householdId": "house-mori",
+      "userId": "user-aoi",
+      "displayName": "碧",
+      "role": "owner",
+      "status": "active",
+      "color": "#315c80",
+      "version": 1
+    },
+    {
+      "id": "member-ren",
+      "householdId": "house-mori",
+      "userId": "user-ren",
+      "displayName": "蓮",
+      "role": "adult",
+      "status": "active",
+      "color": "#a94f38",
+      "version": 1
+    },
+    {
+      "id": "member-hana",
+      "householdId": "house-mori",
+      "userId": "user-hana",
+      "displayName": "花",
+      "role": "child",
+      "status": "active",
+      "color": "#6f7552",
+      "version": 1
+    },
+    {
+      "id": "member-sora",
+      "householdId": "house-mori",
+      "userId": "user-sora",
+      "displayName": "空",
+      "role": "child",
+      "status": "active",
+      "color": "#8a6680",
+      "version": 1
+    },
+    {
+      "id": "member-yui",
+      "householdId": "house-mori",
+      "userId": "user-yui",
+      "displayName": "結衣",
+      "role": "guest",
+      "status": "active",
+      "color": "#796a55",
+      "version": 1
+    }
+  ],
+  "events": [
+    {
+      "id": "event-park",
+      "householdId": "house-mori",
+      "title": "週末の公園",
+      "startsAt": "2026-10-03T10:00:00+09:00",
+      "endsAt": "2026-10-03T12:00:00+09:00",
+      "timezone": "Asia/Tokyo",
+      "ownerMembershipId": "member-ren",
+      "participantMembershipIds": [
+        "member-aoi",
+        "member-ren",
+        "member-hana",
+        "member-sora"
+      ],
+      "weatherSensitive": true,
+      "version": 1,
+      "visibility": {
+        "audience": "selected",
+        "creatorMembershipId": "member-ren",
+        "selectedMembershipIds": [
+          "member-aoi",
+          "member-ren",
+          "member-hana",
+          "member-sora",
+          "member-yui"
+        ]
+      }
+    }
+  ],
+  "todos": [],
+  "memos": [],
+  "expenses": [],
+  "settlementBatches": [],
+  "resources": [
+    {
+      "id": "resource-school",
+      "householdId": "house-mori",
+      "label": "青葉小学校の保護者向けページ",
+      "url": "https://example.com/family-hub/school",
+      "kind": "school",
+      "relatedEntityId": "event-school",
+      "visibility": {
+        "audience": "selected",
+        "creatorMembershipId": "member-aoi",
+        "selectedMembershipIds": [
+          "member-aoi",
+          "member-ren",
+          "member-hana",
+          "member-yui"
+        ]
+      }
+    },
+    {
+      "id": "resource-guide",
+      "householdId": "house-mori",
+      "label": "家族の連絡ルール",
+      "url": "https://example.com/family-hub/guide",
+      "kind": "document",
+      "visibility": {
+        "audience": "selected",
+        "creatorMembershipId": "member-aoi",
+        "selectedMembershipIds": [
+          "member-aoi",
+          "member-ren",
+          "member-hana",
+          "member-sora",
+          "member-yui"
+        ]
+      }
+    }
+  ],
+  "links": [],
+  "colorLabels": [
+    {
+      "id": "label-school",
+      "householdId": "house-mori",
+      "name": "学校",
+      "color": "#315c80"
+    },
+    {
+      "id": "label-home",
+      "householdId": "house-mori",
+      "name": "家のこと",
+      "color": "#6f7552"
+    },
+    {
+      "id": "label-lesson",
+      "householdId": "house-mori",
+      "name": "習いごと",
+      "color": "#a94f38"
+    }
+  ],
+  "context": {
+    "asOf": "2026-09-30T07:30:00+09:00",
+    "timezone": "Asia/Tokyo",
+    "weather": {
+      "location": "東京",
+      "condition": "rain",
+      "temperatureC": 22,
+      "precipitationPercent": 70,
+      "alert": "15時ごろから雨脚が強まる見込み"
+    },
+    "holidays": [
+      {
+        "date": "2026-10-12",
+        "name": "スポーツの日"
+      }
+    ],
+    "sync": {
+      "state": "synced",
+      "lastSyncedAt": "2026-09-30T07:29:00+09:00"
+    }
+  }
+}

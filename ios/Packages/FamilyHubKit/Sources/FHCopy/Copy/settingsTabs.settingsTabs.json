@@ -1,0 +1,74 @@
+[
+  {
+    "href": "/settings/household",
+    "label": "家族",
+    "capability": "household.members.read",
+    "description": "家族のメンバーと役割、招待、予定やタスクに付ける色のリストを管理します。"
+  },
+  {
+    "href": "/settings/security",
+    "label": "サインインとセキュリティ",
+    "capability": "settings.own",
+    "description": "パスキーとパスワード、サインインしている端末を確かめて変更します。"
+  },
+  {
+    "href": "/settings/account",
+    "label": "アカウント",
+    "capability": "settings.own",
+    "description": "名前やメールアドレスなど、自分のアカウントの情報を変更します。"
+  },
+  {
+    "href": "/settings/privacy",
+    "label": "共有とプライバシー",
+    "capability": "settings.own",
+    "description": "新しく作る記録の共有範囲と、この端末での通知や画面の扱いを決めます。"
+  },
+  {
+    "href": "/settings/notifications",
+    "label": "通知",
+    "capability": "notification.manage",
+    "description": "受け取る通知と、夜間に通知を控えるかどうかを選びます。"
+  },
+  {
+    "href": "/settings/location",
+    "label": "位置情報",
+    "capability": "place.read",
+    "description": "支出やメモに場所を付けるときの、位置情報の使い方と外部への送信についての説明です。"
+  },
+  {
+    "href": "/settings/accessibility",
+    "label": "表示・操作",
+    "capability": "settings.own",
+    "description": "テーマや文字の詰め具合、動きの量など、この端末での見え方と操作を変えます。"
+  },
+  {
+    "href": "/settings/resources",
+    "label": "関連リンク",
+    "capability": "resource.read",
+    "description": "学校や自治体など、家族でよく使うリンクを開きます。"
+  },
+  {
+    "href": "/settings/recently-deleted",
+    "label": "最近削除",
+    "capability": "settings.own",
+    "description": "削除した記録を、完全に消える前に元に戻せます。"
+  },
+  {
+    "href": "/settings/audit",
+    "label": "変更の記録",
+    "capability": "audit.read",
+    "description": "家族の記録を誰がいつ変えたかを、新しい順に表示します。記録の中身や入力した値は残していません。変更の記録は24か月残し、その後は消します。"
+  },
+  {
+    "href": "/settings/help",
+    "label": "ヘルプ",
+    "capability": "settings.own",
+    "description": "よくある質問と、それぞれの画面の使い方を探せます。"
+  },
+  {
+    "href": "/settings/legal",
+    "label": "規約（草案）",
+    "capability": "settings.own",
+    "description": "利用規約とプライバシーポリシーの草案を確認できます。"
+  }
+]

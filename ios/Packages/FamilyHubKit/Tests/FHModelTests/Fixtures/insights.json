@@ -1,0 +1,38 @@
+[
+  {
+    "id": "insight-review-waiting",
+    "confidence": "high",
+    "title": "確認待ちのタスクが1件",
+    "summary": "「就学援助の確認票」は蓮さんの確認待ちです。提出前に内容がそろっているか確認してください。",
+    "evidence": "タスクの状態（担当：碧、確認する人：蓮）",
+    "actionLabel": "タスクを開く",
+    "destination": "/tasks/todo-form"
+  },
+  {
+    "id": "insight-due-today",
+    "confidence": "high",
+    "title": "今日が期限のタスクが2件",
+    "summary": "いちばん早い期限は「図書館の本を返す」の18:00です。",
+    "evidence": "担当がご自身で、期限が9月30日(水)のタスク",
+    "actionLabel": "タスクを見る",
+    "destination": "/tasks/todo-library"
+  },
+  {
+    "id": "insight-unsettled",
+    "confidence": "high",
+    "title": "未精算は合計￥3,110",
+    "summary": "記録した支出の負担額から計算しています。誰が誰にいくら払うかを確認できます。",
+    "evidence": "未精算の支出2件（1円単位で計算）",
+    "actionLabel": "内訳を見る",
+    "destination": "/budget"
+  },
+  {
+    "id": "insight-holiday",
+    "confidence": "high",
+    "title": "10月12日(月)はスポーツの日",
+    "summary": "祝日の予定や、学校・習い事の休みを確認しておくと安心です。",
+    "evidence": "国民の祝日（内閣府の公表日）",
+    "actionLabel": "予定を確認",
+    "destination": "/calendar?month=2026-10"
+  }
+]

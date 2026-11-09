@@ -1,0 +1,637 @@
+{
+  "viewer": {
+    "userId": "user-aoi",
+    "membershipId": "member-aoi",
+    "role": "owner",
+    "status": "active",
+    "capabilities": [
+      "household.members.read",
+      "household.members.manage",
+      "household.invites.manage",
+      "event.read",
+      "event.create",
+      "event.update",
+      "event.delete",
+      "task.read",
+      "task.create",
+      "task.update",
+      "task.delete",
+      "task.transition",
+      "memo.read",
+      "memo.create",
+      "memo.update",
+      "memo.delete",
+      "memo.attach",
+      "expense.read",
+      "expense.create",
+      "expense.update",
+      "expense.delete",
+      "expense.settle",
+      "album.read",
+      "album.create",
+      "album.update",
+      "album.delete",
+      "link.manage",
+      "assistant.use",
+      "place.read",
+      "insight.read",
+      "resource.read",
+      "settings.own",
+      "notification.manage",
+      "audit.read"
+    ],
+    "permissionRevision": 1
+  },
+  "permissionOverrides": [],
+  "user": {
+    "id": "user-aoi",
+    "displayName": "碧",
+    "email": "user-aoi@example.test",
+    "avatarTone": "indigo"
+  },
+  "household": {
+    "id": "house-mori",
+    "name": "森さんち",
+    "timezone": "Asia/Tokyo"
+  },
+  "memberships": [
+    {
+      "id": "member-aoi",
+      "householdId": "house-mori",
+      "userId": "user-aoi",
+      "displayName": "碧",
+      "role": "owner",
+      "status": "active",
+      "color": "#315c80",
+      "version": 1
+    },
+    {
+      "id": "member-ren",
+      "householdId": "house-mori",
+      "userId": "user-ren",
+      "displayName": "蓮",
+      "role": "adult",
+      "status": "active",
+      "color": "#a94f38",
+      "version": 1
+    },
+    {
+      "id": "member-hana",
+      "householdId": "house-mori",
+      "userId": "user-hana",
+      "displayName": "花",
+      "role": "child",
+      "status": "active",
+      "color": "#6f7552",
+      "version": 1
+    },
+    {
+      "id": "member-sora",
+      "householdId": "house-mori",
+      "userId": "user-sora",
+      "displayName": "空",
+      "role": "child",
+      "status": "active",
+      "color": "#8a6680",
+      "version": 1
+    },
+    {
+      "id": "member-yui",
+      "householdId": "house-mori",
+      "userId": "user-yui",
+      "displayName": "結衣",
+      "role": "guest",
+      "status": "active",
+      "color": "#796a55",
+      "version": 1
+    }
+  ],
+  "events": [
+    {
+      "id": "event-school",
+      "householdId": "house-mori",
+      "title": "学校公開",
+      "startsAt": "2026-09-30T09:30:00+09:00",
+      "endsAt": "2026-09-30T11:30:00+09:00",
+      "timezone": "Asia/Tokyo",
+      "ownerMembershipId": "member-aoi",
+      "participantMembershipIds": [
+        "member-aoi",
+        "member-hana"
+      ],
+      "location": "青葉小学校",
+      "resourceIds": [
+        "resource-school"
+      ],
+      "note": "上履きと来校証を忘れずに",
+      "version": 1,
+      "visibility": {
+        "audience": "participants",
+        "creatorMembershipId": "member-aoi",
+        "selectedMembershipIds": []
+      }
+    },
+    {
+      "id": "event-clean",
+      "householdId": "house-mori",
+      "title": "資源回収",
+      "startsAt": "2026-10-01T08:00:00+09:00",
+      "endsAt": "2026-10-01T08:30:00+09:00",
+      "timezone": "Asia/Tokyo",
+      "ownerMembershipId": "member-aoi",
+      "participantMembershipIds": [
+        "member-aoi",
+        "member-ren"
+      ],
+      "recurrence": {
+        "rrule": "FREQ=WEEKLY;BYDAY=TH",
+        "timezone": "Asia/Tokyo",
+        "exceptions": []
+      },
+      "version": 1,
+      "visibility": {
+        "audience": "household",
+        "creatorMembershipId": "member-aoi",
+        "selectedMembershipIds": []
+      }
+    },
+    {
+      "id": "event-park",
+      "householdId": "house-mori",
+      "title": "週末の公園",
+      "startsAt": "2026-10-03T10:00:00+09:00",
+      "endsAt": "2026-10-03T12:00:00+09:00",
+      "timezone": "Asia/Tokyo",
+      "ownerMembershipId": "member-ren",
+      "participantMembershipIds": [
+        "member-aoi",
+        "member-ren",
+        "member-hana",
+        "member-sora"
+      ],
+      "weatherSensitive": true,
+      "version": 1,
+      "visibility": {
+        "audience": "selected",
+        "creatorMembershipId": "member-ren",
+        "selectedMembershipIds": [
+          "member-aoi",
+          "member-ren",
+          "member-hana",
+          "member-sora",
+          "member-yui"
+        ]
+      }
+    }
+  ],
+  "todos": [
+    {
+      "id": "todo-form",
+      "householdId": "house-mori",
+      "title": "就学援助の確認票",
+      "dueAt": "2026-09-30T20:00:00+09:00",
+      "status": "review",
+      "assigneeMembershipId": "member-aoi",
+      "reviewerMembershipId": "member-ren",
+      "creatorMembershipId": "member-aoi",
+      "version": 2,
+      "note": "記入済み。提出前の確認をお願いします。",
+      "visibility": {
+        "audience": "participants",
+        "creatorMembershipId": "member-aoi",
+        "selectedMembershipIds": []
+      }
+    },
+    {
+      "id": "todo-library",
+      "householdId": "house-mori",
+      "title": "図書館の本を返す",
+      "dueAt": "2026-09-30T18:00:00+09:00",
+      "status": "doing",
+      "assigneeMembershipId": "member-aoi",
+      "creatorMembershipId": "member-ren",
+      "version": 1,
+      "visibility": {
+        "audience": "participants",
+        "creatorMembershipId": "member-ren",
+        "selectedMembershipIds": []
+      }
+    },
+    {
+      "id": "todo-garbage",
+      "householdId": "house-mori",
+      "title": "資源ごみをまとめる",
+      "dueAt": "2026-10-01T07:30:00+09:00",
+      "status": "open",
+      "assigneeMembershipId": "member-ren",
+      "creatorMembershipId": "member-aoi",
+      "version": 1,
+      "recurrence": {
+        "rrule": "FREQ=WEEKLY;BYDAY=TH",
+        "timezone": "Asia/Tokyo",
+        "exceptions": []
+      },
+      "visibility": {
+        "audience": "adults",
+        "creatorMembershipId": "member-aoi",
+        "selectedMembershipIds": []
+      }
+    },
+    {
+      "id": "todo-practice",
+      "householdId": "house-mori",
+      "title": "音読の記録",
+      "dueAt": "2026-09-30T19:30:00+09:00",
+      "status": "open",
+      "assigneeMembershipId": "member-hana",
+      "reviewerMembershipId": "member-aoi",
+      "creatorMembershipId": "member-aoi",
+      "version": 1,
+      "visibility": {
+        "audience": "participants",
+        "creatorMembershipId": "member-aoi",
+        "selectedMembershipIds": []
+      }
+    },
+    {
+      "id": "todo-done",
+      "householdId": "house-mori",
+      "title": "給食費の口座確認",
+      "status": "done",
+      "assigneeMembershipId": "member-ren",
+      "reviewerMembershipId": "member-aoi",
+      "creatorMembershipId": "member-ren",
+      "version": 3,
+      "visibility": {
+        "audience": "adults",
+        "creatorMembershipId": "member-ren",
+        "selectedMembershipIds": []
+      }
+    }
+  ],
+  "memos": [
+    {
+      "id": "memo-school",
+      "householdId": "house-mori",
+      "title": "学校公開のお知らせ",
+      "body": "受付 9:15〜。来校証を着用。撮影は教室外のみ。",
+      "updatedAt": "2026-09-29T21:10:00+09:00",
+      "authorMembershipId": "member-aoi",
+      "tags": [
+        "学校",
+        "今週"
+      ],
+      "attachments": [
+        {
+          "id": "attachment-school",
+          "memoId": "memo-school",
+          "originalName": "学校公開.pdf",
+          "mimeType": "application/pdf",
+          "byteSize": 842310,
+          "status": "clean",
+          "statusMessage": "確認が終わり、開ける状態です"
+        }
+      ],
+      "ocrText": "令和8年度 学校公開のお知らせ…",
+      "place": {
+        "name": "青葉小学校 体育館",
+        "capturedVia": "manual",
+        "selectedAt": "2026-09-29T21:10:00+09:00"
+      },
+      "visibility": {
+        "audience": "selected",
+        "creatorMembershipId": "member-aoi",
+        "selectedMembershipIds": [
+          "member-aoi",
+          "member-ren",
+          "member-hana"
+        ]
+      },
+      "version": 1
+    },
+    {
+      "id": "memo-clinic",
+      "householdId": "house-mori",
+      "title": "小児科の控え",
+      "body": "次回は10月14日。保険証を持参。",
+      "updatedAt": "2026-09-28T18:40:00+09:00",
+      "authorMembershipId": "member-ren",
+      "tags": [
+        "控え"
+      ],
+      "attachments": [],
+      "visibility": {
+        "audience": "adults",
+        "creatorMembershipId": "member-ren",
+        "selectedMembershipIds": []
+      },
+      "version": 1
+    },
+    {
+      "id": "memo-receipt",
+      "householdId": "house-mori",
+      "title": "教材費レシート",
+      "body": "家計への登録待ち。",
+      "updatedAt": "2026-09-30T06:50:00+09:00",
+      "authorMembershipId": "member-aoi",
+      "tags": [
+        "家計"
+      ],
+      "attachments": [
+        {
+          "id": "attachment-receipt",
+          "memoId": "memo-receipt",
+          "originalName": "receipt.jpg",
+          "mimeType": "image/jpeg",
+          "byteSize": 1284300,
+          "status": "quarantined",
+          "statusMessage": "ファイルを確認しています。完了するまで開けません"
+        },
+        {
+          "id": "attachment-receipt-photo",
+          "memoId": "memo-receipt",
+          "originalName": "教材の写真.jpg",
+          "mimeType": "image/jpeg",
+          "byteSize": 2259,
+          "status": "clean",
+          "statusMessage": "確認が終わり、開ける状態です"
+        },
+        {
+          "id": "attachment-receipt-clip",
+          "memoId": "memo-receipt",
+          "originalName": "教材の使い方.mp4",
+          "mimeType": "video/mp4",
+          "byteSize": 2836,
+          "status": "clean",
+          "statusMessage": "確認が終わり、開ける状態です"
+        }
+      ],
+      "ocrText": "青葉書店　教材 2,860円",
+      "visibility": {
+        "audience": "adults",
+        "creatorMembershipId": "member-aoi",
+        "selectedMembershipIds": []
+      },
+      "version": 1
+    }
+  ],
+  "expenses": [
+    {
+      "id": "expense-books",
+      "householdId": "house-mori",
+      "kind": "expense",
+      "creatorMembershipId": "member-aoi",
+      "visibility": {
+        "audience": "household",
+        "creatorMembershipId": "member-aoi",
+        "selectedMembershipIds": []
+      },
+      "title": "学校教材",
+      "amountJpy": 2860,
+      "incurredOn": "2026-09-29",
+      "payerMembershipId": "member-aoi",
+      "category": "education",
+      "shares": [
+        {
+          "membershipId": "member-aoi",
+          "amountJpy": 1430,
+          "settledJpy": 1430
+        },
+        {
+          "membershipId": "member-ren",
+          "amountJpy": 1430,
+          "settledJpy": 0
+        }
+      ],
+      "settlements": [],
+      "note": "花の図工・理科教材",
+      "place": {
+        "name": "青葉書店",
+        "address": "東京都世田谷区",
+        "capturedVia": "manual",
+        "selectedAt": "2026-09-29T18:20:00+09:00"
+      },
+      "version": 1
+    },
+    {
+      "id": "expense-train",
+      "householdId": "house-mori",
+      "kind": "expense",
+      "creatorMembershipId": "member-aoi",
+      "visibility": {
+        "audience": "household",
+        "creatorMembershipId": "member-aoi",
+        "selectedMembershipIds": []
+      },
+      "title": "家族のおでかけ交通費",
+      "amountJpy": 3360,
+      "incurredOn": "2026-09-27",
+      "payerMembershipId": "member-ren",
+      "category": "transport",
+      "shares": [
+        {
+          "membershipId": "member-aoi",
+          "amountJpy": 1680,
+          "settledJpy": 0
+        },
+        {
+          "membershipId": "member-ren",
+          "amountJpy": 1680,
+          "settledJpy": 1680
+        }
+      ],
+      "settlements": [],
+      "version": 1
+    },
+    {
+      "id": "expense-groceries",
+      "householdId": "house-mori",
+      "kind": "expense",
+      "creatorMembershipId": "member-aoi",
+      "visibility": {
+        "audience": "household",
+        "creatorMembershipId": "member-aoi",
+        "selectedMembershipIds": []
+      },
+      "title": "週末の食材",
+      "amountJpy": 5840,
+      "incurredOn": "2026-09-26",
+      "payerMembershipId": "member-aoi",
+      "category": "food",
+      "shares": [
+        {
+          "membershipId": "member-aoi",
+          "amountJpy": 2920,
+          "settledJpy": 2920
+        },
+        {
+          "membershipId": "member-ren",
+          "amountJpy": 2920,
+          "settledJpy": 2920
+        }
+      ],
+      "settlements": [
+        {
+          "id": "settlement-1",
+          "amountJpy": 2920,
+          "fromMembershipId": "member-ren",
+          "toMembershipId": "member-aoi",
+          "recordedAt": "2026-09-28T20:00:00+09:00"
+        }
+      ],
+      "version": 1
+    },
+    {
+      "id": "income-salary",
+      "householdId": "house-mori",
+      "kind": "income",
+      "creatorMembershipId": "member-aoi",
+      "visibility": {
+        "audience": "household",
+        "creatorMembershipId": "member-aoi",
+        "selectedMembershipIds": []
+      },
+      "title": "9月の給与",
+      "amountJpy": 320000,
+      "incurredOn": "2026-09-25",
+      "payerMembershipId": "member-aoi",
+      "category": "income_salary",
+      "shares": [],
+      "settlements": [],
+      "version": 1
+    },
+    {
+      "id": "expense-august-utilities",
+      "householdId": "house-mori",
+      "kind": "expense",
+      "creatorMembershipId": "member-ren",
+      "visibility": {
+        "audience": "household",
+        "creatorMembershipId": "member-ren",
+        "selectedMembershipIds": []
+      },
+      "title": "8月の電気代",
+      "amountJpy": 9800,
+      "incurredOn": "2026-08-20",
+      "payerMembershipId": "member-ren",
+      "category": "utilities",
+      "shares": [
+        {
+          "membershipId": "member-ren",
+          "amountJpy": 9800,
+          "settledJpy": 9800
+        }
+      ],
+      "settlements": [],
+      "version": 1
+    }
+  ],
+  "settlementBatches": [],
+  "resources": [
+    {
+      "id": "resource-school",
+      "householdId": "house-mori",
+      "label": "青葉小学校の保護者向けページ",
+      "url": "https://example.com/family-hub/school",
+      "kind": "school",
+      "relatedEntityId": "event-school",
+      "visibility": {
+        "audience": "selected",
+        "creatorMembershipId": "member-aoi",
+        "selectedMembershipIds": [
+          "member-aoi",
+          "member-ren",
+          "member-hana",
+          "member-yui"
+        ]
+      }
+    },
+    {
+      "id": "resource-city",
+      "householdId": "house-mori",
+      "label": "世田谷区の子育て手続き",
+      "url": "https://example.com/family-hub/city",
+      "kind": "municipality",
+      "visibility": {
+        "audience": "household",
+        "creatorMembershipId": "member-aoi",
+        "selectedMembershipIds": []
+      }
+    },
+    {
+      "id": "resource-guide",
+      "householdId": "house-mori",
+      "label": "家族の連絡ルール",
+      "url": "https://example.com/family-hub/guide",
+      "kind": "document",
+      "visibility": {
+        "audience": "selected",
+        "creatorMembershipId": "member-aoi",
+        "selectedMembershipIds": [
+          "member-aoi",
+          "member-ren",
+          "member-hana",
+          "member-sora",
+          "member-yui"
+        ]
+      }
+    }
+  ],
+  "links": [
+    {
+      "id": "link-school",
+      "householdId": "house-mori",
+      "from": {
+        "kind": "event",
+        "id": "event-school"
+      },
+      "to": {
+        "kind": "memo",
+        "id": "memo-school"
+      },
+      "createdByMembershipId": "member-aoi",
+      "createdAt": "2026-09-29T21:12:00+09:00"
+    }
+  ],
+  "colorLabels": [
+    {
+      "id": "label-school",
+      "householdId": "house-mori",
+      "name": "学校",
+      "color": "#315c80"
+    },
+    {
+      "id": "label-home",
+      "householdId": "house-mori",
+      "name": "家のこと",
+      "color": "#6f7552"
+    },
+    {
+      "id": "label-lesson",
+      "householdId": "house-mori",
+      "name": "習いごと",
+      "color": "#a94f38"
+    }
+  ],
+  "context": {
+    "asOf": "2026-09-30T07:30:00+09:00",
+    "timezone": "Asia/Tokyo",
+    "weather": {
+      "location": "東京",
+      "condition": "rain",
+      "temperatureC": 22,
+      "precipitationPercent": 70,
+      "alert": "15時ごろから雨脚が強まる見込み"
+    },
+    "holidays": [
+      {
+        "date": "2026-10-12",
+        "name": "スポーツの日"
+      }
+    ],
+    "sync": {
+      "state": "synced",
+      "lastSyncedAt": "2026-09-30T07:29:00+09:00"
+    }
+  }
+}

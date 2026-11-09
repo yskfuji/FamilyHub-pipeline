@@ -1,0 +1,291 @@
+{
+  "viewer": {
+    "userId": "user-hana",
+    "membershipId": "member-hana",
+    "role": "child",
+    "status": "active",
+    "capabilities": [
+      "event.read",
+      "event.create",
+      "event.update",
+      "event.delete",
+      "task.read",
+      "task.create",
+      "task.update",
+      "task.delete",
+      "task.transition",
+      "memo.read",
+      "memo.create",
+      "memo.update",
+      "memo.delete",
+      "memo.attach",
+      "album.read",
+      "album.create",
+      "album.update",
+      "album.delete",
+      "resource.read",
+      "settings.own",
+      "notification.manage"
+    ],
+    "permissionRevision": 1
+  },
+  "permissionOverrides": [],
+  "user": {
+    "id": "user-hana",
+    "displayName": "花",
+    "email": "user-hana@example.test",
+    "avatarTone": "indigo"
+  },
+  "household": {
+    "id": "house-mori",
+    "name": "森さんち",
+    "timezone": "Asia/Tokyo"
+  },
+  "memberships": [
+    {
+      "id": "member-aoi",
+      "householdId": "house-mori",
+      "userId": "user-aoi",
+      "displayName": "碧",
+      "role": "owner",
+      "status": "active",
+      "color": "#315c80",
+      "version": 1
+    },
+    {
+      "id": "member-ren",
+      "householdId": "house-mori",
+      "userId": "user-ren",
+      "displayName": "蓮",
+      "role": "adult",
+      "status": "active",
+      "color": "#a94f38",
+      "version": 1
+    },
+    {
+      "id": "member-hana",
+      "householdId": "house-mori",
+      "userId": "user-hana",
+      "displayName": "花",
+      "role": "child",
+      "status": "active",
+      "color": "#6f7552",
+      "version": 1
+    },
+    {
+      "id": "member-sora",
+      "householdId": "house-mori",
+      "userId": "user-sora",
+      "displayName": "空",
+      "role": "child",
+      "status": "active",
+      "color": "#8a6680",
+      "version": 1
+    }
+  ],
+  "events": [
+    {
+      "id": "event-school",
+      "householdId": "house-mori",
+      "title": "学校公開",
+      "startsAt": "2026-09-30T09:30:00+09:00",
+      "endsAt": "2026-09-30T11:30:00+09:00",
+      "timezone": "Asia/Tokyo",
+      "ownerMembershipId": "member-aoi",
+      "participantMembershipIds": [
+        "member-aoi",
+        "member-hana"
+      ],
+      "location": "青葉小学校",
+      "resourceIds": [
+        "resource-school"
+      ],
+      "note": "上履きと来校証を忘れずに",
+      "version": 1,
+      "visibility": {
+        "audience": "participants",
+        "creatorMembershipId": "member-aoi",
+        "selectedMembershipIds": []
+      }
+    },
+    {
+      "id": "event-park",
+      "householdId": "house-mori",
+      "title": "週末の公園",
+      "startsAt": "2026-10-03T10:00:00+09:00",
+      "endsAt": "2026-10-03T12:00:00+09:00",
+      "timezone": "Asia/Tokyo",
+      "ownerMembershipId": "member-ren",
+      "participantMembershipIds": [
+        "member-aoi",
+        "member-ren",
+        "member-hana",
+        "member-sora"
+      ],
+      "weatherSensitive": true,
+      "version": 1,
+      "visibility": {
+        "audience": "selected",
+        "creatorMembershipId": "member-ren",
+        "selectedMembershipIds": [
+          "member-aoi",
+          "member-ren",
+          "member-hana",
+          "member-sora",
+          "member-yui"
+        ]
+      }
+    }
+  ],
+  "todos": [
+    {
+      "id": "todo-practice",
+      "householdId": "house-mori",
+      "title": "音読の記録",
+      "dueAt": "2026-09-30T19:30:00+09:00",
+      "status": "open",
+      "assigneeMembershipId": "member-hana",
+      "reviewerMembershipId": "member-aoi",
+      "creatorMembershipId": "member-aoi",
+      "version": 1,
+      "visibility": {
+        "audience": "participants",
+        "creatorMembershipId": "member-aoi",
+        "selectedMembershipIds": []
+      }
+    }
+  ],
+  "memos": [
+    {
+      "id": "memo-school",
+      "householdId": "house-mori",
+      "title": "学校公開のお知らせ",
+      "body": "受付 9:15〜。来校証を着用。撮影は教室外のみ。",
+      "updatedAt": "2026-09-29T21:10:00+09:00",
+      "authorMembershipId": "member-aoi",
+      "tags": [
+        "学校",
+        "今週"
+      ],
+      "attachments": [
+        {
+          "id": "attachment-school",
+          "memoId": "memo-school",
+          "originalName": "学校公開.pdf",
+          "mimeType": "application/pdf",
+          "byteSize": 842310,
+          "status": "clean",
+          "statusMessage": "確認が終わり、開ける状態です"
+        }
+      ],
+      "ocrText": "令和8年度 学校公開のお知らせ…",
+      "visibility": {
+        "audience": "selected",
+        "creatorMembershipId": "member-aoi",
+        "selectedMembershipIds": [
+          "member-aoi",
+          "member-ren",
+          "member-hana"
+        ]
+      },
+      "version": 1
+    }
+  ],
+  "expenses": [],
+  "settlementBatches": [],
+  "resources": [
+    {
+      "id": "resource-school",
+      "householdId": "house-mori",
+      "label": "青葉小学校の保護者向けページ",
+      "url": "https://example.com/family-hub/school",
+      "kind": "school",
+      "relatedEntityId": "event-school",
+      "visibility": {
+        "audience": "selected",
+        "creatorMembershipId": "member-aoi",
+        "selectedMembershipIds": [
+          "member-aoi",
+          "member-ren",
+          "member-hana",
+          "member-yui"
+        ]
+      }
+    },
+    {
+      "id": "resource-guide",
+      "householdId": "house-mori",
+      "label": "家族の連絡ルール",
+      "url": "https://example.com/family-hub/guide",
+      "kind": "document",
+      "visibility": {
+        "audience": "selected",
+        "creatorMembershipId": "member-aoi",
+        "selectedMembershipIds": [
+          "member-aoi",
+          "member-ren",
+          "member-hana",
+          "member-sora",
+          "member-yui"
+        ]
+      }
+    }
+  ],
+  "links": [
+    {
+      "id": "link-school",
+      "householdId": "house-mori",
+      "from": {
+        "kind": "event",
+        "id": "event-school"
+      },
+      "to": {
+        "kind": "memo",
+        "id": "memo-school"
+      },
+      "createdByMembershipId": "member-aoi",
+      "createdAt": "2026-09-29T21:12:00+09:00"
+    }
+  ],
+  "colorLabels": [
+    {
+      "id": "label-school",
+      "householdId": "house-mori",
+      "name": "学校",
+      "color": "#315c80"
+    },
+    {
+      "id": "label-home",
+      "householdId": "house-mori",
+      "name": "家のこと",
+      "color": "#6f7552"
+    },
+    {
+      "id": "label-lesson",
+      "householdId": "house-mori",
+      "name": "習いごと",
+      "color": "#a94f38"
+    }
+  ],
+  "context": {
+    "asOf": "2026-09-30T07:30:00+09:00",
+    "timezone": "Asia/Tokyo",
+    "weather": {
+      "location": "東京",
+      "condition": "rain",
+      "temperatureC": 22,
+      "precipitationPercent": 70,
+      "alert": "15時ごろから雨脚が強まる見込み"
+    },
+    "holidays": [
+      {
+        "date": "2026-10-12",
+        "name": "スポーツの日"
+      }
+    ],
+    "sync": {
+      "state": "synced",
+      "lastSyncedAt": "2026-09-30T07:29:00+09:00"
+    }
+  }
+}

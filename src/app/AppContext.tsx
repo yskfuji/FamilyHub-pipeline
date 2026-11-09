@@ -228,6 +228,4 @@ export function useApp() {
   return value;
 }
 
-export function memberName(snapshot: HouseholdSnapshot, id?: string) {
-  return snapshot.memberships.find((member) => member.id === id)?.displayName ?? '非公開';
-}
+export { memberName } from '../domain/memberName';

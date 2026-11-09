@@ -14,3 +14,29 @@ export function stripLanes(marks: ReadonlyArray<{ start: number; minutes: number
     return lane;
   });
 }
+
+export interface StripLayout {
+  /** 帯の左の端と右の端（0時からの分）。3時間ごとにそろえる。 */
+  from: number;
+  to: number;
+  /** 目盛り（分）。最後の目盛り（右の端）は字を出さないので含めない。 */
+  ticks: number[];
+  /** 印ごとの段（stripLanes）。 */
+  lanes: number[];
+  laneCount: number;
+}
+
+/** 時刻の帯の目盛りと段。朝6時から夜22時を基本に、印と今の時刻が入るように広げる。 */
+export function stripLayout(marks: ReadonlyArray<{ start: number; minutes: number }>, now: number): StripLayout {
+  const first = Math.min(6 * 60, ...marks.map((mark) => mark.start));
+  const last = Math.max(22 * 60, ...marks.map((mark) => mark.start + mark.minutes), now);
+  const from = Math.floor(first / 180) * 180;
+  const to = Math.min(24 * 60, Math.ceil(last / 180) * 180);
+  const ticks: number[] = [];
+  for (let minute = from; minute < to; minute += 180) ticks.push(minute);
+  const lanes = stripLanes(marks, to - from);
+  return { from, to, ticks, lanes, laneCount: Math.max(1, ...lanes.map((lane) => lane + 1)) };
+}
+
+/** 帯の上の位置（0〜1）。範囲の外は端にそろえる。 */
+export const stripPosition = (layout: Pick<StripLayout, 'from' | 'to'>, minutes: number) => (Math.min(layout.to, Math.max(layout.from, minutes)) - layout.from) / (layout.to - layout.from);

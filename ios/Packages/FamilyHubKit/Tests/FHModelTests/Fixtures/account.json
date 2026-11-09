@@ -1,0 +1,12 @@
+{
+  "displayName": "碧",
+  "email": "user-aoi@example.test",
+  "avatar": {
+    "kind": "initial"
+  },
+  "idleTimeoutMinutes": 30,
+  "birthdateDeclared": true,
+  "adultDeclared": true,
+  "totpEnabled": false,
+  "totpUnavailable": false
+}

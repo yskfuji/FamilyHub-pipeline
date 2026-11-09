@@ -1688,7 +1688,10 @@ components:
     sessionCookie:
       type: apiKey
       in: cookie
-      name: __Host-family_session
+      name: __Host-fh_session
+      description: >-
+        On https the cookie is __Host-fh_session. Local development over plain
+        http on a loopback host uses fh_session (server/auth/sessions.ts).
   parameters:
     CsrfToken:
       name: X-CSRF-Token

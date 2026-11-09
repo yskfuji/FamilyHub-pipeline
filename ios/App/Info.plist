@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- 手元の開発サーバー（ios/Config/Local.xcconfig の FH_DEV_SERVER_URL）。空なら見本だけ。 -->
+	<key>FHDevServerURL</key>
+	<string>$(FH_DEV_SERVER_URL)</string>
+	<!-- パスキーを使うドメイン（Base.xcconfig の FH_ASSOCIATED_DOMAIN）。空ならパスキーの追加を出さない。 -->
+	<key>FHPasskeyRelyingParty</key>
+	<string>$(FH_ASSOCIATED_DOMAIN)</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>同じ Wi-Fi にある手元の開発サーバーにつなぐために使います。</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>支出やメモに場所を付けるとき、近くのお店の候補を出すために使います。正確な現在地は端末の中だけで使い、外部へは約100m単位に丸めた位置だけを送ります。</string>
+</dict>
+</plist>

@@ -1,0 +1,45 @@
+{
+  "id": "expense-books",
+  "householdId": "house-mori",
+  "kind": "expense",
+  "creatorMembershipId": "member-aoi",
+  "visibility": {
+    "audience": "household",
+    "creatorMembershipId": "member-aoi",
+    "selectedMembershipIds": []
+  },
+  "title": "学校教材",
+  "amountJpy": 2860,
+  "incurredOn": "2026-09-29",
+  "payerMembershipId": "member-aoi",
+  "category": "education",
+  "shares": [
+    {
+      "membershipId": "member-aoi",
+      "amountJpy": 1430,
+      "settledJpy": 1430
+    },
+    {
+      "membershipId": "member-ren",
+      "amountJpy": 1430,
+      "settledJpy": 715
+    }
+  ],
+  "settlements": [
+    {
+      "id": "settlement-mock-2",
+      "amountJpy": 715,
+      "fromMembershipId": "member-ren",
+      "toMembershipId": "member-aoi",
+      "recordedAt": "2026-09-30T07:45:00+09:00"
+    }
+  ],
+  "note": "花の図工・理科教材",
+  "place": {
+    "name": "青葉書店",
+    "address": "東京都世田谷区",
+    "capturedVia": "manual",
+    "selectedAt": "2026-09-29T18:20:00+09:00"
+  },
+  "version": 2
+}

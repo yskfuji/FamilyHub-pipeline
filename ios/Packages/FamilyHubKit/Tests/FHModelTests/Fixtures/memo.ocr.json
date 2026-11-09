@@ -1,0 +1,39 @@
+{
+  "id": "memo-school",
+  "householdId": "house-mori",
+  "title": "学校公開のお知らせ",
+  "body": "受付 9:15〜。来校証を着用。撮影は教室外のみ。",
+  "updatedAt": "2026-09-30T07:46:00+09:00",
+  "authorMembershipId": "member-aoi",
+  "tags": [
+    "学校",
+    "今週"
+  ],
+  "attachments": [
+    {
+      "id": "attachment-school",
+      "memoId": "memo-school",
+      "originalName": "学校公開.pdf",
+      "mimeType": "application/pdf",
+      "byteSize": 842310,
+      "status": "clean",
+      "statusMessage": "確認が終わり、開ける状態です"
+    }
+  ],
+  "ocrText": "令和8年度 学校公開",
+  "place": {
+    "name": "青葉小学校 体育館",
+    "capturedVia": "manual",
+    "selectedAt": "2026-09-29T21:10:00+09:00"
+  },
+  "visibility": {
+    "audience": "selected",
+    "creatorMembershipId": "member-aoi",
+    "selectedMembershipIds": [
+      "member-aoi",
+      "member-ren",
+      "member-hana"
+    ]
+  },
+  "version": 2
+}

@@ -4,7 +4,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist', 'dist-audit', 'dist-http', 'dist-server', 'release', 'artifacts/screens', 'docs/er.svg', 'test-results', 'playwright-report'] },
+  { ignores: ['dist', 'dist-audit', 'dist-http', 'dist-server', 'release', 'artifacts/screens', 'docs/er.svg', 'test-results', 'playwright-report', 'ios/build', 'ios/**/.build', 'ios/Packages/FamilyHubKit/Sources/FHGateway/Resources/sample-engine.js'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

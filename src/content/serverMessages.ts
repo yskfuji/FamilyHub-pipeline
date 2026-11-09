@@ -46,6 +46,7 @@ export const serverMessages = {
   brand: 'よりどころ',
   passkeyLabel: 'パスキー',
   genericBrowser: 'ブラウザ',
+  appLabel: 'アプリ',
   deletedMember: '退会したメンバー',
   birthdateInvalid: '誕生日を確認してください。',
   guardianConsentRequired: '18歳未満の方は、保護者の同意が必要です。',

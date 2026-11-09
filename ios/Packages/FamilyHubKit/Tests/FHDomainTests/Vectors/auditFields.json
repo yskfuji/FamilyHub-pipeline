@@ -1,0 +1,1 @@
+[{"input":[],"expected":""},{"input":["title"],"expected":"題名"},{"input":["title","body","tags"],"expected":"題名・本文・タグ"},{"input":["shareAmounts","shareMembershipIds","title"],"expected":"負担・題名"},{"input":["unknownField","other","title"],"expected":"そのほかの項目・題名"},{"input":["place","location"],"expected":"場所"}]

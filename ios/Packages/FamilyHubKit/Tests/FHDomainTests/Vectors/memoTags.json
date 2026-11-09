@@ -1,0 +1,1 @@
+[{"input":"学校、今週, 家計 ,,","expected":["学校","今週","家計"]},{"input":"","expected":[]},{"input":" , 、 ","expected":[]},{"input":"a,b,c,d,e,f,g,h,i,j,k","expected":["a","b","c","d","e","f","g","h","i","j","k"]},{"input":"学校　","expected":["学校"]},{"input":"　全角の空白　,x","expected":["全角の空白","x"]}]
