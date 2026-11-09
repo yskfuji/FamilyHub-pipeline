@@ -163,6 +163,13 @@ public final class SampleGateway: FamilyHubGateway {
 
   public func listNotifications() async -> GatewayResult<[HouseholdNotification]> { await invoke(.listNotifications) }
   public func markNotificationRead(id: Id) async -> GatewayResult<HouseholdNotification> { await invoke(.markNotificationRead, id) }
+  public func snoozeNotification(id: Id, minutes: Int) async -> GatewayResult<HouseholdNotification> { await invoke(.snoozeNotification, id, minutes) }
+  public func stopNotification(id: Id) async -> GatewayResult<HouseholdNotification> { await invoke(.stopNotification, id) }
+  public func resumeNotification(id: Id) async -> GatewayResult<HouseholdNotification> { await invoke(.resumeNotification, id) }
+  public func getNotificationPreferences() async -> GatewayResult<NotificationPreferences> { await invoke(.getNotificationPreferences) }
+  public func updateNotificationPreferences(_ input: NotificationPreferences) async -> GatewayResult<NotificationPreferences> { await invoke(.updateNotificationPreferences, input) }
+  public func search(_ query: String) async -> GatewayResult<[SearchResult]> { await invoke(.search, query) }
+  public func listInsights() async -> GatewayResult<[Insight]> { await invoke(.listInsights) }
 }
 
 /// 見本の仕組みに渡すファイル（{"__file": {name, type, size, head, ref}}）。中身は先頭の数バイトだけを渡す。

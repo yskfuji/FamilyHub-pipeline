@@ -93,12 +93,7 @@ struct ExpenseFormView: View {
       if !outside.isEmpty {
         Section { Label("\(outside.map(\.displayName).joined(separator: "、"))さんには、この公開範囲だと記録が表示されません。", systemImage: "exclamationmark.triangle").foregroundStyle(colors.ink.color) }
       }
-      if !income, let place = draft.place {
-        Section(Copy.ja.ja.place.legend) {
-          LabeledContent("場所", value: place.name)
-          Button("場所を外す", role: .destructive) { draft.place = nil }
-        }
-      }
+      if !income, model.can(.placeRead) { PlaceFieldSection(value: $draft.place) }
     }
     .disabled(busy)
     .onChange(of: problem) { _, message in if !message.isEmpty { announce(message) } }

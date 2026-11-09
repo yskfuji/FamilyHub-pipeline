@@ -59,6 +59,10 @@ struct ExpenseDetailView: View {
         }
         if let place = expense.place {
           DetailItem(title: Copy.ja.ja.place.legend, value: [place.name, place.address].compactMap { $0 }.joined(separator: "\n"))
+          if model.can(.placeRead) {
+            Button("この場所の記録を見る") { model.open(destination: "/places/\(Places.key(of: place))") }.fhButton(.secondary)
+          }
+          if place.provenance != nil { Text("\(Copy.ja.ja.place.attributionPrefix): \(Copy.ja.ja.place.attributionLabel)").font(.footnote).foregroundStyle(theme.colors.inkSoft.color) }
         }
         if !income { shares(expense, snapshot: snapshot) }
         if canEdit || canDelete {

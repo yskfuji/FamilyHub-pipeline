@@ -784,3 +784,57 @@ write('formatRelative', pasts.map((input) => ({ input, expected: formatRelative(
   write('albumToDraft', form.albumToDraft(detail.album));
   write('bgmNotes', (['calm', 'bright', 'gentle'] as const).flatMap((preset) => [0, 1, 2, 3, 4, 7].map((bar) => ({ input: { preset, bar }, expected: { notes: bgm.barNotes(preset, bar), seconds: bgm.barSeconds(preset) } }))));
 }
+
+// ---- 段階 S6: 場所・通知の予定 ----
+{
+  const { readFileSync } = await import('node:fs');
+  const places = await import('../../src/domain/places');
+  const geo = await import('../../src/features/place/geo');
+  const { placeDistanceLabel, placeCategoryLabel } = await import('../../src/content/ja');
+  const { planNotifications } = await import('../../src/domain/notificationPlan');
+  const { groupSearchResults } = await import('../../src/app/searchGroups');
+  type Snapshot = import('../../src/domain/types').HouseholdSnapshot;
+  const fixture = (name: string) => JSON.parse(readFileSync(`ios/Packages/FamilyHubKit/Tests/FHModelTests/Fixtures/${name}.json`, 'utf8'));
+  const aoi = fixture('snapshot.member-aoi') as Snapshot;
+
+  write('placeKeys', [['青葉小学校 体育館', ''], ['青葉書店', '東京都世田谷区'], ['青葉小学校 校庭', ''], ['ＡＢＣ　ストア', ''], ['abc store', ''], ['', ''], ['😀カフェ', '駅前'], ['Ⅳ号館', '']].map(([name, address]) => ({ input: [name, address], expected: places.placeKey(name, address) })));
+  let seed = 20261401;
+  const random = () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const pick = <T,>(list: readonly T[]) => list[Math.floor(random() * list.length)];
+  const placeList = [{ name: '青葉書店', address: '東京都世田谷区' }, { name: '駅前スーパー' }, { name: 'ＡＢＣ　ストア' }, { name: 'abc ストア' }, { name: '公民館', address: '東京都' }];
+  const expenses = aoi.expenses.map((expense) => ({ ...expense }));
+  const memos = aoi.memos.map((memo) => ({ ...memo }));
+  for (let index = 0; index < 30; index += 1) {
+    const place = { ...pick(placeList), capturedVia: 'manual' as const, selectedAt: '2026-09-30T07:30:00+09:00' };
+    const date = `2026-09-${String(1 + Math.floor(random() * 28)).padStart(2, '0')}`;
+    if (random() < 0.6) expenses.push({ ...aoi.expenses[0], id: `px${index}`, title: pick(['文具', '食材', 'ノート']), amountJpy: 100 + Math.floor(random() * 5000), incurredOn: date, place, kind: random() < 0.1 ? 'income' : 'expense', ...(random() < 0.1 ? { deletedAt: '2026-09-29T00:00:00+09:00' } : {}) });
+    else memos.push({ ...aoi.memos[0], id: `pm${index}`, title: pick(['連絡', 'メモ']), updatedAt: `${date}T${random() < 0.5 ? '23:30:00Z' : '10:00:00+09:00'}`, place });
+  }
+  const aggregated = places.aggregatePlaces(expenses, memos);
+  write('placeRecords', { expenses, memos });
+  write('placeSummaries', { aggregated, sorted: (['recent', 'amount', 'frequency'] as const).map((sort) => [sort, places.sortPlaces(aggregated, sort).map((item) => item.key)]) });
+  write('placeDistances', [0, 29.9, 30, 34, 35, 994, 995, 999.9, 1000, 1234, 12345, 1050, 1150].map((input) => ({ input, expected: placeDistanceLabel(input) })));
+  write('placeCategories', ['restaurant', 'tourism', 'unknown', '', 'constructor', 'toString'].map((input) => ({ input, expected: placeCategoryLabel(input) ?? null })));
+  const origin = { lat: 35.6431, lng: 139.6693 };
+  write('placeCoarsen', [origin, { lat: 35.6435, lng: 139.6695 }, { lat: -33.8675, lng: 151.2071 }, { lat: 35.0005, lng: -0.0005 }].map((input) => ({ input, expected: { coarse: geo.coarsen(input), distance: geo.haversineMeters(origin, input) } })));
+  const candidates = Array.from({ length: 20 }, (_, index) => {
+    const name = pick(['青葉書店', '駅前スーパー', 'カフェ', 'あおば薬局', 'Aoba']);
+    const address = pick(['', '東京都']);
+    return { key: places.placeKey(name, address), name, address, lat: origin.lat + (random() - 0.5) * 0.01, lng: origin.lng + (random() - 0.5) * 0.01, ...(random() < 0.5 ? { category: pick(['cafe', 'unknown', 'pharmacy']) } : {}), source: 'osm', licenses: ['ODbL'], attributions: ['© OpenStreetMap'] };
+  });
+  write('placeCandidates', { candidates, ranked: geo.rankCandidates(candidates, origin), refs: candidates.slice(0, 5).map((candidate) => geo.toPlaceRef(candidate, 'device', new Date('2026-09-30T07:30:00+09:00'))) });
+  // 通知の予定。見本の家族に、通知の時間が決まった予定を足して確かめる。
+  const events = [...aoi.events,
+    { ...aoi.events[0], id: 'plan-1', startsAt: '2026-09-30T18:00:00+09:00', endsAt: '2026-09-30T19:00:00+09:00', reminderMinutesBefore: 30, location: '公民館', participantMembershipIds: ['member-aoi'] },
+    { ...aoi.events[0], id: 'plan-2', startsAt: '2026-09-29T08:00:00+09:00', endsAt: '2026-09-29T09:00:00+09:00', reminderMinutesBefore: 60, recurrence: { rrule: 'FREQ=DAILY', timezone: 'Asia/Tokyo', exceptions: ['2026-10-01'] }, participantMembershipIds: ['member-aoi'] },
+    { ...aoi.events[0], id: 'plan-3', startsAt: '2026-10-01T20:00:00+09:00', endsAt: '2026-10-01T21:00:00+09:00', reminderMinutesBefore: 1440, location: '', ownerMembershipId: 'member-ren', participantMembershipIds: ['member-ren'] },
+    { ...aoi.events[0], id: 'plan-4', startsAt: '2026-10-02T09:00:00+09:00', endsAt: '2026-10-02T10:00:00+09:00', reminderMinutesBefore: 10, participantMembershipIds: ['member-aoi'] },
+  ];
+  const planned = { ...aoi, events };
+  write('notificationPlanSnapshot', planned);
+  write('notificationPlans', ['2026-09-30T07:30:00+09:00', '2026-09-30T17:45:00+09:00', '2026-09-29T21:00:00+09:00', '2026-10-01T06:00:00+09:00'].flatMap((now) => ['member-aoi', 'member-ren'].map((viewer) => ({
+    input: { now, viewer }, expected: planNotifications({ ...planned, viewer: { ...planned.viewer, membershipId: viewer } }, now),
+  }))));
+  write('searchResults', fixture('search'));
+  write('searchGroups', groupSearchResults(fixture('search')).map((group) => ({ kind: group.kind, label: group.label, ids: group.items.map((item) => item.id) })));
+}

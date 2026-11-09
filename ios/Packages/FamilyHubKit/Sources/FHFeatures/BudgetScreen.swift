@@ -65,6 +65,14 @@ struct BudgetScreen: View {
       }
     }
     .task { await loadReadingStatus() }
+    .onAppear(perform: takeFocus)
+    .onChange(of: model.focus) { _, _ in takeFocus() }
+  }
+
+  private func takeFocus() {
+    guard case .expense(let id)? = model.focus else { return }
+    model.focus = nil
+    selection = id
   }
 
   private func detail(_ id: Id) -> some View {

@@ -96,6 +96,16 @@ public protocol FamilyHubGateway: Sendable {
   // notifications
   func listNotifications() async -> GatewayResult<[HouseholdNotification]>
   func markNotificationRead(id: Id) async -> GatewayResult<HouseholdNotification>
+  /// 延ばせるのは30分だけ（Web と同じ）。
+  func snoozeNotification(id: Id, minutes: Int) async -> GatewayResult<HouseholdNotification>
+  func stopNotification(id: Id) async -> GatewayResult<HouseholdNotification>
+  func resumeNotification(id: Id) async -> GatewayResult<HouseholdNotification>
+  func getNotificationPreferences() async -> GatewayResult<NotificationPreferences>
+  func updateNotificationPreferences(_ input: NotificationPreferences) async -> GatewayResult<NotificationPreferences>
+
+  // search・insights
+  func search(_ query: String) async -> GatewayResult<[SearchResult]>
+  func listInsights() async -> GatewayResult<[Insight]>
 }
 
 public enum GatewayMode: Sendable, Hashable {
@@ -160,6 +170,13 @@ public enum GatewayMethod: String, CaseIterable, Sendable {
   case getAssistantJob = "assistant.getJob"
   case listNotifications = "notifications.list"
   case markNotificationRead = "notifications.markRead"
+  case snoozeNotification = "notifications.snooze"
+  case stopNotification = "notifications.stop"
+  case resumeNotification = "notifications.resume"
+  case getNotificationPreferences = "notifications.getPreferences"
+  case updateNotificationPreferences = "notifications.updatePreferences"
+  case search = "resources.search"
+  case listInsights = "insights.list"
 }
 
 /// JSON の引数。末尾の nil は渡さない（JS の省略と同じにする）。

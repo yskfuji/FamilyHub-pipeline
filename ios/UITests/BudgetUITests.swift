@@ -88,7 +88,10 @@ final class BudgetUITests: XCTestCase {
     amount.tap()
     amount.typeText("1001")
     XCTAssertEqual(amount.value as? String, "1,001")
-    XCTAssertTrue(app.staticTexts["碧さん ￥501・蓮さん ￥500"].waitForExistence(timeout: 5))
+    // 負担の見通しは金額の下の行。iPad の入力の画面は低いので、見えるところまで送る。
+    let preview = app.staticTexts["碧さん ￥501・蓮さん ￥500"]
+    for _ in 0..<4 where !preview.waitForExistence(timeout: 1) { app.swipeUp() }
+    XCTAssertTrue(preview.exists)
     app.buttons["budget.form.save"].tap()
     let edit = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "budget.expense.edit.")).firstMatch
     XCTAssertTrue(edit.waitForExistence(timeout: 5))

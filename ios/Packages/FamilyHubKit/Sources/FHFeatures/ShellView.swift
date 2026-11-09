@@ -55,8 +55,7 @@ enum ShellTab: String, Hashable, CaseIterable, Identifiable {
   /// この画面を作る段階（docs/ios/README.md の「段階」）。
   var plannedStage: String? {
     switch self {
-    case .today, .calendar, .tasks, .notes, .budget, .albums: nil
-    case .places, .insights: "S6"
+    case .today, .calendar, .tasks, .notes, .budget, .albums, .places, .insights: nil
     case .settings: "S7"
     }
   }
@@ -110,6 +109,7 @@ struct ShellView: View {
         if case .tab(let tab) = selection, !primary.contains(tab) { selection = .tab(.today) }
         morePath.removeAll { !overflow.contains($0) }
       }
+      .onChange(of: model.requestedTab) { _, tab in take(tab) }
     } else {
       TabView(selection: $selection) {
         ForEach(available) { tab in
@@ -121,7 +121,14 @@ struct ShellView: View {
       .onChange(of: model.snapshot?.viewer.capabilities) { _, _ in
         if case .tab(let tab) = selection, !available.contains(tab) { selection = .tab(.today) }
       }
+      .onChange(of: model.requestedTab) { _, tab in take(tab) }
     }
+  }
+
+  private func take(_ tab: ShellTab?) {
+    guard let tab else { return }
+    model.requestedTab = nil
+    open(tab)
   }
 
   /// 今日の画面の「開く」などから、ほかの機能の画面へ移る。iPhone で「その他」の中にある画面は、その他のタブの中で開く。
@@ -200,6 +207,8 @@ struct ShellContent: View {
     case .notes: NotesScreen()
     case .budget: BudgetScreen()
     case .albums: AlbumsScreen()
+    case .places: PlacesScreen()
+    case .insights: InsightsScreen()
     case .settings: InterimSettingsView()
     default: PlannedScreen(tab: tab)
     }
@@ -217,15 +226,31 @@ extension View {
 /// 上部（Web の topbar）。日付と天気、通知、昼と夜の切り替え。
 struct ShellToolbar: ViewModifier {
   @Environment(AppModel.self) private var model
+  @Environment(\.horizontalSizeClass) private var sizeClass
   @Environment(Preferences.self) private var preferences
   @Environment(\.theme) private var theme
   @State private var showNotifications = false
+  @State private var searching = false
+  @State private var adding: QuickAddKind?
 
   func body(content: Content) -> some View {
     content
       // 日付と天気は画面の副題に出す（Web の topbar-date）。上部のボタンの中に置くと、文字を大きくしたときに大きくならない。
       .navigationSubtitle(subtitle)
       .toolbar {
+        // iPad は上の帯にタブが並ぶので、右には2つしか置けない。検索とすぐに追加は左に置く。
+        ToolbarItemGroup(placement: sizeClass == .compact ? .primaryAction : .navigation) {
+          Button { searching = true } label: { Image(systemName: "magnifyingglass") }
+            .keyboardShortcut("k", modifiers: .command)
+            .accessibilityLabel("検索")
+          let kinds = QuickAddKind.allCases.filter { model.can($0.capability) }
+          if !kinds.isEmpty {
+            Menu {
+              ForEach(kinds) { kind in Button { adding = kind } label: { Label("\(kind.label)を追加", systemImage: kind.systemImage) } }
+            } label: { Image(systemName: "plus.circle") }
+            .accessibilityLabel("すぐに追加")
+          }
+        }
         ToolbarItemGroup(placement: .primaryAction) {
           if model.can(.notificationManage) {
             Button { Task { await model.loadNotifications(); showNotifications = true } } label: {
@@ -240,6 +265,8 @@ struct ShellToolbar: ViewModifier {
         }
       }
       .sheet(isPresented: $showNotifications) { NotificationsView() }
+      .sheet(isPresented: $searching) { SearchSheet { kind in Task { try? await Task.sleep(for: .milliseconds(400)); adding = kind } } }
+      .sheet(item: $adding) { QuickAddSheet(kind: $0) }
       .task { if !model.notificationsLoaded { await model.loadNotifications() } }
   }
 
@@ -263,12 +290,20 @@ struct ShellToolbar: ViewModifier {
   }
 }
 
-/// 通知の一覧（Web の通知のドロワー。止める・30分後は段階 S6 で足す）。
+/// 通知の操作。
+enum NotificationAction {
+  case snooze, stop, resume
+  var done: String { switch self { case .snooze: "通知を30分後に変更しました。"; case .stop: "この通知を停止しました。"; case .resume: "通知を再開しました。" } }
+}
+
+/// 通知の一覧（Web の通知のドロワー）。既読・30分後・停止・再開と、記録を開く。
 struct NotificationsView: View {
   @Environment(AppModel.self) private var model
   @Environment(\.dismiss) private var dismiss
   @Environment(\.theme) private var theme
   @State private var revealed: Set<Id> = []
+  @State private var busy: String?
+  @State private var device = DeviceNotifications.enabled
 
   var body: some View {
     let hide = model.privacy?.hideNotificationContent ?? true
@@ -298,15 +333,43 @@ struct NotificationsView: View {
               Text(item.body).font(.callout).foregroundStyle(theme.colors.inkSoft.color)
             }
             Text("通知予定：\(Format.time(item.remindAt))").font(.caption).foregroundStyle(theme.colors.inkSoft.color)
-            if !item.read { Button("既読にする") { Task { await model.markNotificationRead(item.id) } }.fhButton(.secondary) }
+            Button(item.kind == "todoDue" ? "タスクを開く" : "予定を開く") { dismiss(); model.open(destination: item.destination) }.fhLink()
+            HStack(spacing: TokenSpace.space2) {
+              if !item.read { Button("既読にする") { Task { busy = item.id; await model.markNotificationRead(item.id); busy = nil } }.fhButton(.secondary) }
+              if item.status != .stopped {
+                Button(busy == "\(item.id).snooze" ? "変更中…" : "30分後に通知") { run(item, .snooze) }.fhButton(.secondary)
+                Button(busy == "\(item.id).stop" ? "停止中…" : "通知を停止") { run(item, .stop) }.fhButton(.secondary)
+              } else {
+                Button("通知を再開") { run(item, .resume) }.fhButton(.secondary)
+              }
+            }
+            .disabled(busy != nil)
+            .buttonStyle(.borderless)
           }
           .padding(.vertical, TokenSpace.space2)
+        }
+        Section {
+          Toggle("この端末にも通知する", isOn: Binding(get: { device }, set: { on in
+            Task {
+              if on { device = await DeviceNotifications.enable(); if device { await DeviceNotifications.sync(model) } }
+              else { DeviceNotifications.disable(); device = false }
+            }
+          }))
+          .accessibilityIdentifier("notifications.device")
+        } footer: {
+          Text("オンにすると、タスクの期限や予定の出発時刻をこの端末に通知します。夜間（21:00〜翌7:00）の分は7:00にまとめ、内容を隠す設定なら題名を出しません。サインアウトすると、予約した通知は消えます。")
         }
       }
       .navigationTitle("通知")
       .inlineNavigationTitle()
       .toolbar { ToolbarItem(placement: .confirmationAction) { Button("閉じる") { dismiss() } } }
     }
+  }
+
+  private func run(_ item: HouseholdNotification, _ action: NotificationAction) {
+    guard busy == nil else { return }
+    busy = "\(item.id).\(action == .snooze ? "snooze" : action == .stop ? "stop" : "resume")"
+    Task { _ = await model.changeNotification(item.id, action); busy = nil }
   }
 
   private func statusLabel(_ status: NotificationStatus) -> String {

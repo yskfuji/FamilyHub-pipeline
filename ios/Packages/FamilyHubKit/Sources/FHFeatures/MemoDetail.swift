@@ -55,6 +55,10 @@ struct MemoDetailView: View {
         DetailItem(title: "共有範囲", value: Visibility.text(.memo, memo.visibility, nameOf: name))
         if let place = memo.place {
           DetailItem(title: Copy.ja.ja.place.legend, value: [place.name, place.address].compactMap { $0 }.joined(separator: "\n"))
+          if model.can(.placeRead) {
+            Button("この場所の記録を見る") { model.open(destination: "/places/\(Places.key(of: place))") }.fhButton(.secondary)
+          }
+          if place.provenance != nil { Text("\(Copy.ja.ja.place.attributionPrefix): \(Copy.ja.ja.place.attributionLabel)").font(.footnote).foregroundStyle(theme.colors.inkSoft.color) }
         }
         MemoAttachmentsView(memo: memo, canAttach: canAttach, queue: queue)
         if memo.ocrText != nil || (canEdit && !memo.attachments.isEmpty) {

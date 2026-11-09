@@ -40,12 +40,7 @@ struct MemoFormView: View {
         }
       }
       VisibilitySection(kind: .memo, audience: $draft.audience, selectedIds: $draft.selectedIds, initialAudience: initial.audience, people: visible)
-      if let place = draft.place {
-        Section("場所") {
-          LabeledContent("場所", value: place.name)
-          Button("場所を外す", role: .destructive) { draft.place = nil }
-        }
-      }
+      if model.can(.placeRead) { PlaceFieldSection(value: $draft.place) }
       if offerFiles, model.can(.memoAttach) {
         Section {
           AttachmentPickButtons { files += $0 }

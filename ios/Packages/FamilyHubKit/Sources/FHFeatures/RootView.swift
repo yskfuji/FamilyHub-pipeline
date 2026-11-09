@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 import FHModel
 import FHGateway
 import FHDesign
@@ -54,6 +55,8 @@ public struct FamilyHubRoot: View {
     }
     let next = AppModel(gateway: gateway, preferences: preferences)
     next.onLeave = { [preferences] in preferences.connection = nil }
+    NotificationOpener.shared.model = next
+    UNUserNotificationCenter.current().delegate = NotificationOpener.shared
     model = next
   }
 }

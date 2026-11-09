@@ -38,7 +38,16 @@ public final class AppModel {
   public var toast: String?
   /// ほかの画面から開きたいタスク・メモ。開く画面が受け取ったら nil に戻す。
   public var focus: Focus?
-  public enum Focus: Hashable, Sendable { case task(Id), memo(Id) }
+  public enum Focus: Hashable, Sendable { case task(Id), memo(Id), expense(Id), place(String), album(Id) }
+  /// 開くように頼まれた画面（ShellView が受け取る）。
+  var requestedTab: ShellTab?
+
+  /// Web の行き先（/tasks/<id> など）を開く。ヒント・検索・通知から使う。
+  func open(destination: String) {
+    guard let (tab, focus) = Router.route(destination) else { return }
+    self.focus = focus
+    requestedTab = tab
+  }
   public var reauth: ReauthPrompt?
   /// はじめに（家族グループの設定）を進めている間は、段階が active になっても最後まで見せる。
   public var onboarding = false
@@ -142,6 +151,8 @@ public final class AppModel {
     // 開くために取った添付のファイルは、サインアウトの後に残さない。
     AttachmentFiles.clear()
     MediaCache.shared.clear()
+    // この端末に予約した通知も、サインアウトの後に残さない。
+    DeviceNotifications.clear()
     focus = nil
     snapshot = nil
     privacy = nil
@@ -277,8 +288,30 @@ public final class AppModel {
   public func loadNotifications() async {
     guard can(.notificationManage) else { notifications = []; return }
     switch await gateway.listNotifications() {
-    case .success(let list): notifications = list; notificationsError = nil; notificationsLoaded = true
+    case .success(let list):
+      notifications = list; notificationsError = nil; notificationsLoaded = true
+      await DeviceNotifications.sync(self)
     case .failure(let failure): notificationsError = failure.message
+    }
+  }
+
+  /// 通知の操作（既読以外）。終わったら一覧を読み直す。
+  func changeNotification(_ id: Id, _ action: NotificationAction) async -> Bool {
+    let result: GatewayResult<HouseholdNotification> = await run { [gateway] in
+      switch action {
+      case .snooze: await gateway.snoozeNotification(id: id, minutes: 30)
+      case .stop: await gateway.stopNotification(id: id)
+      case .resume: await gateway.resumeNotification(id: id)
+      }
+    }
+    switch result {
+    case .success:
+      await loadNotifications()
+      announce(action.done)
+      return true
+    case .failure(let failure):
+      notificationsError = failure.message
+      return false
     }
   }
 

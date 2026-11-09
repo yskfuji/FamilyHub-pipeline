@@ -300,6 +300,17 @@ public final class HTTPGateway: FamilyHubGateway {
   // MARK: notifications
   public func listNotifications() async -> GatewayResult<[HouseholdNotification]> { await send(.init(.get, "/v1/notifications")) }
   public func markNotificationRead(id: Id) async -> GatewayResult<HouseholdNotification> { await send(.init(.post, "/v1/notifications/\(id.uriComponent)/read", csrf: true)) }
+  public func snoozeNotification(id: Id, minutes: Int) async -> GatewayResult<HouseholdNotification> {
+    await send(json(.post, "/v1/notifications/\(id.uriComponent)/snooze", ["minutes": .number(Double(minutes))]))
+  }
+  public func stopNotification(id: Id) async -> GatewayResult<HouseholdNotification> { await send(.init(.post, "/v1/notifications/\(id.uriComponent)/stop", csrf: true)) }
+  public func resumeNotification(id: Id) async -> GatewayResult<HouseholdNotification> { await send(.init(.post, "/v1/notifications/\(id.uriComponent)/resume", csrf: true)) }
+  public func getNotificationPreferences() async -> GatewayResult<NotificationPreferences> { await send(.init(.get, "/v1/notification-preferences")) }
+  public func updateNotificationPreferences(_ input: NotificationPreferences) async -> GatewayResult<NotificationPreferences> { await send(.json(.patch, "/v1/notification-preferences", input)) }
+
+  // MARK: search・insights
+  public func search(_ query: String) async -> GatewayResult<[SearchResult]> { await send(.init(.get, "/v1/search?q=\(query.uriComponent)")) }
+  public func listInsights() async -> GatewayResult<[Insight]> { await send(.init(.get, "/v1/insights")) }
 }
 
 /// 予定の変更の本文（Web と同じ順と形）。

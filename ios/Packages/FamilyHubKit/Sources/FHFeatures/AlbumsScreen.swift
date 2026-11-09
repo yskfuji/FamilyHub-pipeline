@@ -95,8 +95,16 @@ struct AlbumsScreen: View {
     }
     .sheet(isPresented: $creating) { AlbumCreateSheet { path = $0.id; Task { await load() } } }
     .task { await load() }
+    .onAppear(perform: takeFocus)
+    .onChange(of: model.focus) { _, _ in takeFocus() }
     .onChange(of: path) { _, value in if value == nil { Task { await load() } } }
     .onChange(of: model.snapshot?.viewer.permissionRevision) { _, _ in Task { await load() } }
+  }
+
+  private func takeFocus() {
+    guard case .album(let id)? = model.focus else { return }
+    model.focus = nil
+    path = id
   }
 
   private func load() async {

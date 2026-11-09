@@ -1,0 +1,1 @@
+[{"input":"restaurant","expected":"飲食店"},{"input":"tourism","expected":"観光"},{"input":"unknown","expected":null},{"input":"","expected":null},{"input":"constructor","expected":null},{"input":"toString","expected":null}]

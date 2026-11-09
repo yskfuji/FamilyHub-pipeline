@@ -127,11 +127,13 @@ public struct PlaceProvenance: Codable, Sendable, Hashable {
   public var source: String
   public var licenses: [String]
   public var attributions: [String]
+  public init(provider: String, source: String, licenses: [String], attributions: [String]) { self.provider = provider; self.source = source; self.licenses = licenses; self.attributions = attributions }
 }
 
 public struct Coordinates: Codable, Sendable, Hashable {
   public var lat: Double
   public var lng: Double
+  public init(lat: Double, lng: Double) { self.lat = lat; self.lng = lng }
 }
 
 /// 利用者が選んだ場所。端末や写真から得た利用者自身の座標は含めない。
@@ -143,6 +145,9 @@ public struct PlaceRef: Codable, Sendable, Hashable {
   public var provenance: PlaceProvenance?
   public var capturedVia: PlaceCaptureSource
   public var selectedAt: Rfc3339
+  public init(name: String, address: String? = nil, coordinates: Coordinates? = nil, category: String? = nil, provenance: PlaceProvenance? = nil, capturedVia: PlaceCaptureSource, selectedAt: Rfc3339) {
+    self.name = name; self.address = address; self.coordinates = coordinates; self.category = category; self.provenance = provenance; self.capturedVia = capturedVia; self.selectedAt = selectedAt
+  }
 }
 
 public struct Memo: Codable, Sendable, Hashable, Identifiable {
@@ -407,6 +412,7 @@ public struct SecurityOverview: Codable, Sendable, Hashable {
 public struct PlaceLookupConsent: Codable, Sendable, Hashable {
   public var noticeVersion: String
   public var grantedAt: Rfc3339
+  public init(noticeVersion: String, grantedAt: Rfc3339) { self.noticeVersion = noticeVersion; self.grantedAt = grantedAt }
 }
 
 public struct PrivacySettings: Codable, Sendable, Hashable {
@@ -433,6 +439,9 @@ public struct HouseholdNotification: Codable, Sendable, Hashable, Identifiable {
   public var remindAt: Rfc3339
   public var read: Bool
   public var status: NotificationStatus
+  public init(id: Id, kind: NotificationKind, destination: String, title: String, body: String, remindAt: Rfc3339, read: Bool, status: NotificationStatus) {
+    self.id = id; self.kind = kind; self.destination = destination; self.title = title; self.body = body; self.remindAt = remindAt; self.read = read; self.status = status
+  }
 }
 
 public struct SessionInfo: Codable, Sendable, Hashable {
