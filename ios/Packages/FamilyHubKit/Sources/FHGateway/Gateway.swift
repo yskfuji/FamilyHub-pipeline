@@ -106,6 +106,45 @@ public protocol FamilyHubGateway: Sendable {
   // search・insights
   func search(_ query: String) async -> GatewayResult<[SearchResult]>
   func listInsights() async -> GatewayResult<[Insight]>
+  // account・security（設定。段階 S7）
+  func getAccount() async -> GatewayResult<AccountProfile>
+  func updateAccount(_ input: AccountUpdateInput) async -> GatewayResult<AccountProfile>
+  /// 変えると、前のアドレスにもお知らせが届く。
+  func changeEmail(_ email: String) async -> GatewayResult<AccountProfile>
+  func deleteAccount() async -> GatewayResult<Empty>
+  func beginTotpEnrollment() async -> GatewayResult<TotpEnrollment>
+  func confirmTotpEnrollment(code: String) async -> GatewayResult<RecoveryCodes>
+  func disableTotp() async -> GatewayResult<Empty>
+  func getSecurityOverview() async -> GatewayResult<SecurityOverview>
+  func beginPasskeyRegistration() async -> GatewayResult<PasskeyRegistrationStart>
+  /// credential は WebAuthn の登録の応答（RegistrationResponseJSON）。見本では端末の確認を模した値。
+  func finishPasskeyRegistration(challengeId: Id, credential: JSONValue) async -> GatewayResult<Authenticator>
+  func changePassword(current: String, new: String) async -> GatewayResult<Empty>
+  func revokeSession(id: Id) async -> GatewayResult<Empty>
+
+  // household の管理
+  func updateHouseholdProfile(_ input: HouseholdProfileInput) async -> GatewayResult<Household>
+  func updateMembershipRole(id: Id, role: MembershipRole, expectedVersion: Int) async -> GatewayResult<HouseholdMembership>
+  func createInvite(role: MembershipRole) async -> GatewayResult<HouseholdInvite>
+  func listInvites() async -> GatewayResult<[HouseholdInvite]>
+  func revokeInvite(id: Id) async -> GatewayResult<HouseholdInvite>
+  func getPermissionOverrides(membershipId: Id) async -> GatewayResult<[PermissionOverride]>
+  func updatePermissionOverrides(membershipId: Id, overrides: [PermissionOverride], expectedPermissionRevision: Int) async -> GatewayResult<HouseholdSnapshot>
+  func resetPermissionOverrides(membershipId: Id, expectedPermissionRevision: Int) async -> GatewayResult<HouseholdSnapshot>
+
+  // family（メンバーと色のリスト）
+  func transferOwnership(toMembershipId: Id, expectedVersion: Int) async -> GatewayResult<HouseholdMembership>
+  func setMemberStatus(membershipId: Id, status: MembershipStatus, expectedVersion: Int) async -> GatewayResult<HouseholdMembership>
+  func removeMember(membershipId: Id, expectedVersion: Int) async -> GatewayResult<Empty>
+  func leaveHousehold() async -> GatewayResult<Empty>
+  func createColorLabel(_ input: ColorLabelInput) async -> GatewayResult<ColorLabel>
+  func updateColorLabel(id: Id, input: ColorLabelInput) async -> GatewayResult<ColorLabel>
+  func deleteColorLabel(id: Id) async -> GatewayResult<Empty>
+
+  // trash・audit
+  func listTrash() async -> GatewayResult<[TrashItem]>
+  func listAudit(_ query: AuditQuery) async -> GatewayResult<AuditPage>
+  func listMyAudit(_ query: AccountAuditQuery) async -> GatewayResult<AccountAuditPage>
 }
 
 public enum GatewayMode: Sendable, Hashable {
@@ -177,6 +216,36 @@ public enum GatewayMethod: String, CaseIterable, Sendable {
   case updateNotificationPreferences = "notifications.updatePreferences"
   case search = "resources.search"
   case listInsights = "insights.list"
+  case getAccount = "auth.getAccount"
+  case updateAccount = "auth.updateAccount"
+  case changeEmail = "auth.changeEmail"
+  case deleteAccount = "auth.deleteAccount"
+  case beginTotpEnrollment = "auth.beginTotpEnrollment"
+  case confirmTotpEnrollment = "auth.confirmTotpEnrollment"
+  case disableTotp = "auth.disableTotp"
+  case getSecurityOverview = "auth.getSecurityOverview"
+  case beginPasskeyRegistration = "auth.beginPasskeyRegistration"
+  case finishPasskeyRegistration = "auth.finishPasskeyRegistration"
+  case changePassword = "auth.changePassword"
+  case revokeSession = "auth.revokeSession"
+  case updateHouseholdProfile = "household.updateProfile"
+  case updateMembershipRole = "household.updateMembershipRole"
+  case createInvite = "household.createInvite"
+  case listInvites = "household.listInvites"
+  case revokeInvite = "household.revokeInvite"
+  case getPermissionOverrides = "household.getPermissionOverrides"
+  case updatePermissionOverrides = "household.updatePermissionOverrides"
+  case resetPermissionOverrides = "household.resetPermissionOverrides"
+  case transferOwnership = "family.transferOwnership"
+  case setMemberStatus = "family.setMemberStatus"
+  case removeMember = "family.removeMember"
+  case leaveHousehold = "family.leaveHousehold"
+  case createColorLabel = "family.createColorLabel"
+  case updateColorLabel = "family.updateColorLabel"
+  case deleteColorLabel = "family.deleteColorLabel"
+  case listTrash = "trash.list"
+  case listAudit = "audit.list"
+  case listMyAudit = "audit.listMine"
 }
 
 /// JSON の引数。末尾の nil は渡さない（JS の省略と同じにする）。

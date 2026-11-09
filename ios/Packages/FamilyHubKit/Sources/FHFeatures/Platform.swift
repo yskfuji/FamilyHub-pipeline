@@ -119,3 +119,33 @@ extension View {
     #endif
   }
 }
+
+extension View {
+  /// 一覧の節の間を詰める（表示の密度が「コンパクト」のとき）。
+  func densityListSpacing(_ compact: Bool) -> some View {
+    #if os(iOS)
+    self.listSectionSpacing(compact ? .compact : .default)
+    #else
+    self
+    #endif
+  }
+
+  /// 数字だけのキーボード（確認コードなど）。
+  func numberPadInput() -> some View {
+    #if os(iOS)
+    self.keyboardType(.numberPad).textContentType(.oneTimeCode)
+    #else
+    self
+    #endif
+  }
+}
+
+/// 文字をクリップボードに写す。
+@MainActor func copyToClipboard(_ text: String) {
+  #if os(iOS)
+  UIPasteboard.general.string = text
+  #else
+  NSPasteboard.general.clearContents()
+  NSPasteboard.general.setString(text, forType: .string)
+  #endif
+}

@@ -59,6 +59,8 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
+        # サーバーにつなぐ試験は、試験の側からも 127.0.0.1 の開発サーバーを http で呼ぶ（UITests-Info.plist）。
+        INFOPLIST_FILE: UITests-Info.plist
         PRODUCT_BUNDLE_IDENTIFIER: $(FH_BUNDLE_PREFIX).uitests
         TEST_TARGET_NAME: FamilyHub
 schemes:

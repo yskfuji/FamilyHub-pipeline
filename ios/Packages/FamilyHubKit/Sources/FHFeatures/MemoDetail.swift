@@ -1,5 +1,6 @@
 import SwiftUI
 import FHModel
+import FHGateway
 import FHDomain
 import FHDesign
 import FHCopy
@@ -257,11 +258,12 @@ struct MemoOcrView: View {
     defer { busy = false }
     let input = MemoForm.ocrInput(text)
     let id = memo.id, version = memo.version
-    switch await model.mutate({ await $0.updateMemo(id: id, input: input, expectedVersion: version, context: nil) }) {
-    case .success:
+    switch await model.mutateOrQueue(.memoUpdate(id: id, input: input, expectedVersion: version), summary: "メモ「\(memo.title)」の文字を修正", key: nil, { await $0.updateMemo(id: id, input: input, expectedVersion: version, context: nil) }) {
+    case .completed:
       editing = false
       model.announce("文字認識の結果を修正しました")
-    case .failure(let failure):
+    case .queued: editing = false
+    case .failed(let failure):
       error = failure.message
     }
   }

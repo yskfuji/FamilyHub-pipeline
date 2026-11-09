@@ -48,6 +48,18 @@ public struct ThemeChoice: Equatable, Sendable {
   }
 }
 
+private struct CompactDensityKey: EnvironmentKey {
+  static let defaultValue = false
+}
+
+extension EnvironmentValues {
+  /// 表示の密度が「コンパクト」か（カードの余白を詰める）。
+  public var compactDensity: Bool {
+    get { self[CompactDensityKey.self] }
+    set { self[CompactDensityKey.self] = newValue }
+  }
+}
+
 private struct ThemeKey: EnvironmentKey {
   static let defaultValue: ThemeName = .light
 }

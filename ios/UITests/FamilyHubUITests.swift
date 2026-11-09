@@ -48,7 +48,7 @@ final class FamilyHubUITests: XCTestCase {
       XCTAssertTrue(app.staticTexts["家族のアルバム"].waitForExistence(timeout: 5))
       app.navigationBars.buttons.element(boundBy: 0).tap()
       app.buttons["設定"].tap()
-      XCTAssertTrue(app.buttons["接続先を選び直す"].waitForExistence(timeout: 5))
+      XCTAssertTrue(app.buttons["settings.section.household"].waitForExistence(timeout: 5))
       // 今日の画面から、その他の中の画面（家計）へ移る。
       app.tabBars.buttons["今日"].tap()
       let budget = app.buttons["内訳と精算を確認"]
@@ -116,9 +116,14 @@ final class FamilyHubUITests: XCTestCase {
     } else {
       app.buttons["設定"].firstMatch.tap()
     }
-    let signOut = app.buttons["サインアウト"]
+    let security = app.buttons["settings.section.security"]
+    XCTAssertTrue(security.waitForExistence(timeout: 5))
+    security.tap()
+    let signOut = app.buttons["settings.session.sign-out-current"]
     XCTAssertTrue(signOut.waitForExistence(timeout: 5))
+    for _ in 0..<8 where !signOut.isHittable { app.swipeUp() }
     signOut.tap()
+    app.alerts.buttons["サインアウト"].tap()
     XCTAssertTrue(app.textFields["auth.email"].waitForExistence(timeout: 10))
   }
 }

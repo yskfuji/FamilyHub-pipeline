@@ -36,6 +36,7 @@
     "audit:controls": "node scripts/check-control-contracts.mjs",
     "ios:export": "node scripts/ios/export-all.mjs",
     "ios:device": "sh scripts/ios/device.sh",
+    "verify:ios:live": "node scripts/ios/live.mjs",
     "verify:ios": "node scripts/ios/verify.mjs",
     "audit:licenses": "node scripts/audit-licenses.mjs",
     "audit:contract": "node scripts/audit-contract.mjs",

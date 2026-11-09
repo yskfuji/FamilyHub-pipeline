@@ -206,3 +206,51 @@ final class SampleFiles: @unchecked Sendable {
     lock.withLock { urls[ref] = target }
   }
 }
+
+// MARK: 設定（段階 S7）
+extension SampleGateway {
+  public func getAccount() async -> GatewayResult<AccountProfile> { await invoke(.getAccount) }
+  public func updateAccount(_ input: AccountUpdateInput) async -> GatewayResult<AccountProfile> { await invoke(.updateAccount, input) }
+  public func changeEmail(_ email: String) async -> GatewayResult<AccountProfile> { await invoke(.changeEmail, email) }
+  public func deleteAccount() async -> GatewayResult<Empty> { await invoke(.deleteAccount) }
+  public func beginTotpEnrollment() async -> GatewayResult<TotpEnrollment> { await invoke(.beginTotpEnrollment) }
+  public func confirmTotpEnrollment(code: String) async -> GatewayResult<RecoveryCodes> { await invoke(.confirmTotpEnrollment, code) }
+  public func disableTotp() async -> GatewayResult<Empty> { await invoke(.disableTotp) }
+  public func getSecurityOverview() async -> GatewayResult<SecurityOverview> { await invoke(.getSecurityOverview) }
+  public func beginPasskeyRegistration() async -> GatewayResult<PasskeyRegistrationStart> { await invoke(.beginPasskeyRegistration) }
+  public func finishPasskeyRegistration(challengeId: Id, credential: JSONValue) async -> GatewayResult<Authenticator> { await invoke(.finishPasskeyRegistration, challengeId, credential) }
+  public func changePassword(current: String, new: String) async -> GatewayResult<Empty> { await invoke(.changePassword, current, new) }
+  public func revokeSession(id: Id) async -> GatewayResult<Empty> { await invoke(.revokeSession, id) }
+
+  public func updateHouseholdProfile(_ input: HouseholdProfileInput) async -> GatewayResult<Household> { await invoke(.updateHouseholdProfile, input) }
+  public func updateMembershipRole(id: Id, role: MembershipRole, expectedVersion: Int) async -> GatewayResult<HouseholdMembership> { await invoke(.updateMembershipRole, id, role, expectedVersion) }
+  public func createInvite(role: MembershipRole) async -> GatewayResult<HouseholdInvite> { await invoke(.createInvite, role) }
+  public func listInvites() async -> GatewayResult<[HouseholdInvite]> { await invoke(.listInvites) }
+  public func revokeInvite(id: Id) async -> GatewayResult<HouseholdInvite> { await invoke(.revokeInvite, id) }
+  public func getPermissionOverrides(membershipId: Id) async -> GatewayResult<[PermissionOverride]> { await invoke(.getPermissionOverrides, membershipId) }
+  public func updatePermissionOverrides(membershipId: Id, overrides: [PermissionOverride], expectedPermissionRevision: Int) async -> GatewayResult<HouseholdSnapshot> {
+    await invoke(.updatePermissionOverrides, membershipId, overrides, expectedPermissionRevision)
+  }
+  public func resetPermissionOverrides(membershipId: Id, expectedPermissionRevision: Int) async -> GatewayResult<HouseholdSnapshot> {
+    await invoke(.resetPermissionOverrides, membershipId, expectedPermissionRevision)
+  }
+
+  public func transferOwnership(toMembershipId: Id, expectedVersion: Int) async -> GatewayResult<HouseholdMembership> { await invoke(.transferOwnership, toMembershipId, expectedVersion) }
+  public func setMemberStatus(membershipId: Id, status: MembershipStatus, expectedVersion: Int) async -> GatewayResult<HouseholdMembership> { await invoke(.setMemberStatus, membershipId, status, expectedVersion) }
+  public func removeMember(membershipId: Id, expectedVersion: Int) async -> GatewayResult<Empty> { await invoke(.removeMember, membershipId, expectedVersion) }
+  public func leaveHousehold() async -> GatewayResult<Empty> { await invoke(.leaveHousehold) }
+  public func createColorLabel(_ input: ColorLabelInput) async -> GatewayResult<ColorLabel> { await invoke(.createColorLabel, input) }
+  public func updateColorLabel(id: Id, input: ColorLabelInput) async -> GatewayResult<ColorLabel> { await invoke(.updateColorLabel, id, input) }
+  public func deleteColorLabel(id: Id) async -> GatewayResult<Empty> { await invoke(.deleteColorLabel, id) }
+
+  public func listTrash() async -> GatewayResult<[TrashItem]> { await invoke(.listTrash) }
+  public func listAudit(_ query: AuditQuery) async -> GatewayResult<AuditPage> { await invoke(.listAudit, query) }
+  public func listMyAudit(_ query: AccountAuditQuery) async -> GatewayResult<AccountAuditPage> { await invoke(.listMyAudit, query) }
+}
+
+extension SampleGateway {
+  /// 通信が切れた状態を試す（Web の見本の offline の場面）。次に家族の記録を読み込むまで、変更は OFFLINE で断られる。
+  public func simulateOffline() async {
+    let _: GatewayResult<HouseholdSnapshot> = await invoke(.getSnapshot, "offline")
+  }
+}

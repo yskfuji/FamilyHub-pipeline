@@ -33,6 +33,10 @@ for (const item of catalog.cases) {
     if (!name || !source.includes(name)) broken.push(`${item.id}: ${file} に「${name}」がない`);
   }
 }
+// iOS のアプリ（products の I）で確かめる使い方は、ios/ の試験を名指しする。
+const iosUnnamed = catalog.cases.filter((item) => item.products.includes('I') && !(item.tests ?? []).some((reference) => reference.startsWith('ios/'))).map((item) => item.id);
+if (iosUnnamed.length) throw new Error(`use-case catalog: iOS cases without an ios/ test: ${iosUnnamed}`);
 if (unnamed.length || broken.length) throw new Error(`use-case catalog test references: unnamed=${unnamed}; broken=${broken.join(' / ')}`);
 const named = catalog.cases.filter((item) => item.tests?.length);
-console.log(`Use-case catalog: ${ids.length} entries, no duplicates or omissions, capabilities all exist; ${named.length} name ${named.reduce((sum, item) => sum + item.tests.length, 0)} tests that exist.`);
+const ios = catalog.cases.filter((item) => item.products.includes('I')).length;
+console.log(`Use-case catalog: ${ids.length} entries, no duplicates or omissions, capabilities all exist; ${named.length} name ${named.reduce((sum, item) => sum + item.tests.length, 0)} tests that exist; ${ios} are checked in the iOS app.`);

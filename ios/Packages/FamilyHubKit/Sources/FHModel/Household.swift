@@ -29,6 +29,7 @@ public struct PermissionOverride: Codable, Sendable, Hashable {
   public var membershipId: Id
   public var capability: Capability
   public var effect: String
+  public init(membershipId: Id, capability: Capability, effect: String) { self.membershipId = membershipId; self.capability = capability; self.effect = effect }
 }
 
 public struct ViewerContext: Codable, Sendable, Hashable {

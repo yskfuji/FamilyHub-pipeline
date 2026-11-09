@@ -314,3 +314,63 @@ public struct UploadSlot: Codable, Sendable, Hashable {
   public var itemId: Id
   public var offset: Int
 }
+
+// 未送信の変更（待ち行列）に入れた入力を読み戻すため、変更の入力も読めるようにする。
+// 項目がなければ keep、null なら clear、値があれば set（書くときと逆）。
+extension KeyedDecodingContainer {
+  func decodePatch<Value>(_ type: Value.Type, forKey key: Key) throws -> Patch<Value> {
+    guard contains(key) else { return .keep }
+    if try decodeNil(forKey: key) { return .clear }
+    return .set(try decode(Value.self, forKey: key))
+  }
+}
+
+extension EventUpdateInput: Decodable {
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: Keys.self)
+    self.init()
+    title = try container.decodeIfPresent(String.self, forKey: .title)
+    startsAt = try container.decodeIfPresent(Rfc3339.self, forKey: .startsAt)
+    endsAt = try container.decodeIfPresent(Rfc3339.self, forKey: .endsAt)
+    allDay = try container.decodeIfPresent(Bool.self, forKey: .allDay)
+    participantMembershipIds = try container.decodeIfPresent([Id].self, forKey: .participantMembershipIds)
+    location = try container.decodePatch(String.self, forKey: .location)
+    note = try container.decodePatch(String.self, forKey: .note)
+    weatherSensitive = try container.decodeIfPresent(Bool.self, forKey: .weatherSensitive)
+    colorLabelId = try container.decodePatch(Id.self, forKey: .colorLabelId)
+    reminderMinutesBefore = try container.decodePatch(Int.self, forKey: .reminderMinutesBefore)
+    visibility = try container.decodeIfPresent(VisibilityInput.self, forKey: .visibility)
+    recurrence = try container.decodePatch(RecurrenceRule.self, forKey: .recurrence)
+  }
+}
+
+extension TodoUpdateInput: Decodable {
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: Keys.self)
+    self.init()
+    title = try container.decodeIfPresent(String.self, forKey: .title)
+    assigneeMembershipId = try container.decodeIfPresent(Id.self, forKey: .assigneeMembershipId)
+    reviewerMembershipId = try container.decodePatch(Id.self, forKey: .reviewerMembershipId)
+    dueAt = try container.decodePatch(Rfc3339.self, forKey: .dueAt)
+    dueStartAt = try container.decodePatch(Rfc3339.self, forKey: .dueStartAt)
+    note = try container.decodePatch(String.self, forKey: .note)
+    priority = try container.decodePatch(TodoPriority.self, forKey: .priority)
+    colorLabelId = try container.decodePatch(Id.self, forKey: .colorLabelId)
+    visibility = try container.decodeIfPresent(VisibilityInput.self, forKey: .visibility)
+    recurrence = try container.decodePatch(RecurrenceRule.self, forKey: .recurrence)
+  }
+}
+
+extension MemoUpdateInput: Decodable {
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: Keys.self)
+    self.init()
+    title = try container.decodeIfPresent(String.self, forKey: .title)
+    body = try container.decodeIfPresent(String.self, forKey: .body)
+    tags = try container.decodeIfPresent([String].self, forKey: .tags)
+    memoDate = try container.decodePatch(IsoDate.self, forKey: .memoDate)
+    place = try container.decodePatch(PlaceRef.self, forKey: .place)
+    ocrText = try container.decodePatch(String.self, forKey: .ocrText)
+    visibility = try container.decodeIfPresent(VisibilityInput.self, forKey: .visibility)
+  }
+}

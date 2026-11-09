@@ -385,3 +385,68 @@ extension String {
     return (addingPercentEncoding(withAllowedCharacters: allowed) ?? self).replacingOccurrences(of: " ", with: "+")
   }
 }
+
+// MARK: 設定（段階 S7）
+extension HTTPGateway {
+  /// Web の queryOf（URLSearchParams）と同じ並びと書き方。空なら付けない。
+  static func query(_ items: [(String, String)]) -> String {
+    items.isEmpty ? "" : "?" + items.map { "\($0.0.formComponent)=\($0.1.formComponent)" }.joined(separator: "&")
+  }
+
+  public func getAccount() async -> GatewayResult<AccountProfile> { await send(.init(.get, "/v1/account")) }
+  public func updateAccount(_ input: AccountUpdateInput) async -> GatewayResult<AccountProfile> { await send(.json(.patch, "/v1/account", input)) }
+  public func changeEmail(_ email: String) async -> GatewayResult<AccountProfile> { await send(json(.post, "/v1/account/email", ["email": .string(email)])) }
+  public func deleteAccount() async -> GatewayResult<Empty> { await send(.init(.delete, "/v1/account", csrf: true)) }
+  public func beginTotpEnrollment() async -> GatewayResult<TotpEnrollment> { await send(.init(.post, "/v1/account/totp", csrf: true)) }
+  public func confirmTotpEnrollment(code: String) async -> GatewayResult<RecoveryCodes> { await send(json(.post, "/v1/account/totp/confirm", ["code": .string(code)])) }
+  public func disableTotp() async -> GatewayResult<Empty> { await send(.init(.delete, "/v1/account/totp", csrf: true)) }
+  public func getSecurityOverview() async -> GatewayResult<SecurityOverview> { await send(.init(.get, "/v1/auth/security")) }
+  public func beginPasskeyRegistration() async -> GatewayResult<PasskeyRegistrationStart> { await send(.init(.post, "/v1/auth/passkeys/registration", csrf: true)) }
+  public func finishPasskeyRegistration(challengeId: Id, credential: JSONValue) async -> GatewayResult<Authenticator> {
+    await send(json(.post, "/v1/auth/passkeys/registration/complete", ["challengeId": .string(challengeId), "credential": credential]))
+  }
+  public func changePassword(current: String, new: String) async -> GatewayResult<Empty> {
+    await send(json(.post, "/v1/auth/password/change", ["currentPassword": .string(current), "newPassword": .string(new)]))
+  }
+  public func revokeSession(id: Id) async -> GatewayResult<Empty> { await send(.init(.delete, "/v1/auth/sessions/\(id.uriComponent)", csrf: true)) }
+
+  public func updateHouseholdProfile(_ input: HouseholdProfileInput) async -> GatewayResult<Household> { await send(.json(.patch, "/v1/households/current", input)) }
+  public func updateMembershipRole(id: Id, role: MembershipRole, expectedVersion: Int) async -> GatewayResult<HouseholdMembership> {
+    await send(json(.patch, "/v1/household-memberships/\(id.uriComponent)", ["role": .string(role.rawValue), "expectedVersion": .number(Double(expectedVersion))]))
+  }
+  public func createInvite(role: MembershipRole) async -> GatewayResult<HouseholdInvite> { await send(json(.post, "/v1/household-invites", ["role": .string(role.rawValue)])) }
+  public func listInvites() async -> GatewayResult<[HouseholdInvite]> { await send(.init(.get, "/v1/household-invites")) }
+  public func revokeInvite(id: Id) async -> GatewayResult<HouseholdInvite> { await send(.init(.delete, "/v1/household-invites/\(id.uriComponent)", csrf: true)) }
+  public func getPermissionOverrides(membershipId: Id) async -> GatewayResult<[PermissionOverride]> {
+    await send(.init(.get, "/v1/household-memberships/\(membershipId.uriComponent)/permission-overrides"))
+  }
+  public func updatePermissionOverrides(membershipId: Id, overrides: [PermissionOverride], expectedPermissionRevision: Int) async -> GatewayResult<HouseholdSnapshot> {
+    await send(.json(.put, "/v1/household-memberships/\(membershipId.uriComponent)/permission-overrides", OverridesBody(overrides: overrides, expectedPermissionRevision: expectedPermissionRevision)))
+  }
+  public func resetPermissionOverrides(membershipId: Id, expectedPermissionRevision: Int) async -> GatewayResult<HouseholdSnapshot> {
+    await send(.init(.delete, "/v1/household-memberships/\(membershipId.uriComponent)/permission-overrides?expectedPermissionRevision=\(expectedPermissionRevision)", csrf: true))
+  }
+
+  public func transferOwnership(toMembershipId: Id, expectedVersion: Int) async -> GatewayResult<HouseholdMembership> {
+    await send(json(.post, "/v1/households/current/ownership", ["toMembershipId": .string(toMembershipId), "expectedVersion": .number(Double(expectedVersion))]))
+  }
+  public func setMemberStatus(membershipId: Id, status: MembershipStatus, expectedVersion: Int) async -> GatewayResult<HouseholdMembership> {
+    await send(json(.put, "/v1/household-memberships/\(membershipId.uriComponent)/status", ["status": .string(status.rawValue), "expectedVersion": .number(Double(expectedVersion))]))
+  }
+  public func removeMember(membershipId: Id, expectedVersion: Int) async -> GatewayResult<Empty> {
+    await send(.init(.delete, "/v1/household-memberships/\(membershipId.uriComponent)?expectedVersion=\(expectedVersion)", csrf: true))
+  }
+  public func leaveHousehold() async -> GatewayResult<Empty> { await send(.init(.post, "/v1/households/current/leave", csrf: true)) }
+  public func createColorLabel(_ input: ColorLabelInput) async -> GatewayResult<ColorLabel> { await send(.json(.post, "/v1/color-labels", input)) }
+  public func updateColorLabel(id: Id, input: ColorLabelInput) async -> GatewayResult<ColorLabel> { await send(.json(.put, "/v1/color-labels/\(id.uriComponent)", input)) }
+  public func deleteColorLabel(id: Id) async -> GatewayResult<Empty> { await send(.init(.delete, "/v1/color-labels/\(id.uriComponent)", csrf: true)) }
+
+  public func listTrash() async -> GatewayResult<[TrashItem]> { await send(.init(.get, "/v1/recently-deleted")) }
+  public func listAudit(_ query: AuditQuery) async -> GatewayResult<AuditPage> { await send(.init(.get, "/v1/audit-events\(Self.query(query.queryItems))")) }
+  public func listMyAudit(_ query: AccountAuditQuery) async -> GatewayResult<AccountAuditPage> { await send(.init(.get, "/v1/account/audit-events\(Self.query(query.queryItems))")) }
+}
+
+struct OverridesBody: Encodable, Sendable {
+  var overrides: [PermissionOverride]
+  var expectedPermissionRevision: Int
+}

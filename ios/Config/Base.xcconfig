@@ -3,7 +3,7 @@ FH_BUNDLE_PREFIX = example.familyhub
 FH_TEAM_ID =
 // 手元の開発サーバー（npm run dev:lan が表示する URL）。空なら見本だけ。xcconfig では // が注釈になるので https:/$()/ と書く。
 FH_DEV_SERVER_URL =
-// パスキーを使うドメイン（webcredentials）。空ならパスキーの入口を出さない。
+// パスキーを使うドメイン（webcredentials）。空ならパスキーの追加を出さない。使うときは entitlement の associated-domains にも webcredentials:<ドメイン> を足す（docs/ios/README.md）。
 FH_ASSOCIATED_DOMAIN =
 
 IPHONEOS_DEPLOYMENT_TARGET = 26.0

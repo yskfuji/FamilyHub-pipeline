@@ -38,7 +38,7 @@ public final class AppModel {
   public var toast: String?
   /// ほかの画面から開きたいタスク・メモ。開く画面が受け取ったら nil に戻す。
   public var focus: Focus?
-  public enum Focus: Hashable, Sendable { case task(Id), memo(Id), expense(Id), place(String), album(Id) }
+  public enum Focus: Hashable, Sendable { case task(Id), memo(Id), expense(Id), place(String), album(Id), settings(String) }
   /// 開くように頼まれた画面（ShellView が受け取る）。
   var requestedTab: ShellTab?
 
@@ -66,10 +66,15 @@ public final class AppModel {
   @ObservationIgnored private var lastPing = Date()
   @ObservationIgnored private let clock: @Sendable () -> Date
 
-  public init(gateway: any FamilyHubGateway, preferences: Preferences, clock: @escaping @Sendable () -> Date = { Date() }) {
+  /// 送れなかった変更（予定・タスク・メモの追加と変更）。見本は記憶の中、サーバーは端末に暗号にして置く。
+  @ObservationIgnored public let queue: OfflineQueue
+  public private(set) var pendingCommands: [QueuedCommand] = []
+
+  public init(gateway: any FamilyHubGateway, preferences: Preferences, clock: @escaping @Sendable () -> Date = { Date() }, queueStore: (any QueueStore)? = nil) {
     self.gateway = gateway
     self.preferences = preferences
     self.clock = clock
+    queue = OfflineQueue(store: queueStore ?? (gateway.mode == .sample ? MemoryQueueStore() : DeviceQueueStore()))
     // 見本は最初からサインインしている（Web の見本と同じ）。
     if gateway.mode == .sample { session = SessionInfo(stage: .active, idleTimeoutMinutes: 30) }
   }
@@ -121,6 +126,7 @@ public final class AppModel {
     switch await gateway.getSnapshot() {
     case .success(let value):
       snapshot = value
+      if blocking { await loadQueue() }
       if let privacyTask, value.viewer.capabilities.contains(.settingsOwn), case .success(let settings) = await privacyTask.value { privacy = settings }
       return true
     case .failure(let failure):
@@ -323,4 +329,103 @@ public final class AppModel {
   }
 
   public var unreadNotifications: Int { notifications.filter { !$0.read }.count }
+
+  // MARK: 送れなかった変更（Web の executeQueueable・retryQueued）
+
+  public enum QueueOutcome<Value: Sendable>: Sendable {
+    case completed(Value)
+    case queued
+    case failed(GatewayError)
+  }
+
+  /// 送る。つながらなかったときだけ、未送信の変更としてこの端末に置く。key は最初に送ったときの冪等の鍵（送り直しでも同じ）。
+  public func mutateOrQueue<Value: Sendable>(_ command: QueueableCommand, summary: String, key: String?, _ operation: @escaping @Sendable (any FamilyHubGateway) async -> GatewayResult<Value>) async -> QueueOutcome<Value> {
+    let result = await mutate(operation)
+    switch result {
+    case .success(let value): return .completed(value)
+    case .failure(let failure) where failure.code == .offline:
+      guard let snapshot else { return .failed(failure) }
+      do {
+        try await queue.enqueue(command, summary: summary, actorUserId: snapshot.viewer.userId, householdId: snapshot.household.id, permissionRevision: snapshot.viewer.permissionRevision, clientOperationId: key)
+        await loadQueue()
+        announce("未送信の変更として、この端末に保存しました。")
+        return .queued
+      } catch {
+        return .failed(GatewayError(code: .offline, message: (error as? LocalizedError)?.errorDescription ?? failure.message, retryable: true))
+      }
+    case .failure(let failure): return .failed(failure)
+    }
+  }
+
+  /// 未送信の変更を読み直す。別の人・別の家族の変更なら、送らずに消す。
+  public func loadQueue() async {
+    do {
+      let items = try await queue.list()
+      if let snapshot, items.contains(where: { $0.actorUserId != snapshot.viewer.userId || $0.householdId != snapshot.household.id }) {
+        try? await queue.clear()
+        pendingCommands = []
+        announce("別のアカウントで保存された未送信の変更を削除しました。")
+        return
+      }
+      pendingCommands = items
+    } catch {
+      pendingCommands = []
+      try? await queue.clear()
+      announce("未送信の変更を読み込めませんでした。この端末に残っていた分は削除しました。")
+    }
+  }
+
+  private func send(_ item: QueuedCommand) async -> GatewayResult<Empty> {
+    let context = MutationContext(idempotencyKey: item.clientOperationId, expectedPermissionRevision: item.permissionRevision)
+    return await run { [gateway] () async -> GatewayResult<Empty> in
+      switch item.command {
+      case .eventCreate(let input): return await gateway.createEvent(input, context: context).map { _ in Empty() }
+      case .eventUpdate(let id, let scope, let input, let version, let date): return await gateway.updateEvent(id: id, scope: scope, input: input, expectedVersion: version, context: context, occurrenceDate: date).map { _ in Empty() }
+      case .taskCreate(let input): return await gateway.createTodo(input, context: context).map { _ in Empty() }
+      case .taskUpdate(let id, let scope, let input, let version): return await gateway.updateTodo(id: id, scope: scope, input: input, expectedVersion: version, context: context).map { _ in Empty() }
+      case .memoCreate(let input): return await gateway.createMemo(input, context: context).map { _ in Empty() }
+      case .memoUpdate(let id, let input, let version): return await gateway.updateMemo(id: id, input: input, expectedVersion: version, context: context).map { _ in Empty() }
+      }
+    }
+  }
+
+  /// 確かめてから送る（id がなければすべて）。版の競合は「内容の確認が必要」、権限や対象がないときは「権限の確認が必要」にして残す。
+  public func retryQueued(_ id: String? = nil) async {
+    if case .failure(let failure) = await gateway.getSnapshot() {
+      announce("\(failure.message) 接続を確認してから、もう一度お試しください。")
+      return
+    }
+    let targets = ((try? await queue.list()) ?? []).filter { id == nil || $0.id == id }
+    var sent = 0
+    for item in targets {
+      switch await send(item) {
+      case .success:
+        try? await queue.remove(item.id); sent += 1
+      case .failure(let failure) where failure.code == .conflict:
+        try? await queue.mark(item.id, .conflicted)
+      case .failure(let failure) where failure.code == .forbidden || failure.code == .notFound:
+        try? await queue.mark(item.id, .blocked)
+      case .failure(let failure):
+        announce("\(item.summary)を送信できませんでした。\(failure.message)")
+        await loadQueue()
+        await refresh()
+        return
+      }
+    }
+    await loadQueue()
+    await refresh()
+    announce(sent > 0 ? "\(sent)件を送信しました。" : "送信できる変更はありません。最新の内容と権限を確認してください。")
+  }
+
+  public func discardQueued(_ id: String) async {
+    try? await queue.remove(id)
+    await loadQueue()
+    announce("未送信の変更を削除しました。")
+  }
+
+  public func clearQueued() async {
+    try? await queue.clear()
+    pendingCommands = []
+    announce("未送信の変更をすべて削除しました。")
+  }
 }

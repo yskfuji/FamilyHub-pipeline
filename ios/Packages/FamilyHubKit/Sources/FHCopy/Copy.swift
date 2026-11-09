@@ -210,6 +210,7 @@ public enum Copy {
         public static let municipality = "自治体"
         public static let document = "文書"
         public static let other = "その他"
+        public static let table: [String: String] = ["school": "学校", "municipality": "自治体", "document": "文書", "other": "その他"]
       }
       public static let capability: [String: String] = ["household.members.read": "家族のメンバーを見る", "household.members.manage": "メンバーと役割を管理する", "household.invites.manage": "招待を管理する", "event.read": "予定を見る", "event.create": "予定を追加する", "event.update": "予定を変更する", "event.delete": "予定を削除する", "task.read": "タスクを見る", "task.create": "タスクを追加する", "task.update": "タスクを変更する", "task.delete": "タスクを削除する", "task.transition": "タスクの状態を変更する", "memo.read": "メモを見る", "memo.create": "メモを追加する", "memo.update": "メモを変更する", "memo.delete": "メモを削除する", "memo.attach": "メモにファイルを添付する", "expense.read": "家計を見る", "expense.create": "支出を追加する", "expense.update": "支出を変更する", "expense.delete": "支出を削除する", "expense.settle": "精算を記録する", "album.read": "アルバムを見る", "album.create": "アルバムを作る", "album.update": "アルバムを変更する", "album.delete": "アルバムを削除する", "link.manage": "関連づけを変更する", "assistant.use": "読み取りの補助を使う", "place.read": "記録した場所を見る・付ける", "insight.read": "暮らしのヒントを見る", "resource.read": "関連リンクを見る", "settings.own": "自分の設定を変更する", "notification.manage": "通知を管理する", "audit.read": "変更の記録を見る"]
       public enum actions {
@@ -410,6 +411,7 @@ public enum Copy {
       public static let invited = "招待中"
       public static let suspended = "利用停止"
       public static let left = "退出済み"
+      public static let table: [String: String] = ["active": "利用中", "invited": "招待中", "suspended": "利用停止", "left": "退出済み"]
     }
     public enum notificationStatusLabels {
       public static let active = "通知予定"
@@ -421,6 +423,7 @@ public enum Copy {
       public static let adult = "大人のメンバー"
       public static let child = "子どもメンバー"
       public static let guest = "ゲスト"
+      public static let table: [String: String] = ["owner": "管理者", "adult": "大人のメンバー", "child": "子どもメンバー", "guest": "ゲスト"]
     }
     public enum seriesPreviewCopy {
       public static let switchToFuture = "「これ以降の予定」に切り替える"
@@ -632,6 +635,7 @@ public enum Copy {
       public static let title = "題名"
       public static let visibility = "公開範囲"
       public static let weatherSensitive = "天気の影響"
+      public static let table: [String: String] = ["allDay": "終日", "amountJpy": "金額", "assigneeMembershipId": "担当", "avatar": "アイコン", "bgmPreset": "音楽", "birthdate": "誕生日", "body": "本文", "category": "費目", "colorLabelId": "色のリスト", "coverItemId": "表紙", "description": "説明", "displayName": "表示名", "dueAt": "期限", "dueStartAt": "期限の開始", "endsAt": "終了", "idleTimeoutMinutes": "無操作の時間", "incurredOn": "日付", "kind": "種類", "location": "場所", "memoDate": "メモの日付", "note": "メモ", "ocrText": "読み取った文字", "participantMembershipIds": "参加者", "payerMembershipId": "支払った人", "place": "場所", "priority": "優先度", "recurrence": "繰り返し", "reminderMinutesBefore": "通知", "reviewerMembershipId": "確認する人", "shareAmounts": "負担", "shareMembershipIds": "負担", "startsAt": "開始", "tags": "タグ", "timezone": "時間帯", "title": "題名", "visibility": "公開範囲", "weatherSensitive": "天気の影響"]
     }
     public enum auditGroupLabels {
       public static let account = "アカウント"
@@ -647,6 +651,7 @@ public enum Copy {
       public static let assistant = "読み取りの補助"
       public static let `operator` = "運営者"
       public static let other = "そのほか"
+      public static let table: [String: String] = ["account": "アカウント", "household": "家族グループ", "members": "メンバーと招待", "events": "予定", "tasks": "タスク", "memos": "メモ", "expenses": "家計", "albums": "アルバム", "links": "関連づけ", "notifications": "通知", "assistant": "読み取りの補助", "operator": "運営者", "other": "そのほか"]
     }
     public enum auditTargetLabels {
       public static let event = "予定"
@@ -660,6 +665,7 @@ public enum Copy {
       public static let colorLabel = "色のリスト"
       public static let link = "関連づけ"
       public static let notification = "通知"
+      public static let table: [String: String] = ["event": "予定", "task": "タスク", "memo": "メモ", "expense": "家計の記録", "settlementBatch": "まとめた精算", "album": "アルバム", "member": "メンバー", "invite": "招待", "colorLabel": "色のリスト", "link": "関連づけ", "notification": "通知"]
     }
   }
   public enum auditIntro {

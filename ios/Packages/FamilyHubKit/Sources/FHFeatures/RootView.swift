@@ -3,6 +3,7 @@ import UserNotifications
 import FHModel
 import FHGateway
 import FHDesign
+import FHCopy
 
 /// アプリの一番外側。接続先（見本・サーバー）を選び、選んだ接続先の AppModel を作る。
 public struct FamilyHubRoot: View {
@@ -13,7 +14,11 @@ public struct FamilyHubRoot: View {
 
   public init(configuration: LaunchConfiguration) {
     self.configuration = configuration
-    if configuration.resetPreferences, let domain = Bundle.main.bundleIdentifier { UserDefaults.standard.removePersistentDomain(forName: domain) }
+    if configuration.resetPreferences {
+      // 試験のための「はじめから」。設定と、サーバーのセッションの cookie を消す（前の試験のサインインを持ち越さない）。
+      if let domain = Bundle.main.bundleIdentifier { UserDefaults.standard.removePersistentDomain(forName: domain) }
+      HTTPCookieStorage.shared.removeCookies(since: .distantPast)
+    }
     let preferences = Preferences()
     if configuration.forceSample { preferences.connection = .sample }
     if preferences.connection == .server, configuration.serverURL == nil { preferences.connection = nil }
@@ -37,6 +42,9 @@ public struct FamilyHubRoot: View {
         }
       }
       .environment(preferences)
+      .environment(\.compactDensity, preferences.density == .compact)
+      .densityListSpacing(preferences.density == .compact)
+      .modifier(MotionAndPrivacy(preferences: preferences))
     }
     .task(id: preferences.connection) { connect() }
   }
@@ -61,11 +69,41 @@ public struct FamilyHubRoot: View {
   }
 }
 
+/// 「動きを減らす」と「隠れている間はぼかす」（この端末の設定）。
+struct MotionAndPrivacy: ViewModifier {
+  let preferences: Preferences
+  @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+  @Environment(\.scenePhase) private var scenePhase
+
+  func body(content: Content) -> some View {
+    let reduce = preferences.reducedMotion || systemReduceMotion
+    let hidden = preferences.privacyBlur && scenePhase != .active
+    content
+      // 動きを減らすときは、画面の切り替えや開閉の動きを止める。
+      .transaction { if reduce { $0.disablesAnimations = true } }
+      .environment(\.fhReduceMotion, reduce)
+      .blur(radius: hidden ? 24 : 0)
+      .overlay { if hidden { Color.black.opacity(0.25).ignoresSafeArea().accessibilityHidden(true) } }
+      .accessibilityHidden(hidden)
+  }
+}
+
+private struct ReduceMotionKey: EnvironmentKey { static let defaultValue = false }
+
+extension EnvironmentValues {
+  /// 動きを減らすか（端末の設定か、この端末のアプリの設定）。
+  var fhReduceMotion: Bool {
+    get { self[ReduceMotionKey.self] }
+    set { self[ReduceMotionKey.self] = newValue }
+  }
+}
+
 /// 段階ごとの画面と、どの画面の上にも出すもの（本人確認・無操作の予告・短い知らせ）。
 struct AppStageView: View {
   @Environment(AppModel.self) private var model
   @Environment(\.scenePhase) private var scenePhase
   @Environment(\.theme) private var theme
+  @State private var showingPending = false
 
   var body: some View {
     @Bindable var model = model
@@ -87,6 +125,7 @@ struct AppStageView: View {
         ReauthSheet(prompt: prompt).interactiveDismissDisabled()
       }
       .overlay(alignment: .bottom) { bottomNotices }
+      .sheet(isPresented: $showingPending) { PendingChangesSheet() }
       #if os(iOS)
       .background(ActivityTracker { model.recordActivity() })
       #endif
@@ -113,6 +152,9 @@ struct AppStageView: View {
 
   @ViewBuilder private var bottomNotices: some View {
     VStack(spacing: TokenSpace.space2) {
+      if model.stage == .ready, !model.pendingCommands.isEmpty {
+        PendingCard(count: model.pendingCommands.count) { showingPending = true }
+      }
       if let remaining = model.idleRemaining {
         IdleCard(remaining: remaining) { model.recordActivity() }
       }
@@ -127,6 +169,86 @@ struct AppStageView: View {
     }
     .padding(.horizontal, TokenSpace.space4)
     .padding(.bottom, 72)
+  }
+}
+
+/// 未送信の変更があることの知らせ（Web の上部の「未送信の変更」）。
+struct PendingCard: View {
+  @Environment(\.theme) private var theme
+  let count: Int
+  let open: () -> Void
+  var body: some View {
+    let colors = theme.colors
+    HStack(spacing: TokenSpace.space3) {
+      Image(systemName: "icloud.slash").foregroundStyle(colors.attention.color).accessibilityHidden(true)
+      Text("未送信の変更が\(count)件あります").font(.callout.weight(.semibold)).foregroundStyle(colors.ink.color)
+      Spacer(minLength: 0)
+      Button("確認する", action: open).fhButton(.secondary).accessibilityIdentifier("queue.open")
+    }
+    .padding(.horizontal, TokenSpace.space4)
+    .padding(.vertical, TokenSpace.space2)
+    .background(colors.sheetRaised.color, in: RoundedRectangle(cornerRadius: TokenRadius.radiusMd))
+    .overlay(RoundedRectangle(cornerRadius: TokenRadius.radiusMd).stroke(colors.attention.color))
+    .accessibilityElement(children: .contain)
+  }
+}
+
+/// 未送信の変更の一覧。接続が戻っても自動では送らない。確かめてから送るか、削除する。
+struct PendingChangesSheet: View {
+  @Environment(AppModel.self) private var model
+  @Environment(\.dismiss) private var dismiss
+  @Environment(\.theme) private var theme
+  @State private var busy = false
+  @State private var clearing = false
+
+  var body: some View {
+    let colors = theme.colors
+    NavigationStack {
+      List {
+        Section {
+          Text("送信する内容を確認してください。接続が戻っても自動では送信しません。").font(.callout).foregroundStyle(colors.inkSoft.color)
+        }
+        if model.pendingCommands.isEmpty {
+          Text("未送信の変更はありません。").foregroundStyle(colors.inkSoft.color)
+        }
+        ForEach(model.pendingCommands) { item in
+          VStack(alignment: .leading, spacing: TokenSpace.space2) {
+            HStack {
+              StatusBadge(item.state == .pending ? "未送信" : item.state == .conflicted ? "内容の確認が必要" : "権限の確認が必要", tone: item.state == .pending ? .attention : .danger)
+              Spacer()
+              Text("保存後24時間まで").font(.footnote).foregroundStyle(colors.inkSoft.color)
+            }
+            Text(item.summary).font(.headline).foregroundStyle(colors.ink.color)
+            HStack(spacing: TokenSpace.space2) {
+              Button("この変更を送信") { Task { busy = true; await model.retryQueued(item.id); busy = false } }
+                .fhButton(.primary)
+                .accessibilityIdentifier("queue.retry.\(item.id)")
+              Button("削除") { Task { await model.discardQueued(item.id) } }
+                .fhButton(.secondary)
+                .accessibilityIdentifier("queue.discard.\(item.id)")
+            }
+            .buttonStyle(.borderless)
+          }
+          .padding(.vertical, TokenSpace.space1)
+        }
+        if !model.pendingCommands.isEmpty {
+          Section {
+            Button(busy ? "送信しています…" : "すべて送信") { Task { busy = true; await model.retryQueued(); busy = false } }
+              .disabled(busy)
+              .accessibilityIdentifier("queue.retry-all")
+            Button { clearing = true } label: { Text("すべて削除").foregroundStyle(colors.danger.color) }.disabled(busy)
+          }
+        }
+      }
+      .disabled(busy)
+      .navigationTitle("未送信の変更")
+      .inlineNavigationTitle()
+      .toolbar { ToolbarItem(placement: .confirmationAction) { Button("閉じる") { dismiss() } } }
+      .alert("未送信の変更をすべて削除しますか", isPresented: $clearing) {
+        Button(Copy.ja.ja.actions.cancel, role: .cancel) {}
+        Button("すべて削除", role: .destructive) { Task { await model.clearQueued() } }
+      } message: { Text("この端末に保存した変更は送信されずに消えます。") }
+    }
   }
 }
 

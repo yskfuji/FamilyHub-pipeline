@@ -59,13 +59,14 @@ extension ThemeName {
 /// カード（.card）。accent は上に柿色の線を引く（要確認のとき）。
 public struct Card<Content: View>: View {
   @Environment(\.theme) private var theme
+  @Environment(\.compactDensity) private var compact
   private let accent: Bool
   private let content: Content
   public init(accent: Bool = false, @ViewBuilder content: () -> Content) { self.accent = accent; self.content = content() }
   public var body: some View {
     let colors = theme.colors
-    VStack(alignment: .leading, spacing: TokenSpace.space3) { content }
-      .padding(TokenSpace.space4)
+    VStack(alignment: .leading, spacing: compact ? TokenSpace.space2 : TokenSpace.space3) { content }
+      .padding(compact ? TokenSpace.space3 : TokenSpace.space4)
       .frame(maxWidth: .infinity, alignment: .leading)
       .background(colors.sheet.color, in: RoundedRectangle(cornerRadius: TokenRadius.radiusMd))
       .overlay(alignment: .top) {

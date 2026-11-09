@@ -12,7 +12,7 @@
         "required": ["id", "title", "products", "roles", "capability", "success", "failures", "recovery"],
         "properties": {
           "id": {"pattern": "^UC-[A-Z][0-9]{2}$"},
-          "products": {"type": "array", "items": {"enum": ["B", "F"]}, "minItems": 1, "uniqueItems": true},
+          "products": {"type": "array", "items": {"enum": ["B", "F", "I"]}, "minItems": 1, "uniqueItems": true},
           "roles": {"type": "array", "minItems": 1},
           "failures": {"type": "array", "minItems": 1},
           "tests": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[^#]+#.+$"}}

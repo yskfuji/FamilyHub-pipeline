@@ -11,6 +11,11 @@ public final class Preferences {
     static let colorMode = "fh.colorMode"
     static let memberScope = "fh.memberScope"
     static let connection = "fh.connection"
+    static let density = "fh.density"
+    static let reducedMotion = "fh.reducedMotion"
+    static let privacyBlur = "fh.privacyBlur"
+    // アルバムの追加の画面（AlbumUploadSheet の @AppStorage）と同じ鍵。
+    static let keepPhotoLocation = "fh.keepPhotoLocation"
   }
 
   @ObservationIgnored private let defaults: UserDefaults
@@ -22,6 +27,15 @@ public final class Preferences {
   /// 最後に選んだ接続先。まだ選んでいなければ nil（はじめの画面を出す）。
   public var connection: ConnectionKind? { didSet { defaults.set(connection?.rawValue, forKey: Key.connection) } }
 
+  /// 表示の詰め具合。
+  public var density: Density { didSet { defaults.set(density.rawValue, forKey: Key.density) } }
+  /// 動きを減らす（端末の設定で減らしているときも減らす）。
+  public var reducedMotion: Bool { didSet { defaults.set(reducedMotion, forKey: Key.reducedMotion) } }
+  /// アプリが隠れている間（アプリの切り替えの画面など）は、内容をぼかす。
+  public var privacyBlur: Bool { didSet { defaults.set(privacyBlur, forKey: Key.privacyBlur) } }
+  /// アルバムに追加するときに撮影場所を残すか（初期値）。
+  public var keepPhotoLocation: Bool { didSet { defaults.set(keepPhotoLocation, forKey: Key.keepPhotoLocation) } }
+
   public init(defaults: UserDefaults = .standard) {
     self.defaults = defaults
     palette = ThemePalette(rawValue: defaults.string(forKey: Key.palette) ?? "") ?? .standard
@@ -29,9 +43,19 @@ public final class Preferences {
     colorMode = ColorMode(rawValue: defaults.string(forKey: Key.colorMode) ?? "") ?? .system
     memberScope = defaults.string(forKey: Key.memberScope).flatMap { $0.isEmpty ? nil : $0 } ?? "all"
     connection = ConnectionKind(rawValue: defaults.string(forKey: Key.connection) ?? "")
+    density = defaults.string(forKey: Key.density) == Density.compact.rawValue ? .compact : .comfortable
+    reducedMotion = defaults.bool(forKey: Key.reducedMotion)
+    privacyBlur = defaults.bool(forKey: Key.privacyBlur)
+    keepPhotoLocation = defaults.bool(forKey: Key.keepPhotoLocation)
   }
 
   public var themeChoice: ThemeChoice { ThemeChoice(palette: palette, mode: colorMode) }
+}
+
+/// 表示の詰め具合（Web の Density）。
+public enum Density: String, CaseIterable, Sendable {
+  case comfortable, compact
+  public var label: String { self == .compact ? "コンパクト" : "ゆったり" }
 }
 
 /// 接続先の種類。

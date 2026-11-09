@@ -817,7 +817,7 @@ write('formatRelative', pasts.map((input) => ({ input, expected: formatRelative(
   write('placeCategories', ['restaurant', 'tourism', 'unknown', '', 'constructor', 'toString'].map((input) => ({ input, expected: placeCategoryLabel(input) ?? null })));
   const origin = { lat: 35.6431, lng: 139.6693 };
   write('placeCoarsen', [origin, { lat: 35.6435, lng: 139.6695 }, { lat: -33.8675, lng: 151.2071 }, { lat: 35.0005, lng: -0.0005 }].map((input) => ({ input, expected: { coarse: geo.coarsen(input), distance: geo.haversineMeters(origin, input) } })));
-  const candidates = Array.from({ length: 20 }, (_, index) => {
+  const candidates = Array.from({ length: 20 }, () => {
     const name = pick(['青葉書店', '駅前スーパー', 'カフェ', 'あおば薬局', 'Aoba']);
     const address = pick(['', '東京都']);
     return { key: places.placeKey(name, address), name, address, lat: origin.lat + (random() - 0.5) * 0.01, lng: origin.lng + (random() - 0.5) * 0.01, ...(random() < 0.5 ? { category: pick(['cafe', 'unknown', 'pharmacy']) } : {}), source: 'osm', licenses: ['ODbL'], attributions: ['© OpenStreetMap'] };
@@ -837,4 +837,64 @@ write('formatRelative', pasts.map((input) => ({ input, expected: formatRelative(
   }))));
   write('searchResults', fixture('search'));
   write('searchGroups', groupSearchResults(fixture('search')).map((group) => ({ kind: group.kind, label: group.label, ids: group.items.map((item) => item.id) })));
+}
+
+// ---- 段階 S7: 設定（家族の上限・役割の能力・変更の記録・ヘルプ・色のリスト） ----
+{
+  const { readFileSync } = await import('node:fs');
+  const limits = await import('../../src/domain/householdLimits');
+  const policy = await import('../../src/authz/policy');
+  const auditView = await import('../../src/domain/auditView');
+  const { auditActionLabel, auditFieldsText } = await import('../../src/content/auditLabels');
+  const { filterHelpItems, helpItems, helpCategories } = await import('../../src/content/help');
+  const { colorLabelInputSchema, householdProfileSchema } = await import('../../src/domain/schemas');
+  type Snapshot = import('../../src/domain/types').HouseholdSnapshot;
+  const fixture = (name: string) => JSON.parse(readFileSync(`ios/Packages/FamilyHubKit/Tests/FHModelTests/Fixtures/${name}.json`, 'utf8'));
+  const aoi = fixture('snapshot.member-aoi') as Snapshot;
+  const now = '2026-09-30T07:30:00+09:00';
+
+  write('nameChangesLeft', [[], ['2026-09-30T07:00:00+09:00'], ['2026-09-29T07:30:00+09:00', '2026-09-29T07:30:01+09:00'], ['2026-09-30T01:00:00+09:00', '2026-09-30T02:00:00+09:00', '2026-09-30T03:00:00+09:00'], ['2026-09-30T01:00:00+09:00', '2026-09-30T02:00:00+09:00', '2026-09-30T03:00:00+09:00', '2026-09-30T04:00:00+09:00'], ['2026-09-28T22:30:00Z']].map((changes) => ({ input: changes, expected: { left: limits.nameChangesLeft(changes, now), recent: limits.recentNameChanges(changes, now) } })));
+  const members = aoi.memberships;
+  const variants: Array<[string, typeof members]> = [
+    ['as-is', members],
+    ['second-owner', members.map((member) => (member.id === 'member-ren' ? { ...member, role: 'owner' as const } : member))],
+    ['second-owner-suspended', members.map((member) => (member.id === 'member-ren' ? { ...member, role: 'owner' as const, status: 'suspended' as const } : member))],
+    ['one-left', members.map((member) => (member.id === 'member-yui' ? { ...member, status: 'left' as const } : member))],
+  ];
+  write('leaveStates', variants.flatMap(([name, list]) => members.map((viewer) => ({ input: { name, viewer: viewer.id }, expected: { state: limits.leaveStateFor(list, viewer.id), active: limits.activeMemberCount(list), owners: limits.activeOwners(list).map((member) => member.id) } }))));
+  write('leaveMembers', Object.fromEntries(variants));
+  write('householdNames', ['森さんち', '  ', '', 'あ'.repeat(40), 'あ'.repeat(41), ' 森 ', '😀'.repeat(20), '😀'.repeat(21)].map((input) => ({ input, expected: householdProfileSchema.safeParse({ name: input }).error?.issues[0]?.message ?? null })));
+
+  let seed = 20261501;
+  const random = () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const roles = ['owner', 'adult', 'child', 'guest'] as const;
+  write('roleCapabilities', roles.map((role) => ({ input: role, expected: { ceiling: policy.capabilityCeilingFor(role), defaults: policy.defaultCapabilitiesFor(role) } })));
+  write('capabilityOverrides', Array.from({ length: 80 }, () => {
+    const role = roles[Math.floor(random() * roles.length)];
+    const overrides = Array.from({ length: Math.floor(random() * 6) }, () => ({ membershipId: 'member-ren', capability: policy.allCapabilities[Math.floor(random() * policy.allCapabilities.length)], effect: random() < 0.5 ? 'allow' as const : 'deny' as const }));
+    return { input: { role, overrides }, expected: policy.capabilitiesFor(role, overrides) };
+  }));
+
+  const filters: import('../../src/domain/auditView').AuditFilters[] = [
+    { view: 'household', membershipId: null, group: null, period: 'all' },
+    { view: 'household', membershipId: 'member-ren', group: 'tasks', period: 'today' },
+    { view: 'household', membershipId: null, group: 'account', period: 'week' },
+    { view: 'household', membershipId: null, group: null, period: 'month' },
+  ];
+  write('auditQueries', filters.flatMap((item) => [['2026-09-30T07:30:00+09:00', undefined], ['2026-03-01T00:10:00+09:00', '120'], ['2026-02-28T15:30:00Z', '']].map(([asOf, cursor]) => ({ input: { filters: item, asOf, cursor: cursor ?? null }, expected: auditView.auditQueryFor(item, asOf as string, cursor) }))));
+  const targets = [null, { kind: 'event', id: 'event-1', hidden: false }, { kind: 'task', id: 'a b/c', hidden: false }, { kind: 'memo', id: 'memo-1', hidden: true }, { kind: 'expense', id: null, hidden: false }, { kind: 'settlementBatch', id: 'batch-1', hidden: false }, { kind: 'album', id: 'album-1', hidden: false }, { kind: 'member', id: 'member-ren', hidden: false }, { kind: 'invite', id: 'invite-1', hidden: false }, { kind: 'colorLabel', id: 'label-1', hidden: false }, { kind: 'link', id: 'link-1', hidden: false }, { kind: 'notification', id: 'n-1', hidden: false }, { kind: 'event', id: '', hidden: false }];
+  write('auditTargets', targets.map((input) => ({ input, expected: auditView.auditTargetHref(input as never) })));
+  write('auditFields', [[], ['title'], ['title', 'body', 'tags'], ['shareAmounts', 'shareMembershipIds', 'title'], ['unknownField', 'other', 'title'], ['place', 'location']].map((input) => ({ input, expected: auditFieldsText(input) })));
+  write('auditActions', ['createEvent', 'operator.grant', 'signIn', 'somethingNew', ''].map((input) => ({ input, expected: auditActionLabel(input) })));
+  const audit = fixture('audit');
+  write('auditDays', { input: audit.items, expected: auditView.groupByDay(audit.items).map((day) => ({ day: day.day, ids: day.items.map((item: { id: string }) => item.id) })) });
+
+  const queries = ['', 'シフト', ' シフト ', 'ＰＤＦ', 'pdf', 'パスキー', '招待', 'ぜんぜんない語', 'Ａ', '⌘K', 'ｶﾞ'];
+  const categories = [null, ...helpCategories.map((item) => item.id)];
+  write('helpFilters', queries.flatMap((query) => categories.map((category) => ({ input: { query, category }, expected: filterHelpItems(helpItems, query, category).map((item) => item.id) }))));
+
+  write('colorLabelInputs', [['学校', '#315c80'], ['  学校  ', '#ABCDEF'], ['', '#315c80'], ['   ', '#315c80'], ['あ'.repeat(40), '#000000'], ['あ'.repeat(41), '#000000'], ['学校', '315c80'], ['学校', '#31c80'], ['学校', '#gggggg'], ['学校', 'red'], ['😀'.repeat(40), '#000000'], ['😀'.repeat(41), '#000000']].map(([name, color]) => {
+    const parsed = colorLabelInputSchema.safeParse({ name, color });
+    return { input: { name, color }, expected: parsed.success ? { ok: parsed.data } : { message: parsed.error.issues[0]?.message ?? null } };
+  }));
 }

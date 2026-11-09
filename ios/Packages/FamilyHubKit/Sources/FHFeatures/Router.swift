@@ -16,7 +16,7 @@ enum Router {
     case "albums": return (.albums, id.map(AppModel.Focus.album))
     case "calendar": return (.calendar, nil)
     case "insights": return (.insights, nil)
-    case "settings": return (.settings, nil)
+    case "settings": return (.settings, id.map(AppModel.Focus.settings))
     case "today": return (.today, nil)
     default: return nil
     }

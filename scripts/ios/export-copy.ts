@@ -14,6 +14,7 @@ import * as legal from '../../src/content/legal';
 import * as passwordMessages from '../../src/content/passwordMessages';
 import * as serverMessages from '../../src/content/serverMessages';
 import * as settingsRoutes from '../../src/content/settingsRoutes';
+import { settingsTabs } from '../../src/features/settings/settingsTabs';
 import { writeGenerated } from './generated.mjs';
 
 const keywords = new Set(['associatedtype', 'class', 'deinit', 'enum', 'extension', 'fileprivate', 'func', 'import', 'init', 'inout', 'internal', 'let', 'open', 'operator', 'private', 'protocol', 'public', 'rethrows', 'static', 'struct', 'subscript', 'typealias', 'var', 'break', 'case', 'continue', 'default', 'defer', 'do', 'else', 'fallthrough', 'for', 'guard', 'if', 'in', 'repeat', 'return', 'switch', 'where', 'while', 'as', 'catch', 'false', 'is', 'nil', 'super', 'self', 'Self', 'throw', 'throws', 'true', 'try', 'Type', 'Any', 'some', 'any']);
@@ -23,6 +24,8 @@ const literal = (value: string) => JSON.stringify(value).replace(/\\u([0-9a-f]{4
 const isPlainObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 const skipped: string[] = [];
+/** 鍵（サーバーが返す値）で文言を引く表。enum の定数に加えて table（辞書）も書き出す。 */
+const lookupTables = new Set(['auditLabels.auditFieldLabels', 'auditLabels.auditGroupLabels', 'auditLabels.auditTargetLabels', 'ja.ja.resourceKinds', 'ja.roleLabels', 'ja.membershipStatusLabels']);
 const documents: Record<string, unknown> = {};
 
 /** 対応表（鍵が識別子でない、または値が入れ子）を Swift の辞書の型と式にする。 */
@@ -52,7 +55,9 @@ function emit(key: string, value: unknown, path: string, indent: string): string
   if (isPlainObject(value)) {
     const entries = Object.entries(value);
     if (entries.every(([child]) => identifier.test(child))) {
-      return [`${indent}public enum ${name(key)} {`, ...entries.flatMap(([child, item]) => emit(child, item, `${path}.${child}`, `${indent}  `)), `${indent}}`];
+      // 鍵で引く表（記録の項目名など）は、辞書も添える。
+      const table = lookupTables.has(path) ? dictionary(value, path) : null;
+      return [`${indent}public enum ${name(key)} {`, ...entries.flatMap(([child, item]) => emit(child, item, `${path}.${child}`, `${indent}  `)), ...(table ? [`${indent}  public static let table: ${table.type} = ${table.expression}`] : []), `${indent}}`];
     }
     const table = dictionary(value, path);
     if (table) return [`${indent}public static let ${name(key)}: ${table.type} = ${table.expression}`];
@@ -79,6 +84,8 @@ documents['help.helpItems'] = help.helpItems;
 documents['legal.legalDocuments'] = legal.legalDocuments;
 documents['legal.legalNotice'] = legal.legalNotice;
 documents['settingsRoutes.settingsRoutes'] = settingsRoutes.settingsRoutes;
+// 設定のタブの名前・説明・表示に要る能力（Web の settingsTabs.ts）。
+documents['settingsTabs.settingsTabs'] = settingsTabs;
 
 const swift = `// 生成したファイル。手で書き換えない。npx tsx scripts/ios/export-copy.ts で作り直す。
 // 元: src/content/*.ts

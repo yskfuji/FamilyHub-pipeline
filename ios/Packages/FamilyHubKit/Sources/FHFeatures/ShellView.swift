@@ -51,26 +51,6 @@ enum ShellTab: String, Hashable, CaseIterable, Identifiable {
     case .settings: .settingsOwn
     }
   }
-
-  /// この画面を作る段階（docs/ios/README.md の「段階」）。
-  var plannedStage: String? {
-    switch self {
-    case .today, .calendar, .tasks, .notes, .budget, .albums, .places, .insights: nil
-    case .settings: "S7"
-    }
-  }
-
-  var emptyIllustration: Illustration {
-    switch self {
-    case .today, .calendar: .emptyEvents
-    case .tasks: .emptyTasks
-    case .notes: .emptyMemos
-    case .budget: .emptyBudget
-    case .albums: .emptyAlbums
-    case .places: .emptyPlaces
-    case .insights, .settings: .emptySearch
-    }
-  }
 }
 
 /// 画面の枠。iPhone は下のタブ（今日・予定・タスク・メモ・その他）、iPad は横の一覧にすべての機能を並べる。
@@ -197,9 +177,15 @@ struct ShellScreen: View {
 }
 
 struct ShellContent: View {
+  @Environment(AppModel.self) private var model
   let tab: ShellTab
   let open: (ShellTab) -> Void
   var body: some View {
+    // 未送信の変更の知らせ（画面の下に浮かぶ）に、最後の行が隠れないようにする。
+    screen.safeAreaPadding(.bottom, model.pendingCommands.isEmpty ? 0 : 72)
+  }
+
+  @ViewBuilder private var screen: some View {
     switch tab {
     case .today: TodayView(open: open)
     case .calendar: CalendarScreen()
@@ -209,8 +195,7 @@ struct ShellContent: View {
     case .albums: AlbumsScreen()
     case .places: PlacesScreen()
     case .insights: InsightsScreen()
-    case .settings: InterimSettingsView()
-    default: PlannedScreen(tab: tab)
+    case .settings: SettingsScreen()
     }
   }
 }
@@ -378,61 +363,6 @@ struct NotificationsView: View {
     case .snoozed: labels.snoozed
     case .stopped: labels.stopped
     default: labels.active
-    }
-  }
-}
-
-/// まだ作っていない画面。どの段階で作るかを示す。
-struct PlannedScreen: View {
-  @Environment(\.theme) private var theme
-  let tab: ShellTab
-  var body: some View {
-    ScrollView {
-      EmptyStateView(title: "\(tab.label)の画面は、これから作ります", message: "段階 \(tab.plannedStage ?? "") で、Web と同じ中身にします。今は今日の画面とサインインを使えます。", illustration: tab.emptyIllustration)
-        .padding(TokenSpace.space5)
-    }
-    .background(theme.colors.paper.color.ignoresSafeArea())
-  }
-}
-
-/// 設定の仮の画面（12のタブは段階 S7）。表示・接続先・サインアウト。
-struct InterimSettingsView: View {
-  @Environment(AppModel.self) private var model
-  @Environment(Preferences.self) private var preferences
-  @Environment(\.theme) private var theme
-
-  var body: some View {
-    @Bindable var preferences = preferences
-    Form {
-      if let snapshot = model.snapshot {
-        Section("アカウント") {
-          LabeledContent("名前", value: snapshot.user.displayName)
-          LabeledContent("メールアドレス", value: snapshot.user.email)
-          LabeledContent("家族グループ", value: snapshot.household.name)
-          LabeledContent("役割", value: roleLabel(snapshot.viewer.role))
-        }
-      }
-      Section("表示") {
-        Picker("配色", selection: $preferences.palette) {
-          ForEach(ThemePalette.allCases, id: \.self) { Text($0.label).tag($0) }
-        }
-        Picker("昼と夜", selection: $preferences.colorMode) {
-          ForEach(ColorMode.allCases, id: \.self) { Text($0.label).tag($0) }
-        }
-      }
-      Section {
-        switch model.gateway.mode {
-        case .sample: LabeledContent("接続先", value: "見本（森さんち）")
-        case .server(let url): LabeledContent("接続先", value: url.host() ?? url.absoluteString)
-        }
-        Button("接続先を選び直す") { model.onLeave() }
-      } footer: {
-        Text(model.isSample ? "見本の変更は、この端末の記憶の中だけに残ります。接続先を選び直すと、見本ははじめの状態に戻ります。" : "")
-      }
-      if !model.isSample {
-        Section { Button("サインアウト", role: .destructive) { Task { await model.signOut() } } }
-      }
-      Section { Text("設定の12のタブ（家族・メンバー・招待・権限・セキュリティなど）は、段階 S7 で作ります。").font(.footnote).foregroundStyle(theme.colors.inkSoft.color) }
     }
   }
 }

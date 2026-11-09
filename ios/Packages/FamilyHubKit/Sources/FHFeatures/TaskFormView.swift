@@ -1,5 +1,6 @@
 import SwiftUI
 import FHModel
+import FHGateway
 import FHDomain
 import FHDesign
 import FHCopy
@@ -138,12 +139,13 @@ struct TaskCreateSheet: View {
     defer { busy = false }
     let input = TaskForm.createInput(draft)
     let context = model.mutationContext(key: key)
-    switch await model.mutate({ await $0.createTodo(input, context: context) }) {
-    case .success(let todo):
+    switch await model.mutateOrQueue(.taskCreate(input: input), summary: "タスク「\(input.title)」を作成", key: key, { await $0.createTodo(input, context: context) }) {
+    case .completed(let todo):
       model.announce("タスクを追加しました")
       onCreated(todo)
       dismiss()
-    case .failure(let failure):
+    case .queued: dismiss()
+    case .failed(let failure):
       error = failure.message
     }
   }
@@ -200,11 +202,12 @@ struct TaskEditSheet: View {
     defer { busy = false }
     let input = TaskForm.updateInput(draft, original: todo, recurrenceEditable: recurrenceEditable)
     let id = todo.id, version = todo.version, chosen = scope
-    switch await model.mutate({ await $0.updateTodo(id: id, scope: chosen, input: input, expectedVersion: version, context: nil) }) {
-    case .success:
+    switch await model.mutateOrQueue(.taskUpdate(id: id, scope: chosen, input: input, expectedVersion: version), summary: "タスク「\(todo.title)」を変更", key: nil, { await $0.updateTodo(id: id, scope: chosen, input: input, expectedVersion: version, context: nil) }) {
+    case .completed:
       model.announce("「\(Account.jsTrim(draft.title))」を更新しました")
       dismiss()
-    case .failure(let failure):
+    case .queued: dismiss()
+    case .failed(let failure):
       error = failure.message
     }
   }

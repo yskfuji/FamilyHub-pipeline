@@ -9,6 +9,7 @@
  * FAMILY_HUB_SKIP_IOS=1 で飛ばせる。
  */
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 
 const skip = (why) => { console.log(`verify:ios を飛ばします（${why}）。`); process.exit(0); };
 if (process.env.FAMILY_HUB_SKIP_IOS === '1') skip('FAMILY_HUB_SKIP_IOS=1');
@@ -35,6 +36,13 @@ function simulator(prefix) {
 }
 
 run('生成物が最新か', 'node', ['scripts/ios/export-all.mjs', '--check']);
+// Debug のビルドは App/Info-Debug.plist だけを使う。Info.plist の鍵が欠けると、位置の許可などでアプリが止まる。
+{
+  const keys = (file) => new Set([...readFileSync(file, 'utf8').matchAll(/<key>([^<]+)<\/key>/g)].map((match) => match[1]));
+  const debug = keys('ios/App/Info-Debug.plist');
+  const missing = [...keys('ios/App/Info.plist')].filter((key) => !debug.has(key));
+  if (missing.length) { console.error(`✘ ios/App/Info-Debug.plist に足りない鍵: ${missing.join(', ')}`); process.exit(1); }
+}
 run('xcodegen', 'xcodegen', ['generate', '--quiet', '--spec', 'ios/project.yml']);
 run('swift test', 'swift', ['test', '--package-path', 'ios/Packages/FamilyHubKit']);
 const phone = simulator('iPhone 17');

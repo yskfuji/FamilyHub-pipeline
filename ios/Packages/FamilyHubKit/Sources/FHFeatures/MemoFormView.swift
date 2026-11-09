@@ -1,5 +1,6 @@
 import SwiftUI
 import FHModel
+import FHGateway
 import FHDomain
 import FHDesign
 import FHCopy
@@ -115,12 +116,16 @@ struct MemoCreateSheet: View {
     defer { busy = false }
     let input = MemoForm.createInput(draft)
     let context = model.mutationContext(key: key)
-    switch await model.mutate({ await $0.createMemo(input, context: context) }) {
-    case .success(let memo):
+    switch await model.mutateOrQueue(.memoCreate(input: input), summary: "メモ「\(input.title)」を作成", key: key, { await $0.createMemo(input, context: context) }) {
+    case .completed(let memo):
       model.announce("メモを作成しました")
       onCreated(memo, files)
       dismiss()
-    case .failure(let failure):
+    case .queued:
+      // 添付は、メモが届いてからでないと送れない。未送信のメモには付けない。
+      if !files.isEmpty { model.announce("未送信の変更として保存しました。添付は、メモを送信してから付けてください。") }
+      dismiss()
+    case .failed(let failure):
       error = failure.message
     }
   }
@@ -169,11 +174,12 @@ struct MemoEditSheet: View {
     defer { busy = false }
     let input = MemoForm.updateInput(draft, original: memo)
     let id = memo.id, version = memo.version
-    switch await model.mutate({ await $0.updateMemo(id: id, input: input, expectedVersion: version, context: nil) }) {
-    case .success:
+    switch await model.mutateOrQueue(.memoUpdate(id: id, input: input, expectedVersion: version), summary: "メモ「\(memo.title)」を変更", key: nil, { await $0.updateMemo(id: id, input: input, expectedVersion: version, context: nil) }) {
+    case .completed:
       model.announce("メモを更新しました")
       dismiss()
-    case .failure(let failure):
+    case .queued: dismiss()
+    case .failed(let failure):
       error = failure.message
     }
   }

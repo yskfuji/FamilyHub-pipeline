@@ -108,7 +108,7 @@ struct AlbumViewer: View {
 /// スライドショー（Web の Slideshow.tsx）。写真は5秒ずつ、動画は終わるまで流す。曲は再生を押すまで鳴らさない。
 struct SlideshowView: View {
   @Environment(\.dismiss) private var dismiss
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @Environment(\.fhReduceMotion) private var reduceMotion
   @Environment(\.scenePhase) private var scenePhase
   let album: Album
   let items: [AlbumItem]

@@ -1,5 +1,6 @@
 import SwiftUI
 import FHModel
+import FHGateway
 import FHDomain
 import FHDesign
 import FHCopy
@@ -302,11 +303,12 @@ struct EventCreateSheet: View {
     defer { busy = false }
     let input = EventForm.createInput(draft)
     let context = model.mutationContext(key: key)
-    switch await model.mutate({ await $0.createEvent(input, context: context) }) {
-    case .success:
+    switch await model.mutateOrQueue(.eventCreate(input: input), summary: "予定「\(input.title)」を作成", key: key, { await $0.createEvent(input, context: context) }) {
+    case .completed:
       model.announce("予定を追加しました")
       dismiss()
-    case .failure(let failure):
+    case .queued: dismiss()
+    case .failed(let failure):
       error = failure.message
     }
   }
@@ -380,11 +382,13 @@ struct EventEditSheet: View {
                                       seriesStart: wholeSeries ? CalendarLayout.dateKey(series.startsAt) : nil, occurrenceDate: wholeSeries ? occurrence.occurrenceDate : nil)
     let id = occurrence.event.id, version = occurrence.event.version, chosen = scope
     let date = recurring && scope != .series ? occurrence.occurrenceDate : nil
-    switch await model.mutate({ await $0.updateEvent(id: id, scope: chosen, input: input, expectedVersion: version, context: nil, occurrenceDate: date) }) {
-    case .success(let event):
+    let command = QueueableCommand.eventUpdate(id: id, scope: chosen, input: input, expectedVersion: version, occurrenceDate: date)
+    switch await model.mutateOrQueue(command, summary: "予定「\(occurrence.event.title)」を変更", key: nil, { await $0.updateEvent(id: id, scope: chosen, input: input, expectedVersion: version, context: nil, occurrenceDate: date) }) {
+    case .completed(let event):
       model.announce("「\(event.title)」を更新しました")
       dismiss()
-    case .failure(let failure):
+    case .queued: dismiss()
+    case .failed(let failure):
       error = failure.message
     }
   }
