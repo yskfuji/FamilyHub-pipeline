@@ -79,6 +79,22 @@ public actor APIClient {
     }
   }
 
+  /// 本文や見出しを、そのまま受け渡す（分けて送る送信で使う）。CSRF の token と User-Agent は付ける。
+  public func exchange(_ method: Method, _ path: String, body: Data? = nil, headers: [String: String] = [:], csrf: Bool = true) async throws -> (status: Int, headers: [String: String], data: Data) {
+    var request = URLRequest(url: url(path))
+    request.httpMethod = method.rawValue
+    request.httpBody = body
+    request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+    request.setValue("application/json", forHTTPHeaderField: "Accept")
+    if csrf, let token = try await token(refresh: false) { request.setValue(token, forHTTPHeaderField: "X-CSRF-Token") }
+    for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
+    let (data, response) = try await session.data(for: request)
+    let http = response as? HTTPURLResponse
+    var fields: [String: String] = [:]
+    for (key, value) in http?.allHeaderFields ?? [:] { if let key = key as? String, let value = value as? String { fields[key.lowercased()] = value } }
+    return (http?.statusCode ?? 0, fields, data)
+  }
+
   /// 添付のファイルを取る。道は署名つきの相対の道（/v1/attachment-files/…）。同じセッションの cookie を使い、destination に置く。
   public func download(_ path: String, to destination: URL) async -> GatewayResult<URL> {
     guard let target = URL(string: path, relativeTo: baseURL)?.absoluteURL, target.host == baseURL.host, target.scheme == baseURL.scheme else {

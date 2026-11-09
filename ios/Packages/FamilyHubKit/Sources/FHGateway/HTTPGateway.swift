@@ -182,6 +182,102 @@ public final class HTTPGateway: FamilyHubGateway {
     await send(.init(.post, "/v1/settlement-batches/\(id.uriComponent)/reverse", csrf: true, idempotencyKey: idempotencyKey))
   }
 
+  // MARK: albums
+  public func listAlbums() async -> GatewayResult<[AlbumSummary]> { await send(.init(.get, "/v1/albums")) }
+  public func getAlbum(id: Id) async -> GatewayResult<AlbumDetail> { await send(.init(.get, "/v1/albums/\(id.uriComponent)")) }
+  public func createAlbum(_ input: AlbumInput, idempotencyKey: String) async -> GatewayResult<Album> { await send(.json(.post, "/v1/albums", input, idempotencyKey: idempotencyKey)) }
+  public func updateAlbum(id: Id, input: AlbumUpdateInput, expectedVersion: Int) async -> GatewayResult<Album> {
+    await send(.json(.patch, "/v1/albums/\(id.uriComponent)", AlbumUpdateBody(input: input, expectedVersion: expectedVersion)))
+  }
+  public func deleteAlbum(id: Id, expectedVersion: Int) async -> GatewayResult<Empty> {
+    await send(.init(.delete, "/v1/albums/\(id.uriComponent)?expectedVersion=\(expectedVersion)", csrf: true))
+  }
+  public func restoreAlbum(id: Id) async -> GatewayResult<Album> { await send(.init(.post, "/v1/albums/\(id.uriComponent)/restore", csrf: true)) }
+  public func reorderItems(albumId: Id, itemIds: [Id], expectedVersion: Int) async -> GatewayResult<Album> {
+    await send(.json(.put, "/v1/albums/\(albumId.uriComponent)/order", ReorderBody(itemIds: itemIds, expectedVersion: expectedVersion)))
+  }
+  public func deleteItem(albumId: Id, itemId: Id) async -> GatewayResult<Empty> {
+    await send(.init(.delete, "/v1/albums/\(albumId.uriComponent)/items/\(itemId.uriComponent)", csrf: true))
+  }
+  public func restoreItem(albumId: Id, itemId: Id) async -> GatewayResult<AlbumItem> {
+    await send(.init(.post, "/v1/albums/\(albumId.uriComponent)/items/\(itemId.uriComponent)/restore", csrf: true))
+  }
+
+  static let chunkBytes = 8 * 1024 * 1024
+  static let uploadRetries = 6
+  private static let tus = ["Tus-Resumable": "1.0.0"]
+
+  /// 受け取られた位置。枠がなくなっていれば nil。
+  private func receivedOffset(_ uploadId: Id) async throws -> Int? {
+    let response = try await client.exchange(.head, "/v1/uploads/\(uploadId.uriComponent)", headers: Self.tus)
+    return (200..<300).contains(response.status) ? Int(response.headers["upload-offset"] ?? "0") ?? 0 : nil
+  }
+
+  /// Web の uploadItem と同じ手順: 枠を作り（または続きを確かめ）、8MiB ずつ PATCH で送り、最後に動画の縮小画像を PUT する。
+  public func uploadItem(albumId: Id, source: UploadSource, keepLocation: Bool, thumbnail: Data?, ticket: UploadTicket, progress: @escaping UploadProgress) async -> GatewayResult<Id> {
+    var offset = 0
+    var uploadId: Id?
+    var itemId: Id?
+    if await ticket.albumId == albumId, let open = await ticket.uploadId {
+      if let received = try? await receivedOffset(open) { uploadId = open; itemId = await ticket.itemId; offset = received } else { await ticket.close() }
+    }
+    if uploadId == nil {
+      let body = CreateUploadBody(albumId: albumId, name: source.name, mimeType: source.type, byteSize: source.size, keepLocation: keepLocation)
+      let created: GatewayResult<UploadSlot> = await send(.json(.post, "/v1/uploads", body))
+      guard case .success(let slot) = created else { if case .failure(let error) = created { return .failure(error) }; return .failure(GatewayFailure.response) }
+      await ticket.open(albumId: albumId, uploadId: slot.uploadId, itemId: slot.itemId)
+      uploadId = slot.uploadId; itemId = slot.itemId; offset = slot.offset
+    }
+    guard let uploadId, let itemId else { return .failure(GatewayFailure.response) }
+    var retries = 0
+    while offset < source.size {
+      if Task.isCancelled { _ = await cancelUpload(ticket: ticket); return .failure(GatewayError(code: .offline, message: "送信を止めました。", retryable: true)) }
+      do {
+        let chunk = try source.chunk(at: offset, length: Self.chunkBytes)
+        let response = try await client.exchange(.patch, "/v1/uploads/\(uploadId.uriComponent)", body: chunk,
+                                                  headers: Self.tus.merging(["Content-Type": "application/offset+octet-stream", "Upload-Offset": String(offset)]) { $1 })
+        if response.status == 204 {
+          offset = Int(response.headers["upload-offset"] ?? "") ?? offset + chunk.count
+          retries = 0
+          progress(offset, source.size)
+          continue
+        }
+        if response.status != 409 {
+          let error = (try? JSONDecoder().decode(GatewayError.self, from: response.data)) ?? GatewayFailure.response
+          if !error.retryable { _ = await cancelUpload(ticket: ticket) }
+          return .failure(error)
+        }
+        offset = (try? await receivedOffset(uploadId)) ?? nil ?? offset
+      } catch {
+        // 通信が切れたら、受け取られた位置を確かめて続きから送る。
+        retries += 1
+        if retries > Self.uploadRetries { return .failure(GatewayFailure.offline) }
+        try? await Task.sleep(for: .milliseconds(500 * (1 << retries)))
+        if let received = try? await receivedOffset(uploadId) { offset = received }
+      }
+    }
+    await ticket.close()
+    if let thumbnail {
+      _ = try? await client.exchange(.put, "/v1/albums/\(albumId.uriComponent)/items/\(itemId.uriComponent)/thumbnail", body: thumbnail, headers: ["Content-Type": "application/octet-stream"])
+    }
+    return .success(itemId)
+  }
+
+  public func cancelUpload(ticket: UploadTicket) async -> GatewayResult<Empty> {
+    if let uploadId = await ticket.uploadId { _ = try? await client.exchange(.delete, "/v1/uploads/\(uploadId.uriComponent)", headers: Self.tus) }
+    await ticket.close()
+    return .success(Empty())
+  }
+
+  public func mediaSource(albumId: Id, itemId: Id, variant: MediaVariant) -> MediaSource {
+    .server(path: "/v1/albums/\(albumId.uriComponent)/items/\(itemId.uriComponent)/\(variant.rawValue)")
+  }
+
+  public func downloadMedia(_ source: MediaSource, fileName: String) async -> GatewayResult<URL> {
+    guard case .server(let path) = source else { return .failure(AttachmentFiles.unavailable) }
+    return await client.download(path, to: AttachmentFiles.destination(for: fileName))
+  }
+
   // MARK: assistant
   public func readReceipt(_ file: UploadFile) async -> GatewayResult<AssistantJob> {
     let form = MultipartForm(file: file)
@@ -219,6 +315,25 @@ struct ScopedUpdateBody<Input: Encodable & Sendable>: Encodable, Sendable {
   var scope: RecurrenceScope
   var input: Input
   var expectedVersion: Int
+}
+
+/// アルバムの変更の本文。
+struct AlbumUpdateBody: Encodable, Sendable {
+  var input: AlbumUpdateInput
+  var expectedVersion: Int
+}
+
+struct ReorderBody: Encodable, Sendable {
+  var itemIds: [Id]
+  var expectedVersion: Int
+}
+
+struct CreateUploadBody: Encodable, Sendable {
+  var albumId: Id
+  var name: String
+  var mimeType: String
+  var byteSize: Int
+  var keepLocation: Bool
 }
 
 /// 支出の変更の本文。

@@ -67,6 +67,25 @@ public protocol FamilyHubGateway: Sendable {
   func settleAll(_ input: SettleAllInput, idempotencyKey: String) async -> GatewayResult<SettlementBatch>
   func reverseBatch(id: Id, idempotencyKey: String) async -> GatewayResult<SettlementBatch>
 
+  // albums（写真と動画。送信は分けて送り、途切れても続きから送る）
+  func listAlbums() async -> GatewayResult<[AlbumSummary]>
+  func getAlbum(id: Id) async -> GatewayResult<AlbumDetail>
+  func createAlbum(_ input: AlbumInput, idempotencyKey: String) async -> GatewayResult<Album>
+  func updateAlbum(id: Id, input: AlbumUpdateInput, expectedVersion: Int) async -> GatewayResult<Album>
+  func deleteAlbum(id: Id, expectedVersion: Int) async -> GatewayResult<Empty>
+  func restoreAlbum(id: Id) async -> GatewayResult<Album>
+  /// itemIds はアルバムの全項目の並び。
+  func reorderItems(albumId: Id, itemIds: [Id], expectedVersion: Int) async -> GatewayResult<Album>
+  func deleteItem(albumId: Id, itemId: Id) async -> GatewayResult<Empty>
+  func restoreItem(albumId: Id, itemId: Id) async -> GatewayResult<AlbumItem>
+  /// 送る。ticket が前回の枠を持っていれば、その続きから送る。動画の縮小画像（JPEG）は送り終えてから付ける。
+  func uploadItem(albumId: Id, source: UploadSource, keepLocation: Bool, thumbnail: Data?, ticket: UploadTicket, progress: @escaping UploadProgress) async -> GatewayResult<Id>
+  /// 送り直さないと決めたファイルの枠を手放す。
+  func cancelUpload(ticket: UploadTicket) async -> GatewayResult<Empty>
+  func mediaSource(albumId: Id, itemId: Id, variant: MediaVariant) -> MediaSource
+  /// 写真や動画をこの端末の一時の場所に取る（AttachmentFiles）。
+  func downloadMedia(_ source: MediaSource, fileName: String) async -> GatewayResult<URL>
+
   // assistant（読み取りの補助。結果は提案で、記録には何も保存しない）
   func readReceipt(_ file: UploadFile) async -> GatewayResult<AssistantJob>
   func getAssistantStatus() async -> GatewayResult<AssistantStatus>
@@ -124,6 +143,17 @@ public enum GatewayMethod: String, CaseIterable, Sendable {
   case settleAll = "expenses.settleAll"
   case reverseBatch = "expenses.reverseBatch"
   case readReceipt = "assistant.readReceipt"
+  case listAlbums = "albums.listAlbums"
+  case getAlbum = "albums.getAlbum"
+  case createAlbum = "albums.createAlbum"
+  case updateAlbum = "albums.updateAlbum"
+  case deleteAlbum = "albums.deleteAlbum"
+  case restoreAlbum = "albums.restoreAlbum"
+  case reorderItems = "albums.reorderItems"
+  case deleteItem = "albums.deleteItem"
+  case restoreItem = "albums.restoreItem"
+  case uploadItem = "albums.uploadItem"
+  case cancelUpload = "albums.cancelUpload"
   case getAssistantStatus = "assistant.getStatus"
   case readEventImage = "assistant.readEventImage"
   case readEventUrl = "assistant.readEventUrl"

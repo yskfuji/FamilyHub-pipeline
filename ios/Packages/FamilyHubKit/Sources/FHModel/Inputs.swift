@@ -272,3 +272,45 @@ public struct SettleAllInput: Codable, Sendable, Hashable {
   public var transfers: [SettlementTransfer]
   public init(shares: [Share], transfers: [SettlementTransfer]) { self.shares = shares; self.transfers = transfers }
 }
+
+/// アルバムの作成（albumInputSchema）。
+public struct AlbumInput: Codable, Sendable, Hashable {
+  public var title: String
+  public var description: String?
+  public var place: PlaceRef?
+  public var bgmPreset: BgmPreset?
+  public var visibility: VisibilityInput?
+  public init(title: String, description: String? = nil, place: PlaceRef? = nil, bgmPreset: BgmPreset? = nil, visibility: VisibilityInput? = nil) {
+    self.title = title; self.description = description; self.place = place; self.bgmPreset = bgmPreset; self.visibility = visibility
+  }
+}
+
+/// アルバムの変更（albumUpdateSchema）。説明・曲・場所・表紙は null で外せる。
+public struct AlbumUpdateInput: Encodable, Sendable, Hashable {
+  public var title: String?
+  public var description: Patch<String> = .keep
+  public var place: Patch<PlaceRef> = .keep
+  public var bgmPreset: Patch<BgmPreset> = .keep
+  public var coverItemId: Patch<Id> = .keep
+  public var visibility: VisibilityInput?
+  public init() {}
+
+  private enum Keys: String, CodingKey { case title, description, place, bgmPreset, coverItemId, visibility }
+
+  public func encode(to encoder: any Encoder) throws {
+    var container = encoder.container(keyedBy: Keys.self)
+    try container.encodeIfPresent(title, forKey: .title)
+    try container.encode(description, forKey: .description)
+    try container.encode(place, forKey: .place)
+    try container.encode(bgmPreset, forKey: .bgmPreset)
+    try container.encode(coverItemId, forKey: .coverItemId)
+    try container.encodeIfPresent(visibility, forKey: .visibility)
+  }
+}
+
+/// 送信の枠（POST /v1/uploads の応答）。
+public struct UploadSlot: Codable, Sendable, Hashable {
+  public var uploadId: Id
+  public var itemId: Id
+  public var offset: Int
+}

@@ -141,6 +141,7 @@ public final class AppModel {
   private func clearHousehold() {
     // 開くために取った添付のファイルは、サインアウトの後に残さない。
     AttachmentFiles.clear()
+    MediaCache.shared.clear()
     focus = nil
     snapshot = nil
     privacy = nil

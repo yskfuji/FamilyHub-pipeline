@@ -100,3 +100,22 @@ struct ActivityTracker: UIViewRepresentable {
   }
 }
 #endif
+
+extension View {
+  /// 画面いっぱいに重ねる（iPhone・iPad）。macOS（試験のための組み立て）では普通のシートにする。
+  @ViewBuilder func fullCover<Item: Identifiable, Content: View>(item: Binding<Item?>, @ViewBuilder content: @escaping (Item) -> Content) -> some View {
+    #if os(iOS)
+    fullScreenCover(item: item, content: content)
+    #else
+    sheet(item: item, content: content)
+    #endif
+  }
+
+  @ViewBuilder func fullCover<Content: View>(isPresented: Binding<Bool>, @ViewBuilder content: @escaping () -> Content) -> some View {
+    #if os(iOS)
+    fullScreenCover(isPresented: isPresented, content: content)
+    #else
+    sheet(isPresented: isPresented, content: content)
+    #endif
+  }
+}

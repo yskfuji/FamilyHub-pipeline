@@ -724,3 +724,63 @@ write('formatRelative', pasts.map((input) => ({ input, expected: formatRelative(
   write('settlementPresets', [1431, 1, 2, 0, 1000].map((input) => ({ input, expected: settlement.settlementPresets(input) })));
   write('receiptDrafts', [{ amountJpy: 2860, date: '2026-09-29', merchant: '青葉書店', category: 'education' }, { amountJpy: null, date: null, merchant: null, category: 'other' }, { amountJpy: 0, date: '2026-09-30', merchant: '', category: 'food' }].map((input) => ({ input, expected: receiptToDraft(input as never) })));
 }
+
+// ---- 段階 S5: アルバム（並び・送信・入力・曲） ----
+{
+  const { readFileSync } = await import('node:fs');
+  const view = await import('../../src/domain/albumView');
+  const upload = await import('../../src/domain/albumUpload');
+  const form = await import('../../src/domain/albumForm');
+  const bgm = await import('../../src/features/albums/bgm');
+  type AlbumItem = import('../../src/domain/types').AlbumItem;
+  type Album = import('../../src/domain/types').Album;
+  const detail = JSON.parse(readFileSync('ios/Packages/FamilyHubKit/Tests/FHModelTests/Fixtures/album.album-sports.json', 'utf8')) as { album: Album; items: AlbumItem[] };
+
+  let seed = 20261301;
+  const random = () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const pick = <T,>(list: readonly T[]) => list[Math.floor(random() * list.length)];
+  const items: AlbumItem[] = [...detail.items];
+  for (let index = 0; index < 40; index += 1) {
+    const video = random() < 0.3;
+    const status = pick(['ready', 'ready', 'ready', 'processing', 'rejected', 'uploading'] as const);
+    const taken = random() < 0.7 ? `2026-09-${String(1 + Math.floor(random() * 28)).padStart(2, '0')}T${String(Math.floor(random() * 24)).padStart(2, '0')}:${pick(['00', '30'])}:00${pick(['+09:00', 'Z', '+09:00'])}` : undefined;
+    items.push({
+      id: `i${String(index).padStart(2, '0')}`, albumId: 'album-sports', householdId: 'house-mori', kind: video ? 'video' : 'photo', originalName: `f${index}.${video ? 'mp4' : 'jpg'}`, mimeType: video ? 'video/mp4' : 'image/jpeg',
+      byteSize: 1000 + index, status, locationKept: random() < 0.2, hasThumbnail: random() < 0.8, uploaderMembershipId: pick(['member-aoi', 'member-ren']), position: 3 + index, createdAt: '2026-09-21T10:00:00+09:00',
+      ...(taken ? { takenAt: random() < 0.1 ? 'not a date' : taken } : {}),
+      ...(status === 'rejected' ? { statusMessage: random() < 0.4 ? view.DUPLICATE_ITEM_MESSAGE : '安全を確認できなかったため、保存しませんでした。' } : {}),
+    });
+  }
+  write('albumItems', items);
+  write('albumView', {
+    filters: view.albumFilters.map((filter) => [filter, view.gridItems(items, filter).map((item) => item.id)]),
+    counts: view.filterCounts(items), rejected: view.rejectedItems(items).map((item) => item.id), ready: view.readyItems(items).map((item) => item.id), processing: view.hasProcessing(items),
+    sorted: (['album', 'taken'] as const).map((sort) => [sort, view.sortItems(view.gridItems(items, 'all'), sort).map((item) => item.id)]),
+    covers: [undefined, 'item-sports-2', 'i00', 'missing'].map((coverItemId) => [coverItemId ?? null, view.coverItem({ coverItemId }, items)?.id ?? null]),
+    slideshow: [true, false].map((include) => { const result = view.slideshowItems(items, include); return [include, result.items.map((item) => item.id), result.keptVideos]; }),
+    videosOnly: (() => { const videos = items.filter((item) => item.kind === 'video'); const result = view.slideshowItems(videos, false); return [result.items.map((item) => item.id), result.keptVideos]; })(),
+    neighbors: ['item-sports-1', 'i05', items.at(-1)!.id, 'missing'].map((id) => [id, view.neighborAfterRemoval(items, id)?.id ?? null]),
+    parse: [['photos', 'videos', 'all', '', null].map((value) => [value, view.parseAlbumFilter(value)]), ['taken', 'album', 'x', null].map((value) => [value, view.parseAlbumSort(value)])],
+  });
+  const order = items.map((item) => item.id);
+  const visible = view.gridItems(items, 'photos').map((item) => item.id);
+  write('albumMoves', [visible[0], visible[3], visible.at(-1), 'missing', order[1]].flatMap((id) => ([-1, 1] as const).map((step) => ({ input: { id, step }, expected: view.moveItem(order, visible, id!, step) }))));
+  write('albumSteps', [[0, 5, -1], [4, 5, 1], [2, 5, 1], [0, 0, 1], [3, 1, -1], [0, 3, -4]].map(([index, length, step]) => ({ input: [index, length, step], expected: view.stepIndex(index, length, step) })));
+  write('albumSwipes', [[0, 0], [47, 0], [48, 0], [-48, 0], [-60, 59], [60, 61], [-200, -10], [120, -119]].map(([dx, dy]) => ({ input: [dx, dy], expected: view.swipeStep(dx, dy) })));
+  write('albumFiles', [['a.jpg', '', 10], ['a.JPEG', '', 1], ['a.heic', '', 10], ['a.HEIF', 'image/heif', 10], ['a.jpg', 'image/heic', 10], ['a.png', 'image/png', 0], ['a.mov', '', 4 * 1024 ** 3], ['a.mov', '', 4 * 1024 ** 3 + 1], ['a.mp4', 'video/mp4', 10], ['a.jpg', '', 100 * 1024 ** 2 + 1], ['a.gif', '', 1], ['a', '', 1], ['photo.heic.jpg', 'image/jpeg', 5]].map(([name, type, size]) => ({ input: { name, type, size }, expected: upload.albumFileProblem({ name: name as string, type: type as string, size: size as number }) })));
+  const states = ['staged', 'waiting', 'sending', 'processing', 'done', 'duplicate', 'rejected', 'failed'] as const;
+  const queues: string[][] = [[], ['waiting', 'waiting', 'waiting', 'waiting'], ['sending', 'processing', 'waiting', 'waiting'], ['sending', 'sending', 'processing', 'waiting'], ['staged', 'done', 'failed', 'duplicate', 'rejected', 'waiting']];
+  for (let index = 0; index < 10; index += 1) queues.push(Array.from({ length: 1 + Math.floor(random() * 8) }, () => pick(states)));
+  write('uploadQueues', queues.map((input) => ({ input, expected: { next: upload.nextToSend(input.map((state, index) => ({ state: state as 'waiting', index }))).map((entry) => entry.index), summary: upload.summarizeUploads(input.map((state) => ({ state: state as 'waiting' }))) } })));
+  const staged = [{ key: 'a', albumId: 'x', state: 'staged' }, { key: 'b', albumId: 'y', state: 'staged' }, { key: 'c', albumId: 'x', state: 'waiting' }, { key: 'd', albumId: 'x', state: 'staged' }, { key: 'e', albumId: 'x', state: 'staged' }] as const;
+  write('stagedMoves', ['a', 'b', 'c', 'd', 'e'].flatMap((key) => ([-1, 1] as const).map((step) => ({ input: { key, step }, expected: upload.moveStaged(staged as unknown as Array<{ key: string; albumId: string; state: 'staged' }>, key, step).map((entry) => entry.key) }))));
+  write('uploadPercents', [[0, 0], [1, 3], [1, 2], [5, 1000], [999, 1000], [2, 1], [50, -1]].map(([sent, total]) => ({ input: [sent, total], expected: upload.uploadPercent(sent, total) })));
+  const base = form.newAlbumDraft('household');
+  write('albumDrafts', [
+    ['empty', {}], ['ok', { title: ' 運動会 ', description: ' お弁当 ', bgmPreset: 'bright' }], ['blank description', { title: 'a', description: '  ' }], ['selected none', { title: 'a', audience: 'selected' }],
+    ['selected', { title: 'a', audience: 'selected', selectedIds: ['member-ren'] }],
+  ].map(([name, patch]) => { const draft = { ...base, ...(patch as object) }; return { input: { name, draft }, expected: { problem: form.albumDraftProblem(draft), create: form.albumDraftToCreateInput(draft), update: form.albumDraftToUpdateInput(draft, detail.album) } }; }));
+  write('albumOriginal', detail.album);
+  write('albumToDraft', form.albumToDraft(detail.album));
+  write('bgmNotes', (['calm', 'bright', 'gentle'] as const).flatMap((preset) => [0, 1, 2, 3, 4, 7].map((bar) => ({ input: { preset, bar }, expected: { notes: bgm.barNotes(preset, bar), seconds: bgm.barSeconds(preset) } }))));
+}

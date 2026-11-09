@@ -44,6 +44,9 @@ final class FamilyHubUITests: XCTestCase {
       XCTAssertTrue(app.staticTexts["家族のメモ"].waitForExistence(timeout: 5))
       app.tabBars.buttons["その他"].tap()
       XCTAssertTrue(app.buttons["アルバム"].waitForExistence(timeout: 5))
+      app.buttons["アルバム"].tap()
+      XCTAssertTrue(app.staticTexts["家族のアルバム"].waitForExistence(timeout: 5))
+      app.navigationBars.buttons.element(boundBy: 0).tap()
       app.buttons["設定"].tap()
       XCTAssertTrue(app.buttons["接続先を選び直す"].waitForExistence(timeout: 5))
       // 今日の画面から、その他の中の画面（家計）へ移る。

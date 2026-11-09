@@ -7,6 +7,9 @@ public final class SampleGateway: FamilyHubGateway {
   public var mode: GatewayMode { .sample }
 
   public init(engine: SampleEngine) { self.engine = engine }
+
+  /// 見本で送ったファイル（fh-file://<ref>）の、この端末の中の場所。
+  private let files = SampleFiles()
   public convenience init(actorId: Id = "member-aoi") throws { self.init(engine: try SampleEngine(actorId: actorId)) }
 
   /// 見本をはじめの状態に戻す。
@@ -57,6 +60,53 @@ public final class SampleGateway: FamilyHubGateway {
   public func settleAll(_ input: SettleAllInput, idempotencyKey: String) async -> GatewayResult<SettlementBatch> { await invoke(.settleAll, input, idempotencyKey) }
   public func reverseBatch(id: Id, idempotencyKey: String) async -> GatewayResult<SettlementBatch> { await invoke(.reverseBatch, id, idempotencyKey) }
   public func readReceipt(_ file: UploadFile) async -> GatewayResult<AssistantJob> { await invoke(.readReceipt, SampleFile(file)) }
+
+  public func listAlbums() async -> GatewayResult<[AlbumSummary]> { await invoke(.listAlbums) }
+  public func getAlbum(id: Id) async -> GatewayResult<AlbumDetail> { await invoke(.getAlbum, id) }
+  public func createAlbum(_ input: AlbumInput, idempotencyKey: String) async -> GatewayResult<Album> { await invoke(.createAlbum, input) }
+  public func updateAlbum(id: Id, input: AlbumUpdateInput, expectedVersion: Int) async -> GatewayResult<Album> { await invoke(.updateAlbum, id, input, expectedVersion) }
+  public func deleteAlbum(id: Id, expectedVersion: Int) async -> GatewayResult<Empty> { await invoke(.deleteAlbum, id, expectedVersion) }
+  public func restoreAlbum(id: Id) async -> GatewayResult<Album> { await invoke(.restoreAlbum, id) }
+  public func reorderItems(albumId: Id, itemIds: [Id], expectedVersion: Int) async -> GatewayResult<Album> { await invoke(.reorderItems, albumId, itemIds, expectedVersion) }
+  public func deleteItem(albumId: Id, itemId: Id) async -> GatewayResult<Empty> { await invoke(.deleteItem, albumId, itemId) }
+  public func restoreItem(albumId: Id, itemId: Id) async -> GatewayResult<AlbumItem> { await invoke(.restoreItem, albumId, itemId) }
+
+  struct UploadOptions: Encodable, Sendable { var keepLocation: Bool; var thumbnail: SampleFile? }
+  struct UploadedItem: Decodable, Sendable { var itemId: Id }
+
+  /// 見本は一度に受け取る。送ったファイルは記憶の中の見本と一緒に、この端末の一時の場所に残す（アプリを閉じると消える）。
+  public func uploadItem(albumId: Id, source: UploadSource, keepLocation: Bool, thumbnail: Data?, ticket: UploadTicket, progress: @escaping UploadProgress) async -> GatewayResult<Id> {
+    let ref = UUID().uuidString
+    let thumbRef = UUID().uuidString
+    let head = (try? source.chunk(at: 0, length: 64)) ?? Data()
+    let file = SampleFile(name: source.name, type: source.type, size: source.size, head: head, ref: ref)
+    let thumb = thumbnail.map { SampleFile(name: "thumbnail.jpg", type: "image/jpeg", size: $0.count, head: $0.prefix(64), ref: thumbRef) }
+    let result: GatewayResult<UploadedItem> = await invoke(.uploadItem, albumId, file, UploadOptions(keepLocation: keepLocation, thumbnail: thumb))
+    guard case .success(let uploaded) = result else { if case .failure(let error) = result { return .failure(error) }; return .failure(GatewayFailure.response) }
+    await files.keep(ref, copying: source.url)
+    if let thumbnail { await files.keep(thumbRef, data: thumbnail) }
+    progress(source.size, source.size)
+    return .success(uploaded.itemId)
+  }
+
+  public func cancelUpload(ticket: UploadTicket) async -> GatewayResult<Empty> { .success(Empty()) }
+
+  public func mediaSource(albumId: Id, itemId: Id, variant: MediaVariant) -> MediaSource {
+    let url = engine.mediaURL(albumId: albumId, itemId: itemId, variant: variant.rawValue)
+    if url.hasPrefix("fh-file://"), let local = files.url(String(url.dropFirst("fh-file://".count))) { return .local(local) }
+    return .sampleArt(id: itemId)
+  }
+
+  public func downloadMedia(_ source: MediaSource, fileName: String) async -> GatewayResult<URL> {
+    guard case .local(let url) = source else { return .failure(AttachmentFiles.unavailable) }
+    let destination = AttachmentFiles.destination(for: fileName)
+    do {
+      let copy = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+      try FileManager.default.copyItem(at: url, to: copy)
+      try AttachmentFiles.place(copy, at: destination)
+      return .success(destination)
+    } catch { return .failure(AttachmentFiles.unavailable) }
+  }
 
   public func getAssistantStatus() async -> GatewayResult<AssistantStatus> { await invoke(.getAssistantStatus) }
   public func readEventImage(_ file: UploadFile) async -> GatewayResult<AssistantJob> { await invoke(.readEventImage, SampleFile(file)) }
@@ -121,5 +171,31 @@ struct SampleFile: Encodable, Sendable {
   var __file: Body
   init(_ file: UploadFile) {
     __file = Body(name: file.name, type: file.type, size: file.size, head: file.data.prefix(64).base64EncodedString(), ref: UUID().uuidString)
+  }
+  init(name: String, type: String, size: Int, head: Data, ref: String) {
+    __file = Body(name: name, type: type, size: size, head: head.prefix(64).base64EncodedString(), ref: ref)
+  }
+}
+
+/// 見本で送ったファイルの置き場所。ref ごとに、一時の場所の写しを持つ。
+final class SampleFiles: @unchecked Sendable {
+  private let lock = NSLock()
+  private var urls: [String: URL] = [:]
+  private let folder = FileManager.default.temporaryDirectory.appendingPathComponent("fh-sample-uploads", isDirectory: true)
+
+  func url(_ ref: String) -> URL? { lock.withLock { urls[ref] } }
+
+  func keep(_ ref: String, copying source: URL) async {
+    try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let target = folder.appendingPathComponent("\(ref).\(source.pathExtension)")
+    guard (try? FileManager.default.copyItem(at: source, to: target)) != nil else { return }
+    lock.withLock { urls[ref] = target }
+  }
+
+  func keep(_ ref: String, data: Data) async {
+    try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let target = folder.appendingPathComponent("\(ref).jpg")
+    guard (try? data.write(to: target)) != nil else { return }
+    lock.withLock { urls[ref] = target }
   }
 }
