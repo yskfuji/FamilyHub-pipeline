@@ -1,8 +1,18 @@
-# family-hub-reference
+<p align="center">
+  <img src="docs/brand/logo.png" alt="よりどころ" width="160" />
+</p>
 
-家族向けライフマネジメント製品「よりどころ」の参照実装です。画面（`src/`）に加えて、実際の API サーバー（`server/`）があります。東京の架空4人家族とゲスト、固定日時を用いるモックのデモと、SQLite に保存する実スタックの両方で動きます。
+# よりどころ（family-hub-reference）
+
+家族の予定・タスク・メモ・家計をまとめて確認する、家族向けライフマネジメント製品の参照実装です。
 
 **これは本番で安全と宣言するものではありません。** 外部の侵入試験、実利用者の評価、実機の VoiceOver、法務の確認は行っていません。未確認の項目は [証拠台帳](docs/evidence-register.md) を参照してください。
+
+<p align="center">
+  <img src="docs/brand/window-today.png" alt="今日の画面（架空デモ）" width="720" />
+</p>
+
+画面（`src/`）に加えて、実際の API サーバー（`server/`）があります。東京の架空4人家族とゲスト、固定日時を用いるモックのデモと、SQLite に保存する実スタックの両方で動きます。
 
 ## 必要なもの
 
